@@ -1042,12 +1042,12 @@ function renderSalesPeriod() {
   const datasets=[]; let i=0;
   salesSel.forEach(id => {
     const p = products.find(x=>x.id===id); if(!p)return;
-    const d = makeTotalSalesData(p, def, sYear).slice(0,def.len);
+    const d = makeTotalSalesData(p, def, salesYear).slice(0,def.len);
     datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2,pointRadius:4,pointHoverRadius:6,tension:.35,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
   });
   if(salesChart) salesChart.destroy();
   salesChart = makeChart('salesChart', def.labels, datasets);
-  const all=[]; salesSel.forEach(id=>{const p=products.find(x=>x.id===id);if(p)all.push(...makeTotalSalesData(p,def,sYear));});
+  const all=[]; salesSel.forEach(id=>{const p=products.find(x=>x.id===id);if(p)all.push(...makeTotalSalesData(p,def,salesYear));});
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
   document.getElementById('salesSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
   document.getElementById('salesCurLbl').textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
@@ -1224,12 +1224,12 @@ function renderRgPeriod(){
   const datasets=[];let i=0;
   rgSel.forEach(id=>{
     const p=rgProducts.find(x=>x.id===id);if(!p)return;
-    const d=makeSalesData(p,def,rYear).slice(0,def.len);
+    const d=makeSalesData(p,def,rgYear).slice(0,def.len);
     datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2,pointRadius:4,pointHoverRadius:6,tension:.35,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
   });
   if(rgChart)rgChart.destroy();
   rgChart=makeChart('rgChart',def.labels,datasets);
-  const all=[];rgSel.forEach(id=>{const p=rgProducts.find(x=>x.id===id);if(p)all.push(...makeSalesData(p,def,rYear));});
+  const all=[];rgSel.forEach(id=>{const p=rgProducts.find(x=>x.id===id);if(p)all.push(...makeSalesData(p,def,rgYear));});
   const tot=all.reduce((a,b)=>a+b,0),avg=all.length?Math.round(tot/all.length):0;
   document.getElementById('rgSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${rgSel.size}개</div></div><div class="sc"><div class="sl">합계(박스)</div><div class="sv">${tot}박스</div></div><div class="sc"><div class="sl">평균(박스)</div><div class="sv">${avg}박스</div></div><div class="sc"><div class="sl">최대(박스)</div><div class="sv">${all.length?Math.max(...all):0}박스</div></div>`;
   document.getElementById('rgCurLbl').textContent=`조회: ${periodName(rgPeriod,rgYear)}`;
@@ -1454,11 +1454,13 @@ function _buildPreview(rows){
   if(type==='inv'){
     html=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr><th style="${thStyle}">코드</th><th style="${thStyle}">상품명</th><th style="${thStyle}">구분</th><th style="${thStyle}text-align:right;">박스/수량</th><th style="${thStyle}text-align:right;">현재고</th><th style="${thStyle}">처리</th></tr></thead><tbody>`;
     rows.forEach(r=>{
-      const code=String(r[0]||'').trim(),name=String(r[1]||'').trim(),boxQty=parseInt(r[2])||1,stock=parseInt(r[3])||0;
+      const code=String(r[0]||'').trim(),name=String(r[1]||'').trim();
+      const typeVal=String(r[2]||'').trim()||'기타';
+      const boxQty=parseInt(r[3])||1, stock=parseInt(r[4])||0;
       if(!code||!name){err++;return;}
       const exists=products.find(p=>p.code===code);
       const tag=exists?`<span style="background:#EEF4FF;color:#185FA5;padding:2px 6px;border-radius:4px;font-size:10px;">재고갱신</span>`:`<span style="background:#ECFDF5;color:#059669;padding:2px 6px;border-radius:4px;font-size:10px;">신규등록</span>`;
-      _pendingRows.push({code,name,boxQty,stock,exists});ok++;
+      _pendingRows.push({code,name,typeVal,boxQty,stock,exists});ok++;
       html+=`<tr><td style="${tdStyle}font-family:monospace;">${code}</td><td style="${tdStyle}">${name}</td><td style="${tdStyle}text-align:right;">${boxQty}</td><td style="${tdStyle}text-align:right;font-weight:500;">${stock.toLocaleString()}</td><td style="${tdStyle}">${tag}</td></tr>`;
     });
     html+='</tbody></table>';
