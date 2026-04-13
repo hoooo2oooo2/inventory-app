@@ -614,6 +614,7 @@ document.getElementById('rgUpdLbl').textContent = '최근 갱신: '+fmtFull(now)
 // LOCAL STATE (DB에서 로드)
 // ═══════════════════════════════════════════════
 let products = [], receiveList = [], doneList = [], rgProducts = [], historyLog = [];
+let dailySales = {}; // {code: {YYYY-MM-DD: qty}}
 let invSort = 'code', invDir = 1, ioTarget = null;
 let salesPeriod = 'daily', salesYear = CUR_YEAR, salesSel = new Set();
 let rgPeriod = 'daily', rgYear = CUR_YEAR, rgSel = new Set();
@@ -684,7 +685,24 @@ function mapRecv(r){
     done:r.done||false,doneTime:r.done_time||''};
 }
 
+async function loadDailySales(code, startDate, endDate){
+  // 특정 코드의 일별 데이터 로드 (그래프용)
+  let q = sb.from('daily_sales').select('code,sale_date,qty').order('sale_date');
+  if(code) q = q.eq('code', code);
+  if(startDate) q = q.gte('sale_date', startDate);
+  if(endDate) q = q.lte('sale_date', endDate);
+  const {data, error} = await q.limit(5000);
+  if(error){ console.error('daily_sales load error:', error); return {}; }
+  const result = {};
+  (data||[]).forEach(r=>{
+    if(!result[r.code]) result[r.code] = {};
+    result[r.code][r.sale_date] = (result[r.code][r.sale_date]||0) + r.qty;
+  });
+  return result;
+}
+
 async function loadAll() {
+  // daily_sales는 필요할 때 로드 (전체 로드 시 너무 큼)
   await Promise.all([loadProducts(), loadReceive(), loadRg(), loadHist()]);
   // 로드된 데이터에서 실제 보유 연도 자동 추출
   products.forEach(p=>{
@@ -697,7 +715,7 @@ async function loadAll() {
   refreshYearSelects();
   renderInv(); updateFloat();
   if(products.length > 0) {
-    salesSel = new Set([products[0].id]);
+    salesSel = new Set([products[0].id]); // 기본 첫번째 제품만 선택
   }
   if(rgProducts.length > 0) {
     rgSel = new Set(rgProducts.map(p => p.id));
@@ -971,6 +989,24 @@ function getThisWeekDays() {
   while(c<5){if(d.getDay()>=1&&d.getDay()<=5){days.unshift(`${d.getMonth()+1}/${d.getDate()}(${DNAMES[d.getDay()]})`);c++;}d.setDate(d.getDate()-1);}
   return days;
 }
+function getDateRange(yr, per){
+  const today = new Date();
+  if(per==='daily'){
+    const days=[];let d=new Date(today),c=0;
+    while(c<5){if(d.getDay()>=1&&d.getDay()<=5){days.unshift(fmtDate(d));c++;}d.setDate(d.getDate()-1);}
+    return {start:days[0], end:days[days.length-1], days};
+  }
+  if(per==='lastweek'){
+    const days=[];const d=new Date(today);d.setDate(d.getDate()-7);
+    while(d.getDay()!==1)d.setDate(d.getDate()-1);
+    for(let i=0;i<5;i++){const dd=new Date(d);dd.setDate(d.getDate()+i);days.push(fmtDate(dd));}
+    return {start:days[0], end:days[4], days};
+  }
+  if(per==='weekly'){return {start:`${yr}-01-01`,end:`${yr}-12-31`,days:null};}
+  const qMap={q1:{s:'01-01',e:'03-31'},q2:{s:'04-01',e:'06-30'},q3:{s:'07-01',e:'09-30'},q4:{s:'10-01',e:'12-31'}};
+  const q=qMap[per];
+  return q?{start:`${yr}-${q.s}`,end:`${yr}-${q.e}`,days:null}:{start:`${yr}-01-01`,end:`${yr}-12-31`,days:null};
+}
 function getPeriodDef(yr, per) {
   const isCur=yr===CUR_YEAR, cm=now.getMonth();
   if(per==='lastweek'){const lb=getLastWeekDays();return{labels:lb,len:lb.length};}
@@ -1008,7 +1044,7 @@ function makeChart(canvasId, labels, datasets) {
     type:'line', data:{labels, datasets},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{backgroundColor:isDark?'#1e1e1e':'#fff',titleColor:isDark?'#eee':'#222',bodyColor:isDark?'#ccc':'#555',borderColor:isDark?'rgba(255,255,255,.15)':'rgba(0,0,0,.1)',borderWidth:1,padding:10,
-        callbacks:{label:ctx=>`  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}개`}}},
+        callbacks:{label:ctx=>`  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}개`},title:ctx=>ctx[0]?.label||''}}},
       scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11},autoSkip:false,maxRotation:35}},
         y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>`${v.toLocaleString()}개`},beginAtZero:false}}}
   });
@@ -1025,6 +1061,45 @@ function setSalesPeriod(p) {
   yrSel.disabled=['daily','lastweek'].includes(p); yrSel.style.opacity=['daily','lastweek'].includes(p)?'.45':'1';
   renderSalesPeriod();
 }
+function _renderSPWithDaily(def, dailyData, range){
+  const datasets=[]; let i=0;
+  salesSel.forEach(id=>{
+    const p=products.find(x=>x.id===id);if(!p)return;
+    const pDailyData = dailyData[p.code] || {};
+    let data;
+    if(salesPeriod==='daily'||salesPeriod==='lastweek'){
+      // 일별: labels가 날짜 배열
+      data = def.labels.map(lbl=>{
+        // lbl 형식: "4/7(월)" → range.days 배열에서 매핑
+        const dayIdx = def.labels.indexOf(lbl);
+        const dateStr = range.days ? range.days[dayIdx] : null;
+        return dateStr ? (pDailyData[dateStr]||0) : 0;
+      });
+    } else {
+      // 주별: 각 주의 합산
+      data = def.labels.map((lbl, wIdx)=>{
+        const weekStart = new Date(salesYear, 0, 1 + wIdx*7);
+        let weekSum = 0;
+        for(let d=0;d<7;d++){
+          const dd = new Date(weekStart); dd.setDate(weekStart.getDate()+d);
+          const ds = fmtDate(dd);
+          weekSum += pDailyData[ds]||0;
+        }
+        return weekSum;
+      });
+    }
+    datasets.push({label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
+  });
+  if(salesChart) salesChart.destroy();
+  salesChart = makeChart('salesChart', def.labels, datasets);
+  // 요약 카드
+  const all=datasets.flatMap(d=>d.data);
+  const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
+  document.getElementById('salesSumRow').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
+  document.getElementById('salesCurLbl').textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
+  document.getElementById('salesLegend').innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
+}
+
 function salesYrChange() { salesYear=parseInt(document.getElementById('salesYrSel').value); renderSalesPeriod(); }
 
 // 전체 판매 데이터 (일반 + RG 합산)
@@ -1039,17 +1114,26 @@ function makeTotalSalesData(p, def, year) {
 function renderSalesPeriod() {
   if(!products.length) return;
   const def = getPeriodDef(salesYear, salesPeriod);
+  const useDailyMode = ['daily','lastweek','weekly'].includes(salesPeriod);
+  if(useDailyMode){
+    const range = getDateRange(salesYear, salesPeriod);
+    const selCodes = [...salesSel].map(id=>products.find(x=>x.id===id)?.code).filter(Boolean);
+    loadDailySales(selCodes.length===1?selCodes[0]:null, range.start, range.end).then(dailyData=>{
+      _renderSPWithDaily(def, dailyData, range);
+    });
+    return;
+  }
   const datasets=[]; let i=0;
-  salesSel.forEach(id => {
-    const p = products.find(x=>x.id===id); if(!p)return;
+  salesSel.forEach(id=>{
+    const p=products.find(x=>x.id===id);if(!p)return;
     const d = makeTotalSalesData(p, def, salesYear).slice(0,def.len);
-    datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2,pointRadius:4,pointHoverRadius:6,tension:.35,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
+    datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
   });
   if(salesChart) salesChart.destroy();
   salesChart = makeChart('salesChart', def.labels, datasets);
-  const all=[]; salesSel.forEach(id=>{const p=products.find(x=>x.id===id);if(p)all.push(...makeTotalSalesData(p,def,salesYear));});
+  const all=datasets.flatMap(d=>d.data);
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
-  document.getElementById('salesSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
+  document.getElementById('salesSumRow').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
   document.getElementById('salesCurLbl').textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
   document.getElementById('salesLegend').innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
 }
@@ -1468,7 +1552,7 @@ function _buildPreview(rows){
     html=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr><th style="${thStyle}">날짜</th><th style="${thStyle}">코드</th><th style="${thStyle}">상품명</th><th style="${thStyle}text-align:right;">출고수량</th><th style="${thStyle}">반영월</th></tr></thead><tbody>`;
     rows.forEach(r=>{
       const _rawDate0=r[0];const dateStr=_parseDateStr(_rawDate0),code=String(r[1]||'').trim(),name=String(r[2]||'').trim(),qty=parseInt(r[3])||0;
-      if(!code||!qty){err++;return;}
+      if(!code){err++;return;} if(!qty||qty===0){return;} // 0출고는 조용히 건너뜀
       const mIdx=_parseMonthIdx(_rawDate0||_rawDate1||_rawDate2||dateStr);
       const yr0=_parseYear(_rawDate0||dateStr); trackYear(yr0); _pendingRows.push({code,name,qty,mIdx,year:yr0,dateStr});ok++;
       html+=`<tr><td style="${tdStyle}color:var(--tx2);">${dateStr}</td><td style="${tdStyle}font-family:monospace;">${code}</td><td style="${tdStyle}">${name}</td><td style="${tdStyle}text-align:right;font-weight:500;">${qty.toLocaleString()}개</td><td style="${tdStyle}color:${mIdx>=0?'#059669':'#DC2626'};">${mIdx>=0?(yr0+'년 '+MN[mIdx]):'날짜오류'}</td></tr>`;
@@ -1492,7 +1576,7 @@ function _buildPreview(rows){
     html=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr><th style="${thStyle}">날짜</th><th style="${thStyle}">코드</th><th style="${thStyle}">상품명</th><th style="${thStyle}text-align:right;">박스수</th><th style="${thStyle}">반영월</th></tr></thead><tbody>`;
     rows.forEach(r=>{
       const _rawDate2=r[0];const dateStr=_parseDateStr(_rawDate2),code=String(r[1]||'').trim(),name=String(r[2]||'').trim(),boxes=parseInt(r[3])||0;
-      if(!code||!boxes){err++;return;}
+      if(!code){err++;return;} if(!boxes||boxes===0){return;}
       const mIdx=_parseMonthIdx(_rawDate0||_rawDate1||_rawDate2||dateStr);
       const yr2=_parseYear(_rawDate2||dateStr); trackYear(yr2); _pendingRows.push({code,name,boxes,mIdx,year:yr2,dateStr});ok++;
       html+=`<tr><td style="${tdStyle}color:var(--tx2);">${dateStr}</td><td style="${tdStyle}font-family:monospace;">${code}</td><td style="${tdStyle}">${name}</td><td style="${tdStyle}text-align:right;font-weight:500;">${boxes}박스</td><td style="${tdStyle}color:#059669;">${mIdx>=0?MN[mIdx]:'날짜오류'}</td></tr>`;
@@ -1561,6 +1645,20 @@ async function confirmUpload(){
         await sb.from('products').update(updateData).eq('id',parseInt(id));
         const p=products.find(x=>x.id===parseInt(id));
         if(p){for(const[yr,monthly] of Object.entries(yrs)){p[`monthly_${yr}`]=monthly;}}
+      }
+      // daily_sales 테이블에도 저장 (일별 그래프용)
+      const dailyInserts = _pendingRows
+        .filter(r=>r.mIdx>=0&&r.qty>0&&r.dateStr)
+        .map(r=>({code:r.code,name:r.name,sale_date:r.dateStr,qty:r.qty}));
+      if(dailyInserts.length>0){
+        // 중복 방지: upsert (같은 date+code는 qty 합산)
+        // 배치로 100개씩 insert
+        for(let b=0;b<dailyInserts.length;b+=100){
+          await sb.from('daily_sales').upsert(
+            dailyInserts.slice(b,b+100),
+            {onConflict:'code,sale_date',ignoreDuplicates:false}
+          );
+        }
       }
       await addHistory({menu:'판매분석',type:'upload',code:'MULTI',name:`${_pendingRows.length}건`,desc:'출고 데이터 업로드',before:'-',after:`${Object.keys(upd).length}개 상품 반영`,user:'업로드'});
       if(currentPage==='sales'){renderSalesPeriod();renderSalesTbody();}
