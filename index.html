@@ -1076,7 +1076,7 @@ function _renderSPWithMonthly(def){
 function _updateSalesSummary(datasets){
   const all=datasets.flatMap(d=>d.data||[]);
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
-  const sumEl=document.getElementById('salesSumRow');
+  const sumEl=document.getElementById('salesSum');
   if(sumEl) sumEl.innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
   const lbl=document.getElementById('salesCurLbl');
   if(lbl) lbl.textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
@@ -1118,7 +1118,7 @@ function _renderSPWithDaily(def, dailyData, range){
   // 요약 카드
   const all=datasets.flatMap(d=>d.data);
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
-  document.getElementById('salesSumRow').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
+  document.getElementById('salesSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
   document.getElementById('salesCurLbl').textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
   document.getElementById('salesLegend').innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
 }
@@ -1158,7 +1158,7 @@ function renderSalesPeriod() {
   salesChart = makeChart('salesChart', def.labels, datasets);
   const all=datasets.flatMap(d=>d.data);
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
-  document.getElementById('salesSumRow').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
+  document.getElementById('salesSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
   document.getElementById('salesCurLbl').textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
   document.getElementById('salesLegend').innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
 }
@@ -1570,16 +1570,16 @@ function _buildPreview(rows){
       const exists=products.find(p=>p.code===code);
       const tag=exists?`<span style="background:#EEF4FF;color:#185FA5;padding:2px 6px;border-radius:4px;font-size:10px;">재고갱신</span>`:`<span style="background:#ECFDF5;color:#059669;padding:2px 6px;border-radius:4px;font-size:10px;">신규등록</span>`;
       _pendingRows.push({code,name,typeVal,boxQty,stock,exists});ok++;
-      html+=`<tr><td style="${tdStyle}font-family:monospace;">${code}</td><td style="${tdStyle}">${name}</td><td style="${tdStyle}text-align:right;">${boxQty}</td><td style="${tdStyle}text-align:right;font-weight:500;">${stock.toLocaleString()}</td><td style="${tdStyle}">${tag}</td></tr>`;
+      html+=`<tr><td style="${tdStyle}font-family:monospace;">${code}</td><td style="${tdStyle}">${name}</td><td style="${tdStyle}">${typeVal}</td><td style="${tdStyle}text-align:right;">${boxQty}</td><td style="${tdStyle}text-align:right;font-weight:500;">${stock.toLocaleString()}</td><td style="${tdStyle}">${tag}</td></tr>`;
     });
     html+='</tbody></table>';
   } else if(type==='sales'){
     html=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr><th style="${thStyle}">날짜</th><th style="${thStyle}">코드</th><th style="${thStyle}">상품명</th><th style="${thStyle}text-align:right;">출고수량</th><th style="${thStyle}">반영월</th></tr></thead><tbody>`;
     rows.forEach(r=>{
       const _rawDate0=r[0];const dateStr=_parseDateStr(_rawDate0),code=String(r[1]||'').trim(),name=String(r[2]||'').trim(),qty=parseInt(r[3])||0;
-      if(!code){err++;return;} if(!qty||qty===0){return;} // 0출고는 조용히 건너뜀
-      const mIdx=_parseMonthIdx(_rawDate0||_rawDate1||_rawDate2||dateStr);
-      const yr0=_parseYear(_rawDate0||dateStr); trackYear(yr0); _pendingRows.push({code,name,qty,mIdx,year:yr0,dateStr});ok++;
+      if(!code){err++;return;} if(!qty||qty===0){return;}
+      const mIdx=_parseMonthIdx(_rawDate0);
+      const yr0=_parseYear(_rawDate0); trackYear(yr0, true); _pendingRows.push({code,name,qty,mIdx,year:yr0,dateStr});ok++;
       html+=`<tr><td style="${tdStyle}color:var(--tx2);">${dateStr}</td><td style="${tdStyle}font-family:monospace;">${code}</td><td style="${tdStyle}">${name}</td><td style="${tdStyle}text-align:right;font-weight:500;">${qty.toLocaleString()}개</td><td style="${tdStyle}color:${mIdx>=0?'#059669':'#DC2626'};">${mIdx>=0?(yr0+'년 '+MN[mIdx]):'날짜오류'}</td></tr>`;
     });
     html+='</tbody></table>';
@@ -1602,8 +1602,8 @@ function _buildPreview(rows){
     rows.forEach(r=>{
       const _rawDate2=r[0];const dateStr=_parseDateStr(_rawDate2),code=String(r[1]||'').trim(),name=String(r[2]||'').trim(),boxes=parseInt(r[3])||0;
       if(!code){err++;return;} if(!boxes||boxes===0){return;}
-      const mIdx=_parseMonthIdx(_rawDate0||_rawDate1||_rawDate2||dateStr);
-      const yr2=_parseYear(_rawDate2||dateStr); trackYear(yr2); _pendingRows.push({code,name,boxes,mIdx,year:yr2,dateStr});ok++;
+      const mIdx=_parseMonthIdx(_rawDate2);
+      const yr2=_parseYear(_rawDate2); trackYear(yr2, true); _pendingRows.push({code,name,boxes,mIdx,year:yr2,dateStr});ok++;
       html+=`<tr><td style="${tdStyle}color:var(--tx2);">${dateStr}</td><td style="${tdStyle}font-family:monospace;">${code}</td><td style="${tdStyle}">${name}</td><td style="${tdStyle}text-align:right;font-weight:500;">${boxes}박스</td><td style="${tdStyle}color:#059669;">${mIdx>=0?MN[mIdx]:'날짜오류'}</td></tr>`;
     });
     html+='</tbody></table>';
@@ -1626,8 +1626,8 @@ async function confirmUpload(){
       for(const row of _pendingRows){
         const exists=products.find(p=>p.code===row.code);
         if(exists){
-          await sb.from('products').update({stock:row.stock,box_qty:row.boxQty,type:row.typeVal||exists.type}).eq('id',exists.id); exists.stock=row.stock;exists.boxQty=row.boxQty;if(row.typeVal)exists.type=row.typeVal;
-          exists.stock=row.stock;exists.boxQty=row.boxQty;
+          await sb.from('products').update({stock:row.stock,box_qty:row.boxQty,type:row.typeVal||exists.type}).eq('id',exists.id);
+          exists.stock=row.stock; exists.boxQty=row.boxQty; if(row.typeVal) exists.type=row.typeVal;
         } else {
           const{data}=await sb.from('products').insert({code:row.code,name:row.name,type:row.typeVal||'기타',stock:row.stock,box_qty:row.boxQty,lead_time:1,reorder_point:0,discontinued:false,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)}).select();
           if(data?.[0])products.push(mapProd(data[0]));
@@ -1727,8 +1727,9 @@ async function confirmUpload(){
       await addHistory({menu:'로켓그로스',type:'upload',code:'MULTI',name:`${_pendingRows.length}건`,desc:'로켓그로스 출고 업로드',before:'-',after:`${Object.keys(upd).length}개 반영`,user:'업로드'});
       if(currentPage==='rg'){renderRgPeriod();renderRgTbody();renderTop5();}
     }
-    closeModal('uploadModal');_pendingRows=[];
-    alert(`✅ ${_pendingRows.length||'업로드'} 완료!\n저장 시간: ${fmtFull(new Date())}`);
+    const _uploaded = _pendingRows.length;
+    closeModal('uploadModal'); _pendingRows=[];
+    alert(`✅ ${_uploaded}건 업로드 완료!\n저장 시간: ${fmtFull(new Date())}`);
     if(currentPage==='hist'){await loadHist();renderHist();}
   } catch(err){
     alert('저장 오류: '+err.message);
