@@ -1037,10 +1037,12 @@ function makeSalesData(p_or_arr, def, year) {
 }
 
 function makeChart(canvasId, labels, datasets) {
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return null; // null 가드
   const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
   const gc = isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
   const tc = isDark?'#888':'#aaa';
-  return new Chart(document.getElementById(canvasId), {
+  return new Chart(canvas, {
     type:'line', data:{labels, datasets},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{backgroundColor:isDark?'#1e1e1e':'#fff',titleColor:isDark?'#eee':'#222',bodyColor:isDark?'#ccc':'#555',borderColor:isDark?'rgba(255,255,255,.15)':'rgba(0,0,0,.1)',borderWidth:1,padding:10,
@@ -1074,6 +1076,7 @@ function _renderSPWithMonthly(def){
   _updateSalesSummary(datasets);
 }
 function _updateSalesSummary(datasets){
+  if(!datasets) return;
   const all=datasets.flatMap(d=>d.data||[]);
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
   const sumEl=document.getElementById('salesSum');
@@ -1115,12 +1118,7 @@ function _renderSPWithDaily(def, dailyData, range){
   });
   if(salesChart) salesChart.destroy();
   salesChart = makeChart('salesChart', def.labels, datasets);
-  // 요약 카드
-  const all=datasets.flatMap(d=>d.data);
-  const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
-  document.getElementById('salesSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
-  document.getElementById('salesCurLbl').textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
-  document.getElementById('salesLegend').innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
+  _updateSalesSummary(datasets);
 }
 
 function salesYrChange() { salesYear=parseInt(document.getElementById('salesYrSel').value); renderSalesPeriod(); }
@@ -1144,8 +1142,17 @@ function renderSalesPeriod() {
     // 로딩 중 표시
     if(salesChart) salesChart.destroy();
     loadDailySales(selCodes.length===1?selCodes[0]:null, range.start, range.end)
-      .then(dailyData=>{ _renderSPWithDaily(def, dailyData, range); })
-      .catch(err=>{ console.error('daily load failed:', err); _renderSPWithMonthly(def); });
+      .then(dailyData=>{
+        // daily_sales에 데이터 없으면 monthly로 폴백
+        const hasData = Object.keys(dailyData).length > 0 &&
+          Object.values(dailyData).some(d=>Object.values(d).some(v=>v>0));
+        if(hasData){
+          _renderSPWithDaily(def, dailyData, range);
+        } else {
+          _renderSPWithMonthly(def); // monthly 데이터로 그래프 표시
+        }
+      })
+      .catch(err=>{ console.error('daily load err:', err); _renderSPWithMonthly(def); });
     return;
   }
   const datasets=[]; let i=0;
@@ -1158,9 +1165,7 @@ function renderSalesPeriod() {
   salesChart = makeChart('salesChart', def.labels, datasets);
   const all=datasets.flatMap(d=>d.data);
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
-  document.getElementById('salesSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
-  document.getElementById('salesCurLbl').textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
-  document.getElementById('salesLegend').innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
+  _updateSalesSummary(datasets);
 }
 
 function renderSalesTbody() {
