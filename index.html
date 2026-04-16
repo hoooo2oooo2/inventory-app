@@ -560,11 +560,11 @@ const CUR_YEAR = now.getFullYear();
 // ── 동적 연도 관리 시스템 ──
 // 데이터가 있는 연도 자동 추적 (업로드·로드 시 자동 등록)
 const DATA_YEARS = new Set([CUR_YEAR-1, CUR_YEAR]);
-function trackYear(yr){
+function trackYear(yr, skipRefresh){
   if(!yr||isNaN(yr)||yr<2000||yr>9999) return;
   if(!DATA_YEARS.has(yr)){
     DATA_YEARS.add(yr);
-    refreshYearSelects();
+    if(!skipRefresh) refreshYearSelects(); // skipRefresh=true면 배치 처리
   }
 }
 // 연도 선택 드롭다운 자동 갱신
@@ -638,7 +638,7 @@ function mapProd(r){
   // DB에 있는 모든 연도 컬럼 자동 매핑
   Object.keys(r).forEach(k=>{
     const m1 = k.match(/^monthly_(\d{4,})$/);
-    if(m1){ obj[k] = r[k]||Array(12).fill(0); trackYear(parseInt(m1[1])); }
+    if(m1){ obj[k] = r[k]||Array(12).fill(0); trackYear(parseInt(m1[1]), true); }
     const m2 = k.match(/^rg_monthly_(\d{4,})$/);
     if(m2){ obj[`rg_${m2[1]}`] = r[k]||Array(12).fill(0); }
   });
@@ -705,14 +705,15 @@ async function loadAll() {
   // daily_sales는 필요할 때 로드 (전체 로드 시 너무 큼)
   await Promise.all([loadProducts(), loadReceive(), loadRg(), loadHist()]);
   // 로드된 데이터에서 실제 보유 연도 자동 추출
+  // 연도 추출 - DOM 업데이트는 마지막에 한번만
   products.forEach(p=>{
     Object.keys(p).forEach(k=>{
       const m=k.match(/^monthly_(\d+)$/);
-      if(m && p[k] && p[k].some && p[k].some(v=>v>0)) trackYear(parseInt(m[1]));
+      if(m && p[k] && Array.isArray(p[k]) && p[k].some(v=>v>0)) trackYear(parseInt(m[1]), true);
     });
   });
-  trackYear(CUR_YEAR);
-  refreshYearSelects();
+  trackYear(CUR_YEAR, true);
+  refreshYearSelects(); // 한번만 호출
   renderInv(); updateFloat();
   if(products.length > 0) {
     salesSel = new Set([products[0].id]); // 기본 첫번째 제품만 선택
@@ -1061,6 +1062,29 @@ function setSalesPeriod(p) {
   yrSel.disabled=['daily','lastweek'].includes(p); yrSel.style.opacity=['daily','lastweek'].includes(p)?'.45':'1';
   renderSalesPeriod();
 }
+// 월별 데이터로 폴백 렌더링
+function _renderSPWithMonthly(def){
+  const datasets=[]; let i=0;
+  salesSel.forEach(id=>{
+    const p=products.find(x=>x.id===id);if(!p)return;
+    const d=makeTotalSalesData(p, def, salesYear).slice(0,def.len);
+    datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
+  });
+  if(salesChart) salesChart.destroy();
+  salesChart = makeChart('salesChart', def.labels, datasets);
+  _updateSalesSummary(datasets);
+}
+function _updateSalesSummary(datasets){
+  const all=datasets.flatMap(d=>d.data||[]);
+  const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
+  const sumEl=document.getElementById('salesSumRow');
+  if(sumEl) sumEl.innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
+  const lbl=document.getElementById('salesCurLbl');
+  if(lbl) lbl.textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
+  const leg=document.getElementById('salesLegend');
+  if(leg) leg.innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
+}
+
 function _renderSPWithDaily(def, dailyData, range){
   const datasets=[]; let i=0;
   salesSel.forEach(id=>{
@@ -1118,9 +1142,11 @@ function renderSalesPeriod() {
   if(useDailyMode){
     const range = getDateRange(salesYear, salesPeriod);
     const selCodes = [...salesSel].map(id=>products.find(x=>x.id===id)?.code).filter(Boolean);
-    loadDailySales(selCodes.length===1?selCodes[0]:null, range.start, range.end).then(dailyData=>{
-      _renderSPWithDaily(def, dailyData, range);
-    });
+    // 로딩 중 표시
+    if(salesChart) salesChart.destroy();
+    loadDailySales(selCodes.length===1?selCodes[0]:null, range.start, range.end)
+      .then(dailyData=>{ _renderSPWithDaily(def, dailyData, range); })
+      .catch(err=>{ console.error('daily load failed:', err); _renderSPWithMonthly(def); });
     return;
   }
   const datasets=[]; let i=0;
