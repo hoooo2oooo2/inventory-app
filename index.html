@@ -647,7 +647,6 @@ function mapProd(r){
 // 연도별 monthly 데이터 접근 헬퍼 (완전 동적)
 function getMonthly(p, year){
   const yr = year || CUR_YEAR;
-  trackYear(yr);
   return p[`monthly_${yr}`] || Array(12).fill(0);
 }
 // 연도별 monthly 컬럼명 반환 (동적)
@@ -1045,7 +1044,7 @@ function makeChart(canvasId, labels, datasets) {
     type:'line', data:{labels, datasets},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{backgroundColor:isDark?'#1e1e1e':'#fff',titleColor:isDark?'#eee':'#222',bodyColor:isDark?'#ccc':'#555',borderColor:isDark?'rgba(255,255,255,.15)':'rgba(0,0,0,.1)',borderWidth:1,padding:10,
-        callbacks:{label:ctx=>`  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}개`},title:ctx=>ctx[0]?.label||''}}},
+        callbacks:{label:ctx=>`  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}개`}}},
       scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11},autoSkip:false,maxRotation:35}},
         y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>`${v.toLocaleString()}개`},beginAtZero:false}}}
   });
