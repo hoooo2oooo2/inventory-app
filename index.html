@@ -570,10 +570,13 @@ function trackYear(yr, skipRefresh){
 // 연도 선택 드롭다운 자동 갱신
 function refreshYearSelects(){
   const sorted=[...DATA_YEARS].sort((a,b)=>b-a);
-  ['sYrSel','rYrSel'].forEach(selId=>{
+  // salesYear/rgYear 변수 기준으로 선택값 유지
+  const curS = salesYear || parseInt(document.getElementById('salesYrSel')?.value) || CUR_YEAR;
+  const curR = rgYear   || parseInt(document.getElementById('rgYrSel')?.value)    || CUR_YEAR;
+  ['sYrSel','rYrSel'].forEach((selId,si)=>{
     const sel=document.getElementById(selId);
     if(!sel) return;
-    const cur=parseInt(sel.value)||CUR_YEAR;
+    const cur = si===0 ? curS : curR;
     sel.innerHTML='';
     sorted.forEach(yr=>{
       const o=document.createElement('option');
@@ -581,7 +584,7 @@ function refreshYearSelects(){
       if(yr===cur) o.selected=true;
       sel.appendChild(o);
     });
-    if(!sel.value) sel.value=CUR_YEAR;
+    if(!sel.value && sorted.length) sel.value=sorted[0];
   });
 }
 // 초기 AVAIL_YEARS (DB 로드 후 자동 확장)
@@ -733,11 +736,8 @@ async function loadAll() {
       const hasData = products.some(p=>getTotalMonthly(p,yr).some(v=>v>0));
       if(hasData){ salesYear = yr; rgYear = yr; break; }
     }
-    // 연도 드롭다운 선택값도 맞춤
-    const sYrEl=document.getElementById('salesYrSel');
-    if(sYrEl) sYrEl.value = salesYear;
-    const rYrEl=document.getElementById('rgYrSel');
-    if(rYrEl) rYrEl.value = rgYear;
+    // 연도 드롭다운 선택값도 맞춤 (refreshYearSelects가 salesYear 기준으로 처리)
+    refreshYearSelects();
   }
   renderInv(); updateFloat();
   if(products.length > 0) {
@@ -823,7 +823,11 @@ function goPage(p) {
     const activeBtn=document.getElementById('spt-'+salesPeriod);
     if(activeBtn) activeBtn.classList.add('active');
     const yrSel=document.getElementById('salesYrSel');
-    if(yrSel){ yrSel.disabled=['daily','lastweek'].includes(salesPeriod); yrSel.style.opacity=['daily','lastweek'].includes(salesPeriod)?'.45':'1'; yrSel.value=salesYear; }
+    if(yrSel){
+      yrSel.value=salesYear; // salesYear 변수값으로 드롭다운 맞춤
+      yrSel.disabled=['daily','lastweek'].includes(salesPeriod);
+      yrSel.style.opacity=['daily','lastweek'].includes(salesPeriod)?'.45':'1';
+    }
     renderSalesPeriod(); renderSalesTbody(); renderProdPanel();
   }
   if(p==='rg') { renderRgPeriod(); renderRgTbody(); renderRgProdPanel(); renderTop5(); }
