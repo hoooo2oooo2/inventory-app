@@ -312,20 +312,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div class="main">
   <div class="card">
     <div class="ch">
-      <div><div class="ct">발주 필요 목록</div><div class="cs" id="orderCs">제품별 판매 패턴 기반 — AI 시즌 보정 적용</div></div>
-      <button class="btn btn-pr btn-sm" onclick="recalcOrders()">재계산</button>
-    </div>
-    <div id="seasonBar"></div>
-    <div id="alertWrap"></div>
-    <div class="fbox" id="formulaBox"></div>
-    <div class="sum-row" id="orderSum"></div>
-    <div class="tw"><table>
-      <thead><tr><th>상품명</th><th>코드</th><th>구분</th><th style="text-align:right;">현재고</th><th style="text-align:right;">발주시점</th><th style="text-align:right;">예상월소진</th><th style="text-align:right;">필요수량(박스)</th><th>제품시즌</th><th>시즌보정</th><th>리드타임</th><th>긴급도</th><th class="ns" style="text-align:center;">입고등록</th></tr></thead>
-      <tbody id="orderBody"></tbody>
-    </table></div>
-  </div>
-  <div class="card">
-    <div class="ch">
       <div><div class="ct">발주 입고 체크</div><div class="cs">수정 후 확인 — 완전입고 시 완료탭 이동</div></div>
       <select class="sel" id="recvFilter" onchange="renderRecv()"><option value="">전체</option><option value="대기">대기</option><option value="부분입고">부분입고</option></select>
     </div>
@@ -345,6 +331,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <tbody id="recvDoneBody"></tbody>
       </table></div>
     </div>
+  </div>
+  <div class="card">
+    <div class="ch">
+      <div><div class="ct">발주 필요 목록</div><div class="cs" id="orderCs">제품별 판매 패턴 기반 — AI 시즌 보정 적용</div></div>
+      <button class="btn btn-pr btn-sm" onclick="recalcOrders()">재계산</button>
+    </div>
+    <div id="seasonBar"></div>
+    <div id="alertWrap"></div>
+    <div class="fbox" id="formulaBox"></div>
+    <div class="sum-row" id="orderSum"></div>
+    <div class="tw"><table>
+      <thead><tr><th>상품명</th><th>코드</th><th>구분</th><th style="text-align:right;">현재고</th><th style="text-align:right;">발주시점</th><th style="text-align:right;">예상월소진</th><th style="text-align:right;">필요수량(박스)</th><th>제품시즌</th><th>시즌보정</th><th>리드타임</th><th>긴급도</th><th class="ns" style="text-align:center;">입고등록</th></tr></thead>
+      <tbody id="orderBody"></tbody>
+    </table></div>
   </div>
 </div>
 </div>
@@ -616,7 +616,7 @@ document.getElementById('rgUpdLbl').textContent = '최근 갱신: '+fmtFull(now)
 let products = [], receiveList = [], doneList = [], rgProducts = [], historyLog = [];
 let dailySales = {}; // {code: {YYYY-MM-DD: qty}}
 let invSort = 'code', invDir = 1, ioTarget = null;
-let salesPeriod = 'daily', salesYear = CUR_YEAR, salesSel = new Set();
+let salesPeriod = 'monthly', salesYear = CUR_YEAR, salesSel = new Set();
 let rgPeriod = 'daily', rgYear = CUR_YEAR, rgSel = new Set();
 let salesChart = null, rgChart = null;
 let orderList = [], inTarget = null, floatOpen = false;
@@ -685,7 +685,6 @@ function mapRecv(r){
 }
 
 async function loadDailySales(code, startDate, endDate){
-  // 특정 코드의 일별 데이터 로드 (그래프용)
   let q = sb.from('daily_sales').select('code,sale_date,qty').order('sale_date');
   if(code) q = q.eq('code', code);
   if(startDate) q = q.gte('sale_date', startDate);
@@ -700,9 +699,24 @@ async function loadDailySales(code, startDate, endDate){
   return result;
 }
 
+// 최근 4주 daily_sales 전역 캐시 (발주계산용)
+async function loadDailyCache(){
+  const today = new Date();
+  const cutoff = new Date(today); cutoff.setDate(today.getDate()-31); // 31일치 로드
+  const {data} = await sb.from('daily_sales')
+    .select('code,sale_date,qty')
+    .gte('sale_date', fmtDate(cutoff))
+    .order('sale_date');
+  window._dailyCache = {};
+  (data||[]).forEach(r=>{
+    if(!window._dailyCache[r.code]) window._dailyCache[r.code]={};
+    window._dailyCache[r.code][r.sale_date]=(window._dailyCache[r.code][r.sale_date]||0)+r.qty;
+  });
+}
+
 async function loadAll() {
   // daily_sales는 필요할 때 로드 (전체 로드 시 너무 큼)
-  await Promise.all([loadProducts(), loadReceive(), loadRg(), loadHist()]);
+  await Promise.all([loadProducts(), loadReceive(), loadRg(), loadHist(), loadDailyCache()]);
   // 로드된 데이터에서 실제 보유 연도 자동 추출
   // 연도 추출 - DOM 업데이트는 마지막에 한번만
   products.forEach(p=>{
@@ -713,9 +727,21 @@ async function loadAll() {
   });
   trackYear(CUR_YEAR, true);
   refreshYearSelects(); // 한번만 호출
+  // 데이터 있는 연도로 salesYear 자동 선택
+  if(products.length > 0){
+    for(const yr of [...DATA_YEARS].sort((a,b)=>b-a)){
+      const hasData = products.some(p=>getTotalMonthly(p,yr).some(v=>v>0));
+      if(hasData){ salesYear = yr; rgYear = yr; break; }
+    }
+    // 연도 드롭다운 선택값도 맞춤
+    const sYrEl=document.getElementById('salesYrSel');
+    if(sYrEl) sYrEl.value = salesYear;
+    const rYrEl=document.getElementById('rgYrSel');
+    if(rYrEl) rYrEl.value = rgYear;
+  }
   renderInv(); updateFloat();
   if(products.length > 0) {
-    salesSel = new Set([products[0].id]); // 기본 첫번째 제품만 선택
+    salesSel = new Set([products[0].id]);
   }
   if(rgProducts.length > 0) {
     rgSel = new Set(rgProducts.map(p => p.id));
@@ -788,8 +814,18 @@ function goPage(p) {
   document.getElementById('addTopBtn').style.display = p==='inv' ? '' : 'none';
   document.getElementById('addTopBtn').onclick = () => openAddProd();
   document.getElementById('uploadTopBtn').onclick = () => openUpload(p);
-  if(p==='order') recalcOrders();
-  if(p==='sales') { renderSalesPeriod(); renderSalesTbody(); renderProdPanel(); }
+  if(p==='order'){
+    loadDailyCache().then(()=>recalcOrders());
+  }
+  if(p==='sales') {
+    // 현재 기간 버튼 active 표시
+    document.querySelectorAll('[id^="spt-"]').forEach(b=>b.classList.remove('active'));
+    const activeBtn=document.getElementById('spt-'+salesPeriod);
+    if(activeBtn) activeBtn.classList.add('active');
+    const yrSel=document.getElementById('salesYrSel');
+    if(yrSel){ yrSel.disabled=['daily','lastweek'].includes(salesPeriod); yrSel.style.opacity=['daily','lastweek'].includes(salesPeriod)?'.45':'1'; yrSel.value=salesYear; }
+    renderSalesPeriod(); renderSalesTbody(); renderProdPanel();
+  }
   if(p==='rg') { renderRgPeriod(); renderRgTbody(); renderRgProdPanel(); renderTop5(); }
   if(p==='hist') renderHist();
 }
@@ -812,22 +848,104 @@ function isInSeason(t) {
 // ORDER CALC
 // ═══════════════════════════════════════════════
 function calcNeeded(p) {
-  const curM = getTotalMonthly(p, CUR_YEAR);
+  const curM  = getTotalMonthly(p, CUR_YEAR);
   const prevM = getTotalMonthly(p, CUR_YEAR-1);
-  const r6 = curM.slice(Math.max(0,MONTH-5),MONTH+1);
-  const wts = [1,1.5,2,2.5,3,3.5].slice(-r6.length);
-  const wSum = wts.reduce((a,b)=>a+b,0)||1;
-  const wAvg = Math.round(r6.reduce((a,v,i)=>a+v*wts[i],0)/wSum)||0;
-  const arrM = Math.round(MONTH+p.leadTime)%12;
-  const tr = Math.min(1.5, Math.max(0.7, (curM[arrM]||1)/(prevM[arrM]||1)));
-  const expM = Math.max(wAvg, Math.round((prevM[arrM]||0)*tr));
-  const safety = Math.round(expM*1.2);
-  const needed = Math.max(0, safety+expM*p.leadTime-p.stock);
-  const corrPct = Math.round((tr-1)*100);
+
+  // ── 1. 기본 소진속도: MAX(최근7일 일평균, 최근30일 일평균×0.8) ──
+  const {avg7, avg30} = _getDailyAvgs(p.code);
+  let baseMonthly;
+  if(avg7 > 0 || avg30 > 0){
+    const dailyRate = Math.max(avg7, avg30 * 0.8); // 7일 급등 or 30일 추세
+    baseMonthly = Math.round(dailyRate * 30);
+  } else {
+    // daily 없으면 이번달 monthly 사용 (데이터 있는 연도 탐색)
+    let bestM = curM[MONTH];
+    if(!bestM){
+      for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
+        const m = getTotalMonthly(p, y);
+        if(m[MONTH]>0){ bestM=m[MONTH]; break; }
+      }
+    }
+    baseMonthly = bestM || 0;
+  }
+
+  // ── 2. 작년 시즌 배율 계산 ──
+  const prevAvg = prevM.reduce((a,b)=>a+b,0) / 12 || 1;
+  // 도착 예정월 기준 시즌 배율
+  const arrM = Math.round(MONTH + p.leadTime) % 12;
+  const prevAtArr = prevM[arrM] || 0;
+  const seasonRatio = Math.min(2.5, Math.max(0.5, prevAtArr / prevAvg));
+  // 작년 데이터 없으면 배율 1.0
+  const hasPrevData = prevM.some(v=>v>0);
+
+  // ── 3. 시즌 보정 적용 ──
+  // 도착 예정월이 피크이면 baseMonthly에 시즌 배율 적용
+  let expM;
+  if(hasPrevData && seasonRatio > 1.15){
+    // 성수기 접근: 작년 해당월 기준과 최근 실적 중 큰 값
+    const prevBased = Math.round(prevAtArr * (baseMonthly / (prevM[MONTH]||baseMonthly||1)));
+    expM = Math.max(baseMonthly, prevBased);
+  } else if(hasPrevData && seasonRatio < 0.85){
+    // 비수기: 작년 비수기 비율 반영하되 최소 baseMonthly의 70%
+    expM = Math.max(Math.round(baseMonthly * 0.7), Math.round(prevAtArr));
+  } else {
+    expM = baseMonthly;
+  }
+  expM = Math.max(expM, 1); // 최소 1개
+
+  // ── 4. 사전 알림: 피크 2개월 전이면 미리 증량 ──
+  let preSeasonBoost = 1.0;
+  for(let ahead=1; ahead<=2; ahead++){
+    const futureM = (MONTH + ahead) % 12;
+    const futureRatio = Math.min(2.5, Math.max(0.5, (prevM[futureM]||0) / prevAvg));
+    if(hasPrevData && futureRatio > 1.3){
+      preSeasonBoost = Math.max(preSeasonBoost, futureRatio * (1 - (ahead-1)*0.2));
+    }
+  }
+  if(preSeasonBoost > 1.05){
+    expM = Math.round(expM * preSeasonBoost);
+  }
+
+  // ── 5. 필요발주 = 보정 월소진 × (리드타임 + 안전재고1.2개월) - 현재고 ──
+  const needed = Math.max(0, Math.round(expM * (p.leadTime + 1.2) - p.stock));
+  const boxes  = Math.ceil(needed / (p.boxQty||1));
+
+  // 보정 설명
+  let corrLabel = '최근실적기준';
+  if(preSeasonBoost > 1.05) corrLabel = `성수기대비 +${Math.round((preSeasonBoost-1)*100)}%`;
+  else if(hasPrevData && seasonRatio > 1.15) corrLabel = `성수기 +${Math.round((seasonRatio-1)*100)}%`;
+  else if(hasPrevData && seasonRatio < 0.85) corrLabel = `비수기 -${Math.round((1-seasonRatio)*100)}%`;
+  else if(!hasPrevData) corrLabel = '작년데이터없음';
+
   return {
-    needed: Math.round(needed), boxes: Math.ceil(needed/(p.boxQty||1)), expM,
-    tr, corrLabel: corrPct>5?`성수기 +${corrPct}%`:corrPct<-5?`비수기 ${corrPct}%`:'보정없음'
+    needed, boxes, expM,
+    tr: seasonRatio,
+    corrLabel,
+    baseMonthly,
+    seasonRatio: Math.round(seasonRatio*100)/100
   };
+}
+
+// 최근 일평균 출고량 반환 {avg7, avg30}
+function _getDailyAvgs(code){
+  if(!window._dailyCache || !window._dailyCache[code]) return {avg7:0, avg30:0};
+  const today = new Date();
+  const cut7  = fmtDate(new Date(today.getTime()-7*86400000));
+  const cut30 = fmtDate(new Date(today.getTime()-30*86400000));
+  let sum7=0, sum30=0;
+  Object.entries(window._dailyCache[code]).forEach(([date,qty])=>{
+    if(date >= cut30) sum30+=qty;
+    if(date >= cut7)  sum7+=qty;
+  });
+  return {
+    avg7:  sum7/7,   // 최근 7일 일평균
+    avg30: sum30/30  // 최근 30일 일평균
+  };
+}
+// 하위 호환 - 기존 코드 사용
+function _getRecentDailyAvg(code){
+  const {avg7, avg30} = _getDailyAvgs(code);
+  return Math.max(avg7, avg30*0.8); // 7일 또는 30일×0.8 중 큰 값
 }
 
 function getStatus(p) {
@@ -1068,8 +1186,18 @@ function _renderSPWithMonthly(def){
   const datasets=[]; let i=0;
   salesSel.forEach(id=>{
     const p=products.find(x=>x.id===id);if(!p)return;
-    const d=makeTotalSalesData(p, def, salesYear).slice(0,def.len);
-    datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
+    // 데이터 있는 연도 자동 탐색
+    let yr = salesYear;
+    const total = getTotalMonthly(p, yr);
+    if(total.every(v=>v===0)){
+      // salesYear에 데이터 없으면 DATA_YEARS 중 데이터 있는 연도 찾기
+      for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
+        const t = getTotalMonthly(p, y);
+        if(t.some(v=>v>0)){ yr=y; break; }
+      }
+    }
+    const d=makeTotalSalesData(p, def, yr).slice(0,def.len);
+    datasets.push({label:p.name+(yr!==salesYear?` (${yr}년)`:``),data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
   });
   if(salesChart) salesChart.destroy();
   salesChart = makeChart('salesChart', def.labels, datasets);
@@ -1218,7 +1346,7 @@ function recalcOrders() {
   }).sort((a,b)=>(a.stock/a.reorderPoint)-(b.stock/b.reorderPoint));
 
   document.getElementById('orderBadge').textContent = orderList.length;
-  document.getElementById('formulaBox').innerHTML = `<strong style="color:var(--tx);">발주 계산 (${MNAMES[MONTH]})</strong> | 예상월소진 = MAX(최근6개월 가중평균, 작년동기×트렌드) | 안전재고 = ×1.2 | 필요발주 = 안전재고 + 리드타임×소진 − 현재고 | <span style="color:var(--pr);">시즌보정 0.7~1.5</span>`;
+  document.getElementById('formulaBox').innerHTML = `<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | 📦 기본소진 = <span style="color:var(--pr);">MAX(최근7일 일평균, 최근30일×0.8) × 30</span> (없으면 이번달 실적) | 📅 도착 예정월 시즌 배율 = 작년해당월 ÷ 작년평균 | 🚀 피크 2개월 전 자동 증량 | ✅ 발주수량 = 보정소진 × (리드타임+1.2) − 현재고`;
 
   const actives = products.filter(p=>isInSeason(detectSeason(getBestMonthly(p)).type));
   const sb_el = document.getElementById('seasonBar');
@@ -1226,15 +1354,31 @@ function recalcOrders() {
   else sb_el.innerHTML=`<div class="sbar normal"><span>✓</span><span>${MNAMES[MONTH]} 기준 평시 — 성수기 2개월 전 알림 표시</span></div>`;
 
   const alerts=[]; products.forEach(p=>{const s=detectSeason(getBestMonthly(p));if(s.type==='all')return;const mu=(s.peakStart-MONTH+12)%12;if(mu>0&&mu<=2){const c=calcNeeded(p);alerts.push({p,s,mu,c});}});
-  document.getElementById('alertWrap').innerHTML=alerts.length?`<div class="alert-wrap">`+alerts.map(a=>`<div class="alert-item ${a.mu===1?'urg':'warn'}"><span style="font-size:13px;">${a.mu===1?'🚨':'⚠'}</span><div><div class="alert-title">${a.mu===1?'[긴급]':'[사전알림]'} ${a.p.name} — ${a.s.label} ${a.mu}개월 전</div><div class="alert-desc">권장: <strong style="color:var(--tx);">${a.c.needed.toLocaleString()}개 (${a.c.boxes}박스)</strong> | 현재고: ${a.p.stock.toLocaleString()}개</div></div></div>`).join('')+`</div>`:'';
+  const MAX_ALERTS=3;
+  const alertHTML = alerts.length ? `<div class="alert-wrap" id="alertInner">`+
+    alerts.slice(0,MAX_ALERTS).map(a=>`<div class="alert-item ${a.mu===1?'urg':'warn'}"><span style="font-size:13px;">${a.mu===1?'🚨':'⚠'}</span><div><div class="alert-title">${a.mu===1?'[긴급]':'[사전알림]'} ${a.p.name} — ${a.s.label} ${a.mu}개월 전</div><div class="alert-desc">권장: <strong style="color:var(--tx);">${a.c.needed.toLocaleString()}개 (${a.c.boxes}박스)</strong> | 현재고: ${a.p.stock.toLocaleString()}개</div></div></div>`).join('')+
+    (alerts.length>MAX_ALERTS?`<div id="alertMore" style="display:block;"><div style="padding:6px 12px;font-size:11px;color:var(--pr);cursor:pointer;" onclick="toggleAlerts(${alerts.length})">▼ ${alerts.length-MAX_ALERTS}개 더보기</div></div>
+    <div id="alertExtra" style="display:none;">`+
+    alerts.slice(MAX_ALERTS).map(a=>`<div class="alert-item ${a.mu===1?'urg':'warn'}"><span style="font-size:13px;">${a.mu===1?'🚨':'⚠'}</span><div><div class="alert-title">${a.mu===1?'[긴급]':'[사전알림]'} ${a.p.name} — ${a.s.label} ${a.mu}개월 전</div><div class="alert-desc">권장: <strong style="color:var(--tx);">${a.c.needed.toLocaleString()}개 (${a.c.boxes}박스)</strong> | 현재고: ${a.p.stock.toLocaleString()}개</div></div></div>`).join('')+`</div>`:'')
+    +`</div>` : '';
+  document.getElementById('alertWrap').innerHTML=alertHTML;
 
   const urg=orderList.filter(x=>x.stock<=x.reorderPoint*0.3).length;
   document.getElementById('orderSum').innerHTML=`<div class="sc"><div class="sl">발주필요</div><div class="sv" style="color:#DC2626;">${orderList.length}개</div></div><div class="sc"><div class="sl">즉시발주</div><div class="sv" style="color:#EA580C;">${urg}개</div></div><div class="sc"><div class="sl">총주문수량</div><div class="sv">${orderList.reduce((a,b)=>a+b.needed,0).toLocaleString()}개</div></div><div class="sc"><div class="sl">총박스수</div><div class="sv">${orderList.reduce((a,b)=>a+b.boxes,0)}박스</div></div>`;
   document.getElementById('orderBody').innerHTML=orderList.length?orderList.map(p=>{
     const r=p.stock/p.reorderPoint, ug=r<=0.3?{l:'즉시발주',c:'b-da'}:r<=0.6?{l:'긴급',c:'b-or'}:{l:'발주필요',c:'b-wa'};
-    return `<tr><td style="font-weight:500;max-width:110px;overflow:hidden;text-overflow:ellipsis;">${p.name}${p.inSeason?`<span style="font-size:9px;color:#EA580C;"> ●성수기</span>`:''}</td><td><span class="code-chip">${p.code}</span></td><td><span class="badge b-gy">${p.type}</span></td><td style="text-align:right;font-weight:500;color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':'var(--tx)'};">${p.stock.toLocaleString()}</td><td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td><td style="text-align:right;">${p.expM.toLocaleString()}개</td><td style="text-align:right;font-weight:500;">${p.needed.toLocaleString()}개 <span style="color:var(--tx2);">(${p.boxes}박스)</span></td><td><span class="badge ${p.season.badge}">${p.season.label}</span></td><td style="font-size:11px;color:${p.tr>1.05?'#DC2626':p.tr<0.95?'#059669':'var(--tx2)'};">${p.corrLabel}</td><td><span class="badge b-gy">${p.leadTime}개월</span></td><td><span class="badge ${ug.c}">${ug.l}</span></td><td style="text-align:center;"><button class="btn btn-su btn-sm" onclick="openInReg(${p.id})">입고등록</button></td></tr>`;
+    return `<tr><td style="font-weight:500;max-width:110px;overflow:hidden;text-overflow:ellipsis;">${p.name}${p.inSeason?`<span style="font-size:9px;color:#EA580C;"> ●성수기</span>`:''}</td><td><span class="code-chip">${p.code}</span></td><td><span class="badge b-gy">${p.type}</span></td><td style="text-align:right;font-weight:500;color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':'var(--tx)'};">${p.stock.toLocaleString()}</td><td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td><td style="text-align:right;">${p.expM.toLocaleString()}개</td><td style="text-align:right;font-weight:500;">${p.needed.toLocaleString()}개 <span style="color:var(--tx2);">(${p.boxes}박스)</span></td><td><span class="badge ${p.season.badge}">${p.season.label}</span></td><td style="font-size:11px;color:${p.tr>1.15?'#DC2626':p.tr<0.85?'#059669':'var(--tx2)'};" title="시즌배율: ${p.seasonRatio||1}배">${p.corrLabel}</td><td><span class="badge b-gy">${p.leadTime}개월</span></td><td><span class="badge ${ug.c}">${ug.l}</span></td><td style="text-align:center;"><button class="btn btn-su btn-sm" onclick="openInReg(${p.id})">입고등록</button></td></tr>`;
   }).join(''):`<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--tx2);">발주 필요 상품이 없습니다</td></tr>`;
   renderRecv(); updateFloat();
+}
+
+function toggleAlerts(total){
+  const more=document.getElementById('alertMore');
+  const extra=document.getElementById('alertExtra');
+  if(!more||!extra)return;
+  const isOpen=extra.style.display!=='none';
+  extra.style.display=isOpen?'none':'block';
+  more.innerHTML=`<div style="padding:6px 12px;font-size:11px;color:var(--pr);cursor:pointer;" onclick="toggleAlerts(${total})">${isOpen?'▼ '+(total-3)+'개 더보기':'▲ 접기'}</div>`;
 }
 
 function openInReg(pid){inTarget=pid;const p=products.find(x=>x.id===pid);document.getElementById('inTitle').textContent=`입고등록 — ${p?.name||''}`;openModal('inModal');}
@@ -1628,15 +1772,28 @@ async function confirmUpload(){
   const type=_pendingType;
   try{
     if(type==='inv'){
-      for(const row of _pendingRows){
+      // 배치 처리: 개별 422번 대신 upsert로 한번에
+      const upsertRows = _pendingRows.map(row=>({
+        code: row.code, name: row.name, type: row.typeVal||'기타',
+        stock: row.stock, box_qty: row.boxQty
+      }));
+      // 100개씩 배치 upsert
+      for(let b=0; b<upsertRows.length; b+=100){
+        await sb.from('products').upsert(
+          upsertRows.slice(b,b+100),
+          {onConflict:'code', ignoreDuplicates:false}
+        );
+      }
+      // 로컬 상태 업데이트
+      _pendingRows.forEach(row=>{
         const exists=products.find(p=>p.code===row.code);
-        if(exists){
-          await sb.from('products').update({stock:row.stock,box_qty:row.boxQty,type:row.typeVal||exists.type}).eq('id',exists.id);
-          exists.stock=row.stock; exists.boxQty=row.boxQty; if(row.typeVal) exists.type=row.typeVal;
-        } else {
-          const{data}=await sb.from('products').insert({code:row.code,name:row.name,type:row.typeVal||'기타',stock:row.stock,box_qty:row.boxQty,lead_time:1,reorder_point:0,discontinued:false,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)}).select();
-          if(data?.[0])products.push(mapProd(data[0]));
-        }
+        if(exists){ exists.stock=row.stock; exists.boxQty=row.boxQty; if(row.typeVal) exists.type=row.typeVal; }
+      });
+      // 신규 제품은 다시 로드
+      const newCodes=_pendingRows.filter(r=>!products.find(p=>p.code===r.code)).map(r=>r.code);
+      if(newCodes.length>0){
+        const{data}=await sb.from('products').select('*').in('code',newCodes);
+        if(data) data.forEach(r=>products.push(mapProd(r)));
       }
       await addHistory({menu:'재고관리',type:'upload',code:'MULTI',name:`${_pendingRows.length}개 상품`,desc:'재고 엑셀 업로드',before:'-',after:`${_pendingRows.length}건 반영`,user:'업로드'});
       renderInv();updateFloat();
