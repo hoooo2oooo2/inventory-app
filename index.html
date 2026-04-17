@@ -618,7 +618,7 @@ document.getElementById('rgUpdLbl').textContent = '최근 갱신: '+fmtFull(now)
 let products = [], receiveList = [], doneList = [], rgProducts = [], historyLog = [];
 let dailySales = {}; // {code: {YYYY-MM-DD: qty}}
 let invSort = 'code', invDir = 1, ioTarget = null;
-let salesPeriod = 'monthly', salesYear = 0, salesSel = new Set();
+let salesPeriod = 'monthly', salesYear = CUR_YEAR, salesSel = new Set();
 let rgPeriod = 'daily', rgYear = CUR_YEAR, rgSel = new Set();
 let salesChart = null, rgChart = null;
 let orderList = [], inTarget = null, floatOpen = false;
@@ -717,7 +717,6 @@ async function loadDailyCache(){
 }
 
 async function loadAll() {
-  console.log('🚀 loadAll v8 시작 - ' + new Date().toLocaleTimeString());
   // daily_sales는 필요할 때 로드 (전체 로드 시 너무 큼)
   await Promise.all([loadProducts(), loadReceive(), loadRg(), loadHist(), loadDailyCache()]);
   // 로드된 데이터에서 실제 보유 연도 자동 추출
@@ -1226,7 +1225,6 @@ function _updateSalesSummary(datasets){
 // 제품별 데이터가 가장 많은 연도 반환 (드롭다운 연도 우선, 없으면 최다 데이터 연도)
 function _getBestYear(p, preferYr){
   const yr = preferYr || salesYear;
-  console.log('  _getBestYear: preferYr='+preferYr+' salesYear='+salesYear+' p.monthly_'+yr+'='+JSON.stringify(getTotalMonthly(p,yr).slice(0,3)));
   if(getTotalMonthly(p,yr).some(v=>v>0)) return yr;
   // 선호 연도에 데이터 없으면 가장 합계 큰 연도
   let bestYr=yr, bestSum=0;
@@ -1247,7 +1245,6 @@ function _monthlyToData(monthly, labels){
 }
 
 function renderSalesPeriod(){
-  console.log('📊 renderSalesPeriod: period='+salesPeriod+' salesYear='+salesYear+' sel='+salesSel.size);
   if(!products.length) return;
 
   const sel=[...salesSel].map(id=>products.find(x=>x.id===id)).filter(Boolean);
