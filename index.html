@@ -1146,9 +1146,13 @@ function makeSalesData(p_or_arr, def, year) {
   }
   if(!monthly || monthly.every(v=>v===0)) return Array(def.len).fill(0);
   return Array.from({length:def.len}, (_,i) => {
-    if(def.labels[i]?.includes('월')) {
-      const mIdx = MNAMES.findIndex(m => def.labels[i].includes(m));
-      return mIdx>=0 ? monthly[mIdx] : monthly[MONTH]||0;
+    const lbl = def.labels[i] || '';
+    if(lbl.includes('월')) {
+      // substring 버그 방지: 정확한 월 매칭 (ex: '1월'이 '11월','12월'에 잘못 매칭되는 문제)
+      // MNAMES를 긴 것부터 매칭 (10월,11월,12월 먼저)
+      const sorted = MNAMES.map((m,idx)=>({m,idx})).sort((a,b)=>b.m.length-a.m.length);
+      const found = sorted.find(({m})=>lbl.includes(m));
+      return found ? (monthly[found.idx]||0) : monthly[MONTH]||0;
     }
     return monthly[MONTH]||0;
   });
@@ -1186,18 +1190,18 @@ function _renderSPWithMonthly(def){
   const datasets=[]; let i=0;
   salesSel.forEach(id=>{
     const p=products.find(x=>x.id===id);if(!p)return;
-    // 데이터 있는 연도 자동 탐색
+    // salesYear 우선, 데이터 없으면 DATA_YEARS 중 가장 최근 데이터 있는 연도
     let yr = salesYear;
     const total = getTotalMonthly(p, yr);
     if(total.every(v=>v===0)){
-      // salesYear에 데이터 없으면 DATA_YEARS 중 데이터 있는 연도 찾기
       for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
         const t = getTotalMonthly(p, y);
         if(t.some(v=>v>0)){ yr=y; break; }
       }
     }
     const d=makeTotalSalesData(p, def, yr).slice(0,def.len);
-    datasets.push({label:p.name+(yr!==salesYear?` (${yr}년)`:``),data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
+    const lbl = p.name + (yr!==salesYear ? ` (${yr}년 데이터)` : ``);
+    datasets.push({label:lbl,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
   });
   if(salesChart) salesChart.destroy();
   salesChart = makeChart('salesChart', def.labels, datasets);
@@ -1283,17 +1287,8 @@ function renderSalesPeriod() {
       .catch(err=>{ console.error('daily load err:', err); _renderSPWithMonthly(def); });
     return;
   }
-  const datasets=[]; let i=0;
-  salesSel.forEach(id=>{
-    const p=products.find(x=>x.id===id);if(!p)return;
-    const d = makeTotalSalesData(p, def, salesYear).slice(0,def.len);
-    datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
-  });
-  if(salesChart) salesChart.destroy();
-  salesChart = makeChart('salesChart', def.labels, datasets);
-  const all=datasets.flatMap(d=>d.data);
-  const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
-  _updateSalesSummary(datasets);
+  // 월별/분기 모드 - 연도 자동탐색 포함
+  _renderSPWithMonthly(def);
 }
 
 function renderSalesTbody() {
