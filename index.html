@@ -1197,88 +1197,129 @@ function makeChart(canvasId, labels, datasets) {
 function setSalesPeriod(p) {
   salesPeriod=p;
   document.querySelectorAll('[id^="spt-"]').forEach(b=>b.classList.remove('active'));
-  document.getElementById('spt-'+p).classList.add('active');
+  document.getElementById('spt-'+p)?.classList.add('active');
   const yrSel=document.getElementById('salesYrSel');
-  yrSel.disabled=['daily','lastweek'].includes(p); yrSel.style.opacity=['daily','lastweek'].includes(p)?'.45':'1';
+  if(yrSel){ yrSel.disabled=['daily','lastweek'].includes(p); yrSel.style.opacity=['daily','lastweek'].includes(p)?'.45':'1'; }
   renderSalesPeriod();
 }
-// 월별 데이터로 폴백 렌더링
-function _renderSPWithMonthly(def){
-  const datasets=[]; let i=0;
-  // 실제 사용할 연도와 def를 결정 (데이터 있는 연도 기준)
-  let commonYr = salesYear;
-  // 선택된 첫 제품 기준으로 실제 데이터 있는 연도 탐색
-  const firstId = [...salesSel][0];
-  const firstP = products.find(x=>x.id===firstId);
-  if(firstP && getTotalMonthly(firstP, commonYr).every(v=>v===0)){
-    for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
-      if(getTotalMonthly(firstP,y).some(v=>v>0)){ commonYr=y; break; }
-    }
-  }
-  // def를 실제 연도(commonYr) 기준으로 재생성 → 라벨과 데이터 일치
-  const realDef = commonYr !== salesYear ? getPeriodDef(commonYr, salesPeriod) : def;
-  salesSel.forEach(id=>{
-    const p=products.find(x=>x.id===id);if(!p)return;
-    const d=makeTotalSalesData(p, realDef, commonYr).slice(0,realDef.len);
-    datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
-  });
-  if(salesChart) salesChart.destroy();
-  salesChart = makeChart('salesChart', realDef.labels, datasets);
-  _updateSalesSummary(datasets);
+
+function salesYrChange() {
+  salesYear=parseInt(document.getElementById('salesYrSel').value);
+  renderSalesPeriod();
 }
+
 function _updateSalesSummary(datasets){
   if(!datasets) return;
   const all=datasets.flatMap(d=>d.data||[]);
   const tot=all.reduce((a,b)=>a+b,0), avg=all.length?Math.round(tot/all.length):0;
   const sumEl=document.getElementById('salesSum');
   if(sumEl) sumEl.innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
-  const lbl=document.getElementById('salesCurLbl');
-  if(lbl) lbl.textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
-  const leg=document.getElementById('salesLegend');
-  if(leg) leg.innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
+  const lblEl=document.getElementById('salesCurLbl');
+  if(lblEl) lblEl.textContent=`조회: ${periodName(salesPeriod,salesYear)}`;
+  const legEl=document.getElementById('salesLegend');
+  if(legEl) legEl.innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
 }
 
-function _renderSPWithDaily(def, dailyData, range){
-  const datasets=[]; let i=0;
-  salesSel.forEach(id=>{
-    const p=products.find(x=>x.id===id);if(!p)return;
-    const pDailyData = dailyData[p.code] || {};
-    let data;
-    if(salesPeriod==='daily'||salesPeriod==='lastweek'){
-      // 일별: labels가 날짜 배열
-      data = def.labels.map(lbl=>{
-        // lbl 형식: "4/7(월)" → range.days 배열에서 매핑
-        const dayIdx = def.labels.indexOf(lbl);
-        const dateStr = range.days ? range.days[dayIdx] : null;
-        return dateStr ? (pDailyData[dateStr]||0) : 0;
-      });
-    } else {
-      // 주별: 최근 8주 각각 합산 (라벨 순서와 동일)
-      const today=new Date();
-      data = def.labels.map((_,wIdx)=>{
-        // wIdx=0: 7주 전, wIdx=7: 이번주
-        const weekBase=new Date(today);
-        weekBase.setDate(today.getDate()-(7-wIdx)*7);
-        // 해당 주의 월요일부터 일요일
-        const dayOfWeek=weekBase.getDay()||7;
-        const monday=new Date(weekBase);
-        monday.setDate(weekBase.getDate()-(dayOfWeek-1));
-        let weekSum=0;
-        for(let d=0;d<7;d++){
-          const dd=new Date(monday); dd.setDate(monday.getDate()+d);
-          weekSum+=pDailyData[fmtDate(dd)]||0;
-        }
-        return weekSum;
-      });
+// 제품별 데이터 있는 연도 반환
+function _getBestYear(p){
+  if(getTotalMonthly(p,salesYear).some(v=>v>0)) return salesYear;
+  for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
+    if(getTotalMonthly(p,y).some(v=>v>0)) return y;
+  }
+  return salesYear;
+}
+
+// monthly 배열 → 라벨 배열에 맞는 데이터 배열 반환
+function _monthlyToData(monthly, labels){
+  const sorted=MNAMES.map((m,i)=>({m,i})).sort((a,b)=>b.m.length-a.m.length);
+  return labels.map(lbl=>{
+    const found=sorted.find(({m})=>lbl.includes(m));
+    return found ? (monthly[found.i]||0) : 0;
+  });
+}
+
+function renderSalesPeriod(){
+  if(!products.length) return;
+
+  const sel=[...salesSel].map(id=>products.find(x=>x.id===id)).filter(Boolean);
+  if(!sel.length) return;
+
+  // ── 일별 / 저번주 ──
+  if(salesPeriod==='daily'||salesPeriod==='lastweek'){
+    const range=getDateRange(salesYear,salesPeriod);
+    const code1=sel.length===1?sel[0].code:null;
+    if(salesChart) salesChart.destroy();
+    loadDailySales(code1,range.start,range.end).then(dd=>{
+      const hasDD=Object.keys(dd).length>0&&Object.values(dd).some(v=>Object.values(v).some(x=>x>0));
+      const def=getPeriodDef(salesYear,salesPeriod);
+      if(hasDD){
+        const datasets=sel.map((p,i)=>{
+          const pd=dd[p.code]||{};
+          const data=range.days.map(d=>pd[d]||0);
+          return{label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]};
+        });
+        if(salesChart) salesChart.destroy();
+        salesChart=makeChart('salesChart',def.labels,datasets);
+        _updateSalesSummary(datasets);
+      } else {
+        // daily_sales 없으면 월 일평균으로 대체
+        const today=new Date();
+        const mIdx=today.getMonth();
+        const dInM=new Date(today.getFullYear(),mIdx+1,0).getDate();
+        const datasets=sel.map((p,i)=>{
+          const yr=_getBestYear(p);
+          const daily=Math.round((getTotalMonthly(p,yr)[mIdx]||0)/dInM);
+          return{label:p.name,data:def.labels.map(()=>daily),borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]};
+        });
+        if(salesChart) salesChart.destroy();
+        salesChart=makeChart('salesChart',def.labels,datasets);
+        _updateSalesSummary(datasets);
+      }
+    }).catch(()=>{});
+    return;
+  }
+
+  // ── 주별 ──
+  if(salesPeriod==='weekly'){
+    const today=new Date();
+    const labels=[];
+    for(let w=7;w>=0;w--){
+      const d=new Date(today); d.setDate(today.getDate()-w*7);
+      const mo=d.getMonth()+1;
+      const fd=new Date(d.getFullYear(),d.getMonth(),1);
+      const wom=Math.ceil((d.getDate()+fd.getDay())/7);
+      labels.push(`${mo}월 ${wom}주차`);
     }
-    datasets.push({label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
+    const datasets=sel.map((p,i)=>{
+      const yr=_getBestYear(p);
+      const monthly=getTotalMonthly(p,yr);
+      const data=labels.map((_,wi)=>{
+        const d=new Date(today); d.setDate(today.getDate()-(7-wi)*7);
+        const mi=d.getMonth();
+        const dim=new Date(d.getFullYear(),mi+1,0).getDate();
+        return Math.round((monthly[mi]||0)/dim*7);
+      });
+      return{label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]};
+    });
+    if(salesChart) salesChart.destroy();
+    salesChart=makeChart('salesChart',labels,datasets);
+    _updateSalesSummary(datasets);
+    return;
+  }
+
+  // ── 월별 / 분기 ──
+  // 첫 제품 기준으로 실제 연도 결정 (모든 제품에 동일하게 적용)
+  const yr=_getBestYear(sel[0]);
+  const def=getPeriodDef(yr,salesPeriod);
+  const datasets=sel.map((p,i)=>{
+    const monthly=getTotalMonthly(p,yr);
+    const data=_monthlyToData(monthly,def.labels);
+    return{label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]};
   });
   if(salesChart) salesChart.destroy();
-  salesChart = makeChart('salesChart', def.labels, datasets);
+  salesChart=makeChart('salesChart',def.labels,datasets);
   _updateSalesSummary(datasets);
 }
-
-function salesYrChange() { salesYear=parseInt(document.getElementById('salesYrSel').value); renderSalesPeriod(); }
 
 // 전체 판매 데이터 (일반 + RG 합산)
 function makeTotalSalesData(p, def, year) {
@@ -1289,117 +1330,7 @@ function makeTotalSalesData(p, def, year) {
   return makeSalesData(total, def, yr);
 }
 
-function renderSalesPeriod() {
-  if(!products.length) return;
 
-  // 실제 데이터 있는 연도 탐색 (salesYear에 데이터 없으면 가장 최근 데이터 연도로)
-  function getActualYear(p){
-    if(getTotalMonthly(p, salesYear).some(v=>v>0)) return salesYear;
-    for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
-      if(getTotalMonthly(p,y).some(v=>v>0)) return y;
-    }
-    return salesYear;
-  }
-
-  if(salesPeriod==='daily'||salesPeriod==='lastweek'){
-    // 일별: daily_sales 우선, 없으면 monthly 일별 환산
-    const range = getDateRange(salesYear, salesPeriod);
-    const selCodes = [...salesSel].map(id=>products.find(x=>x.id===id)?.code).filter(Boolean);
-    if(salesChart) salesChart.destroy();
-    loadDailySales(selCodes.length===1?selCodes[0]:null, range.start, range.end)
-      .then(dailyData=>{
-        const hasData = Object.keys(dailyData).length>0 &&
-          Object.values(dailyData).some(d=>Object.values(d).some(v=>v>0));
-        const def = getPeriodDef(salesYear, salesPeriod);
-        if(hasData){ _renderSPWithDaily(def, dailyData, range); }
-        else { _renderSPWithMonthlyFallback(salesPeriod); }
-      })
-      .catch(()=>{ _renderSPWithMonthlyFallback(salesPeriod); });
-    return;
-  }
-
-  if(salesPeriod==='weekly'){
-    // 주별: monthly 일평균으로 주 환산 (daily_sales 없어도 동작)
-    const labels=[];
-    const today=new Date();
-    for(let w=7;w>=0;w--){
-      const d=new Date(today); d.setDate(today.getDate()-w*7);
-      const mo=d.getMonth()+1;
-      const firstDay=new Date(d.getFullYear(),d.getMonth(),1);
-      const wom=Math.ceil((d.getDate()+firstDay.getDay())/7);
-      labels.push(`${mo}월 ${wom}주차`);
-    }
-    const datasets=[]; let i=0;
-    salesSel.forEach(id=>{
-      const p=products.find(x=>x.id===id); if(!p) return;
-      const yr=getActualYear(p);
-      const monthly=getTotalMonthly(p,yr);
-      // 각 주의 월 인덱스로 일평균 → 7일치로 환산
-      const data=labels.map((_,wIdx)=>{
-        const d=new Date(today); d.setDate(today.getDate()-(7-wIdx)*7);
-        const mIdx=d.getMonth();
-        const daysInMonth=new Date(d.getFullYear(),mIdx+1,0).getDate();
-        return Math.round((monthly[mIdx]||0)/daysInMonth*7);
-      });
-      datasets.push({label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
-    });
-    if(salesChart) salesChart.destroy();
-    salesChart=makeChart('salesChart',labels,datasets);
-    _updateSalesSummary(datasets);
-    return;
-  }
-
-  // monthly / 분기: monthly 데이터 직접 사용
-  const datasets=[]; let i=0;
-  salesSel.forEach(id=>{
-    const p=products.find(x=>x.id===id); if(!p) return;
-    const yr=getActualYear(p);
-    const def=getPeriodDef(yr, salesPeriod);
-    const monthly=getTotalMonthly(p,yr);
-    const data=def.labels.map(lbl=>{
-      const sorted=MNAMES.map((m,idx)=>({m,idx})).sort((a,b)=>b.m.length-a.m.length);
-      const found=sorted.find(({m})=>lbl.includes(m));
-      return found?(monthly[found.idx]||0):0;
-    }).slice(0,def.len);
-    datasets.push({label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
-  });
-  // 모든 제품에서 공통으로 쓸 def (첫 제품 기준)
-  const firstP=products.find(x=>salesSel.has(x.id));
-  const commonYr=firstP?getActualYear(firstP):salesYear;
-  const commonDef=getPeriodDef(commonYr, salesPeriod);
-  if(salesChart) salesChart.destroy();
-  salesChart=makeChart('salesChart',commonDef.labels,datasets);
-  _updateSalesSummary(datasets);
-}
-
-// monthly 폴백 렌더링 (daily_sales 없을때)
-function _renderSPWithMonthlyFallback(period){
-  const datasets=[]; let i=0;
-  salesSel.forEach(id=>{
-    const p=products.find(x=>x.id===id); if(!p) return;
-    // 데이터 있는 연도 탐색
-    let yr=salesYear;
-    for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
-      if(getTotalMonthly(p,y).some(v=>v>0)){yr=y;break;}
-    }
-    const monthly=getTotalMonthly(p,yr);
-    const today=new Date();
-    let data, labels;
-    if(period==='daily'||period==='lastweek'){
-      // 일별: 월 일평균으로 5일치
-      const daysInMonth=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
-      const dailyAvg=Math.round((monthly[today.getMonth()]||0)/daysInMonth);
-      const days=period==='daily'?getThisWeekDays():getLastWeekDays();
-      data=days.map(()=>dailyAvg);
-      labels=days;
-    }
-    datasets.push({label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
-  });
-  const days=period==='daily'?getThisWeekDays():getLastWeekDays();
-  if(salesChart) salesChart.destroy();
-  salesChart=makeChart('salesChart',days,datasets);
-  _updateSalesSummary(datasets);
-}
 
 function renderSalesTbody() {
   if(!products.length){document.getElementById('salesTbody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--tx2);">상품 데이터가 없습니다</td></tr>`;return;}
