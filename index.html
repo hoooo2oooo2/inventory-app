@@ -570,13 +570,11 @@ function trackYear(yr, skipRefresh){
 // 연도 선택 드롭다운 자동 갱신
 function refreshYearSelects(){
   const sorted=[...DATA_YEARS].sort((a,b)=>b-a);
-  // salesYear/rgYear 변수 기준으로 선택값 유지
-  const curS = salesYear || parseInt(document.getElementById('salesYrSel')?.value) || CUR_YEAR;
-  const curR = rgYear   || parseInt(document.getElementById('rgYrSel')?.value)    || CUR_YEAR;
-  ['sYrSel','rYrSel'].forEach((selId,si)=>{
+  // salesYear/rgYear 변수 기준으로 드롭다운 선택값 동기화
+  [['salesYrSel', ()=>salesYear], ['rgYrSel', ()=>rgYear]].forEach(([selId, getYr])=>{
     const sel=document.getElementById(selId);
     if(!sel) return;
-    const cur = si===0 ? curS : curR;
+    const cur = getYr() || CUR_YEAR;
     sel.innerHTML='';
     sorted.forEach(yr=>{
       const o=document.createElement('option');
@@ -584,7 +582,8 @@ function refreshYearSelects(){
       if(yr===cur) o.selected=true;
       sel.appendChild(o);
     });
-    if(!sel.value && sorted.length) sel.value=sorted[0];
+    // 선택값이 없으면 cur로 강제 설정
+    if(parseInt(sel.value)!==cur) sel.value=cur;
   });
 }
 // 초기 AVAIL_YEARS (DB 로드 후 자동 확장)
@@ -1133,7 +1132,21 @@ function getPeriodDef(yr, per) {
   const isCur=yr===CUR_YEAR, cm=now.getMonth();
   if(per==='lastweek'){const lb=getLastWeekDays();return{labels:lb,len:lb.length};}
   if(per==='daily'){const lb=getThisWeekDays();return{labels:lb,len:lb.length};}
-  if(per==='weekly'){return{labels:Array.from({length:8},(_,i)=>`${yr}년 ${i+1}주`),len:8};}
+  if(per==='weekly'){
+    // 현재 날짜 기준 최근 8주 라벨: "1월 1주차" 형식
+    const today=new Date();
+    const labels=[];
+    for(let w=7;w>=0;w--){
+      const d=new Date(today);
+      d.setDate(today.getDate()-w*7);
+      const m=d.getMonth()+1;
+      // 해당 월의 몇 번째 주인지 계산
+      const firstDay=new Date(d.getFullYear(),d.getMonth(),1);
+      const weekOfMonth=Math.ceil((d.getDate()+firstDay.getDay())/7);
+      labels.push(`${m}월 ${weekOfMonth}주차`);
+    }
+    return{labels,len:8};
+  }
   if(per==='monthly'){const len=isCur?cm+1:12;return{labels:MNAMES.slice(0,len).map(m=>`${yr}년 ${m}`),len};}
   const qm={q1:['1월','2월','3월'],q2:['4월','5월','6월'],q3:['7월','8월','9월'],q4:['10월','11월','12월']};
   return{labels:qm[per].map(m=>`${yr}년 ${m}`),len:3};
@@ -1192,23 +1205,25 @@ function setSalesPeriod(p) {
 // 월별 데이터로 폴백 렌더링
 function _renderSPWithMonthly(def){
   const datasets=[]; let i=0;
+  // 실제 사용할 연도와 def를 결정 (데이터 있는 연도 기준)
+  let commonYr = salesYear;
+  // 선택된 첫 제품 기준으로 실제 데이터 있는 연도 탐색
+  const firstId = [...salesSel][0];
+  const firstP = products.find(x=>x.id===firstId);
+  if(firstP && getTotalMonthly(firstP, commonYr).every(v=>v===0)){
+    for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
+      if(getTotalMonthly(firstP,y).some(v=>v>0)){ commonYr=y; break; }
+    }
+  }
+  // def를 실제 연도(commonYr) 기준으로 재생성 → 라벨과 데이터 일치
+  const realDef = commonYr !== salesYear ? getPeriodDef(commonYr, salesPeriod) : def;
   salesSel.forEach(id=>{
     const p=products.find(x=>x.id===id);if(!p)return;
-    // salesYear 우선, 데이터 없으면 DATA_YEARS 중 가장 최근 데이터 있는 연도
-    let yr = salesYear;
-    const total = getTotalMonthly(p, yr);
-    if(total.every(v=>v===0)){
-      for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
-        const t = getTotalMonthly(p, y);
-        if(t.some(v=>v>0)){ yr=y; break; }
-      }
-    }
-    const d=makeTotalSalesData(p, def, yr).slice(0,def.len);
-    const lbl = p.name + (yr!==salesYear ? ` (${yr}년 데이터)` : ``);
-    datasets.push({label:lbl,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
+    const d=makeTotalSalesData(p, realDef, commonYr).slice(0,realDef.len);
+    datasets.push({label:p.name,data:d,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]});i++;
   });
   if(salesChart) salesChart.destroy();
-  salesChart = makeChart('salesChart', def.labels, datasets);
+  salesChart = makeChart('salesChart', realDef.labels, datasets);
   _updateSalesSummary(datasets);
 }
 function _updateSalesSummary(datasets){
@@ -1238,14 +1253,20 @@ function _renderSPWithDaily(def, dailyData, range){
         return dateStr ? (pDailyData[dateStr]||0) : 0;
       });
     } else {
-      // 주별: 각 주의 합산
-      data = def.labels.map((lbl, wIdx)=>{
-        const weekStart = new Date(salesYear, 0, 1 + wIdx*7);
-        let weekSum = 0;
+      // 주별: 최근 8주 각각 합산 (라벨 순서와 동일)
+      const today=new Date();
+      data = def.labels.map((_,wIdx)=>{
+        // wIdx=0: 7주 전, wIdx=7: 이번주
+        const weekBase=new Date(today);
+        weekBase.setDate(today.getDate()-(7-wIdx)*7);
+        // 해당 주의 월요일부터 일요일
+        const dayOfWeek=weekBase.getDay()||7;
+        const monday=new Date(weekBase);
+        monday.setDate(weekBase.getDate()-(dayOfWeek-1));
+        let weekSum=0;
         for(let d=0;d<7;d++){
-          const dd = new Date(weekStart); dd.setDate(weekStart.getDate()+d);
-          const ds = fmtDate(dd);
-          weekSum += pDailyData[ds]||0;
+          const dd=new Date(monday); dd.setDate(monday.getDate()+d);
+          weekSum+=pDailyData[fmtDate(dd)]||0;
         }
         return weekSum;
       });
