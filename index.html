@@ -731,11 +731,13 @@ async function loadAll() {
   refreshYearSelects(); // 한번만 호출
   // 데이터 있는 연도로 salesYear 자동 선택
   if(products.length > 0){
-    for(const yr of [...DATA_YEARS].sort((a,b)=>b-a)){
-      const hasData = products.some(p=>getTotalMonthly(p,yr).some(v=>v>0));
-      if(hasData){ salesYear = yr; rgYear = yr; break; }
+    // 데이터 합계가 가장 많은 연도 선택 (2026년 4개월 < 2025년 12개월)
+    let bestYr=CUR_YEAR, bestSum=0;
+    for(const yr of [...DATA_YEARS]){
+      const sum=products.reduce((acc,p)=>acc+getTotalMonthly(p,yr).reduce((a,b)=>a+b,0),0);
+      if(sum>bestSum){ bestSum=sum; bestYr=yr; }
     }
-    // 연도 드롭다운 선택값도 맞춤 (refreshYearSelects가 salesYear 기준으로 처리)
+    salesYear=bestYr; rgYear=bestYr;
     refreshYearSelects();
   }
   renderInv(); updateFloat();
@@ -1220,13 +1222,17 @@ function _updateSalesSummary(datasets){
   if(legEl) legEl.innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.label}</span>`).join('');
 }
 
-// 제품별 데이터 있는 연도 반환
-function _getBestYear(p){
-  if(getTotalMonthly(p,salesYear).some(v=>v>0)) return salesYear;
+// 제품별 데이터가 가장 많은 연도 반환 (드롭다운 연도 우선, 없으면 최다 데이터 연도)
+function _getBestYear(p, preferYr){
+  const yr = preferYr || salesYear;
+  if(getTotalMonthly(p,yr).some(v=>v>0)) return yr;
+  // 선호 연도에 데이터 없으면 가장 합계 큰 연도
+  let bestYr=yr, bestSum=0;
   for(const y of [...DATA_YEARS].sort((a,b)=>b-a)){
-    if(getTotalMonthly(p,y).some(v=>v>0)) return y;
+    const sum=getTotalMonthly(p,y).reduce((a,b)=>a+b,0);
+    if(sum>bestSum){bestSum=sum;bestYr=y;}
   }
-  return salesYear;
+  return bestYr;
 }
 
 // monthly 배열 → 라벨 배열에 맞는 데이터 배열 반환
@@ -1267,7 +1273,7 @@ function renderSalesPeriod(){
         const mIdx=today.getMonth();
         const dInM=new Date(today.getFullYear(),mIdx+1,0).getDate();
         const datasets=sel.map((p,i)=>{
-          const yr=_getBestYear(p);
+          const yr=_getBestYear(p, salesYear);
           const daily=Math.round((getTotalMonthly(p,yr)[mIdx]||0)/dInM);
           return{label:p.name,data:def.labels.map(()=>daily),borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]};
         });
@@ -1291,7 +1297,7 @@ function renderSalesPeriod(){
       labels.push(`${mo}월 ${wom}주차`);
     }
     const datasets=sel.map((p,i)=>{
-      const yr=_getBestYear(p);
+      const yr=_getBestYear(p, salesYear);
       const monthly=getTotalMonthly(p,yr);
       const data=labels.map((_,wi)=>{
         const d=new Date(today); d.setDate(today.getDate()-(7-wi)*7);
@@ -1308,16 +1314,17 @@ function renderSalesPeriod(){
   }
 
   // ── 월별 / 분기 ──
-  // 첫 제품 기준으로 실제 연도 결정 (모든 제품에 동일하게 적용)
-  const yr=_getBestYear(sel[0]);
-  const def=getPeriodDef(yr,salesPeriod);
+  // 첫 제품 기준으로 연도 결정 (드롭다운 salesYear 우선, 데이터 없으면 최다 연도)
+  const yr=_getBestYear(sel[0], salesYear);
+  const def=getPeriodDef(yr, salesPeriod);
   const datasets=sel.map((p,i)=>{
-    const monthly=getTotalMonthly(p,yr);
-    const data=_monthlyToData(monthly,def.labels);
+    // 각 제품도 동일 연도 기준 (일관성)
+    const monthly=getTotalMonthly(p, yr);
+    const data=_monthlyToData(monthly, def.labels);
     return{label:p.name,data,borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%DASHES.length]||[]};
   });
   if(salesChart) salesChart.destroy();
-  salesChart=makeChart('salesChart',def.labels,datasets);
+  salesChart=makeChart('salesChart', def.labels, datasets);
   _updateSalesSummary(datasets);
 }
 
