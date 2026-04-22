@@ -915,21 +915,28 @@ function renderSalesPeriod(){
     return;
   }
 
-  // ── 주별 ── (daily_sales 기반 실제 주차 집계)
+  // ── 주별 ── (daily_sales DB 직접 조회 - 선택 연도 기준 8주)
   if(salesPeriod==='weekly'){
-    // 최근 8주 월요일 기준 날짜 계산
+    // 선택 연도(salesYear) 기준 최근 8주 계산
+    // salesYear가 현재 연도면 오늘 기준, 과거 연도면 그 해 마지막 주 기준
+    const isCurYear = salesYear === CUR_YEAR;
+    const baseDate = isCurYear ? new Date(now) : new Date(salesYear, 11, 31); // 해당년도 12월31일
+    // 기준일의 월요일 찾기
+    const baseMonday = new Date(baseDate);
+    baseMonday.setDate(baseDate.getDate() - ((baseDate.getDay()+6)%7)); // 월요일로
+
     const weeks = [];
     for(let w=7;w>=0;w--){
-      const d=new Date(now);
-      d.setDate(now.getDate() - now.getDay() + 1 - w*7); // 이번주 월요일 기준
-      const end=new Date(d); end.setDate(d.getDate()+6);
-      const mo=d.getMonth()+1;
-      const fd=new Date(d.getFullYear(),d.getMonth(),1);
-      const wom=Math.ceil((d.getDate()+fd.getDay())/7);
+      const mon = new Date(baseMonday);
+      mon.setDate(baseMonday.getDate() - w*7);
+      const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+      const mo = mon.getMonth()+1;
+      const fd = new Date(mon.getFullYear(), mon.getMonth(), 1);
+      const wom = Math.ceil((mon.getDate() + fd.getDay()) / 7);
       weeks.push({
-        label:`${mo}월 ${wom}주차`,
-        start:d.toISOString().slice(0,10),
-        end:end.toISOString().slice(0,10)
+        label: `${mo}월 ${wom}주차`,
+        start: mon.toISOString().slice(0,10),
+        end: sun.toISOString().slice(0,10)
       });
     }
     const labels = weeks.map(w=>w.label);
@@ -938,39 +945,35 @@ function renderSalesPeriod(){
 
     if(salesChart) salesChart.destroy();
 
-    // daily_sales에서 해당 기간 데이터 로드
-    const codes = sel.map(p=>p.code);
+    // daily_sales DB에서 해당 기간 직접 조회 (연도 무관하게 항상 DB 조회)
     loadDailySales(sel.length===1?sel[0].code:null, rangeStart, rangeEnd).then(dd=>{
-      const hasDailyData = Object.keys(dd).length>0 && Object.values(dd).some(v=>Object.values(v).some(x=>x>0));
-
       const ds = sel.map((p,i)=>{
+        const dayData = dd[p.code] || {};
+        const hasDays = Object.keys(dayData).length > 0;
         let data;
-        if(hasDailyData && dd[p.code]){
-          // daily_sales 실제 데이터로 주차 합산
+        if(hasDays){
+          // daily_sales 실제 데이터로 주차별 합산
           data = weeks.map(w=>{
-            let sum=0;
-            const s=new Date(w.start), e=new Date(w.end);
+            let sum = 0;
+            const s = new Date(w.start), e = new Date(w.end);
             for(let dt=new Date(s); dt<=e; dt.setDate(dt.getDate()+1)){
-              const dk=dt.toISOString().slice(0,10);
-              sum += (dd[p.code][dk]||0);
+              sum += dayData[dt.toISOString().slice(0,10)] || 0;
             }
             return sum;
           });
         } else {
-          // daily_sales 없으면 monthly 기반 일평균×7
-          const m=getYearData(p,salesYear).data;
+          // daily_sales 없으면 monthly_YYYY 기반 일평균×7
+          const m = getYearData(p, salesYear).data;
           data = weeks.map(w=>{
-            const d=new Date(w.start);
-            const mi=d.getMonth();
-            const dim=new Date(d.getFullYear(),mi+1,0).getDate();
-            return Math.round((m[mi]||0)/dim*7);
+            const mi = new Date(w.start).getMonth();
+            const dim = new Date(new Date(w.start).getFullYear(), mi+1, 0).getDate();
+            return Math.round((m[mi]||0) / dim * 7);
           });
         }
         return{label:p.name,data,borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};
       });
-
       if(salesChart) salesChart.destroy();
-      salesChart=makeChart('salesChart',labels,ds);
+      salesChart = makeChart('salesChart', labels, ds);
       updateSalesSummary(ds);
     }).catch(()=>{});
     return;
