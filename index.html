@@ -233,7 +233,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="invSrch" placeholder="상품명, 코드..." oninput="renderInv()"></div>
         <select class="sel" id="invStF" onchange="renderInv()"><option value="">전체상태</option><option>정상</option><option>임박</option><option>긴급</option><option>부족</option></select>
         <select class="sel" id="invTyF" onchange="renderInv()"><option value="">전체구분</option><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select>
-        <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨김 포함</button>
+        <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨긴제품만 보기</button>
       </div>
     </div>
     <div class="tw"><table>
@@ -335,7 +335,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="card">
     <div class="ch">
       <div><div class="ct">발주 필요 목록</div><div class="cs" id="orderCs">제품별 판매 패턴 기반 — AI 시즌 보정 적용</div></div>
-      <button class="btn btn-pr btn-sm" onclick="recalcOrders()">재계산</button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="orderSrch" placeholder="상품명, 코드..." oninput="recalcOrders()" style="width:130px;"></div>
+        <button class="btn btn-pr btn-sm" onclick="recalcOrders()">재계산</button>
+      </div>
     </div>
     <div id="seasonBar"></div>
     <div id="alertWrap"></div>
@@ -793,7 +796,8 @@ function renderInv(){
   const sf=document.getElementById('invStF').value;
   const tf=document.getElementById('invTyF').value;
   let data=products.filter(p=>{
-    if(!_showHidden&&p.hidden) return false;
+    if(_showHidden){ if(!p.hidden) return false; } // 숨긴제품만 보기 모드
+    else { if(p.hidden) return false; } // 기본: 숨김 제외
     if(srch&&!p.name.toLowerCase().includes(srch)&&!p.code.toLowerCase().includes(srch)) return false;
     if(sf&&getStatus(p)!==sf) return false;
     if(tf&&p.type!==tf) return false;
@@ -846,7 +850,7 @@ async function saveProd(){
 }
 async function deleteProd(id){const p=products.find(x=>x.id===id);if(!p||!confirm(`"${p.name}" 을 삭제하시겠습니까?`))return;await sb.from('products').delete().eq('id',id);await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:'삭제',before:'존재',after:'삭제',user:'수동'});await loadProducts();renderInv();updateFloat();}
 async function hideProd(id){const p=products.find(x=>x.id===id);if(!p)return;const h=!p.hidden;await sb.from('products').update({hidden:h}).eq('id',id);p.hidden=h;await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:h?'숨김':'표시복원',before:h?'표시':'숨김',after:h?'숨김':'표시',user:'수동'});renderInv();updateFloat();}
-function toggleShowHidden(){_showHidden=!_showHidden;const b=document.getElementById('showHiddenBtn');if(b){b.textContent=_showHidden?'👁 숨김 숨기기':'🙈 숨김 포함';b.style.color=_showHidden?'var(--pr)':'var(--tx2)';}renderInv();}
+function toggleShowHidden(){_showHidden=!_showHidden;const b=document.getElementById('showHiddenBtn');if(b){b.textContent=_showHidden?'👁 전체보기':'🙈 숨긴제품만 보기';b.style.color=_showHidden?'var(--pr)':'var(--tx2)';}renderInv();}
 
 // ══════════════════════════════════════════════
 // 판매분석 차트 유틸
@@ -1034,7 +1038,12 @@ function focusSalesProd(id){salesSel=new Set([id]);renderProdPanel();renderSales
 // 발주관리
 // ══════════════════════════════════════════════
 function recalcOrders(){
-  orderList=products.filter(p=>!p.hidden&&p.stock<=p.reorderPoint&&!p.disc).map(p=>{
+  const _orderSrch=(document.getElementById('orderSrch')?.value||'').toLowerCase().trim();
+  orderList=products.filter(p=>{
+    if(p.hidden||p.disc||p.stock>p.reorderPoint) return false;
+    if(_orderSrch && !p.name.toLowerCase().includes(_orderSrch) && !p.code.toLowerCase().includes(_orderSrch)) return false;
+    return true;
+  }).map(p=>{
     const c=calcNeeded(p),s=detectSeason(getYearData(p,getBestYear(p)).data);
     return{...p,...c,season:s,inSeason:isInSeason(s.type)};
   }).sort((a,b)=>(a.stock/a.reorderPoint)-(b.stock/b.reorderPoint));
@@ -1217,7 +1226,7 @@ function openUpload(page){
     inv:`<strong>재고갱신/상품등록 양식</strong><br><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">상품코드 | 상품명 | 구분 | 박스당수량 | 현재고</code><br><span style="color:#059669;font-size:11px;">※ 기존 코드면 재고 업데이트, 새 코드면 신규 등록</span>`,
     sales:`<strong>출고 데이터 양식</strong><br><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">날짜 | 상품코드 | 상품명 | 출고수량</code><br><span style="color:#059669;font-size:11px;">※ 날짜의 월 기준으로 monthly_YYYY 컬럼에 누적 반영</span>`,
     order:`<strong>입고 데이터 양식</strong><br><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">날짜 | 상품코드 | 상품명 | 박스당수량 | 박스수 | 총수량</code>`,
-    rg:`<strong>로켓그로스 입고 양식</strong><br><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">날짜 | 상품코드 | 상품명 | 박스수</code>`
+    rg:`<strong>로켓그로스 입고 양식</strong><br><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">날짜 | 상품코드 | 상품명 | 출고수량</code>`
   };
   document.getElementById('uploadTitle').textContent=titles[_pendingType]||'엑셀 업로드';
   document.getElementById('uploadFmt').innerHTML=(fmts[_pendingType]||fmts.inv)+`<br><span style="color:#EA580C;font-size:11px;">⚡ 날짜+코드+상품명+수량 동일 시 중복 자동 차단</span>`;
