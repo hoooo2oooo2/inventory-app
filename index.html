@@ -930,9 +930,11 @@ function renderSalesPeriod(){
       const mon = new Date(baseMonday);
       mon.setDate(baseMonday.getDate() - w*7);
       const sun = new Date(mon); sun.setDate(mon.getDate()+6);
-      const mo = mon.getMonth()+1;
-      const fd = new Date(mon.getFullYear(), mon.getMonth(), 1);
-      const wom = Math.ceil((mon.getDate() + fd.getDay()) / 7);
+      // 목요일 기준으로 월 결정 (그 주 목요일이 속한 달)
+      const thu = new Date(mon); thu.setDate(mon.getDate()+3);
+      const mo = thu.getMonth()+1;
+      const fd = new Date(thu.getFullYear(), thu.getMonth(), 1);
+      const wom = Math.ceil((thu.getDate() + fd.getDay()) / 7);
       weeks.push({
         label: `${mo}월 ${wom}주차`,
         start: mon.toISOString().slice(0,10),
