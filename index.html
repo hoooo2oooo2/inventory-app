@@ -39,7 +39,8 @@ body{background:var(--bg2);min-height:100vh;}
 .main{padding:12px;display:flex;flex-direction:column;gap:10px;}
 
 /* CARDS */
-.card{background:var(--bg);border-radius:12px;border:0.5px solid var(--bd);overflow:hidden;}
+.card{background:var(--bg);border-radius:12px;border:0.5px solid var(--bd);}
+/* overflow:hidden을 card에서 제거하고 tw(테이블 래퍼)에만 적용 - sticky header를 위해 필요 */
 .ch{padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px;}
 .ct{font-size:14px;font-weight:600;color:var(--tx);}
 .cs{font-size:11px;color:var(--tx2);margin-top:1px;}
@@ -50,13 +51,15 @@ body{background:var(--bg2);min-height:100vh;}
 
 /* TABLE - 헤더 고정 */
 .tw{overflow-x:auto;}
-/* 테이블 헤더 고정: 탭별로 sticky top 계산 (topbar 50px + nav 44px = 94px) */
+/* card의 overflow:hidden 제거로 sticky 가능 - thead th를 viewport 기준으로 고정 */
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead th{
   padding:7px 9px;text-align:left;color:var(--tx2);font-weight:500;font-size:11px;
   background:var(--bg2);border-bottom:0.5px solid var(--bd);white-space:nowrap;
   cursor:pointer;user-select:none;
   position:sticky;top:94px;z-index:10;
+  /* 카드 border-radius 안에서 헤더가 튀어나와 보이지 않도록 */
+  box-shadow:0 0.5px 0 var(--bd);
 }
 thead th:hover{color:var(--pr);}
 thead th.ns{cursor:default;}
@@ -108,6 +111,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .tab.active{background:var(--bg);color:var(--pr);font-weight:500;}
 .tc{display:none;}
 .tc.active{display:block;}
+/* 탭 내부 테이블: 탭바(43px) 높이까지 더해서 sticky */
+.tab-table thead th{top:137px;}
 
 /* CHART */
 .period-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
@@ -1352,19 +1357,30 @@ async function confirmUpload(){
   const type=_pendingType;
   try{
     if(type==='inv'){
-      for(let b=0;b<_pendingRows.length;b+=100){
-        await sb.from('products').upsert(
-          _pendingRows.slice(b,b+100).map(r=>({code:r.code,name:r.name,type:r.typeVal||'기타',stock:r.stock,box_qty:r.boxQty})),
-          {onConflict:'code',ignoreDuplicates:false}
-        );
+      // upsert 대신 update/insert 명시적 분리 - stock 반영 보장
+      const toUpdate = _pendingRows.filter(r => r.exists);
+      const toInsert = _pendingRows.filter(r => !r.exists);
+      // 기존 상품: stock, box_qty, type 명시적 update
+      for(const r of toUpdate){
+        await sb.from('products').update({
+          stock: r.stock,
+          box_qty: r.boxQty,
+          type: r.typeVal||'기타',
+          name: r.name
+        }).eq('code', r.code);
       }
-      // 로컬 메모리에도 즉시 반영
-      _pendingRows.forEach(r=>{
-        const p=products.find(x=>x.code===r.code);
-        if(p){p.stock=r.stock;p.boxQty=r.boxQty;if(r.typeVal)p.type=r.typeVal;}
-      });
-      const newCodes=_pendingRows.filter(r=>!products.find(p=>p.code===r.code)).map(r=>r.code);
-      if(newCodes.length>0){const{data}=await sb.from('products').select('*').in('code',newCodes);if(data)data.forEach(r=>products.push(mapProd(r)));}
+      // 신규 상품: insert
+      if(toInsert.length>0){
+        for(let b=0;b<toInsert.length;b+=100){
+          await sb.from('products').insert(
+            toInsert.slice(b,b+100).map(r=>({
+              code:r.code, name:r.name, type:r.typeVal||'기타',
+              stock:r.stock, box_qty:r.boxQty,
+              monthly:Array(12).fill(0), last_yr:Array(12).fill(0)
+            }))
+          );
+        }
+      }
       await addHistory({menu:'재고관리',type:'upload',code:'MULTI',name:`${_pendingRows.length}개`,desc:'재고 엑셀 업로드',before:'-',after:`${_pendingRows.length}건`,user:'업로드'});
       // DB에서 최신 데이터 다시 로드하여 완전 동기화
       await loadProducts();
