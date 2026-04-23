@@ -49,19 +49,16 @@ body{background:var(--bg2);min-height:100vh;}
 .sl{font-size:11px;color:var(--tx2);margin-bottom:3px;}
 .sv{font-size:17px;font-weight:600;color:var(--tx);}
 
-/* TABLE
-   핵심: overflow:auto 부모 안에서 sticky가 작동하려면
-   테이블 전체를 max-height로 스크롤하는 방식 대신
-   페이지 전체를 스크롤시키고 .tw는 overflow-x:auto만 유지
-   → thead sticky는 페이지(html/body) 스크롤 기준으로 작동
-*/
-.tw{overflow-x:auto;overflow-y:visible;}
+/* TABLE */
+/* .tw에 max-height + overflow-y:auto 를 줘서 테이블 자체가 스크롤되게 함
+   → overflow:auto 부모 안에서 thead sticky top:0 이 정확히 작동 */
+.tw{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px);}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead th{
   padding:7px 9px;text-align:left;color:var(--tx2);font-weight:500;font-size:11px;
   background:var(--bg2);border-bottom:0.5px solid var(--bd);white-space:nowrap;
   cursor:pointer;user-select:none;
-  position:sticky;top:94px;z-index:10;
+  position:sticky;top:0;z-index:5;
 }
 thead th:hover{color:var(--pr);}
 thead th.ns{cursor:default;}
@@ -69,9 +66,7 @@ tbody tr{border-bottom:0.5px solid var(--bd);transition:background .1s;}
 tbody tr:hover{background:var(--bg2);}
 tbody tr:last-child{border-bottom:none;}
 td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
-
-/* 탭 내부 테이블: 탭바 높이(43px) 추가 */
-.tab-table thead th{top:137px;}
+.tab-table thead th{top:0;}
 
 /* BADGES */
 .badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:500;}
@@ -1481,30 +1476,7 @@ document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 buildYearSelects();
 loadAll();
 
-// ── thead 고정: CSS sticky가 overflow:auto 부모에서 막히므로 JS로 처리 ──
-// topbar(50px) + nav(44px) = 94px 아래에 고정
-function fixTableHeaders(){
-  const FIXED_TOP = 94; // topbar + nav
-  const TAB_BAR_H = 43; // 발주관리 탭바 높이
-  document.querySelectorAll('table').forEach(tbl=>{
-    const thead = tbl.querySelector('thead');
-    if(!thead) return;
-    const isTabTable = tbl.classList.contains('tab-table');
-    const fixedTop = isTabTable ? FIXED_TOP + TAB_BAR_H : FIXED_TOP;
-    const ths = thead.querySelectorAll('th');
-    const tblRect = tbl.getBoundingClientRect();
-    const tbodyRect = tbl.querySelector('tbody')?.getBoundingClientRect();
-    if(!tbodyRect) return;
-    // 테이블이 화면 위로 올라가서 헤더가 고정 시작점에 닿으면
-    if(tblRect.top < fixedTop && tbodyRect.bottom > fixedTop + 30){
-      const offset = fixedTop - tblRect.top;
-      ths.forEach(th=>{ th.style.transform = `translateY(${offset}px)`; th.style.position='relative'; th.style.zIndex='10'; });
-    } else {
-      ths.forEach(th=>{ th.style.transform=''; th.style.position=''; th.style.zIndex=''; });
-    }
-  });
-}
-window.addEventListener('scroll', fixTableHeaders, {passive:true});
+
 
 </script>
 </body>
