@@ -48,16 +48,27 @@ body{background:var(--bg2);min-height:100vh;}
 .sl{font-size:11px;color:var(--tx2);margin-bottom:3px;}
 .sv{font-size:17px;font-weight:600;color:var(--tx);}
 
-/* TABLE */
+/* TABLE - 헤더 고정 */
 .tw{overflow-x:auto;}
+/* 테이블 헤더 고정: 탭별로 sticky top 계산 (topbar 50px + nav 44px = 94px) */
 table{width:100%;border-collapse:collapse;font-size:12px;}
-thead th{padding:7px 9px;text-align:left;color:var(--tx2);font-weight:500;font-size:11px;background:var(--bg2);border-bottom:0.5px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none;}
+thead th{
+  padding:7px 9px;text-align:left;color:var(--tx2);font-weight:500;font-size:11px;
+  background:var(--bg2);border-bottom:0.5px solid var(--bd);white-space:nowrap;
+  cursor:pointer;user-select:none;
+  position:sticky;top:94px;z-index:10;
+}
 thead th:hover{color:var(--pr);}
 thead th.ns{cursor:default;}
 tbody tr{border-bottom:0.5px solid var(--bd);transition:background .1s;}
 tbody tr:hover{background:var(--bg2);}
 tbody tr:last-child{border-bottom:none;}
 td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
+
+/* 탭 내부 테이블 헤더는 탭바(약 43px)도 더해야 함 - 탭바 있는 테이블은 별도 클래스 */
+.tab-table thead th{
+  top:137px; /* 94px + 탭바 약 43px */
+}
 
 /* BADGES */
 .badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:500;}
@@ -92,7 +103,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .sel{padding:4px 8px;border-radius:6px;font-size:11px;border:0.5px solid var(--bd);background:var(--bg2);color:var(--tx);outline:none;cursor:pointer;}
 
 /* TABS */
-.tab-bar{display:flex;gap:3px;padding:10px 14px 0;}
+.tab-bar{display:flex;gap:3px;padding:10px 14px 0;position:sticky;top:94px;z-index:9;background:var(--bg);}
 .tab{padding:6px 12px;border-radius:8px 8px 0 0;font-size:12px;cursor:pointer;color:var(--tx2);border:0.5px solid var(--bd);border-bottom:none;background:var(--bg2);}
 .tab.active{background:var(--bg);color:var(--pr);font-weight:500;}
 .tc{display:none;}
@@ -113,7 +124,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .top5-rank.r1{background:#F59E0B;}.top5-rank.r2{background:#94A3B8;}.top5-rank.r3{background:#b45309;}
 
 /* MEMO */
-.memo-panel{min-width:150px;max-width:185px;}
+.memo-panel{min-width:130px;max-width:150px;}
 .memo-list{max-height:70px;overflow-y:auto;}
 .memo-item{font-size:10px;color:var(--tx);padding:2px 6px;border-bottom:0.5px solid var(--bd);line-height:1.4;}
 .memo-item:last-child{border-bottom:none;}
@@ -192,6 +203,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .divider-v{width:0.5px;height:16px;background:var(--bd);}
 .code-chip{font-family:monospace;font-size:10px;background:var(--bg2);padding:1px 5px;border-radius:4px;border:0.5px solid var(--bd);}
 .empty-row td{text-align:center;padding:24px;color:var(--tx2);font-size:13px;}
+
+/* 발주 입고 체크 테이블 - 1차/2차입고 열 축소 */
+#recvActiveBody td .inp.inp-narrow{width:50px;}
+.recv-name-cell{min-width:120px;max-width:160px;white-space:normal;word-break:break-all;font-size:11px;}
 
 @media(max-width:700px){.sum-row{grid-template-columns:repeat(2,1fr)!important;}.main{padding:8px;gap:8px;}}
 @media(max-width:500px){.period-row .ptab{padding:2px 5px;font-size:10px;}}
@@ -320,18 +335,32 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="tab" id="rt-d" onclick="switchRecvTab('d')">입고완료 <span id="rdCnt" style="font-size:10px;color:#059669;"></span></div>
     </div>
     <div class="tc active" id="rtc-a">
-      <div class="tw"><table>
-        <thead><tr><th>주문날짜</th><th>업로드시간</th><th>코드</th><th>상품명</th><th style="text-align:right;">주문수량</th><th style="text-align:right;">1차입고</th><th style="text-align:right;">2차입고</th><th style="text-align:right;">입고합계</th><th style="text-align:right;">미입고</th><th style="text-align:center;">상태</th><th style="text-align:center;">확인</th><th>메모</th></tr></thead>
+      <div class="tw"><table class="tab-table">
+        <thead><tr>
+          <th>주문날짜</th>
+          <th>업로드시간</th>
+          <th>코드</th>
+          <th style="min-width:140px;">상품명</th>
+          <th style="text-align:right;">주문수량</th>
+          <th style="text-align:right;width:80px;">1차입고</th>
+          <th style="text-align:right;width:80px;">2차입고</th>
+          <th style="text-align:right;">입고합계</th>
+          <th style="text-align:right;">미입고</th>
+          <th style="text-align:center;">상태</th>
+          <th style="text-align:center;">확인</th>
+          <th>메모</th>
+        </tr></thead>
         <tbody id="recvActiveBody"></tbody>
       </table></div>
     </div>
     <div class="tc" id="rtc-d">
-      <div class="tw"><table>
-        <thead><tr><th>주문날짜</th><th>업로드시간</th><th>완료시간</th><th>코드</th><th>상품명</th><th style="text-align:right;">주문수량</th><th style="text-align:right;">최종입고</th><th style="text-align:center;">상태</th><th>메모</th></tr></thead>
+      <div class="tw"><table class="tab-table">
+        <thead><tr><th>주문날짜</th><th>업로드시간</th><th>완료시간</th><th>코드</th><th style="min-width:140px;">상품명</th><th style="text-align:right;">주문수량</th><th style="text-align:right;">최종입고</th><th style="text-align:center;">상태</th><th>메모</th></tr></thead>
         <tbody id="recvDoneBody"></tbody>
       </table></div>
     </div>
   </div>
+
   <div class="card">
     <div class="ch">
       <div><div class="ct">발주 필요 목록</div><div class="cs" id="orderCs">제품별 판매 패턴 기반 — AI 시즌 보정 적용</div></div>
@@ -445,7 +474,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 </div>
 
 <!-- MODALS -->
-<!-- 상품 추가/수정 -->
 <div class="modal-overlay" id="prodModal">
   <div class="modal">
     <h3 id="prodModalTitle">상품 추가</h3>
@@ -463,7 +491,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- 입고등록 -->
 <div class="modal-overlay" id="inModal">
   <div class="modal">
     <h3 id="inTitle">입고등록</h3>
@@ -477,7 +504,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- 로켓그로스 추가 -->
 <div class="modal-overlay" id="rgAddModal">
   <div class="modal">
     <h3>로켓그로스 제품 추가</h3>
@@ -491,7 +517,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- 엑셀 업로드 -->
 <div class="modal-overlay" id="uploadModal">
   <div class="modal" style="max-width:520px;">
     <h3 id="uploadTitle">엑셀 업로드</h3>
@@ -515,8 +540,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-
-<!-- 중복 감지 -->
 <div class="modal-overlay" id="dupModal">
   <div class="modal">
     <h3 style="color:#DC2626;">중복 데이터 감지</h3>
@@ -526,7 +549,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- 초기화 확인 -->
 <div class="modal-overlay" id="clearModal">
   <div class="modal">
     <h3 style="color:#DC2626;">데이터 초기화</h3>
@@ -555,8 +577,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // 상수
 // ══════════════════════════════════════════════
 const now      = new Date();
-const CUR_YEAR = now.getFullYear();        // 2026
-const MONTH    = now.getMonth();           // 0-based (4월=3)
+const CUR_YEAR = now.getFullYear();
+const MONTH    = now.getMonth();
 const MNAMES   = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const DNAMES   = ['일','월','화','수','목','금','토'];
 const COLORS   = ['#3182F6','#05C072','#F59E0B','#EF4444','#8B5CF6','#EC4899','#0EA5E9','#14B8A6'];
@@ -569,8 +591,6 @@ const pad = n => String(n).padStart(2,'0');
 const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const fmtFull = d => `${fmtDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-// ── 사용 가능한 연도 목록 (드롭다운용) ──
-// DB 컬럼에서 자동 감지 후 채워짐. 초기값으로 최근 2년
 let YEARS = [CUR_YEAR-1, CUR_YEAR];
 
 // ══════════════════════════════════════════════
@@ -588,19 +608,16 @@ let _pendingRows=[], _pendingType='';
 // ══════════════════════════════════════════════
 // 데이터 헬퍼
 // ══════════════════════════════════════════════
-// 제품의 monthly_YYYY 컬럼 반환
 function getM(p, yr){ return p['monthly_'+(yr||CUR_YEAR)] || Array(12).fill(0); }
 function getRgM(p, yr){ return p['rg_'+(yr||CUR_YEAR)] || Array(12).fill(0); }
 function getTotalM(p, yr){ const m=getM(p,yr), r=getRgM(p,yr); return m.map((v,i)=>v+(r[i]||0)); }
 
-// 가장 데이터 많은 연도 반환
 function getBestYear(p){
   let best=CUR_YEAR, bestSum=0;
   YEARS.forEach(y=>{ const s=getTotalM(p,y).reduce((a,b)=>a+b,0); if(s>bestSum){bestSum=s;best=y;} });
   return best;
 }
 
-// 선택 연도의 데이터. 없으면 가장 데이터 많은 연도
 function getYearData(p, yr){
   const m = getTotalM(p, yr);
   if(m.some(v=>v>0)) return {data:m, year:yr};
@@ -608,7 +625,6 @@ function getYearData(p, yr){
   return {data:getTotalM(p,by), year:by};
 }
 
-// 계절 감지
 function detectSeason(m){
   const sA=(m[5]+m[6]+m[7])/3, wA=(m[11]+m[0]+m[1])/3;
   const all=m.reduce((a,b)=>a+b,0)/12||1, pk=Math.max(sA,wA)/all;
@@ -631,7 +647,6 @@ function mapProd(r){
     reorderPoint:r.reorder_point||0, hidden:r.hidden||false, disc:r.discontinued||false,
     monthly:r.monthly||Array(12).fill(0), lastYr:r.last_yr||Array(12).fill(0)
   };
-  // monthly_YYYY, rg_monthly_YYYY 컬럼 자동 매핑
   Object.keys(r).forEach(k=>{
     const m1=k.match(/^monthly_(\d{4})$/); if(m1){ p[k]=r[k]||Array(12).fill(0); }
     const m2=k.match(/^rg_monthly_(\d{4})$/); if(m2){ p['rg_'+m2[1]]=r[k]||Array(12).fill(0); }
@@ -641,7 +656,6 @@ function mapProd(r){
 
 async function loadAll(){
   await Promise.all([loadProducts(), loadReceive(), loadRg(), loadHist(), loadDailyCache()]);
-  // 실제 데이터 있는 연도 감지
   const ySet = new Set([CUR_YEAR-1, CUR_YEAR]);
   products.forEach(p=>{
     Object.keys(p).forEach(k=>{
@@ -650,7 +664,6 @@ async function loadAll(){
     });
   });
   YEARS = [...ySet].sort((a,b)=>a-b);
-  // 가장 데이터 많은 연도를 기본 선택
   let bestY=CUR_YEAR, bestS=0;
   YEARS.forEach(y=>{
     const s=products.reduce((acc,p)=>acc+getTotalM(p,y).reduce((a,b)=>a+b,0),0);
@@ -689,7 +702,6 @@ async function addHistory(item){
   historyLog.unshift({id:Date.now(),time:fmtFull(new Date()),...item});
   await sb.from('history_log').insert({time:fmtFull(new Date()),menu:item.menu,type:item.type,code:item.code,name:item.name,description:item.desc,before_val:item.before,after_val:item.after,user_type:item.user});
 }
-// daily_sales 캐시
 let _dCache={};
 async function loadDailyCache(){
   const cutoff=fmtDate(new Date(Date.now()-31*86400000));
@@ -768,18 +780,15 @@ function getStatus(p){
   if(r<=0.3) return '부족'; if(r<=0.6) return '긴급'; if(r<=1) return '임박'; return '정상';
 }
 function calcNeeded(p){
-  // daily 기반 소진 (있으면 우선)
   const {avg7,avg30}=_getDailyAvgs(p.code);
   let base;
   if(avg7>0||avg30>0) base=Math.round(Math.max(avg7,avg30*0.8)*30);
   else {
-    // monthly 기반
     const {data}=getYearData(p,salesYear);
     base=data[MONTH]||0;
     if(!base) for(let i=1;i<=3;i++){ base=data[Math.max(0,MONTH-i)]||0; if(base)break; }
   }
   base=Math.max(base,1);
-  // 시즌 보정
   const best=getYearData(p,CUR_YEAR-1).data;
   const prevAvg=best.reduce((a,b)=>a+b,0)/12||1;
   const arrM=Math.round(MONTH+p.leadTime)%12;
@@ -796,8 +805,8 @@ function renderInv(){
   const sf=document.getElementById('invStF').value;
   const tf=document.getElementById('invTyF').value;
   let data=products.filter(p=>{
-    if(_showHidden){ if(!p.hidden) return false; } // 숨긴제품만 보기 모드
-    else { if(p.hidden) return false; } // 기본: 숨김 제외
+    if(_showHidden){ if(!p.hidden) return false; }
+    else { if(p.hidden) return false; }
     if(srch&&!p.name.toLowerCase().includes(srch)&&!p.code.toLowerCase().includes(srch)) return false;
     if(sf&&getStatus(p)!==sf) return false;
     if(tf&&p.type!==tf) return false;
@@ -872,7 +881,6 @@ function updateSalesSummary(datasets){
 }
 function periodLabel(per,yr){return{lastweek:'저번주',daily:'이번주',weekly:`${yr}년 주별`,monthly:`${yr}년 월별`,q1:`${yr}년 1분기`,q2:`${yr}년 2분기`,q3:`${yr}년 3분기`,q4:`${yr}년 4분기`}[per]||per;}
 
-// 라벨→월인덱스
 function labelToMIdx(lbl){
   const sorted=[...MNAMES].sort((a,b)=>b.length-a.length);
   for(const mn of sorted){ if(lbl.includes(mn)) return MNAMES.indexOf(mn); }
@@ -896,7 +904,6 @@ function renderSalesPeriod(){
   const sel=[...salesSel].map(id=>products.find(x=>x.id===id)).filter(Boolean);
   if(!sel.length) return;
 
-  // ── 일별 / 저번주 ──
   if(salesPeriod==='daily'||salesPeriod==='lastweek'){
     const rng=getDateRange(salesYear,salesPeriod);
     if(salesChart) salesChart.destroy();
@@ -917,22 +924,30 @@ function renderSalesPeriod(){
     return;
   }
 
-  // ── 주별 ── 항상 DB 직접 조회
+  // ── 주별 (수정됨: 선택 연도 기준 전체 주 표시) ──
   if(salesPeriod==='weekly'){
     const isCurYear=salesYear===CUR_YEAR;
+
+    // 현재 연도면 오늘 기준 최근 8주, 과거 연도면 해당 연도 전체 52주
     const baseDate=isCurYear?new Date():new Date(salesYear,11,31);
     const baseMonday=new Date(baseDate);
     baseMonday.setDate(baseDate.getDate()-((baseDate.getDay()+6)%7));
+
     const weeks=[];
-    for(let w=7;w>=0;w--){
+    const weekCount=isCurYear?8:52;
+    for(let w=weekCount-1;w>=0;w--){
       const mon=new Date(baseMonday); mon.setDate(baseMonday.getDate()-w*7);
       const sun=new Date(mon); sun.setDate(mon.getDate()+6);
       const thu=new Date(mon); thu.setDate(mon.getDate()+3);
+      // 해당 연도에 속하는 주만 포함
+      if(thu.getFullYear()!==salesYear) continue;
       const mo=thu.getMonth()+1;
       const fd=new Date(thu.getFullYear(),thu.getMonth(),1);
       const wom=Math.ceil((thu.getDate()+fd.getDay())/7);
       weeks.push({label:`${mo}월 ${wom}주차`,start:mon.toISOString().slice(0,10),end:sun.toISOString().slice(0,10)});
     }
+
+    if(!weeks.length) return;
     const labels=weeks.map(w=>w.label);
     if(salesChart) salesChart.destroy();
     loadDailySales(sel.length===1?sel[0].code:null,weeks[0].start,weeks[weeks.length-1].end).then(dd=>{
@@ -997,11 +1012,9 @@ function getDateRange(yr,per){
 function getLastWeekDays(){const days=[];const d=new Date(now);d.setDate(d.getDate()-7);while(d.getDay()!==1)d.setDate(d.getDate()-1);for(let i=0;i<5;i++){const dd=new Date(d);dd.setDate(d.getDate()+i);days.push(`${dd.getMonth()+1}/${dd.getDate()}(${DNAMES[dd.getDay()]})`);}return days;}
 function getThisWeekDays(){const days=[];let d=new Date(now),c=0;while(c<5){if(d.getDay()>=1&&d.getDay()<=5){days.unshift(`${d.getMonth()+1}/${d.getDate()}(${DNAMES[d.getDay()]})`);c++;}d.setDate(d.getDate()-1);}return days;}
 
-// 판매현황 테이블
 function renderSalesTbody(){
   if(!products.length){document.getElementById('salesTbody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--tx2);">데이터 없음</td></tr>`;return;}
   document.getElementById('salesTbody').innerHTML=products.filter(p=>!p.hidden).map(p=>{
-    // 이번달/저번달 = 올해 기준
     const m=getYearData(p,CUR_YEAR).data;
     const cm=m[MONTH]||0;
     const pm=m[Math.max(0,MONTH-1)]||0;
@@ -1053,7 +1066,6 @@ function recalcOrders(){
   if(actives.length){const hasSu=actives.some(p=>detectSeason(getYearData(p,getBestYear(p)).data).type==='summer');sb_el.innerHTML=`<div class="sbar ${hasSu?'summer':'winter'}"><span>${hasSu?'☀':'❄'}</span><strong>현재 성수기:</strong> ${actives.map(p=>p.name).join(', ')}</div>`;}
   else sb_el.innerHTML=`<div class="sbar normal"><span>✓</span><span>${MNAMES[MONTH]} 기준 평시</span></div>`;
   document.getElementById('formulaBox').innerHTML=`<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | MAX(최근7일, 최근30일×0.8) 기반 월소진 추정 | 리드타임+1.2개월 재고 확보`;
-  // 사전알림
   const alerts=[];
   products.forEach(p=>{const s=detectSeason(getYearData(p,getBestYear(p)).data);if(s.type==='all')return;const mu=(s.peakStart-MONTH+12)%12;if(mu>0&&mu<=2){const c=calcNeeded(p);alerts.push({p,s,mu,c});}});
   document.getElementById('alertWrap').innerHTML=alerts.length?`<div class="alert-wrap">`+alerts.slice(0,5).map(a=>`<div class="alert-item ${a.mu===1?'urg':'warn'}"><span>${a.mu===1?'🚨':'⚠'}</span><div><div class="alert-title">${a.mu===1?'[긴급]':'[사전알림]'} ${a.p.name} — ${a.s.label} ${a.mu}개월 전</div><div class="alert-desc">권장: <strong>${a.c.needed.toLocaleString()}개 (${a.c.boxes}박스)</strong> | 현재고: ${a.p.stock.toLocaleString()}개</div></div></div>`).join('')+'</div>':'';
@@ -1085,14 +1097,28 @@ function renderRecv(){
   let list=receiveList;if(filter)list=list.filter(r=>getRecvSt(r).l===filter);
   document.getElementById('raCnt').textContent=`(${receiveList.length})`;
   document.getElementById('rdCnt').textContent=`(${doneList.length})`;
+  // 1차/2차 입고 칸 너비 줄이고 상품명 넓게
   document.getElementById('recvActiveBody').innerHTML=list.map(r=>{
     const tot=r.in1+r.in2,miss=Math.max(0,r.orderQty-tot),st=getRecvSt(r);
     const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):`<div style="font-size:10px;color:var(--tx2);padding:3px 6px;">메모 없음</div>`;
-    return `<tr id="rv-${r.id}"><td>${r.orderDate}</td><td style="color:var(--tx2);font-size:11px;">${r.uploadTime}</td><td><span class="code-chip">${r.code}</span></td><td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;">${r.name}</td><td style="text-align:right;"><input class="inp" style="width:70px;" id="ord-${r.id}" type="number" value="${r.orderQty}" min="1" onchange="liveCalc(${r.id})"></td><td style="text-align:right;"><input class="inp" id="i1-${r.id}" type="number" value="${r.in1}" min="0" onchange="liveCalc(${r.id})"></td><td style="text-align:right;"><input class="inp" id="i2-${r.id}" type="number" value="${r.in2}" min="0" onchange="liveCalc(${r.id})"></td><td style="text-align:right;font-weight:500;" id="tot-${r.id}">${tot.toLocaleString()}개</td><td style="text-align:right;color:${miss>0?'#DC2626':'#059669'};" id="mis-${r.id}">${miss.toLocaleString()}개</td><td style="text-align:center;"><span class="badge ${st.c}" id="st-${r.id}">${st.l}</span></td><td style="text-align:center;"><button class="btn btn-sm" id="cb-${r.id}" onclick="confirmRecv(${r.id})" style="background:${st.l==='입고완료'?'#ECFDF5':'var(--bg)'};color:${st.l==='입고완료'?'#059669':'var(--tx)'};">확인</button></td><td class="memo-panel"><div class="memo-list">${ml}</div><div class="memo-add"><input type="text" id="mi-${r.id}" placeholder="메모..." onkeydown="if(event.key==='Enter')addMemo(${r.id})"><button onclick="addMemo(${r.id})">+</button></div></td></tr>`;
+    return `<tr id="rv-${r.id}">
+      <td>${r.orderDate}</td>
+      <td style="color:var(--tx2);font-size:11px;">${r.uploadTime}</td>
+      <td><span class="code-chip">${r.code}</span></td>
+      <td class="recv-name-cell">${r.name}</td>
+      <td style="text-align:right;"><input class="inp" style="width:60px;" id="ord-${r.id}" type="number" value="${r.orderQty}" min="1" onchange="liveCalc(${r.id})"></td>
+      <td style="text-align:right;"><input class="inp" style="width:50px;" id="i1-${r.id}" type="number" value="${r.in1}" min="0" onchange="liveCalc(${r.id})"></td>
+      <td style="text-align:right;"><input class="inp" style="width:50px;" id="i2-${r.id}" type="number" value="${r.in2}" min="0" onchange="liveCalc(${r.id})"></td>
+      <td style="text-align:right;font-weight:500;" id="tot-${r.id}">${tot.toLocaleString()}개</td>
+      <td style="text-align:right;color:${miss>0?'#DC2626':'#059669'};" id="mis-${r.id}">${miss.toLocaleString()}개</td>
+      <td style="text-align:center;"><span class="badge ${st.c}" id="st-${r.id}">${st.l}</span></td>
+      <td style="text-align:center;"><button class="btn btn-sm" id="cb-${r.id}" onclick="confirmRecv(${r.id})" style="background:${st.l==='입고완료'?'#ECFDF5':'var(--bg)'};color:${st.l==='입고완료'?'#059669':'var(--tx)'};">확인</button></td>
+      <td class="memo-panel"><div class="memo-list">${ml}</div><div class="memo-add"><input type="text" id="mi-${r.id}" placeholder="메모..." onkeydown="if(event.key==='Enter')addMemo(${r.id})"><button onclick="addMemo(${r.id})">+</button></div></td>
+    </tr>`;
   }).join('');
   document.getElementById('recvDoneBody').innerHTML=doneList.length?doneList.map(r=>{
     const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):`<div style="font-size:10px;color:var(--tx2);padding:3px 6px;">-</div>`;
-    return `<tr><td>${r.orderDate}</td><td style="color:var(--tx2);font-size:11px;">${r.uploadTime}</td><td style="color:var(--tx2);font-size:11px;">${r.doneTime}</td><td><span class="code-chip">${r.code}</span></td><td>${r.name}</td><td style="text-align:right;font-weight:500;">${r.orderQty.toLocaleString()}개</td><td style="text-align:right;color:#059669;font-weight:500;">${(r.in1+r.in2).toLocaleString()}개</td><td style="text-align:center;"><span class="badge b-su">완료</span></td><td class="memo-panel"><div class="memo-list">${ml}</div></td></tr>`;
+    return `<tr><td>${r.orderDate}</td><td style="color:var(--tx2);font-size:11px;">${r.uploadTime}</td><td style="color:var(--tx2);font-size:11px;">${r.doneTime}</td><td><span class="code-chip">${r.code}</span></td><td class="recv-name-cell">${r.name}</td><td style="text-align:right;font-weight:500;">${r.orderQty.toLocaleString()}개</td><td style="text-align:right;color:#059669;font-weight:500;">${(r.in1+r.in2).toLocaleString()}개</td><td style="text-align:center;"><span class="badge b-su">완료</span></td><td class="memo-panel"><div class="memo-list">${ml}</div></td></tr>`;
   }).join(''):`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--tx2);">완료 내역 없음</td></tr>`;
 }
 function liveCalc(id){
@@ -1254,10 +1280,8 @@ function _parseDate(ds){
   if(!ds&&ds!==0) return null;
   if(ds instanceof Date){ return {yr:ds.getFullYear(),mIdx:ds.getMonth(),str:fmtDate(ds)}; }
   const s=String(ds).trim();
-  // YYYY-MM-DD
   let m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
   if(m) return {yr:parseInt(m[1]),mIdx:parseInt(m[2])-1,str:`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`};
-  // 엑셀 시리얼
   const n=parseFloat(s);
   if(!isNaN(n)&&n>1&&n<2958466){
     const d=new Date(Math.round((n-25569)*86400000));
@@ -1328,21 +1352,25 @@ async function confirmUpload(){
   const type=_pendingType;
   try{
     if(type==='inv'){
-      // 100개씩 배치 upsert
       for(let b=0;b<_pendingRows.length;b+=100){
         await sb.from('products').upsert(
           _pendingRows.slice(b,b+100).map(r=>({code:r.code,name:r.name,type:r.typeVal||'기타',stock:r.stock,box_qty:r.boxQty})),
           {onConflict:'code',ignoreDuplicates:false}
         );
       }
-      _pendingRows.forEach(r=>{const p=products.find(x=>x.code===r.code);if(p){p.stock=r.stock;p.boxQty=r.boxQty;if(r.typeVal)p.type=r.typeVal;}});
+      // 로컬 메모리에도 즉시 반영
+      _pendingRows.forEach(r=>{
+        const p=products.find(x=>x.code===r.code);
+        if(p){p.stock=r.stock;p.boxQty=r.boxQty;if(r.typeVal)p.type=r.typeVal;}
+      });
       const newCodes=_pendingRows.filter(r=>!products.find(p=>p.code===r.code)).map(r=>r.code);
       if(newCodes.length>0){const{data}=await sb.from('products').select('*').in('code',newCodes);if(data)data.forEach(r=>products.push(mapProd(r)));}
       await addHistory({menu:'재고관리',type:'upload',code:'MULTI',name:`${_pendingRows.length}개`,desc:'재고 엑셀 업로드',before:'-',after:`${_pendingRows.length}건`,user:'업로드'});
+      // DB에서 최신 데이터 다시 로드하여 완전 동기화
+      await loadProducts();
       renderInv();updateFloat();
       if(products.length>0&&salesSel.size===0)salesSel=new Set([products[0].id]);
     } else if(type==='sales'){
-      // 연도별 그룹핑 후 monthly_YYYY 컬럼 업데이트
       const upd={};
       for(const row of _pendingRows){
         if(row.mIdx<0)continue;
@@ -1352,7 +1380,6 @@ async function confirmUpload(){
         if(!upd[p.id])upd[p.id]={};
         if(!upd[p.id][yr])upd[p.id][yr]=[...(p[col]||Array(12).fill(0))];
         upd[p.id][yr][row.mIdx]=(upd[p.id][yr][row.mIdx]||0)+row.qty;
-        // 새 연도면 YEARS에 추가
         if(!YEARS.includes(yr)){YEARS.push(yr);YEARS.sort((a,b)=>a-b);buildYearSelects();}
       }
       for(const[id,yrs] of Object.entries(upd)){
@@ -1362,7 +1389,6 @@ async function confirmUpload(){
         const p=products.find(x=>x.id===parseInt(id));
         if(p){for(const[yr,monthly] of Object.entries(yrs)) p['monthly_'+yr]=monthly;}
       }
-      // daily_sales에도 저장
       const dailyRows=_pendingRows.filter(r=>r.mIdx>=0&&r.qty>0&&r.dateStr).map(r=>({code:r.code,name:r.name,sale_date:r.dateStr,qty:r.qty}));
       for(let b=0;b<dailyRows.length;b+=100){
         await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100),{onConflict:'code,sale_date',ignoreDuplicates:false});
@@ -1406,7 +1432,6 @@ async function confirmUpload(){
     btn.textContent='📥 적용하기';btn.disabled=false;
   }
 }
-function simulateUpload(){confirmUpload();}
 
 // ══════════════════════════════════════════════
 // 데이터 초기화
@@ -1436,9 +1461,7 @@ document.getElementById('topTime').textContent=fmtFull(now);
 document.getElementById('inDate').value=fmtDate(now);
 document.getElementById('salesUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
-// 초기 드롭다운 (DB 로드 전 임시)
 buildYearSelects();
-
 loadAll();
 </script>
 </body>
