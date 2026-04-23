@@ -49,17 +49,19 @@ body{background:var(--bg2);min-height:100vh;}
 .sl{font-size:11px;color:var(--tx2);margin-bottom:3px;}
 .sv{font-size:17px;font-weight:600;color:var(--tx);}
 
-/* TABLE - 헤더 고정 */
-.tw{overflow-x:auto;}
-/* card의 overflow:hidden 제거로 sticky 가능 - thead th를 viewport 기준으로 고정 */
+/* TABLE
+   핵심: overflow:auto 부모 안에서 sticky가 작동하려면
+   테이블 전체를 max-height로 스크롤하는 방식 대신
+   페이지 전체를 스크롤시키고 .tw는 overflow-x:auto만 유지
+   → thead sticky는 페이지(html/body) 스크롤 기준으로 작동
+*/
+.tw{overflow-x:auto;overflow-y:visible;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead th{
   padding:7px 9px;text-align:left;color:var(--tx2);font-weight:500;font-size:11px;
   background:var(--bg2);border-bottom:0.5px solid var(--bd);white-space:nowrap;
   cursor:pointer;user-select:none;
   position:sticky;top:94px;z-index:10;
-  /* 카드 border-radius 안에서 헤더가 튀어나와 보이지 않도록 */
-  box-shadow:0 0.5px 0 var(--bd);
 }
 thead th:hover{color:var(--pr);}
 thead th.ns{cursor:default;}
@@ -68,10 +70,8 @@ tbody tr:hover{background:var(--bg2);}
 tbody tr:last-child{border-bottom:none;}
 td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
-/* 탭 내부 테이블 헤더는 탭바(약 43px)도 더해야 함 - 탭바 있는 테이블은 별도 클래스 */
-.tab-table thead th{
-  top:137px; /* 94px + 탭바 약 43px */
-}
+/* 탭 내부 테이블: 탭바 높이(43px) 추가 */
+.tab-table thead th{top:137px;}
 
 /* BADGES */
 .badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:500;}
@@ -1362,12 +1362,13 @@ async function confirmUpload(){
       const toInsert = _pendingRows.filter(r => !r.exists);
       // 기존 상품: stock, box_qty, type 명시적 update
       for(const r of toUpdate){
-        await sb.from('products').update({
+        const {error} = await sb.from('products').update({
           stock: r.stock,
           box_qty: r.boxQty,
           type: r.typeVal||'기타',
           name: r.name
         }).eq('code', r.code);
+        if(error) console.error('stock update error:', r.code, error.message);
       }
       // 신규 상품: insert
       if(toInsert.length>0){
@@ -1479,6 +1480,32 @@ document.getElementById('salesUpdLbl').textContent='최근 갱신: '+fmtFull(now
 document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 buildYearSelects();
 loadAll();
+
+// ── thead 고정: CSS sticky가 overflow:auto 부모에서 막히므로 JS로 처리 ──
+// topbar(50px) + nav(44px) = 94px 아래에 고정
+function fixTableHeaders(){
+  const FIXED_TOP = 94; // topbar + nav
+  const TAB_BAR_H = 43; // 발주관리 탭바 높이
+  document.querySelectorAll('table').forEach(tbl=>{
+    const thead = tbl.querySelector('thead');
+    if(!thead) return;
+    const isTabTable = tbl.classList.contains('tab-table');
+    const fixedTop = isTabTable ? FIXED_TOP + TAB_BAR_H : FIXED_TOP;
+    const ths = thead.querySelectorAll('th');
+    const tblRect = tbl.getBoundingClientRect();
+    const tbodyRect = tbl.querySelector('tbody')?.getBoundingClientRect();
+    if(!tbodyRect) return;
+    // 테이블이 화면 위로 올라가서 헤더가 고정 시작점에 닿으면
+    if(tblRect.top < fixedTop && tbodyRect.bottom > fixedTop + 30){
+      const offset = fixedTop - tblRect.top;
+      ths.forEach(th=>{ th.style.transform = `translateY(${offset}px)`; th.style.position='relative'; th.style.zIndex='10'; });
+    } else {
+      ths.forEach(th=>{ th.style.transform=''; th.style.position=''; th.style.zIndex=''; });
+    }
+  });
+}
+window.addEventListener('scroll', fixTableHeaders, {passive:true});
+
 </script>
 </body>
 </html>
