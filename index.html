@@ -50,23 +50,24 @@ body{background:var(--bg2);min-height:100vh;}
 .sv{font-size:17px;font-weight:600;color:var(--tx);}
 
 /* TABLE */
-/* .tw에 max-height + overflow-y:auto 를 줘서 테이블 자체가 스크롤되게 함
-   → overflow:auto 부모 안에서 thead sticky top:0 이 정확히 작동 */
-.tw{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px);}
+.tw{overflow-x:auto;}
+/* 재고관리: 데이터 많아 테이블 내부 스크롤 + 헤더 고정 */
+.tw-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px);}
+/* 발주 입고 체크: 고정 높이로 내부 스크롤 + 헤더 고정 */
+.tw-recv{overflow-x:auto;overflow-y:auto;max-height:380px;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead th{
   padding:7px 9px;text-align:left;color:var(--tx2);font-weight:500;font-size:11px;
   background:var(--bg2);border-bottom:0.5px solid var(--bd);white-space:nowrap;
   cursor:pointer;user-select:none;
-  position:sticky;top:0;z-index:5;
 }
 thead th:hover{color:var(--pr);}
 thead th.ns{cursor:default;}
+.tw-scroll thead th,.tw-recv thead th{position:sticky;top:0;z-index:5;}
 tbody tr{border-bottom:0.5px solid var(--bd);transition:background .1s;}
 tbody tr:hover{background:var(--bg2);}
 tbody tr:last-child{border-bottom:none;}
 td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
-.tab-table thead th{top:0;}
 
 /* BADGES */
 .badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:500;}
@@ -251,7 +252,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨긴제품만 보기</button>
       </div>
     </div>
-    <div class="tw"><table>
+    <div class="tw-scroll"><table>
       <thead><tr>
         <th onclick="sortInv('code')">코드 <span id="is_code">⇅</span></th>
         <th onclick="sortInv('name')">상품명 <span id="is_name">⇅</span></th>
@@ -335,7 +336,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="tab" id="rt-d" onclick="switchRecvTab('d')">입고완료 <span id="rdCnt" style="font-size:10px;color:#059669;"></span></div>
     </div>
     <div class="tc active" id="rtc-a">
-      <div class="tw"><table class="tab-table">
+      <div class="tw-recv"><table class="tab-table">
         <thead><tr>
           <th>주문날짜</th>
           <th>업로드시간</th>
@@ -354,7 +355,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </table></div>
     </div>
     <div class="tc" id="rtc-d">
-      <div class="tw"><table class="tab-table">
+      <div class="tw-recv"><table class="tab-table">
         <thead><tr><th>주문날짜</th><th>업로드시간</th><th>완료시간</th><th>코드</th><th style="min-width:140px;">상품명</th><th style="text-align:right;">주문수량</th><th style="text-align:right;">최종입고</th><th style="text-align:center;">상태</th><th>메모</th></tr></thead>
         <tbody id="recvDoneBody"></tbody>
       </table></div>
