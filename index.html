@@ -51,10 +51,9 @@ body{background:var(--bg2);min-height:100vh;}
 
 /* TABLE */
 .tw{overflow-x:auto;}
-/* 재고관리: 데이터 많아 테이블 내부 스크롤 + 헤더 고정 */
+/* 재고관리만: 내부 스크롤 + 헤더 고정 */
 .tw-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px);}
-/* 발주 입고 체크: 고정 높이로 내부 스크롤 + 헤더 고정 */
-.tw-recv{overflow-x:auto;overflow-y:auto;max-height:380px;}
+.tw-scroll thead th{position:sticky;top:0;z-index:5;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead th{
   padding:7px 9px;text-align:left;color:var(--tx2);font-weight:500;font-size:11px;
@@ -63,7 +62,6 @@ thead th{
 }
 thead th:hover{color:var(--pr);}
 thead th.ns{cursor:default;}
-.tw-scroll thead th,.tw-recv thead th{position:sticky;top:0;z-index:5;}
 tbody tr{border-bottom:0.5px solid var(--bd);transition:background .1s;}
 tbody tr:hover{background:var(--bg2);}
 tbody tr:last-child{border-bottom:none;}
@@ -102,13 +100,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .sel{padding:4px 8px;border-radius:6px;font-size:11px;border:0.5px solid var(--bd);background:var(--bg2);color:var(--tx);outline:none;cursor:pointer;}
 
 /* TABS */
-.tab-bar{display:flex;gap:3px;padding:10px 14px 0;position:sticky;top:94px;z-index:9;background:var(--bg);}
+.tab-bar{display:flex;gap:3px;padding:10px 14px 0;}
 .tab{padding:6px 12px;border-radius:8px 8px 0 0;font-size:12px;cursor:pointer;color:var(--tx2);border:0.5px solid var(--bd);border-bottom:none;background:var(--bg2);}
 .tab.active{background:var(--bg);color:var(--pr);font-weight:500;}
 .tc{display:none;}
 .tc.active{display:block;}
-/* 탭 내부 테이블: 탭바(43px) 높이까지 더해서 sticky */
-.tab-table thead th{top:137px;}
 
 /* CHART */
 .period-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
@@ -336,7 +332,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="tab" id="rt-d" onclick="switchRecvTab('d')">입고완료 <span id="rdCnt" style="font-size:10px;color:#059669;"></span></div>
     </div>
     <div class="tc active" id="rtc-a">
-      <div class="tw-recv"><table class="tab-table">
+      <div class="tw"><table class="tab-table">
         <thead><tr>
           <th>주문날짜</th>
           <th>업로드시간</th>
@@ -355,7 +351,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </table></div>
     </div>
     <div class="tc" id="rtc-d">
-      <div class="tw-recv"><table class="tab-table">
+      <div class="tw"><table class="tab-table">
         <thead><tr><th>주문날짜</th><th>업로드시간</th><th>완료시간</th><th>코드</th><th style="min-width:140px;">상품명</th><th style="text-align:right;">주문수량</th><th style="text-align:right;">최종입고</th><th style="text-align:center;">상태</th><th>메모</th></tr></thead>
         <tbody id="recvDoneBody"></tbody>
       </table></div>
