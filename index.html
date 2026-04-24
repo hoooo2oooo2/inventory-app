@@ -328,7 +328,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="card">
     <div class="ch">
       <div><div class="ct">발주 입고 체크</div><div class="cs">수정 후 확인 — 완전입고 시 완료탭 이동</div></div>
-      <select class="sel" id="recvFilter" onchange="renderRecv()"><option value="">전체</option><option value="대기">대기</option><option value="부분입고">부분입고</option></select>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="recvSrch" placeholder="상품명, 코드..." oninput="renderRecv()" style="width:130px;"></div>
+        <select class="sel" id="recvFilter" onchange="renderRecv()"><option value="">전체</option><option value="대기">대기</option><option value="부분입고">부분입고</option></select>
+      </div>
     </div>
     <div class="tab-bar">
       <div class="tab active" id="rt-a" onclick="switchRecvTab('a')">진행중 <span id="raCnt" style="font-size:10px;color:var(--tx2);"></span></div>
@@ -1094,7 +1097,10 @@ function isDup(item){return[...receiveList,...doneList].some(r=>r.orderDate===it
 function getRecvSt(r){const t=r.in1+r.in2;if(t>=r.orderQty)return{l:'입고완료',c:'b-su'};if(t>0)return{l:'부분입고',c:'b-wa'};return{l:'대기',c:'b-gy'};}
 function renderRecv(){
   const filter=document.getElementById('recvFilter').value;
-  let list=receiveList;if(filter)list=list.filter(r=>getRecvSt(r).l===filter);
+  const srch=(document.getElementById('recvSrch')?.value||'').toLowerCase().trim();
+  let list=receiveList;
+  if(filter) list=list.filter(r=>getRecvSt(r).l===filter);
+  if(srch) list=list.filter(r=>r.name.toLowerCase().includes(srch)||r.code.toLowerCase().includes(srch));
   document.getElementById('raCnt').textContent=`(${receiveList.length})`;
   document.getElementById('rdCnt').textContent=`(${doneList.length})`;
   // 1차/2차 입고 칸 너비 줄이고 상품명 넓게
