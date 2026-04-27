@@ -1707,9 +1707,10 @@ async function confirmUpload(){
         const p=products.find(x=>x.id===parseInt(id));
         if(p){for(const[yr,monthly] of Object.entries(yrs)) p['monthly_'+yr]=monthly;}
       }
-      const dailyRows=_pendingRows.filter(r=>r.mIdx>=0&&r.qty>0&&r.dateStr).map(r=>({code:r.code,name:r.name,sale_date:r.dateStr,qty:r.qty}));
+      const dailyRows=_pendingRows.filter(r=>r.mIdx>=0&&r.qty>0&&r.dateStr).map(r=>({code:r.code,name:r.name,sale_date:r.dateStr,qty:r.qty,is_rg:false}));
       for(let b=0;b<dailyRows.length;b+=100){
-        await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100),{onConflict:'code,sale_date',ignoreDuplicates:false});
+        const {error}=await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100),{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
+        if(error) console.error('daily_sales upsert error:',error.message);
       }
       await addHistory({menu:'판매분석',type:'upload',code:'MULTI',name:`${_pendingRows.length}건`,desc:'출고 데이터 업로드',before:'-',after:`${Object.keys(upd).length}개 상품`,user:'업로드'});
       if(currentPage==='sales'){renderSalesPeriod();renderSalesTbody();}
