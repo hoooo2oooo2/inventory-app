@@ -707,17 +707,38 @@ async function addHistory(item){
 }
 let _dCache={};
 async function loadDailyCache(){
-  const cutoff=fmtDate(new Date(Date.now()-31*86400000));
-  const {data}=await sb.from('daily_sales').select('code,sale_date,qty').gte('sale_date',cutoff).eq('is_rg',false);
+  // 날짜 제한 없이 전체 daily_sales 데이터 로드 (페이지네이션)
   _dCache={};
-  if(data) data.forEach(r=>{if(!_dCache[r.code])_dCache[r.code]={};_dCache[r.code][r.sale_date]=((_dCache[r.code][r.sale_date]||0)+r.qty);});
+  let from=0; const pageSize=1000;
+  while(true){
+    const {data,error}=await sb.from('daily_sales')
+      .select('code,sale_date,qty')
+      .eq('is_rg',false)
+      .order('sale_date')
+      .range(from, from+pageSize-1);
+    if(error||!data||data.length===0) break;
+    data.forEach(r=>{
+      if(!_dCache[r.code])_dCache[r.code]={};
+      _dCache[r.code][r.sale_date]=((_dCache[r.code][r.sale_date]||0)+r.qty);
+    });
+    if(data.length<pageSize) break;
+    from+=pageSize;
+  }
 }
 async function loadDailySales(code,start,end){
-  let q=sb.from('daily_sales').select('code,sale_date,qty').gte('sale_date',start).lte('sale_date',end).eq('is_rg',false);
-  if(code) q=q.eq('code',code);
-  const {data}=await q;
   const out={};
-  if(data) data.forEach(r=>{if(!out[r.code])out[r.code]={};out[r.code][r.sale_date]=(out[r.code][r.sale_date]||0)+r.qty;});
+  let from=0; const pageSize=1000;
+  while(true){
+    let q=sb.from('daily_sales').select('code,sale_date,qty')
+      .gte('sale_date',start).lte('sale_date',end)
+      .eq('is_rg',false).order('sale_date').range(from,from+pageSize-1);
+    if(code) q=q.eq('code',code);
+    const {data,error}=await q;
+    if(error||!data||data.length===0) break;
+    data.forEach(r=>{if(!out[r.code])out[r.code]={};out[r.code][r.sale_date]=(out[r.code][r.sale_date]||0)+r.qty;});
+    if(data.length<pageSize) break;
+    from+=pageSize;
+  }
   return out;
 }
 function _getDailyAvgs(code){
@@ -783,24 +804,59 @@ function getStatus(p){
   if(r<=0.3) return '부족'; if(r<=0.6) return '긴급'; if(r<=1) return '임박'; return '정상';
 }
 function calcNeeded(p){
-  const {avg7,avg30}=_getDailyAvgs(p.code);
-  let base;
-  if(avg7>0||avg30>0) base=Math.round(Math.max(avg7,avg30*0.8)*30);
-  else {
-    const {data}=getYearData(p,salesYear);
-    base=data[MONTH]||0;
-    if(!base) for(let i=1;i<=3;i++){ base=data[Math.max(0,MONTH-i)]||0; if(base)break; }
+  // ── 일별 캐시에서 실제 데이터 기반 일평균 계산 ──
+  const dayData = _dCache[p.code]||{};
+  const dates = Object.keys(dayData).sort();
+  let base = 0;
+
+  if(dates.length > 0){
+    const latestDate = dates[dates.length-1];
+    const latest = new Date(latestDate);
+    // 최신 데이터 기준 7일 / 30일 구간
+    const cut7 = fmtDate(new Date(latest.getTime()-7*86400000));
+    const cut30 = fmtDate(new Date(latest.getTime()-30*86400000));
+    let s7=0, cnt7=0, s30=0, cnt30=0;
+    dates.forEach(d=>{
+      const q=dayData[d];
+      if(d>=cut30){s30+=q;cnt30++;}
+      if(d>=cut7){s7+=q;cnt7++;}
+    });
+    // 최근 7일 기준 일평균 → 월환산
+    const avg7 = cnt7>0 ? s7/7 : 0;
+    // 최근 30일 기준 일평균 → 월환산 (실제 날짜 수 기준)
+    const avg30 = cnt30>0 ? s30/30 : 0;
+    // 더 최근 트렌드(7일)가 있으면 우선, 없으면 30일 평균
+    if(avg7 > 0) base = Math.round(avg7*30);
+    else if(avg30 > 0) base = Math.round(avg30*30);
   }
-  base=Math.max(base,1);
-  const best=getYearData(p,CUR_YEAR-1).data;
-  const prevAvg=best.reduce((a,b)=>a+b,0)/12||1;
-  const arrM=Math.round(MONTH+p.leadTime)%12;
-  const sr=Math.min(2.5,Math.max(0.5,(best[arrM]||0)/prevAvg));
-  const expM=sr>1.15?Math.round(base*sr):base;
-  const needed=Math.max(0,Math.round(expM*(p.leadTime+1.2)-p.stock));
-  const boxes=Math.ceil(needed/(p.boxQty||1));
-  const corrPct=Math.round((sr-1)*100);
-  return {needed,boxes,expM,sr,corrLabel:corrPct>5?`성수기 +${corrPct}%`:corrPct<-5?`비수기 ${corrPct}%`:'보정없음'};
+
+  // 일별 데이터 없거나 0이면 월별 데이터 폴백
+  if(base <= 0){
+    const mData = getYearData(p, CUR_YEAR).data;
+    // 이번달 → 전월 순서로
+    for(let i=0; i<=3; i++){
+      const idx = Math.max(0, MONTH-i);
+      if(mData[idx]>0){ base=mData[idx]; break; }
+    }
+    // 작년 데이터까지 폴백
+    if(base <= 0){
+      const lastYrData = getYearData(p, CUR_YEAR-1).data;
+      base = lastYrData[MONTH] || lastYrData.reduce((a,b)=>Math.max(a,b),0);
+    }
+  }
+
+  base = Math.max(base, 1);
+
+  // 시즌 보정 (리드타임 도착 시점의 작년 판매 비율)
+  const best = getYearData(p, CUR_YEAR-1).data;
+  const prevAvg = best.reduce((a,b)=>a+b,0)/12||1;
+  const arrM = Math.round(MONTH+p.leadTime)%12;
+  const sr = Math.min(2.5, Math.max(0.5,(best[arrM]||0)/prevAvg));
+  const expM = sr>1.15 ? Math.round(base*sr) : base;
+  const needed = Math.max(0, Math.round(expM*(p.leadTime+1.2)-p.stock));
+  const boxes = Math.ceil(needed/(p.boxQty||1));
+  const corrPct = Math.round((sr-1)*100);
+  return {needed, boxes, expM, sr, corrLabel: corrPct>5?`성수기 +${corrPct}%`:corrPct<-5?`비수기 ${corrPct}%`:'보정없음'};
 }
 
 function renderInv(){
@@ -1055,42 +1111,89 @@ function focusSalesProd(id){salesSel=new Set([id]);renderProdPanel();renderSales
 // ══════════════════════════════════════════════
 function recalcOrders(){
   const _orderSrch=(document.getElementById('orderSrch')?.value||'').toLowerCase().trim();
+
+  // 코드별 진행중 주문 합산 (receiveList에서 미입고 수량)
+  const pendingByCode={};
+  receiveList.forEach(r=>{
+    const miss=Math.max(0,r.orderQty-(r.in1+r.in2));
+    if(miss>0) pendingByCode[r.code]=(pendingByCode[r.code]||0)+miss;
+  });
+
   orderList=products.filter(p=>{
     if(p.hidden||p.disc) return false;
     if(_orderSrch && !p.name.toLowerCase().includes(_orderSrch) && !p.code.toLowerCase().includes(_orderSrch)) return false;
-    // reorderPoint가 설정된 경우: stock이 reorderPoint 이하일 때만 표시
-    if(p.reorderPoint>0) return p.stock<=p.reorderPoint;
-    // reorderPoint=0인 경우: 예상 월소진량으로 자동 계산
-    // 예상월소진 × 리드타임 이하면 발주 필요로 판단
     const c=calcNeeded(p);
-    if(c.expM<=0) return false; // 판매 데이터 없으면 제외
-    const autoReorder=Math.round(c.expM*p.leadTime);
-    return p.stock<=autoReorder;
+    if(c.expM<=0) return false;
+    // 발주시점 계산
+    const effectiveReorder=p.reorderPoint>0?p.reorderPoint:Math.round(c.expM*p.leadTime);
+    // 재고가 발주시점 초과면 우선 제외
+    if(p.stock>effectiveReorder) return false;
+    // 진행중 주문이 있을 경우: 재고+주문수량이 필요량을 충족하면 제외
+    const pending=pendingByCode[p.code]||0;
+    const totalCovered=p.stock+pending;
+    const neededTotal=Math.round(c.expM*(p.leadTime+1.2));
+    // 이미 충분히 커버되면 목록에서 제외
+    if(totalCovered>=neededTotal) return false;
+    return true;
   }).map(p=>{
     const c=calcNeeded(p),s=detectSeason(getYearData(p,getBestYear(p)).data);
-    // reorderPoint=0이면 자동 계산값 사용
     const effectiveReorder=p.reorderPoint>0?p.reorderPoint:Math.round(c.expM*p.leadTime);
-    return{...p,...c,season:s,inSeason:isInSeason(s.type),reorderPoint:effectiveReorder};
+    const pending=pendingByCode[p.code]||0;
+    const neededTotal=Math.round(c.expM*(p.leadTime+1.2));
+    // 추가발주 필요량: 전체필요 - 현재고 - 진행중주문
+    const addNeeded=Math.max(0,neededTotal-p.stock-pending);
+    const addBoxes=Math.ceil(addNeeded/(p.boxQty||1));
+    const isAdditional=pending>0; // 이미 주문이 있지만 부족한 경우
+    return{...p,...c,season:s,inSeason:isInSeason(s.type),
+      reorderPoint:effectiveReorder,
+      pending, addNeeded, addBoxes, isAdditional,
+      // 추가발주인 경우 needed/boxes를 추가분으로 덮어씀
+      needed: isAdditional?addNeeded:c.needed,
+      boxes: isAdditional?addBoxes:c.boxes
+    };
   }).sort((a,b)=>{
-    // 재고/발주시점 비율 기준 정렬 (낮을수록 위)
-    const ra=a.reorderPoint>0?a.stock/a.reorderPoint:0;
-    const rb=b.reorderPoint>0?b.stock/b.reorderPoint:0;
+    const ra=a.stock/a.reorderPoint, rb=b.stock/b.reorderPoint;
     return ra-rb;
   });
+
   document.getElementById('orderBadge').textContent=orderList.length;
   const actives=products.filter(p=>isInSeason(detectSeason(getYearData(p,getBestYear(p)).data).type));
   const sb_el=document.getElementById('seasonBar');
   if(actives.length){const hasSu=actives.some(p=>detectSeason(getYearData(p,getBestYear(p)).data).type==='summer');sb_el.innerHTML=`<div class="sbar ${hasSu?'summer':'winter'}"><span>${hasSu?'☀':'❄'}</span><strong>현재 성수기:</strong> ${actives.map(p=>p.name).join(', ')}</div>`;}
   else sb_el.innerHTML=`<div class="sbar normal"><span>✓</span><span>${MNAMES[MONTH]} 기준 평시</span></div>`;
-  document.getElementById('formulaBox').innerHTML=`<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | MAX(최근7일, 최근30일×0.8) 기반 월소진 추정 | 리드타임+1.2개월 재고 확보`;
+
+  document.getElementById('formulaBox').innerHTML=`<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | 최신 데이터 기준 최근7일→최근30일 일평균 월환산 (없으면 월별 데이터 폴백) | 리드타임+1.2개월 재고 확보 | 진행중 주문 자동 반영`;
+
   const alerts=[];
   products.forEach(p=>{const s=detectSeason(getYearData(p,getBestYear(p)).data);if(s.type==='all')return;const mu=(s.peakStart-MONTH+12)%12;if(mu>0&&mu<=2){const c=calcNeeded(p);alerts.push({p,s,mu,c});}});
   document.getElementById('alertWrap').innerHTML=alerts.length?`<div class="alert-wrap">`+alerts.slice(0,5).map(a=>`<div class="alert-item ${a.mu===1?'urg':'warn'}"><span>${a.mu===1?'🚨':'⚠'}</span><div><div class="alert-title">${a.mu===1?'[긴급]':'[사전알림]'} ${a.p.name} — ${a.s.label} ${a.mu}개월 전</div><div class="alert-desc">권장: <strong>${a.c.needed.toLocaleString()}개 (${a.c.boxes}박스)</strong> | 현재고: ${a.p.stock.toLocaleString()}개</div></div></div>`).join('')+'</div>':'';
-  const urg=orderList.filter(x=>x.stock<=x.reorderPoint*0.3).length;
-  document.getElementById('orderSum').innerHTML=`<div class="sc"><div class="sl">발주필요</div><div class="sv" style="color:#DC2626;">${orderList.length}개</div></div><div class="sc"><div class="sl">즉시발주</div><div class="sv" style="color:#EA580C;">${urg}개</div></div><div class="sc"><div class="sl">총주문수량</div><div class="sv">${orderList.reduce((a,b)=>a+b.needed,0).toLocaleString()}개</div></div><div class="sc"><div class="sl">총박스수</div><div class="sv">${orderList.reduce((a,b)=>a+b.boxes,0)}박스</div></div>`;
+
+  const urg=orderList.filter(x=>!x.isAdditional&&x.stock<=x.reorderPoint*0.3).length;
+  const addCnt=orderList.filter(x=>x.isAdditional).length;
+  document.getElementById('orderSum').innerHTML=`<div class="sc"><div class="sl">발주필요</div><div class="sv" style="color:#DC2626;">${orderList.length}개</div></div><div class="sc"><div class="sl">즉시발주</div><div class="sv" style="color:#EA580C;">${urg}개</div></div><div class="sc"><div class="sl">추가발주요청</div><div class="sv" style="color:#534AB7;">${addCnt}개</div></div><div class="sc"><div class="sl">총박스수</div><div class="sv">${orderList.reduce((a,b)=>a+b.boxes,0)}박스</div></div>`;
+
   document.getElementById('orderBody').innerHTML=orderList.length?orderList.map(p=>{
-    const r=p.stock/p.reorderPoint,ug=r<=0.3?{l:'즉시발주',c:'b-da'}:r<=0.6?{l:'긴급',c:'b-or'}:{l:'발주필요',c:'b-wa'};
-    return `<tr><td style="font-weight:500;max-width:110px;overflow:hidden;text-overflow:ellipsis;">${p.name}${p.inSeason?`<span style="font-size:9px;color:#EA580C;"> ●성수기</span>`:''}</td><td><span class="code-chip">${p.code}</span></td><td><span class="badge b-gy">${p.type}</span></td><td style="text-align:right;font-weight:500;color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':'var(--tx)'};">${p.stock.toLocaleString()}</td><td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td><td style="text-align:right;">${p.expM.toLocaleString()}개</td><td style="text-align:right;font-weight:500;">${p.needed.toLocaleString()}개 <span style="color:var(--tx2);">(${p.boxes}박스)</span></td><td><span class="badge ${p.season.badge}">${p.season.label}</span></td><td style="font-size:11px;color:${p.sr>1.15?'#DC2626':p.sr<0.85?'#059669':'var(--tx2)'};">${p.corrLabel}</td><td><span class="badge b-gy">${p.leadTime}개월</span></td><td><span class="badge ${ug.c}">${ug.l}</span></td><td style="text-align:center;"><button class="btn btn-su btn-sm" onclick="openInReg(${p.id})">입고등록</button></td></tr>`;
+    const r=p.stock/p.reorderPoint;
+    const ug=p.isAdditional
+      ? {l:'추가발주요청',c:'b-pu'}
+      : r<=0.3?{l:'즉시발주',c:'b-da'}:r<=0.6?{l:'긴급',c:'b-or'}:{l:'발주필요',c:'b-wa'};
+    const pendingInfo=p.isAdditional
+      ? `<span style="font-size:10px;color:#534AB7;">진행중 ${p.pending.toLocaleString()}개</span>`
+      : '';
+    return `<tr>
+      <td style="font-weight:500;max-width:110px;overflow:hidden;text-overflow:ellipsis;">${p.name}${p.inSeason?`<span style="font-size:9px;color:#EA580C;"> ●성수기</span>`:''}</td>
+      <td><span class="code-chip">${p.code}</span></td>
+      <td><span class="badge b-gy">${p.type}</span></td>
+      <td style="text-align:right;font-weight:500;color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':'var(--tx)'};">${p.stock.toLocaleString()}</td>
+      <td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td>
+      <td style="text-align:right;">${p.expM.toLocaleString()}개</td>
+      <td style="text-align:right;font-weight:500;">${p.needed.toLocaleString()}개 <span style="color:var(--tx2);">(${p.boxes}박스)</span><br>${pendingInfo}</td>
+      <td><span class="badge ${p.season.badge}">${p.season.label}</span></td>
+      <td style="font-size:11px;color:${p.sr>1.15?'#DC2626':p.sr<0.85?'#059669':'var(--tx2)'};">${p.corrLabel}</td>
+      <td><span class="badge b-gy">${p.leadTime}개월</span></td>
+      <td><span class="badge ${ug.c}">${ug.l}</span></td>
+      <td style="text-align:center;"><button class="btn btn-su btn-sm" onclick="openInReg(${p.id})">입고등록</button></td>
+    </tr>`;
   }).join(''):`<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--tx2);">발주 필요 상품이 없습니다</td></tr>`;
   renderRecv(); updateFloat();
 }
@@ -1185,12 +1288,22 @@ function switchRecvTab(t){['a','d'].forEach(x=>{document.getElementById('rt-'+x)
 let _rgDailyCache = {}; // {code: {date: qty}} - is_rg=true 데이터
 
 async function loadRgDailyCache(){
-  const {data} = await sb.from('daily_sales').select('code,sale_date,qty').eq('is_rg',true);
   _rgDailyCache = {};
-  if(data) data.forEach(r=>{
-    if(!_rgDailyCache[r.code]) _rgDailyCache[r.code]={};
-    _rgDailyCache[r.code][r.sale_date] = (_rgDailyCache[r.code][r.sale_date]||0)+r.qty;
-  });
+  let from=0; const pageSize=1000;
+  while(true){
+    const {data,error} = await sb.from('daily_sales')
+      .select('code,sale_date,qty')
+      .eq('is_rg',true)
+      .order('sale_date')
+      .range(from, from+pageSize-1);
+    if(error||!data||data.length===0) break;
+    data.forEach(r=>{
+      if(!_rgDailyCache[r.code]) _rgDailyCache[r.code]={};
+      _rgDailyCache[r.code][r.sale_date] = (_rgDailyCache[r.code][r.sale_date]||0)+r.qty;
+    });
+    if(data.length<pageSize) break;
+    from+=pageSize;
+  }
 }
 
 // RG 출고된 제품 목록 (products 중 is_rg 데이터 있는 것)
