@@ -708,12 +708,12 @@ async function addHistory(item){
 let _dCache={};
 async function loadDailyCache(){
   const cutoff=fmtDate(new Date(Date.now()-31*86400000));
-  const {data}=await sb.from('daily_sales').select('code,sale_date,qty').gte('sale_date',cutoff);
+  const {data}=await sb.from('daily_sales').select('code,sale_date,qty').gte('sale_date',cutoff).eq('is_rg',false);
   _dCache={};
   if(data) data.forEach(r=>{if(!_dCache[r.code])_dCache[r.code]={};_dCache[r.code][r.sale_date]=((_dCache[r.code][r.sale_date]||0)+r.qty);});
 }
 async function loadDailySales(code,start,end){
-  let q=sb.from('daily_sales').select('code,sale_date,qty').gte('sale_date',start).lte('sale_date',end);
+  let q=sb.from('daily_sales').select('code,sale_date,qty').gte('sale_date',start).lte('sale_date',end).eq('is_rg',false);
   if(code) q=q.eq('code',code);
   const {data}=await q;
   const out={};
@@ -1056,13 +1056,27 @@ function focusSalesProd(id){salesSel=new Set([id]);renderProdPanel();renderSales
 function recalcOrders(){
   const _orderSrch=(document.getElementById('orderSrch')?.value||'').toLowerCase().trim();
   orderList=products.filter(p=>{
-    if(p.hidden||p.disc||p.stock>p.reorderPoint) return false;
+    if(p.hidden||p.disc) return false;
     if(_orderSrch && !p.name.toLowerCase().includes(_orderSrch) && !p.code.toLowerCase().includes(_orderSrch)) return false;
-    return true;
+    // reorderPoint가 설정된 경우: stock이 reorderPoint 이하일 때만 표시
+    if(p.reorderPoint>0) return p.stock<=p.reorderPoint;
+    // reorderPoint=0인 경우: 예상 월소진량으로 자동 계산
+    // 예상월소진 × 리드타임 이하면 발주 필요로 판단
+    const c=calcNeeded(p);
+    if(c.expM<=0) return false; // 판매 데이터 없으면 제외
+    const autoReorder=Math.round(c.expM*p.leadTime);
+    return p.stock<=autoReorder;
   }).map(p=>{
     const c=calcNeeded(p),s=detectSeason(getYearData(p,getBestYear(p)).data);
-    return{...p,...c,season:s,inSeason:isInSeason(s.type)};
-  }).sort((a,b)=>(a.stock/a.reorderPoint)-(b.stock/b.reorderPoint));
+    // reorderPoint=0이면 자동 계산값 사용
+    const effectiveReorder=p.reorderPoint>0?p.reorderPoint:Math.round(c.expM*p.leadTime);
+    return{...p,...c,season:s,inSeason:isInSeason(s.type),reorderPoint:effectiveReorder};
+  }).sort((a,b)=>{
+    // 재고/발주시점 비율 기준 정렬 (낮을수록 위)
+    const ra=a.reorderPoint>0?a.stock/a.reorderPoint:0;
+    const rb=b.reorderPoint>0?b.stock/b.reorderPoint:0;
+    return ra-rb;
+  });
   document.getElementById('orderBadge').textContent=orderList.length;
   const actives=products.filter(p=>isInSeason(detectSeason(getYearData(p,getBestYear(p)).data).type));
   const sb_el=document.getElementById('seasonBar');
