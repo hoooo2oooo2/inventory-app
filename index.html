@@ -303,7 +303,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div><span class="ct">상품별 판매현황</span><div style="font-size:10px;color:var(--tx2);margin-top:2px;" id="salesUpdLbl"></div></div>
           <span style="font-size:11px;color:var(--tx2);">행 클릭 → 그래프 반영</span>
         </div>
-        <div class="tw"><table>
+        <div class="tw-scroll"><table>
           <thead><tr><th>코드</th><th>상품명</th><th>구분</th><th style="text-align:right;">저번달</th><th style="text-align:right;">이번달</th><th style="text-align:right;">증감</th><th style="text-align:right;">6개월평균</th><th style="text-align:right;">예상소진</th><th>시즌성</th><th style="text-align:right;">현재고</th><th style="text-align:right;">재고일수</th></tr></thead>
           <tbody id="salesTbody"></tbody>
         </table></div>
@@ -377,7 +377,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="alertWrap"></div>
     <div class="fbox" id="formulaBox"></div>
     <div class="sum-row" id="orderSum"></div>
-    <div class="tw"><table>
+    <div class="tw-scroll"><table>
       <thead><tr><th>상품명</th><th>코드</th><th>구분</th><th style="text-align:right;">현재고</th><th style="text-align:right;">발주시점</th><th style="text-align:right;">예상월소진</th><th style="text-align:right;">필요수량(박스)</th><th>제품시즌</th><th>시즌보정</th><th>리드타임</th><th>긴급도</th><th class="ns" style="text-align:center;">입고등록</th></tr></thead>
       <tbody id="orderBody"></tbody>
     </table></div>
@@ -902,7 +902,7 @@ function calcNeeded(p){
   const sr=Math.min(1.4,Math.max(0.8,1+(rawSr-1)*seasonWeight));
   const expM=sr>1.05?Math.round(base*sr):base;
 
-  const needed=Math.max(0,Math.round(expM*(p.leadTime+1.2)-p.stock));
+  const needed=Math.max(0,Math.round(expM*(p.leadTime+0.5)-p.stock));
   const boxes=Math.ceil(needed/(p.boxQty||1));
   const corrPct=Math.round((sr-1)*100);
   return {needed,boxes,expM,sr,corrLabel:corrPct>5?`성수기 +${corrPct}%`:corrPct<-5?`비수기 ${corrPct}%`:'보정없음'};
@@ -1180,7 +1180,7 @@ function recalcOrders(){
     // 진행중 주문이 있을 경우: 재고+주문수량이 필요량을 충족하면 제외
     const pending=pendingByCode[p.code]||0;
     const totalCovered=p.stock+pending;
-    const neededTotal=Math.round(c.expM*(p.leadTime+1.2));
+    const neededTotal=Math.round(c.expM*(p.leadTime+0.5));
     // 이미 충분히 커버되면 목록에서 제외
     if(totalCovered>=neededTotal) return false;
     return true;
@@ -1188,7 +1188,7 @@ function recalcOrders(){
     const c=calcNeeded(p),s=detectSeason(getYearData(p,getBestYear(p)).data);
     const effectiveReorder=p.reorderPoint>0?p.reorderPoint:Math.round(c.expM*p.leadTime);
     const pending=pendingByCode[p.code]||0;
-    const neededTotal=Math.round(c.expM*(p.leadTime+1.2));
+    const neededTotal=Math.round(c.expM*(p.leadTime+0.5));
     // 추가발주 필요량: 전체필요 - 현재고 - 진행중주문
     const addNeeded=Math.max(0,neededTotal-p.stock-pending);
     const addBoxes=Math.ceil(addNeeded/(p.boxQty||1));
@@ -1211,7 +1211,7 @@ function recalcOrders(){
   if(actives.length){const hasSu=actives.some(p=>detectSeason(getYearData(p,getBestYear(p)).data).type==='summer');sb_el.innerHTML=`<div class="sbar ${hasSu?'summer':'winter'}"><span>${hasSu?'☀':'❄'}</span><strong>현재 성수기:</strong> ${actives.map(p=>p.name).join(', ')}</div>`;}
   else sb_el.innerHTML=`<div class="sbar normal"><span>✓</span><span>${MNAMES[MONTH]} 기준 평시</span></div>`;
 
-  document.getElementById('formulaBox').innerHTML=`<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | 최신 데이터 기준 최근7일→최근30일 일평균 월환산 (없으면 월별 데이터 폴백) | 리드타임+1.2개월 재고 확보 | 진행중 주문 자동 반영`;
+  document.getElementById('formulaBox').innerHTML=`<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | 최신 데이터 기준 최근7일→최근30일 일평균 월환산 (없으면 월별 데이터 폴백) | 리드타임+0.5개월 재고 확보 | 진행중 주문 자동 반영`;
 
   const alerts=[];
   products.forEach(p=>{const s=detectSeason(getYearData(p,getBestYear(p)).data);if(s.type==='all')return;const mu=(s.peakStart-MONTH+12)%12;if(mu>0&&mu<=2){const c=calcNeeded(p);alerts.push({p,s,mu,c});}});
