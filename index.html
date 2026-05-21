@@ -1986,52 +1986,57 @@ function clearChatHistory() {
   _loadChatHistory();
 }
 
+// 재고 관련 질문인지 판별
+function _isInventoryQ(msg) {
+  return /재고|판매|발주|제품|상품|수량|출고|입고|주문|박스|팔린|팔리|부족|임박|긴급|로켓|리스트|목록|분석|현황|어제|최근|이번주|지난주|얼마나|순위|top|TOP/.test(msg);
+}
+
+// 재고 데이터 요약 (토큰 절약형)
 function _buildContext() {
   const today = new Date();
   const todayStr = fmtDate(today);
   const activeProds = products.filter(p => !p.hidden && !p.disc);
+  const yday = fmtDate(new Date(today.getTime() - 86400000));
 
-  const rows = activeProds.map(p => {
+  // 제품별 판매량 계산 (7일/30일)
+  const prodStats = activeProds.map(p => {
     const dc = _dCache[p.code] || {};
-    const yday = fmtDate(new Date(today.getTime() - 86400000));
-    const ydaySales = dc[yday] || 0;
     let s7 = 0, s30 = 0;
     for (let i = 0; i < 30; i++) {
       const d = fmtDate(new Date(today.getTime() - i * 86400000));
-      const q = dc[d] || 0;
-      s30 += q;
+      const q = dc[d] || 0; s30 += q;
       if (i < 7) s7 += q;
     }
     const mData = getM(p, CUR_YEAR);
-    const prevM = MONTH > 0 ? (mData[MONTH - 1] || 0) : 0;
-    const curM = mData[MONTH] || 0;
     const needed = calcNeeded(p);
-    const neededBoxes = needed.needed > 0 && p.boxQty > 0 ? Math.ceil(needed.needed / p.boxQty) : 0;
-    const status = p.stock <= 0 ? '재고없음' : p.stock <= p.reorderPoint * 0.5 ? '긴급' : p.stock <= p.reorderPoint ? '임박' : '정상';
-    return `• ${p.name}(${p.code})|구분:${p.type}|현재고:${p.stock}|상태:${status}|발주시점:${p.reorderPoint}|박스당:${p.boxQty}|리드타임:${p.leadTime}개월|어제:${ydaySales}|7일:${s7}|30일:${s30}|전월:${prevM}|당월:${curM}|필요발주:${needed.needed}개(${neededBoxes}박스)`;
+    const nb = needed.needed > 0 && p.boxQty > 0 ? Math.ceil(needed.needed / p.boxQty) : 0;
+    const st = p.stock <= 0 ? '없음' : p.stock <= p.reorderPoint * 0.5 ? '긴급' : p.stock <= p.reorderPoint ? '임박' : '정상';
+    return { p, dc, s7, s30, prevM: MONTH > 0 ? (mData[MONTH-1]||0) : 0, curM: mData[MONTH]||0, nb, st, ydayQty: dc[yday]||0 };
   });
 
-  // 최근 7일 일자별 상위 판매
-  const daily7 = [];
-  for (let i = 1; i <= 7; i++) {
-    const d = fmtDate(new Date(today.getTime() - i * 86400000));
-    const label = i === 1 ? '어제' : `${i}일전`;
-    const sales = activeProds
-      .map(p => ({ name: p.name, qty: (_dCache[p.code] || {})[d] || 0 }))
-      .filter(x => x.qty > 0)
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5)
-      .map(x => `${x.name}:${x.qty}`);
-    if (sales.length) daily7.push(`${label}(${d}): ${sales.join(', ')}`);
-  }
+  // 어제 판매 TOP5
+  const ydayTop = [...prodStats].sort((a,b)=>b.ydayQty-a.ydayQty).filter(x=>x.ydayQty>0).slice(0,5)
+    .map(x=>`${x.p.name}:${x.ydayQty}개`).join(', ') || '없음';
 
-  return `[오늘: ${todayStr} / 총${activeProds.length}개 제품 / 발주임박:${activeProds.filter(p=>p.stock<=p.reorderPoint).length}개]
+  // 7일 판매 TOP10
+  const top10 = [...prodStats].sort((a,b)=>b.s7-a.s7).slice(0,10)
+    .map(x=>`${x.p.name}:${x.s7}`).join(', ');
 
-=제품별 현황(이름|코드|현재고|상태|발주시점|박스당|리드|어제판매|7일|30일|전월|당월|필요발주)=
-${rows.join('\n')}
+  // 발주 필요 제품만
+  const urgentRows = prodStats.filter(x=>x.p.stock<=x.p.reorderPoint)
+    .map(x=>`${x.p.name}(재고${x.p.stock}/시점${x.p.reorderPoint}/필요${x.nb}박스)`).join(', ') || '없음';
 
-=최근7일 일별 판매 TOP5=
-${daily7.length ? daily7.join('\n') : '데이터 없음'}`;
+  // 전체 제품 요약 (핵심만, 한 줄로)
+  const allRows = prodStats.map(x=>
+    `${x.p.name}|${x.st}|재고${x.p.stock}|7일${x.s7}|30일${x.s30}|전월${x.prevM}|당월${x.curM}|발주${x.nb}박스`
+  ).join('\n');
+
+  return `[${todayStr} / 총${activeProds.length}제품 / 발주임박${prodStats.filter(x=>x.p.stock<=x.p.reorderPoint).length}개]
+어제TOP: ${ydayTop}
+7일TOP10: ${top10}
+발주필요: ${urgentRows}
+---전제품---
+${allRows}`;
 }
 
 function _appendChatMsg(role, text) {
@@ -2067,17 +2072,10 @@ async function sendChatMsg() {
   document.getElementById('chatSendBtn').disabled = true;
 
   try {
-    const ctx = _buildContext();
-    const sys = `당신은 재고관리 앱에 내장된 AI 어시스턴트입니다. 재고 분석이 주특기지만 무엇이든 편하게 대화할 수 있습니다.
-
-아래는 현재 앱의 실시간 재고/판매 데이터입니다 (재고 관련 질문 시 활용):
-${ctx}
-
-답변 방식:
-- 재고·판매·발주 질문: 구체적 수치와 함께 실용적으로 분석
-- 발주 추천 시: 제품명, 필요수량, 박스수를 명확히 제시
-- 일상 대화, 잡담, 다른 주제 질문도 자연스럽게 대화
-- 항상 한국어로 답변`;
+    const needCtx = _isInventoryQ(msg);
+    const sys = needCtx
+      ? `당신은 재고관리 앱 AI 어시스턴트입니다. 아래 실시간 데이터를 기반으로 분석하세요.\n\n${_buildContext()}\n\n규칙: 구체적 수치 포함, 발주추천 시 박스수 명시, 한국어로 답변`
+      : `당신은 재고관리 앱에 내장된 친근한 AI 어시스턴트입니다. 무엇이든 편하게 대화할 수 있습니다. 항상 한국어로 답변하세요.`;
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
