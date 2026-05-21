@@ -857,9 +857,10 @@ async function loadAll(){
   salesYear=bestY; rgYear=bestY;
   buildYearSelects();
   renderInv(); updateFloat();
-  if(products.length>0) salesSel=new Set([products[0].id]);
+  // 초기 선택 없음 — 사용자가 직접 제품 클릭 시 그래프 표시
+  salesSel=new Set();
   const rgProds=getRgProducts();
-  if(rgProds.length>0) rgSel=new Set([rgProds[0].id]);
+  rgSel=new Set();
 }
 
 async function loadProducts(){
@@ -981,9 +982,17 @@ function goPage(p){
 // ══════════════════════════════════════════════
 // 재고관리
 // ══════════════════════════════════════════════
+function getEffectiveReorder(p){
+  // reorderPoint가 설정된 경우 그대로, 0이면 calcNeeded expM으로 자동계산
+  if(p.reorderPoint>0) return p.reorderPoint;
+  const c=calcNeeded(p);
+  return c.noData?0:Math.round(c.expM*p.leadTime);
+}
 function getStatus(p){
   if(p.disc) return '단종';
-  const r=p.stock/(p.reorderPoint||1);
+  const er=getEffectiveReorder(p);
+  if(er<=0) return '정상';
+  const r=p.stock/er;
   if(r<=0.3) return '부족'; if(r<=0.6) return '긴급'; if(r<=1) return '임박'; return '정상';
 }
 function calcNeeded(p){
@@ -1126,7 +1135,13 @@ function renderInv(){
   document.getElementById('invSum').innerHTML=`<div class="sc"><div class="sl">전체</div><div class="sv">${products.length}</div></div><div class="sc"><div class="sl" style="color:#059669;">정상</div><div class="sv" style="color:#059669;">${ok}</div></div><div class="sc"><div class="sl" style="color:#D97706;">임박/긴급</div><div class="sv" style="color:#D97706;">${wn}</div></div><div class="sc"><div class="sl" style="color:#DC2626;">부족</div><div class="sv" style="color:#DC2626;">${cr}</div></div>`;
   if(!data.length){document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--tx2);">상품이 없습니다.</td></tr>`;return;}
   document.getElementById('invBody').innerHTML=data.map(p=>{
-    const st=getStatus(p),r=p.stock/p.reorderPoint,ord=calcNeeded(p),show=st!=='정상'&&st!=='단종';
+    const ord=calcNeeded(p);
+    const er=p.reorderPoint>0?p.reorderPoint:(ord.noData?0:Math.round(ord.expM*p.leadTime));
+    const st=p.disc?'단종':er<=0?'정상':(()=>{const r=p.stock/er;return r<=0.3?'부족':r<=0.6?'긴급':r<=1?'임박':'정상';})();
+    const r=er>0?p.stock/er:99;
+    const show=st!=='정상'&&st!=='단종';
+    const erLabel=er>0?er.toLocaleString():'-';
+    const erStyle=p.reorderPoint===0&&er>0?'color:#9333EA;font-size:10px;':''; // 자동계산 표시
     return `<tr>
       <td><span class="code-chip">${p.code}</span></td>
       <td style="font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;">${p.name}</td>
@@ -1135,7 +1150,8 @@ function renderInv(){
       <td><span class="badge ${SBADGE[st]}">${st}</span></td>
       <td style="text-align:right;color:var(--tx2);">${p.boxQty}개</td>
       <td><span class="badge b-gy">${p.leadTime}개월</span></td>
-      <td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td>
+      <td style="text-align:right;${erStyle}" title="${p.reorderPoint===0&&er>0?'발주시점 미설정 → expM×리드타임으로 자동계산':''}">
+        ${erLabel}${p.reorderPoint===0&&er>0?'<span style="font-size:9px;color:#9333EA;margin-left:2px;">(자동)</span>':''}</td>
       <td style="text-align:right;font-size:11px;">${(()=>{
         if(st==='단종') return '<span style="color:var(--tx2);">-</span>';
         if(ord.noData) return '<span style="color:#94A3B8;font-size:10px;">데이터 쌓는 중</span>';
@@ -1227,7 +1243,11 @@ function setSalesPeriod(p){
 function renderSalesPeriod(){
   if(!products.length) return;
   const sel=[...salesSel].map(id=>products.find(x=>x.id===id)).filter(Boolean);
-  if(!sel.length) return;
+  if(!sel.length){
+    if(salesChart){salesChart.destroy();salesChart=null;}
+    updateSalesSummary([]);
+    return;
+  }
 
   if(salesPeriod==='daily'||salesPeriod==='lastweek'){
     const rng=getDateRange(salesYear,salesPeriod);
@@ -1368,8 +1388,8 @@ function renderProdPanel(){
   const tf=document.getElementById('prodTyF').value;
   document.getElementById('prodPanel').innerHTML=products.filter(p=>!p.hidden&&(!tf||p.type===tf)&&(!srch||p.name.toLowerCase().includes(srch)||p.code.toLowerCase().includes(srch))).map(p=>`<div class="prod-panel-item ${salesSel.has(p.id)?'sel':''}" onclick="toggleSalesProd(${p.id})"><span class="pcheck ${salesSel.has(p.id)?'on':''}">${salesSel.has(p.id)?'✓':''}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">${p.name}</span><span style="font-size:10px;color:var(--tx2);">${p.type}</span></div>`).join('');
 }
-function toggleSalesProd(id){salesSel.has(id)?(salesSel.size>1&&salesSel.delete(id)):salesSel.add(id);renderProdPanel();renderSalesPeriod();}
-function clearSalesSel(){if(products.length)salesSel=new Set([products[0].id]);renderProdPanel();renderSalesPeriod();}
+function toggleSalesProd(id){salesSel.has(id)?salesSel.delete(id):salesSel.add(id);renderProdPanel();renderSalesPeriod();}
+function clearSalesSel(){salesSel=new Set();renderProdPanel();renderSalesPeriod();}
 function focusSalesProd(id){salesSel=new Set([id]);renderProdPanel();renderSalesPeriod();}
 
 // ══════════════════════════════════════════════
@@ -1391,7 +1411,7 @@ function recalcOrders(){
     const c=calcNeeded(p);
     if(c.expM<=0) return false;
     // 발주시점 계산
-    const effectiveReorder=p.reorderPoint>0?p.reorderPoint:Math.round(c.expM*p.leadTime);
+    const effectiveReorder=getEffectiveReorder(p);
     // 재고가 발주시점 초과면 우선 제외
     if(p.stock>effectiveReorder) return false;
     // 진행중 주문이 있을 경우: 재고+주문수량이 필요량을 충족하면 제외
@@ -1403,7 +1423,7 @@ function recalcOrders(){
     return true;
   }).map(p=>{
     const c=calcNeeded(p),s=detectSeason(getYearData(p,getBestYear(p)).data);
-    const effectiveReorder=p.reorderPoint>0?p.reorderPoint:Math.round(c.expM*p.leadTime);
+    const effectiveReorder=getEffectiveReorder(p);
     const pending=pendingByCode[p.code]||0;
     const neededTotal=Math.round(c.expM*(p.leadTime+0.5));
     // 추가발주 필요량: 전체필요 - 현재고 - 진행중주문
@@ -1858,7 +1878,11 @@ function _deadlineLabel(days){
 }
 
 function updateFloat(){
-  const urg=products.filter(p=>!p.hidden&&p.stock<=p.reorderPoint&&!p.disc);
+  const urg=products.filter(p=>{
+    if(p.hidden||p.disc) return false;
+    const er=getEffectiveReorder(p);
+    return er>0 && p.stock<=er;
+  });
   const fw=document.getElementById('floatWrap'),np=document.getElementById('navPulse');
   if(!urg.length){fw.style.display='none';np.style.display='none';document.getElementById('orderBadge').textContent='0';return;}
   fw.style.display='block';np.style.display='inline-flex';
