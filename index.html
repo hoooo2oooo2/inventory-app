@@ -161,6 +161,19 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* GROQ CHAT */
 .chat-fab{position:fixed;bottom:20px;right:18px;z-index:201;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--pr);color:#fff;box-shadow:0 4px 16px rgba(49,130,246,.4);transition:transform .15s,background .15s;}
 .chat-fab:hover{background:#2172E5;transform:scale(1.07);}
+/* CALENDAR FAB & PANEL */
+.cal-fab{position:fixed;bottom:20px;right:72px;z-index:201;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;background:#059669;color:#fff;box-shadow:0 4px 16px rgba(5,150,105,.35);transition:transform .15s,background .15s;}
+.cal-fab:hover{background:#047857;transform:scale(1.07);}
+.cal-panel{position:fixed;top:0;right:0;width:780px;max-width:100vw;height:100vh;z-index:500;background:#fff;box-shadow:-8px 0 40px rgba(0,0,0,.18);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
+.cal-panel.open{transform:translateX(0);}
+.cal-panel-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #E5E8EB;flex-shrink:0;background:#fff;}
+.cal-panel-title{font-size:14px;font-weight:700;color:#191F28;display:flex;align-items:center;gap:8px;}
+.cal-panel-close{background:none;border:none;font-size:20px;cursor:pointer;color:#8B95A1;padding:4px;border-radius:6px;line-height:1;}
+.cal-panel-close:hover{background:#F2F4F6;color:#191F28;}
+.cal-panel iframe{flex:1;border:none;width:100%;height:100%;}
+.cal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:499;display:none;}
+.cal-overlay.open{display:block;}
+.cal-fab-badge{position:absolute;top:-2px;right:-2px;width:16px;height:16px;background:#DC2626;border-radius:50%;font-size:9px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;}
 .chat-win{position:fixed;bottom:78px;right:16px;width:340px;max-width:calc(100vw - 24px);background:var(--bg);border-radius:16px;border:1px solid var(--bd);z-index:210;display:none;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.18);max-height:520px;}
 .chat-win.open{display:flex;}
 .chat-win-hd{padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;background:var(--pr);border-radius:16px 16px 0 0;flex-shrink:0;}
@@ -520,6 +533,19 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <span class="float-pulse"></span><span class="float-pulse float-pulse2"></span>
     <span style="position:relative;z-index:1;">🚨</span>
   </div>
+</div>
+
+<!-- CALENDAR FAB & PANEL -->
+<button class="cal-fab" id="calFab" onclick="openCalPanel()" title="업무 캘린더">
+  <span id="calFabBadge" class="cal-fab-badge" style="display:none;"></span>📅
+</button>
+<div class="cal-overlay" id="calOverlay" onclick="closeCalPanel()"></div>
+<div class="cal-panel" id="calPanel">
+  <div class="cal-panel-hd">
+    <div class="cal-panel-title">📅 업무 캘린더 <span style="font-size:11px;font-weight:400;color:#8B95A1;">재고 일정 자동 연동</span></div>
+    <button class="cal-panel-close" onclick="closeCalPanel()">✕</button>
+  </div>
+  <iframe id="calIframe" src="" title="업무 캘린더"></iframe>
 </div>
 
 <!-- GROQ AI CHAT -->
@@ -1924,6 +1950,7 @@ function updateFloat(){
       </div>
     </div>`;
   }).join('');
+  _updateCalBadge(); // 캘린더 배지도 함께 갱신
 }
 function toggleFloat(){floatOpen=!floatOpen;document.getElementById('floatCard').classList.toggle('open',floatOpen);}
 
@@ -2458,6 +2485,88 @@ function _appendChatMsg(role, text, save = true) {
   return div;
 }
 
+// ══════════════════════════════════════════════
+// 업무 캘린더 패널
+// ══════════════════════════════════════════════
+let _calLoaded = false;
+
+function openCalPanel() {
+  const panel = document.getElementById('calPanel');
+  const overlay = document.getElementById('calOverlay');
+  const iframe = document.getElementById('calIframe');
+  // 첫 오픈 시 iframe src 설정
+  if (!_calLoaded) {
+    iframe.src = 'calendar.html';
+    _calLoaded = true;
+    iframe.onload = () => { setTimeout(_syncCalendarEvents, 400); };
+  } else {
+    _syncCalendarEvents();
+  }
+  panel.classList.add('open');
+  overlay.classList.add('open');
+}
+
+function closeCalPanel() {
+  document.getElementById('calPanel').classList.remove('open');
+  document.getElementById('calOverlay').classList.remove('open');
+}
+
+function _syncCalendarEvents() {
+  const iframe = document.getElementById('calIframe');
+  if (!iframe || !iframe.contentWindow || !iframe.contentWindow.__addInventoryEvents) return;
+
+  const today = fmtDate(new Date());
+  const events = [];
+
+  // ① 발주 필요 제품 → 오늘 날짜 이벤트
+  const statusPri = { '부족': 'high', '긴급': 'high', '임박': 'medium' };
+  products.filter(p => !p.hidden && !p.disc).forEach(p => {
+    const st = getStatus(p);
+    if (!statusPri[st]) return;
+    const ord = calcNeeded(p);
+    if (ord.noData) return;
+    const boxStr = ord.boxes > 0 ? ` ${ord.boxes}박스` : '';
+    const label = st === '부족' ? '🔴 발주필요' : st === '긴급' ? '🟠 발주긴급' : '🟡 발주임박';
+    events.push({ date: today, title: `${label}: ${p.name}${boxStr}`, priority: statusPri[st] });
+  });
+
+  // ② 진행중 발주 → 주문일 이벤트
+  receiveList.forEach(r => {
+    const miss = Math.max(0, r.orderQty - (r.in1 + r.in2));
+    if (miss <= 0) return;
+    const p = products.find(x => x.code === r.code);
+    const boxes = p ? Math.ceil(miss / (p.boxQty || 1)) : 0;
+    const boxStr = boxes > 0 ? ` (${boxes}박스)` : ` (${miss}개)`;
+    events.push({ date: r.orderDate || today, title: `📦 입고대기: ${r.name}${boxStr}`, priority: 'low' });
+    // 예상 입고일 (리드타임 기준)
+    if (p && p.leadTime && r.orderDate) {
+      const expDate = new Date(r.orderDate);
+      expDate.setDate(expDate.getDate() + Math.round(p.leadTime * 30));
+      events.push({ date: fmtDate(expDate), title: `✅ 입고예정: ${r.name}${boxStr}`, priority: 'medium' });
+    }
+  });
+
+  // 배지 업데이트 (발주필요 건수)
+  const urgentCnt = events.filter(e => e.priority === 'high').length;
+  const badge = document.getElementById('calFabBadge');
+  if (badge) { badge.style.display = urgentCnt > 0 ? 'flex' : 'none'; badge.textContent = urgentCnt > 9 ? '9+' : urgentCnt; }
+
+  try {
+    iframe.contentWindow.__addInventoryEvents(events);
+  } catch(e) { console.warn('캘린더 연동 실패', e); }
+}
+
+// 페이지 로드 후 배지만 업데이트 (패널 열기 전)
+function _updateCalBadge() {
+  let urgentCnt = 0;
+  products.filter(p => !p.hidden && !p.disc).forEach(p => {
+    const st = getStatus(p);
+    if (st === '부족' || st === '긴급') urgentCnt++;
+  });
+  const badge = document.getElementById('calFabBadge');
+  if (badge) { badge.style.display = urgentCnt > 0 ? 'flex' : 'none'; badge.textContent = urgentCnt > 9 ? '9+' : String(urgentCnt); }
+}
+
 function toggleChat() {
   _chatOpen = !_chatOpen;
   document.getElementById('chatWin').classList.toggle('open', _chatOpen);
@@ -2696,6 +2805,7 @@ _initOrderCycleSel();
 loadAll().then(async ()=>{
   checkTelegramAlert();
   startTgPolling();
+  _updateCalBadge();
   // 페이지 로드 시 월별집계 오류 자동 감지 & 수정
   const issues=_detectMonthlyBatch();
   if(issues.length){
