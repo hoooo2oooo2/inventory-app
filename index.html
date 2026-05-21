@@ -37,7 +37,7 @@ body{background:var(--bg2);min-height:100vh;}
 /* PAGES */
 .page{display:none;}
 .page.active{display:block;}
-.main{padding:12px;display:flex;flex-direction:column;gap:10px;}
+.main{padding:12px;display:flex;flex-direction:column;gap:10px;padding-bottom:80px;}
 
 /* CARDS */
 .card{background:var(--bg);border-radius:12px;border:0.5px solid var(--bd);}
@@ -97,6 +97,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .btn-su{background:#ECFDF5;color:#059669;border-color:#BBF7D0;}
 .btn-da{background:#FEF2F2;color:#DC2626;border-color:#FECACA;}
 .btn-or{background:#FFF7ED;color:#EA580C;border-color:#FED7AA;}
+.btn-gy{background:var(--bg2);color:var(--tx2);border-color:var(--bd);}
 
 /* INPUTS */
 .inp{padding:3px 5px;border:0.5px solid var(--bd);border-radius:5px;font-size:11px;background:var(--bg);color:var(--tx);text-align:center;outline:none;}
@@ -152,8 +153,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* FLOAT */
 .float-btn-wrap{position:fixed;bottom:78px;right:18px;z-index:200;}
 .float-btn{width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;position:relative;z-index:1;background:#DC2626;}
-.float-pulse{position:absolute;inset:-4px;border-radius:50%;opacity:0;animation:pRing 1.8s ease-out infinite;border:2.5px solid #DC2626;}
-.float-pulse2{animation-delay:.7s;}
+.float-pulse{position:absolute;inset:-4px;border-radius:50%;opacity:0;animation:pRing 1.8s ease-out infinite;border:2.5px solid #DC2626;pointer-events:none;}
+.float-pulse2{animation-delay:.7s;pointer-events:none;}
 .float-card{position:fixed;bottom:134px;right:16px;width:264px;border-radius:14px;border:1.5px solid #DC2626;background:var(--bg);z-index:200;overflow:hidden;display:none;}
 .float-card.open{display:block;}
 
@@ -515,8 +516,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="chat-win-hd">
     <div class="chat-win-title">🤖 AI 재고 어시스턴트</div>
     <div style="display:flex;gap:6px;align-items:center;">
-      <div class="chat-token-wrap" id="chatTokenWrap" title="분당 토큰 사용량 (1분 후 초기화)">
-        <span class="chat-token-txt" id="chatTokenTxt">0 / 12k</span>
+      <div class="chat-token-wrap" id="chatTokenWrap" title="분당 토큰 사용량 (TPM) — 1분마다 초기화">
+        <span class="chat-token-txt" id="chatTokenTxt">TPM 0%</span>
         <div class="chat-token-track"><div class="chat-token-fill" id="chatTokenFill"></div></div>
       </div>
       <button class="chat-win-close" onclick="clearChatHistory()" title="대화 초기화">🗑</button>
@@ -1006,7 +1007,7 @@ function renderInv(){
       <td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td>
       <td style="text-align:right;font-size:11px;color:${show?'#EA580C':'var(--tx2)'};">${show?`${ord.needed.toLocaleString()}개 (${ord.boxes}박스)`:'-'}</td>
       <td id="iotd-${p.id}">${ioTarget===p.id?`<div style="display:flex;gap:3px;align-items:center;"><input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button></div>`:`<button class="btn btn-sm" onclick="startIO(${p.id})">입출고</button>`}</td>
-      <td><div style="display:flex;gap:3px;"><button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button><button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button><button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button></div></td>
+      <td><div style="display:flex;gap:3px;"><button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button><button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button><button class="btn btn-sm ${p.disc?'btn-or':'btn-gy'}" onclick="discProd(${p.id})" title="${p.disc?'단종 해제':'단종 처리'}">${p.disc?'↩단종':'단종'}</button><button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button></div></td>
     </tr>`;
   }).join('');
 }
@@ -1031,6 +1032,15 @@ async function saveProd(){
   closeModal('prodModal');renderInv();updateFloat();
 }
 async function deleteProd(id){const p=products.find(x=>x.id===id);if(!p||!confirm(`"${p.name}" 을 삭제하시겠습니까?`))return;await sb.from('products').delete().eq('id',id);await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:'삭제',before:'존재',after:'삭제',user:'수동'});await loadProducts();renderInv();updateFloat();}
+async function discProd(id){
+  const p=products.find(x=>x.id===id);if(!p)return;
+  const d=!p.disc;
+  if(d&&!confirm(`"${p.name}"을 단종 처리하시겠습니까?\n단종 제품은 발주 알림 및 발주 목록에서 제외됩니다.`))return;
+  await sb.from('products').update({discontinued:d}).eq('id',id);
+  p.disc=d;
+  await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:d?'단종처리':'단종해제',before:d?'정상':'단종',after:d?'단종':'정상',user:'수동'});
+  renderInv();updateFloat();
+}
 async function hideProd(id){const p=products.find(x=>x.id===id);if(!p)return;const h=!p.hidden;await sb.from('products').update({hidden:h}).eq('id',id);p.hidden=h;await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:h?'숨김':'표시복원',before:h?'표시':'숨김',after:h?'숨김':'표시',user:'수동'});renderInv();updateFloat();}
 function toggleShowHidden(){_showHidden=!_showHidden;const b=document.getElementById('showHiddenBtn');if(b){b.textContent=_showHidden?'👁 전체보기':'🙈 숨긴제품만 보기';b.style.color=_showHidden?'var(--pr)':'var(--tx2)';}renderInv();}
 
@@ -2023,9 +2033,7 @@ function _updateTokenGauge() {
   if (!fill || !txt) return;
   fill.style.width = pct + '%';
   fill.style.background = pct < 55 ? '#4ade80' : pct < 80 ? '#facc15' : '#f87171';
-  txt.textContent = usedTotal >= 1000
-    ? `${(usedTotal/1000).toFixed(1)}k / ${usedInv>0?'12k':'20k'}`
-    : `${usedTotal} / ${usedInv>0?'12k':'20k'}`;
+  txt.textContent = `TPM ${Math.round(pct)}%`;
 }
 setInterval(_updateTokenGauge, 2000);
 
