@@ -936,6 +936,7 @@ function calcNeeded(p){
 
   const dates = entries.map(([d])=>d);
   let base = 0;
+  let _dataPoints30 = 0; // 진단용: 최근 30일 데이터 일수
 
   if(entries.length > 0){
     const latestDate = dates[dates.length-1];
@@ -978,6 +979,7 @@ function calcNeeded(p){
       else if(d>=cut28) prev14+=(outlier?0:q);
     });
 
+    _dataPoints30 = vals30.length;
     const avg7  = vals7.reduce((a,b)=>a+b,0)/7;
     const avg30 = vals30.reduce((a,b)=>a+b,0)/30;
     const accel = prev14>0 ? rec14/prev14 : (rec14>0?1.2:1.0);
@@ -1034,7 +1036,12 @@ function calcNeeded(p){
   const orderCycle = getOrderCycle();
   const needed=Math.max(0,Math.round(expM*(orderCycle+p.leadTime+0.5)-p.stock));
   const boxes=Math.ceil(needed/(p.boxQty||1));
-  return {needed,boxes,expM,sr,corrLabel,noData:false,orderCycle};
+  // 진단용: 데이터 일수, 일평균, 의심 여부
+  const avgDay = Math.round(expM/30*10)/10;
+  // 데이터 일수 적은데 expM이 reorderPoint 기반 예상치보다 2.5배 이상 → 배치/집계 데이터 의심
+  const impliedExpM = p.reorderPoint > 0 ? p.reorderPoint / Math.max(p.leadTime + 0.5, 1) : 0;
+  const suspect = _dataPoints30 < 10 && impliedExpM > 0 && expM > impliedExpM * 2.5;
+  return {needed,boxes,expM,sr,corrLabel,noData:false,orderCycle,avgDay,dataPoints30:_dataPoints30,suspect};
 }
 // ── 일별 데이터 부족 여부 판단 (calcNeeded 진입 전 사전 체크용)
 function _hasEnoughDailyData(p){
@@ -1081,8 +1088,10 @@ function renderInv(){
         const days=calcOrderDeadlineDays(p);
         const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
         const seasonBadge=ord.corrLabel&&ord.corrLabel!=='보정없음'&&ord.corrLabel!=='작년 데이터 없음'?` <span style="font-size:9px;color:${ord.sr>1.05?'#DC2626':'#059669'}">${ord.corrLabel}</span>`:'';
-        const cycleTip=`title="예상월소진 ${ord.expM}개 × (주문주기${ord.orderCycle||getOrderCycle()}개월 + 리드타임${p.leadTime}개월 + 안전0.5) - 현재고${p.stock}"`;
-        return `<span style="color:#EA580C;" ${cycleTip}>${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}`;
+        const cycleTip=`title="계산식: 예상월소진${ord.expM}개 × (주문주기${ord.orderCycle}개월+리드타임${p.leadTime}개월+안전0.5) - 현재고${p.stock}\n근거: 최근30일 데이터 ${ord.dataPoints30}일치 / 일평균 ${ord.avgDay}개"`;
+        const suspectBadge=ord.suspect?`<span style="font-size:9px;color:#F59E0B;display:block;">⚠ 데이터 확인필요</span>`:'';
+        const diagLine=`<span style="font-size:9px;color:var(--tx2);display:block;">일평균 ${ord.avgDay}개 · ${ord.dataPoints30}일치</span>`;
+        return `<span style="color:#EA580C;" ${cycleTip}>${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}${suspectBadge}${diagLine}`;
       })()}</td>
       <td id="iotd-${p.id}">${ioTarget===p.id?`<div style="display:flex;gap:3px;align-items:center;"><input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button></div>`:`<button class="btn btn-sm" onclick="startIO(${p.id})">입출고</button>`}</td>
       <td><div style="display:flex;gap:3px;"><button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button><button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button><button class="btn btn-sm ${p.disc?'btn-or':'btn-gy'}" onclick="discProd(${p.id})" title="${p.disc?'단종 해제':'단종 처리'}">${p.disc?'↩단종':'단종'}</button><button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button></div></td>
