@@ -510,7 +510,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div class="chat-win" id="chatWin">
   <div class="chat-win-hd">
     <div class="chat-win-title">🤖 AI 재고 어시스턴트</div>
-    <button class="chat-win-close" onclick="toggleChat()">✕</button>
+    <div style="display:flex;gap:4px;align-items:center;">
+      <button class="chat-win-close" onclick="clearChatHistory()" title="대화 초기화">🗑</button>
+      <button class="chat-win-close" onclick="toggleKeyBanner()" title="API 키 변경">⚙️</button>
+      <button class="chat-win-close" onclick="toggleChat()">✕</button>
+    </div>
   </div>
   <div class="chat-sugs" id="chatSugs">
     <span class="chat-sug" onclick="chatSuggest('어제 가장 많이 팔린 제품은?')">어제 판매 TOP</span>
@@ -524,7 +528,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMsg()">➤</button>
   </div>
   <div class="chat-key-banner" id="chatKeyBanner" style="display:none;">
-    ⚠️ Groq API 키를 입력하세요 (<a href="https://console.groq.com/keys" target="_blank" style="color:var(--pr);">발급받기</a>)
+    🔑 Groq API 키 (<a href="https://console.groq.com/keys" target="_blank" style="color:var(--pr);">발급받기</a>)
     <input type="password" id="chatKeyInp" placeholder="gsk_..." />
     <button onclick="saveGroqKey()">저장</button>
   </div>
@@ -1897,9 +1901,57 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('cl
 // GROQ AI 채팅
 // ══════════════════════════════════════════════
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const CHAT_STORE_KEY = 'groq_chat_log';
 let _chatOpen = false;
-let _chatHistory = []; // {role, content}
-let _chatInitialized = false;
+let _chatHistory = []; // API용 {role, content}
+
+function _esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _nl(t){ return _esc(t).replace(/\n/g,'<br>'); }
+
+// localStorage에서 대화 복원
+function _loadChatHistory() {
+  const msgs = document.getElementById('chatMsgs');
+  msgs.innerHTML = '';
+  _chatHistory = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHAT_STORE_KEY) || '[]');
+    if (saved.length === 0) {
+      _appendChatMsg('ai', '안녕하세요! 재고 AI 어시스턴트입니다 🤖\n재고 현황, 판매 분석, 발주 추천은 물론 일상 대화도 가능합니다.\n\n※ 현재 앱에 로드된 실제 데이터를 기반으로 분석합니다.', false);
+      return;
+    }
+    saved.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'chat-msg ' + item.role;
+      div.innerHTML = item.html;
+      msgs.appendChild(div);
+      if (item.role !== 'ai' || !item.isWelcome) {
+        _chatHistory.push({ role: item.role === 'user' ? 'user' : 'assistant', content: item.text });
+      }
+    });
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch(e) { console.warn('chat restore error', e); }
+}
+
+// 메시지 추가 + localStorage 저장
+function _appendChatMsg(role, text, save = true) {
+  const msgs = document.getElementById('chatMsgs');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  const html = _nl(text);
+  div.innerHTML = html;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  if (save) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CHAT_STORE_KEY) || '[]');
+      saved.push({ role, text, html });
+      // 최대 200개 메시지만 보관
+      if (saved.length > 200) saved.splice(0, saved.length - 200);
+      localStorage.setItem(CHAT_STORE_KEY, JSON.stringify(saved));
+    } catch(e) {}
+  }
+  return div;
+}
 
 function toggleChat() {
   _chatOpen = !_chatOpen;
@@ -1907,16 +1959,15 @@ function toggleChat() {
   if (_chatOpen) {
     const key = localStorage.getItem('groq_api_key');
     document.getElementById('chatKeyBanner').style.display = key ? 'none' : 'block';
-    if (!_chatInitialized) {
-      _chatInitialized = true;
-      _appendChatMsg('ai', '안녕하세요! 재고 AI 어시스턴트입니다 🤖\n재고 현황, 판매 분석, 발주 추천에 대해 질문해보세요.\n\n※ 현재 앱에 로드된 실제 데이터를 기반으로 답변합니다.');
-    }
-    setTimeout(() => {
-      const msgs = document.getElementById('chatMsgs');
-      msgs.scrollTop = msgs.scrollHeight;
-      document.getElementById('chatInp').focus();
-    }, 50);
+    _loadChatHistory();
+    setTimeout(() => { document.getElementById('chatInp').focus(); }, 50);
   }
+}
+
+function toggleKeyBanner() {
+  const banner = document.getElementById('chatKeyBanner');
+  banner.style.display = banner.style.display === 'none' ? 'block' : 'none';
+  if (banner.style.display === 'block') document.getElementById('chatKeyInp').focus();
 }
 
 function saveGroqKey() {
@@ -1925,7 +1976,14 @@ function saveGroqKey() {
   localStorage.setItem('groq_api_key', key);
   document.getElementById('chatKeyBanner').style.display = 'none';
   document.getElementById('chatKeyInp').value = '';
-  _appendChatMsg('ai', '✅ API 키가 저장되었습니다. 이제 질문해보세요!');
+  _appendChatMsg('ai', '✅ API 키가 저장되었습니다!');
+}
+
+function clearChatHistory() {
+  if (!confirm('대화 내역을 모두 삭제할까요?')) return;
+  localStorage.removeItem(CHAT_STORE_KEY);
+  _chatHistory = [];
+  _loadChatHistory();
 }
 
 function _buildContext() {
@@ -2003,7 +2061,8 @@ async function sendChatMsg() {
   _appendChatMsg('user', msg);
   _chatHistory.push({ role: 'user', content: msg });
 
-  const loadDiv = _appendChatMsg('ai', '분석 중...');
+  // 로딩 표시 (저장 안 함)
+  const loadDiv = _appendChatMsg('ai', '분석 중...', false);
   loadDiv.classList.add('thinking');
   document.getElementById('chatSendBtn').disabled = true;
 
@@ -2039,11 +2098,22 @@ ${ctx}
     const data = await res.json();
     const reply = data.choices[0].message.content;
     _chatHistory.push({ role: 'assistant', content: reply });
+
+    // 로딩 div를 실제 답변으로 교체
     loadDiv.classList.remove('thinking');
-    loadDiv.innerHTML = reply.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    loadDiv.innerHTML = _nl(reply);
+
+    // 답변을 localStorage에 저장
+    try {
+      const saved = JSON.parse(localStorage.getItem(CHAT_STORE_KEY) || '[]');
+      saved.push({ role: 'ai', text: reply, html: _nl(reply) });
+      if (saved.length > 200) saved.splice(0, saved.length - 200);
+      localStorage.setItem(CHAT_STORE_KEY, JSON.stringify(saved));
+    } catch(e) {}
+
   } catch (err) {
     loadDiv.classList.remove('thinking');
-    loadDiv.innerHTML = `❌ 오류: ${err.message}<br><small>API 키를 확인하거나 잠시 후 다시 시도하세요.</small>`;
+    loadDiv.innerHTML = `❌ 오류: ${_esc(err.message)}<br><small>API 키를 확인하거나 잠시 후 다시 시도하세요.</small>`;
   } finally {
     document.getElementById('chatSendBtn').disabled = false;
     document.getElementById('chatMsgs').scrollTop = 9999;
