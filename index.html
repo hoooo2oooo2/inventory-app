@@ -184,6 +184,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .chat-key-banner input{width:100%;margin-top:5px;padding:5px 8px;border:0.5px solid #FDE68A;border-radius:6px;font-size:11px;background:#fff;color:var(--tx);outline:none;}
 .chat-key-banner input:focus{border-color:var(--pr);}
 .chat-key-banner button{margin-top:5px;padding:3px 10px;border-radius:5px;border:none;background:var(--pr);color:#fff;font-size:11px;cursor:pointer;}
+.chat-token-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:58px;}
+.chat-token-txt{font-size:9px;color:rgba(255,255,255,.8);white-space:nowrap;line-height:1;}
+.chat-token-track{width:58px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden;}
+.chat-token-fill{height:100%;width:0%;border-radius:2px;transition:width .6s,background .4s;background:#4ade80;}
 .fc-hd{padding:8px 12px;display:flex;align-items:center;justify-content:space-between;background:#DC2626;}
 .fc-htitle{font-size:12px;font-weight:500;color:#fff;display:flex;align-items:center;gap:5px;}
 .fc-x{background:none;border:none;color:rgba(255,255,255,.85);font-size:14px;cursor:pointer;}
@@ -510,7 +514,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div class="chat-win" id="chatWin">
   <div class="chat-win-hd">
     <div class="chat-win-title">🤖 AI 재고 어시스턴트</div>
-    <div style="display:flex;gap:4px;align-items:center;">
+    <div style="display:flex;gap:6px;align-items:center;">
+      <div class="chat-token-wrap" id="chatTokenWrap" title="분당 토큰 사용량 (1분 후 초기화)">
+        <span class="chat-token-txt" id="chatTokenTxt">0 / 12k</span>
+        <div class="chat-token-track"><div class="chat-token-fill" id="chatTokenFill"></div></div>
+      </div>
       <button class="chat-win-close" onclick="clearChatHistory()" title="대화 초기화">🗑</button>
       <button class="chat-win-close" onclick="toggleKeyBanner()" title="API 키 변경">⚙️</button>
       <button class="chat-win-close" onclick="toggleChat()">✕</button>
@@ -1900,8 +1908,12 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('cl
 // ══════════════════════════════════════════════
 // GROQ AI 채팅
 // ══════════════════════════════════════════════
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const CHAT_STORE_KEY = 'groq_chat_log';
+// 재고 분석: 70b / 일반 대화: 8b (TPM 한도 높음)
+const GROQ_MODEL_INV  = 'llama-3.3-70b-versatile'; // 12,000 TPM
+const GROQ_MODEL_FAST = 'llama-3.1-8b-instant';    // 20,000 TPM
+const TPM_LIMIT_INV   = 12000;
+const TPM_LIMIT_FAST  = 20000;
+const CHAT_STORE_KEY  = 'groq_chat_log';
 let _chatOpen = false;
 let _chatHistory = []; // API용 {role, content}
 
@@ -1986,60 +1998,95 @@ function clearChatHistory() {
   _loadChatHistory();
 }
 
-// 재고 관련 질문인지 판별
-function _isInventoryQ(msg) {
-  return /재고|판매|발주|제품|상품|수량|출고|입고|주문|박스|팔린|팔리|부족|임박|긴급|로켓|리스트|목록|분석|현황|어제|최근|이번주|지난주|얼마나|순위|top|TOP/.test(msg);
+// ── 토큰 게이지 ──────────────────────────────
+let _tokenLog = []; // { time, tokens, isInv }
+
+function _recordTokens(tokens, isInv) {
+  const now = Date.now();
+  _tokenLog.push({ time: now, tokens, isInv });
+  _tokenLog = _tokenLog.filter(e => now - e.time < 60000);
+  _updateTokenGauge();
 }
 
-// 재고 데이터 요약 (토큰 절약형)
-function _buildContext() {
-  const today = new Date();
-  const todayStr = fmtDate(today);
-  const activeProds = products.filter(p => !p.hidden && !p.disc);
-  const yday = fmtDate(new Date(today.getTime() - 86400000));
+function _updateTokenGauge() {
+  const now = Date.now();
+  _tokenLog = _tokenLog.filter(e => now - e.time < 60000);
+  // 두 모델 중 더 빡빡한 쪽(INV) 기준으로 표시
+  const usedInv  = _tokenLog.filter(e=>e.isInv).reduce((s,e)=>s+e.tokens,0);
+  const usedFast = _tokenLog.filter(e=>!e.isInv).reduce((s,e)=>s+e.tokens,0);
+  const pctInv   = Math.min(100, usedInv  / TPM_LIMIT_INV  * 100);
+  const pctFast  = Math.min(100, usedFast / TPM_LIMIT_FAST * 100);
+  const pct = Math.max(pctInv, pctFast);
+  const usedTotal = usedInv + usedFast;
+  const fill = document.getElementById('chatTokenFill');
+  const txt  = document.getElementById('chatTokenTxt');
+  if (!fill || !txt) return;
+  fill.style.width = pct + '%';
+  fill.style.background = pct < 55 ? '#4ade80' : pct < 80 ? '#facc15' : '#f87171';
+  txt.textContent = usedTotal >= 1000
+    ? `${(usedTotal/1000).toFixed(1)}k / ${usedInv>0?'12k':'20k'}`
+    : `${usedTotal} / ${usedInv>0?'12k':'20k'}`;
+}
+setInterval(_updateTokenGauge, 2000);
 
-  const prodStats = activeProds.map(p => {
+// ── 스마트 컨텍스트 (키워드별 필요한 것만) ────
+function _isInventoryQ(msg) {
+  return /재고|판매|발주|제품|상품|수량|출고|입고|주문|박스|팔린|팔리|부족|임박|긴급|로켓|리스트|목록|분석|현황|어제|최근|이번주|지난주|얼마나|순위|top/i.test(msg);
+}
+
+function _buildSmartContext(msg) {
+  const m = msg;
+  const today = new Date();
+  const yday = fmtDate(new Date(today.getTime() - 86400000));
+  const activeProds = products.filter(p => !p.hidden && !p.disc);
+
+  // 제품별 핵심 스탯 계산
+  const stats = activeProds.map(p => {
     const dc = _dCache[p.code] || {};
     let s7 = 0;
-    for (let i = 0; i < 7; i++) {
-      s7 += dc[fmtDate(new Date(today.getTime() - i * 86400000))] || 0;
-    }
+    for (let i = 0; i < 7; i++) s7 += dc[fmtDate(new Date(today.getTime()-i*86400000))]||0;
     const needed = calcNeeded(p);
-    const nb = needed.needed > 0 && p.boxQty > 0 ? Math.ceil(needed.needed / p.boxQty) : 0;
-    const st = p.stock <= 0 ? '없음' : p.stock <= p.reorderPoint * 0.5 ? '긴급' : p.stock <= p.reorderPoint ? '임박' : '정상';
-    return { name: p.name, stock: p.stock, st, s7, nb, reorder: p.reorderPoint, ydayQty: dc[yday] || 0 };
+    const nb = needed.needed>0&&p.boxQty>0 ? Math.ceil(needed.needed/p.boxQty) : 0;
+    const st = p.stock<=0?'없음':p.stock<=p.reorderPoint*0.5?'긴급':p.stock<=p.reorderPoint?'임박':'정상';
+    return { name:p.name, stock:p.stock, reorder:p.reorderPoint, st, s7, nb, yday:dc[yday]||0 };
   });
 
-  // 어제 TOP5
-  const ydayTop = [...prodStats].sort((a,b)=>b.ydayQty-a.ydayQty)
-    .filter(x=>x.ydayQty>0).slice(0,5).map(x=>`${x.name}:${x.ydayQty}개`).join(', ') || '없음';
+  const parts = [`날짜:${fmtDate(today)} 총${activeProds.length}개제품`];
 
-  // 7일 TOP10
-  const top10 = [...prodStats].sort((a,b)=>b.s7-a.s7).slice(0,10)
-    .map(x=>`${x.name}:${x.s7}개`).join(', ');
+  // 어제 관련
+  if (/어제|yesterday/.test(m)) {
+    const top = [...stats].sort((a,b)=>b.yday-a.yday).filter(x=>x.yday>0).slice(0,8);
+    parts.push(`어제판매TOP:${top.map(x=>`${x.name}:${x.yday}개`).join(', ')||'없음'}`);
+  }
 
-  // 발주 필요
-  const urgent = prodStats.filter(x=>x.stock<=x.reorder)
-    .map(x=>`${x.name}(재고${x.stock}/필요${x.nb}박스)`).join(', ') || '없음';
+  // 발주 관련
+  if (/발주|주문|order|부족|임박|긴급/.test(m)) {
+    const urg = stats.filter(x=>x.stock<=x.reorder);
+    parts.push(`발주필요(${urg.length}개):${urg.map(x=>`${x.name}(재고${x.stock}/시점${x.reorder}/필요${x.nb}박스)`).join(' | ')||'없음'}`);
+  }
 
-  // 전제품: 이름,상태,재고,7일판매,발주박스 만 (최소화)
-  const all = prodStats.map(x=>`${x.name}:${x.st}/재고${x.stock}/7일${x.s7}/발주${x.nb}박스`).join(' | ');
+  // 판매순위/분석
+  if (/판매|팔|분석|많이|순위|top|최근|이번주|지난주/i.test(m)) {
+    const top = [...stats].sort((a,b)=>b.s7-a.s7).slice(0,10);
+    parts.push(`7일판매TOP10:${top.map(x=>`${x.name}:${x.s7}개`).join(', ')}`);
+  }
 
-  return `날짜:${todayStr} 총${activeProds.length}개
-어제TOP5:${ydayTop}
-7일TOP10:${top10}
-발주필요:${urgent}
-전제품:${all}`;
-}
+  // 재고 현황
+  if (/재고|현황|상태|수량/.test(m)) {
+    const issues = stats.filter(x=>x.st!=='정상');
+    parts.push(`이슈제품(${issues.length}개):${issues.map(x=>`${x.name}(${x.st},재고${x.stock})`).join(' | ')||'없음'}`);
+    // 정상 제품은 간략히
+    const normals = stats.filter(x=>x.st==='정상').slice(0,12);
+    parts.push(`정상제품:${normals.map(x=>`${x.name}:${x.stock}`).join(', ')}`);
+  }
 
-function _appendChatMsg(role, text) {
-  const msgs = document.getElementById('chatMsgs');
-  const div = document.createElement('div');
-  div.className = 'chat-msg ' + role;
-  div.innerHTML = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
-  return div;
+  // 키워드 미매칭 → 최소 요약만
+  if (parts.length === 1) {
+    const urg = stats.filter(x=>x.stock<=x.reorder);
+    parts.push(`발주임박:${urg.length}개 / 7일TOP5:${[...stats].sort((a,b)=>b.s7-a.s7).slice(0,5).map(x=>`${x.name}:${x.s7}`).join(',')}`);
+  }
+
+  return parts.join('\n');
 }
 
 async function sendChatMsg() {
@@ -2059,52 +2106,54 @@ async function sendChatMsg() {
   _appendChatMsg('user', msg);
   _chatHistory.push({ role: 'user', content: msg });
 
-  // 로딩 표시 (저장 안 함)
-  const loadDiv = _appendChatMsg('ai', '분석 중...', false);
+  const loadDiv = _appendChatMsg('ai', '생각 중...', false);
   loadDiv.classList.add('thinking');
   document.getElementById('chatSendBtn').disabled = true;
 
-  try {
-    const needCtx = _isInventoryQ(msg);
-    const sys = needCtx
-      ? `당신은 재고관리 앱 AI 어시스턴트입니다. 아래 실시간 데이터를 기반으로 분석하세요.\n\n${_buildContext()}\n\n규칙: 구체적 수치 포함, 발주추천 시 박스수 명시, 한국어로 답변`
-      : `당신은 재고관리 앱에 내장된 친근한 AI 어시스턴트입니다. 무엇이든 편하게 대화할 수 있습니다. 항상 한국어로 답변하세요.`;
+  const isInv = _isInventoryQ(msg);
+  // 재고질문: 70b 모델 / 일반대화: 8b 모델 (TPM 한도 더 높음)
+  const model = isInv ? GROQ_MODEL_INV : GROQ_MODEL_FAST;
+  const sys = isInv
+    ? `재고관리 AI. 아래 실시간 데이터 기반으로 분석. 수치 명시, 박스수 포함, 한국어 답변.\n${_buildSmartContext(msg)}`
+    : `재고관리 앱 내장 AI. 무엇이든 편하게 대화. 항상 한국어로 답변.`;
 
+  try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: 'system', content: sys }, ..._chatHistory.slice(-4)],
+        model,
+        messages: [{ role:'system', content:sys }, ..._chatHistory.slice(-4)],
         temperature: 0.2,
-        max_tokens: 1200
+        max_tokens: 700
       })
     });
 
     if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
+      const e = await res.json().catch(()=>({}));
       throw new Error(e.error?.message || `HTTP ${res.status}`);
     }
 
     const data = await res.json();
     const reply = data.choices[0].message.content;
-    _chatHistory.push({ role: 'assistant', content: reply });
+    _chatHistory.push({ role:'assistant', content:reply });
 
-    // 로딩 div를 실제 답변으로 교체
+    // 토큰 기록
+    if (data.usage) _recordTokens(data.usage.total_tokens, isInv);
+
     loadDiv.classList.remove('thinking');
     loadDiv.innerHTML = _nl(reply);
 
-    // 답변을 localStorage에 저장
     try {
-      const saved = JSON.parse(localStorage.getItem(CHAT_STORE_KEY) || '[]');
-      saved.push({ role: 'ai', text: reply, html: _nl(reply) });
-      if (saved.length > 200) saved.splice(0, saved.length - 200);
+      const saved = JSON.parse(localStorage.getItem(CHAT_STORE_KEY)||'[]');
+      saved.push({ role:'ai', text:reply, html:_nl(reply) });
+      if (saved.length>200) saved.splice(0, saved.length-200);
       localStorage.setItem(CHAT_STORE_KEY, JSON.stringify(saved));
     } catch(e) {}
 
-  } catch (err) {
+  } catch(err) {
     loadDiv.classList.remove('thinking');
-    loadDiv.innerHTML = `❌ 오류: ${_esc(err.message)}<br><small>API 키를 확인하거나 잠시 후 다시 시도하세요.</small>`;
+    loadDiv.innerHTML = `❌ 오류: ${_esc(err.message)}<br><small>잠시 후 다시 시도하거나 API 키를 확인하세요.</small>`;
   } finally {
     document.getElementById('chatSendBtn').disabled = false;
     document.getElementById('chatMsgs').scrollTop = 9999;
@@ -2112,17 +2161,14 @@ async function sendChatMsg() {
 }
 
 function chatSuggest(text) {
-  const inp = document.getElementById('chatInp');
-  inp.value = text;
+  document.getElementById('chatInp').value = text;
   sendChatMsg();
 }
 
-// Enter 전송 (Shift+Enter 줄바꿈)
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('chatInp').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMsg(); }
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendChatMsg(); }
   });
-  // 자동 높이 조절
   document.getElementById('chatInp').addEventListener('input', function() {
     this.style.height = '36px';
     this.style.height = Math.min(this.scrollHeight, 90) + 'px';
