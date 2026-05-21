@@ -258,6 +258,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
     <button class="btn btn-pr" id="addTopBtn" style="display:none;">+ 추가</button>
+    <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
     <button class="btn btn-da btn-sm" onclick="confirmClearAll()" title="예시 데이터 초기화">🗑 초기화</button>
   </div>
 </div>
@@ -633,6 +634,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- TELEGRAM MODAL -->
+<div class="modal-overlay" id="telegramModal">
+  <div class="modal">
+    <h3>📱 텔레그램 발주 알림 설정</h3>
+    <div class="modal-sub" style="margin-bottom:12px;">
+      발주 임박 제품이 생기면 텔레그램으로 자동 알림을 받을 수 있습니다.<br>
+      <b>설정 방법:</b><br>
+      1. 텔레그램에서 <b>@BotFather</b> 검색 → /newbot → 봇 생성 → Token 복사<br>
+      2. <b>@userinfobot</b> 검색 → 메시지 보내면 Chat ID 확인<br>
+      3. 만든 봇에게 먼저 메시지 한 번 보내야 수신 가능
+    </div>
+    <div class="field"><label>Bot Token</label><input id="tg_token" placeholder="1234567890:AABBCCDDEEFFaabbccddeeff-1234567890" /></div>
+    <div class="field"><label>Chat ID</label><input id="tg_chat" placeholder="123456789" /></div>
+    <div class="field">
+      <label>알림 주기</label>
+      <select id="tg_interval" style="width:100%;padding:7px 9px;border:0.5px solid var(--bd);border-radius:7px;font-size:12px;">
+        <option value="4">4시간마다</option>
+        <option value="8" selected>8시간마다</option>
+        <option value="24">하루 1회</option>
+      </select>
+    </div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('telegramModal')">닫기</button>
+      <button class="btn" onclick="testTelegram()">🧪 테스트 전송</button>
+      <button class="btn btn-pr" onclick="saveTelegramSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -1005,7 +1035,14 @@ function renderInv(){
       <td style="text-align:right;color:var(--tx2);">${p.boxQty}개</td>
       <td><span class="badge b-gy">${p.leadTime}개월</span></td>
       <td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td>
-      <td style="text-align:right;font-size:11px;color:${show?'#EA580C':'var(--tx2)'};">${show?`${ord.needed.toLocaleString()}개 (${ord.boxes}박스)`:'-'}</td>
+      <td style="text-align:right;font-size:11px;color:${show?'#EA580C':'var(--tx2)'};">${(()=>{
+        if(!show) return '-';
+        const hasDailyData=Object.keys(_dCache[p.code]||{}).length>=3;
+        const days=calcOrderDeadlineDays(p);
+        const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
+        const fallbackWarn=!hasDailyData?` <span title="일별 판매 데이터 없음 — 월별 데이터 기반 추정치" style="cursor:help;color:#94A3B8;">※</span>`:'';
+        return `${ord.needed.toLocaleString()}개 (${ord.boxes}박스)${dlStr}${fallbackWarn}`;
+      })()}</td>
       <td id="iotd-${p.id}">${ioTarget===p.id?`<div style="display:flex;gap:3px;align-items:center;"><input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button></div>`:`<button class="btn btn-sm" onclick="startIO(${p.id})">입출고</button>`}</td>
       <td><div style="display:flex;gap:3px;"><button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button><button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button><button class="btn btn-sm ${p.disc?'btn-or':'btn-gy'}" onclick="discProd(${p.id})" title="${p.disc?'단종 해제':'단종 처리'}">${p.disc?'↩단종':'단종'}</button><button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button></div></td>
     </tr>`;
@@ -1689,6 +1726,32 @@ function histPageChange(dir){const max=Math.ceil(historyLog.length/HIST_PER)-1;h
 // ══════════════════════════════════════════════
 // 플로트 알림
 // ══════════════════════════════════════════════
+// 발주 기한까지 남은 일수 계산 (음수 = 이미 늦음)
+function calcOrderDeadlineDays(p){
+  const dc=_dCache[p.code]||{};
+  const today=new Date();
+  let s7=0;
+  for(let i=0;i<7;i++) s7+=dc[fmtDate(new Date(today.getTime()-i*86400000))]||0;
+  let adu=s7/7;
+  if(adu<=0){
+    const mData=getM(p,CUR_YEAR);
+    const ref=MONTH>0?(mData[MONTH-1]||mData[MONTH]||0):(mData[MONTH]||0);
+    adu=ref/30;
+  }
+  if(adu<=0) return null;
+  const ltDays=Math.round(p.leadTime*30);
+  // 현재고로 며칠 버티는지 - 리드타임 = 발주 여유일
+  return Math.floor(p.stock/adu)-ltDays;
+}
+
+function _deadlineLabel(days){
+  if(days===null) return '';
+  if(days<=0)  return '<span style="color:#DC2626;font-size:10px;font-weight:600;">⚠ 지금 당장 발주!</span>';
+  if(days<=7)  return `<span style="color:#DC2626;font-size:10px;">⏰ ${days}일 이내 발주</span>`;
+  if(days<=14) return `<span style="color:#EA580C;font-size:10px;">⏰ ${days}일 이내 발주</span>`;
+  return `<span style="color:#D97706;font-size:10px;">📅 ${days}일 이내 발주</span>`;
+}
+
 function updateFloat(){
   const urg=products.filter(p=>!p.hidden&&p.stock<=p.reorderPoint&&!p.disc);
   const fw=document.getElementById('floatWrap'),np=document.getElementById('navPulse');
@@ -1696,9 +1759,101 @@ function updateFloat(){
   fw.style.display='block';np.style.display='inline-flex';
   document.getElementById('orderBadge').textContent=urg.length;
   document.getElementById('fcTitle').textContent=`발주 임박 ${urg.length}개 제품`;
-  document.getElementById('fcBody').innerHTML=urg.slice(0,4).map(p=>{const c=calcNeeded(p);return`<div class="fc-row"><div><div class="fc-rname">${p.name}</div><div class="fc-rmeta">재고 ${p.stock}개 / 발주시점 ${p.reorderPoint}개</div></div><div class="fc-rqty">${c.needed.toLocaleString()}개</div></div>`;}).join('');
+  document.getElementById('fcBody').innerHTML=urg.slice(0,4).map(p=>{
+    const c=calcNeeded(p);
+    const days=calcOrderDeadlineDays(p);
+    const dl=_deadlineLabel(days);
+    return`<div class="fc-row" style="flex-direction:column;align-items:flex-start;gap:2px;padding:5px 0;">
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+        <div class="fc-rname">${p.name}</div>
+        <div class="fc-rqty">${c.boxes}박스</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+        <div class="fc-rmeta">재고 ${p.stock}개 / 시점 ${p.reorderPoint}개</div>
+        ${dl}
+      </div>
+    </div>`;
+  }).join('');
 }
 function toggleFloat(){floatOpen=!floatOpen;document.getElementById('floatCard').classList.toggle('open',floatOpen);}
+
+// ══════════════════════════════════════════════
+// 텔레그램 알림
+// ══════════════════════════════════════════════
+function openTelegramSettings(){
+  document.getElementById('tg_token').value=localStorage.getItem('tg_token')||'';
+  document.getElementById('tg_chat').value=localStorage.getItem('tg_chat')||'';
+  document.getElementById('tg_interval').value=localStorage.getItem('tg_interval')||'8';
+  const btn=document.getElementById('tgBtn');
+  btn.style.background=localStorage.getItem('tg_token')?'#ECFDF5':'';
+  btn.style.color=localStorage.getItem('tg_token')?'#059669':'';
+  openModal('telegramModal');
+}
+
+function saveTelegramSettings(){
+  const tok=document.getElementById('tg_token').value.trim();
+  const chat=document.getElementById('tg_chat').value.trim();
+  const interval=document.getElementById('tg_interval').value;
+  if(!tok||!chat){alert('Bot Token과 Chat ID를 모두 입력해주세요.');return;}
+  localStorage.setItem('tg_token',tok);
+  localStorage.setItem('tg_chat',chat);
+  localStorage.setItem('tg_interval',interval);
+  const btn=document.getElementById('tgBtn');
+  btn.style.background='#ECFDF5';btn.style.color='#059669';
+  closeModal('telegramModal');
+  alert('✅ 저장되었습니다. 발주 임박 제품이 있으면 텔레그램으로 알림을 받습니다.');
+}
+
+async function _tgPost(token,chat,text){
+  return fetch(`https://api.telegram.org/bot${token}/sendMessage`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({chat_id:chat,text,parse_mode:'HTML'})
+  }).then(r=>r.json());
+}
+
+async function testTelegram(){
+  const tok=document.getElementById('tg_token').value.trim();
+  const chat=document.getElementById('tg_chat').value.trim();
+  if(!tok||!chat){alert('Bot Token과 Chat ID를 입력해주세요.');return;}
+  try{
+    const d=await _tgPost(tok,chat,'✅ <b>재고관리 시스템 연결 성공!</b>\n텔레그램 발주 알림이 정상적으로 작동합니다 📦');
+    if(d.ok) alert('✅ 테스트 메시지 전송 성공! 텔레그램을 확인하세요.');
+    else alert('❌ 실패: '+d.description+'\nBot에게 먼저 /start 메시지를 보내세요.');
+  }catch(e){alert('❌ 오류: '+e.message);}
+}
+
+async function checkTelegramAlert(){
+  const tok=localStorage.getItem('tg_token');
+  const chat=localStorage.getItem('tg_chat');
+  if(!tok||!chat) return;
+  const intervalH=parseInt(localStorage.getItem('tg_interval')||'8');
+  const lastSent=parseInt(localStorage.getItem('tg_last_sent')||'0');
+  if(Date.now()-lastSent < intervalH*3600*1000) return;
+
+  const urg=products.filter(p=>!p.hidden&&p.stock<=p.reorderPoint&&!p.disc)
+    .sort((a,b)=>{
+      const da=calcOrderDeadlineDays(a)??999;
+      const db=calcOrderDeadlineDays(b)??999;
+      return da-db;
+    });
+  if(!urg.length) return;
+
+  const lines=urg.slice(0,10).map((p,i)=>{
+    const c=calcNeeded(p);
+    const days=calcOrderDeadlineDays(p);
+    const urgTag=days===null?'':(days<=0?'\n    🚨 <b>지금 당장 발주!</b>':(days<=7?`\n    ⏰ <b>${days}일 이내 발주 필요</b>`:`\n    📅 ${days}일 이내 발주`));
+    return `${i+1}. <b>${p.name}</b>\n    재고: ${p.stock}개 | 발주시점: ${p.reorderPoint}개\n    필요발주: <b>${c.boxes}박스</b> (${c.needed.toLocaleString()}개)${urgTag}`;
+  });
+
+  const more=urg.length>10?`\n...외 ${urg.length-10}개 제품`:'';
+  const text=`🚨 <b>재고관리 발주 알림</b>\n발주 필요: ${urg.length}개 제품\n\n${lines.join('\n\n')}${more}\n\n📱 앱 확인: https://hoooo2oooo2.github.io/inventory-app/`;
+
+  try{
+    const d=await _tgPost(tok,chat,text);
+    if(d.ok) localStorage.setItem('tg_last_sent',Date.now().toString());
+  }catch(e){console.warn('TG alert error',e);}
+}
 
 // ══════════════════════════════════════════════
 // 엑셀 업로드
@@ -2189,7 +2344,7 @@ document.getElementById('inDate').value=fmtDate(now);
 document.getElementById('salesUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 buildYearSelects();
-loadAll();
+loadAll().then(()=>{ checkTelegramAlert(); });
 
 
 
