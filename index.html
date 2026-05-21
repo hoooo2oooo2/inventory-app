@@ -283,6 +283,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="invSrch" placeholder="상품명, 코드..." oninput="renderInv()"></div>
         <select class="sel" id="invStF" onchange="renderInv()"><option value="">전체상태</option><option>정상</option><option>임박</option><option>긴급</option><option>부족</option></select>
         <select class="sel" id="invTyF" onchange="renderInv()"><option value="">전체구분</option><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select>
+        <div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--bd);border-radius:7px;padding:3px 7px;font-size:11px;background:var(--bg2);">
+          <span style="color:var(--tx2);white-space:nowrap;">📦 주문주기</span>
+          <select id="orderCycleSel" onchange="saveOrderCycle(this.value)" style="border:none;background:transparent;font-size:11px;padding:0;color:var(--tx);cursor:pointer;">
+            <option value="1.5">1.5개월</option>
+            <option value="2">2개월</option>
+            <option value="2.5">2.5개월</option>
+            <option value="3">3개월</option>
+            <option value="3.5">3.5개월</option>
+          </select>
+        </div>
         <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨긴제품만 보기</button>
       </div>
     </div>
@@ -697,6 +707,17 @@ const fmtFull = d => `${fmtDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 
 let YEARS = [CUR_YEAR-1, CUR_YEAR];
 
+// ── 주문주기 설정 (localStorage) ──────────────
+function getOrderCycle(){ return parseFloat(localStorage.getItem('order_cycle_months')||'2.5'); }
+function saveOrderCycle(v){
+  localStorage.setItem('order_cycle_months', v);
+  renderInv(); updateFloat();
+}
+function _initOrderCycleSel(){
+  const sel = document.getElementById('orderCycleSel');
+  if(sel) sel.value = String(getOrderCycle());
+}
+
 // ══════════════════════════════════════════════
 // 상태
 // ══════════════════════════════════════════════
@@ -1009,9 +1030,11 @@ function calcNeeded(p){
     corrLabel='작년 데이터 없음';
   }
 
-  const needed=Math.max(0,Math.round(expM*(p.leadTime+0.5)-p.stock));
+  // 주문주기 + 리드타임 + 안전재고(0.5개월) 기준 목표재고
+  const orderCycle = getOrderCycle();
+  const needed=Math.max(0,Math.round(expM*(orderCycle+p.leadTime+0.5)-p.stock));
   const boxes=Math.ceil(needed/(p.boxQty||1));
-  return {needed,boxes,expM,sr,corrLabel,noData:false};
+  return {needed,boxes,expM,sr,corrLabel,noData:false,orderCycle};
 }
 // ── 일별 데이터 부족 여부 판단 (calcNeeded 진입 전 사전 체크용)
 function _hasEnoughDailyData(p){
@@ -1058,7 +1081,8 @@ function renderInv(){
         const days=calcOrderDeadlineDays(p);
         const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
         const seasonBadge=ord.corrLabel&&ord.corrLabel!=='보정없음'&&ord.corrLabel!=='작년 데이터 없음'?` <span style="font-size:9px;color:${ord.sr>1.05?'#DC2626':'#059669'}">${ord.corrLabel}</span>`:'';
-        return `<span style="color:#EA580C;">${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}`;
+        const cycleTip=`title="예상월소진 ${ord.expM}개 × (주문주기${ord.orderCycle||getOrderCycle()}개월 + 리드타임${p.leadTime}개월 + 안전0.5) - 현재고${p.stock}"`;
+        return `<span style="color:#EA580C;" ${cycleTip}>${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}`;
       })()}</td>
       <td id="iotd-${p.id}">${ioTarget===p.id?`<div style="display:flex;gap:3px;align-items:center;"><input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button></div>`:`<button class="btn btn-sm" onclick="startIO(${p.id})">입출고</button>`}</td>
       <td><div style="display:flex;gap:3px;"><button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button><button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button><button class="btn btn-sm ${p.disc?'btn-or':'btn-gy'}" onclick="discProd(${p.id})" title="${p.disc?'단종 해제':'단종 처리'}">${p.disc?'↩단종':'단종'}</button><button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button></div></td>
@@ -2452,6 +2476,7 @@ document.getElementById('inDate').value=fmtDate(now);
 document.getElementById('salesUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 buildYearSelects();
+_initOrderCycleSel();
 loadAll().then(()=>{ checkTelegramAlert(); startTgPolling(); });
 
 
