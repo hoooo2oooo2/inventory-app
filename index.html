@@ -1998,45 +1998,38 @@ function _buildContext() {
   const activeProds = products.filter(p => !p.hidden && !p.disc);
   const yday = fmtDate(new Date(today.getTime() - 86400000));
 
-  // 제품별 판매량 계산 (7일/30일)
   const prodStats = activeProds.map(p => {
     const dc = _dCache[p.code] || {};
-    let s7 = 0, s30 = 0;
-    for (let i = 0; i < 30; i++) {
-      const d = fmtDate(new Date(today.getTime() - i * 86400000));
-      const q = dc[d] || 0; s30 += q;
-      if (i < 7) s7 += q;
+    let s7 = 0;
+    for (let i = 0; i < 7; i++) {
+      s7 += dc[fmtDate(new Date(today.getTime() - i * 86400000))] || 0;
     }
-    const mData = getM(p, CUR_YEAR);
     const needed = calcNeeded(p);
     const nb = needed.needed > 0 && p.boxQty > 0 ? Math.ceil(needed.needed / p.boxQty) : 0;
     const st = p.stock <= 0 ? '없음' : p.stock <= p.reorderPoint * 0.5 ? '긴급' : p.stock <= p.reorderPoint ? '임박' : '정상';
-    return { p, dc, s7, s30, prevM: MONTH > 0 ? (mData[MONTH-1]||0) : 0, curM: mData[MONTH]||0, nb, st, ydayQty: dc[yday]||0 };
+    return { name: p.name, stock: p.stock, st, s7, nb, reorder: p.reorderPoint, ydayQty: dc[yday] || 0 };
   });
 
-  // 어제 판매 TOP5
-  const ydayTop = [...prodStats].sort((a,b)=>b.ydayQty-a.ydayQty).filter(x=>x.ydayQty>0).slice(0,5)
-    .map(x=>`${x.p.name}:${x.ydayQty}개`).join(', ') || '없음';
+  // 어제 TOP5
+  const ydayTop = [...prodStats].sort((a,b)=>b.ydayQty-a.ydayQty)
+    .filter(x=>x.ydayQty>0).slice(0,5).map(x=>`${x.name}:${x.ydayQty}개`).join(', ') || '없음';
 
-  // 7일 판매 TOP10
+  // 7일 TOP10
   const top10 = [...prodStats].sort((a,b)=>b.s7-a.s7).slice(0,10)
-    .map(x=>`${x.p.name}:${x.s7}`).join(', ');
+    .map(x=>`${x.name}:${x.s7}개`).join(', ');
 
-  // 발주 필요 제품만
-  const urgentRows = prodStats.filter(x=>x.p.stock<=x.p.reorderPoint)
-    .map(x=>`${x.p.name}(재고${x.p.stock}/시점${x.p.reorderPoint}/필요${x.nb}박스)`).join(', ') || '없음';
+  // 발주 필요
+  const urgent = prodStats.filter(x=>x.stock<=x.reorder)
+    .map(x=>`${x.name}(재고${x.stock}/필요${x.nb}박스)`).join(', ') || '없음';
 
-  // 전체 제품 요약 (핵심만, 한 줄로)
-  const allRows = prodStats.map(x=>
-    `${x.p.name}|${x.st}|재고${x.p.stock}|7일${x.s7}|30일${x.s30}|전월${x.prevM}|당월${x.curM}|발주${x.nb}박스`
-  ).join('\n');
+  // 전제품: 이름,상태,재고,7일판매,발주박스 만 (최소화)
+  const all = prodStats.map(x=>`${x.name}:${x.st}/재고${x.stock}/7일${x.s7}/발주${x.nb}박스`).join(' | ');
 
-  return `[${todayStr} / 총${activeProds.length}제품 / 발주임박${prodStats.filter(x=>x.p.stock<=x.p.reorderPoint).length}개]
-어제TOP: ${ydayTop}
-7일TOP10: ${top10}
-발주필요: ${urgentRows}
----전제품---
-${allRows}`;
+  return `날짜:${todayStr} 총${activeProds.length}개
+어제TOP5:${ydayTop}
+7일TOP10:${top10}
+발주필요:${urgent}
+전제품:${all}`;
 }
 
 function _appendChatMsg(role, text) {
@@ -2082,7 +2075,7 @@ async function sendChatMsg() {
       headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages: [{ role: 'system', content: sys }, ..._chatHistory.slice(-8)],
+        messages: [{ role: 'system', content: sys }, ..._chatHistory.slice(-4)],
         temperature: 0.2,
         max_tokens: 1200
       })
