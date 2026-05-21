@@ -2648,7 +2648,25 @@ document.getElementById('salesUpdLbl').textContent='최근 갱신: '+fmtFull(now
 document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 buildYearSelects();
 _initOrderCycleSel();
-loadAll().then(()=>{ checkTelegramAlert(); startTgPolling(); });
+loadAll().then(async ()=>{
+  checkTelegramAlert();
+  startTgPolling();
+  // 페이지 로드 시 월별집계 오류 자동 감지 & 수정
+  const issues=_detectMonthlyBatch();
+  if(issues.length){
+    const {fixed,failed}=await applyMonthlyBatchFix(issues);
+    if(fixed>0){
+      renderInv(); updateFloat();
+      console.log(`✅ 자동 데이터 정상화: ${fixed}개 수정됨`);
+      // 우상단에 5초 알림 표시
+      const n=document.createElement('div');
+      n.style.cssText='position:fixed;top:56px;right:12px;z-index:9999;background:#059669;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);';
+      n.textContent=`✅ 데이터 자동 정상화 ${fixed}건 완료`;
+      document.body.appendChild(n);
+      setTimeout(()=>n.remove(),5000);
+    }
+  }
+});
 
 
 
