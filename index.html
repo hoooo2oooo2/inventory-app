@@ -2673,8 +2673,38 @@ function _buildSmartContext(msg) {
     parts.push(`[조회제품]\n${info.join('\n')}`);
   }
 
-  // ── 어제 관련 ──
-  if (/어제|yesterday/.test(m)) {
+  // ── 로켓그로스 관련 ──
+  const isRgQuery = /로켓|rocket\s*grow|rg출고/i.test(m);
+  if (isRgQuery) {
+    const rgProds = getRgProducts();
+    if (/어제|yesterday/.test(m)) {
+      // 로켓그로스 어제 출고 목록
+      const rgYday = rgProds.map(p => ({
+        name: p.name,
+        qty: (_rgDailyCache[p.code] || {})[yday] || 0
+      })).filter(x => x.qty > 0).sort((a,b) => b.qty - a.qty);
+      const total = rgYday.reduce((s,x) => s + x.qty, 0);
+      parts.push(`[로켓그로스 어제(${yday}) 출고]\n${rgYday.map((x,i)=>`${i+1}. ${x.name}: ${x.qty}개`).join('\n') || '출고없음'}\n총 ${total}개 출고`);
+    } else if (/오늘|today/.test(m)) {
+      const todayStr = fmtDate(today);
+      const rgToday = rgProds.map(p => ({
+        name: p.name,
+        qty: (_rgDailyCache[p.code] || {})[todayStr] || 0
+      })).filter(x => x.qty > 0).sort((a,b) => b.qty - a.qty);
+      const total = rgToday.reduce((s,x) => s + x.qty, 0);
+      parts.push(`[로켓그로스 오늘(${todayStr}) 출고]\n${rgToday.map((x,i)=>`${i+1}. ${x.name}: ${x.qty}개`).join('\n') || '출고없음'}\n총 ${total}개 출고`);
+    } else {
+      // 이번달 로켓그로스 출고 현황
+      const rgMonth = rgProds.map(p => {
+        const monthly = getRgMonthly(p.code, CUR_YEAR);
+        return { name: p.name, cur: monthly[MONTH] || 0, prev: monthly[Math.max(0, MONTH-1)] || 0 };
+      }).filter(x => x.cur > 0).sort((a,b) => b.cur - a.cur);
+      parts.push(`[로켓그로스 이번달 출고]\n${rgMonth.map(x=>`${x.name}: ${x.cur}개 (전월${x.prev}개)`).join('\n') || '없음'}`);
+    }
+  }
+
+  // ── 어제 관련 (일반 판매, 로켓그로스 아닌 경우) ──
+  if (/어제|yesterday/.test(m) && !isRgQuery) {
     const top = [...stats].sort((a,b)=>b.yday-a.yday).filter(x=>x.yday>0).slice(0,8);
     parts.push(`어제판매TOP:${top.map(x=>`${x.name}:${x.yday}개`).join(', ')||'없음'}`);
   }
