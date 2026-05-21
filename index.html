@@ -975,7 +975,7 @@ function goPage(p){
     document.getElementById('spt-'+salesPeriod)?.classList.add('active');
     renderSalesPeriod(); renderSalesTbody(); renderProdPanel();
   }
-  if(p==='rg'){ loadRgDailyCache().then(()=>{ const rp=getRgProducts(); if(rp.length) rgSel=new Set([rp[0].id]); renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
+  if(p==='rg'){ loadRgDailyCache().then(()=>{ renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
   if(p==='hist') renderHist();
 }
 
@@ -1134,6 +1134,12 @@ function renderInv(){
   const cr=products.filter(p=>!p.hidden&&getStatus(p)==='부족').length;
   document.getElementById('invSum').innerHTML=`<div class="sc"><div class="sl">전체</div><div class="sv">${products.length}</div></div><div class="sc"><div class="sl" style="color:#059669;">정상</div><div class="sv" style="color:#059669;">${ok}</div></div><div class="sc"><div class="sl" style="color:#D97706;">임박/긴급</div><div class="sv" style="color:#D97706;">${wn}</div></div><div class="sc"><div class="sl" style="color:#DC2626;">부족</div><div class="sv" style="color:#DC2626;">${cr}</div></div>`;
   if(!data.length){document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--tx2);">상품이 없습니다.</td></tr>`;return;}
+  // 코드별 진행중 주문 합산 (재고목록 필요발주 셀용)
+  const pendingByCode={};
+  receiveList.forEach(r=>{
+    const miss=Math.max(0,r.orderQty-(r.in1+r.in2));
+    if(miss>0) pendingByCode[r.code]=(pendingByCode[r.code]||0)+miss;
+  });
   document.getElementById('invBody').innerHTML=data.map(p=>{
     const ord=calcNeeded(p);
     const er=p.reorderPoint>0?p.reorderPoint:(ord.noData?0:Math.round(ord.expM*p.leadTime));
@@ -1156,12 +1162,23 @@ function renderInv(){
         if(st==='단종') return '<span style="color:var(--tx2);">-</span>';
         if(ord.noData) return '<span style="color:#94A3B8;font-size:10px;">데이터 쌓는 중</span>';
         if(!show) return '<span style="color:var(--tx2);">-</span>';
+        const pending=pendingByCode[p.code]||0;
         const days=calcOrderDeadlineDays(p);
         const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
         const seasonBadge=ord.corrLabel&&ord.corrLabel!=='보정없음'&&ord.corrLabel!=='작년 데이터 없음'?` <span style="font-size:9px;color:${ord.sr>1.05?'#DC2626':'#059669'}">${ord.corrLabel}</span>`:'';
         const cycleTip=`title="계산식: 예상월소진${ord.expM}개 × (주문주기${ord.orderCycle}개월+리드타임${p.leadTime}개월+안전0.5) - 현재고${p.stock}\n근거: 최근30일 데이터 ${ord.dataPoints30}일치 / 일평균 ${ord.avgDay}개"`;
         const suspectBadge=ord.suspect?`<span style="font-size:9px;color:#F59E0B;display:block;">⚠ 데이터 확인필요</span>`:'';
         const diagLine=`<span style="font-size:9px;color:var(--tx2);display:block;">일평균 ${ord.avgDay}개 · ${ord.dataPoints30}일치</span>`;
+        // 진행중 주문이 필요량을 충족하는 경우
+        if(pending>0&&pending>=ord.needed){
+          return `<span style="color:#059669;font-weight:600;">✓ 주문진행 중</span><span style="font-size:9px;color:#059669;display:block;">${pending.toLocaleString()}개 입고예정</span>${diagLine}`;
+        }
+        // 진행중 주문이 있지만 추가발주 필요한 경우
+        if(pending>0){
+          const addNeeded=ord.needed-pending;
+          const addBoxes=Math.ceil(addNeeded/(p.boxQty||1));
+          return `<span style="color:#9333EA;font-weight:600;" ${cycleTip}>추가 ${addNeeded.toLocaleString()}개 (${addBoxes}박스)</span>${dlStr}<span style="font-size:9px;color:#9333EA;display:block;">진행중 ${pending.toLocaleString()}개 포함 총 ${ord.needed.toLocaleString()}개</span>${seasonBadge}${suspectBadge}${diagLine}`;
+        }
         return `<span style="color:#EA580C;" ${cycleTip}>${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}${suspectBadge}${diagLine}`;
       })()}</td>
       <td id="iotd-${p.id}">${ioTarget===p.id?`<div style="display:flex;gap:3px;align-items:center;"><input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button></div>`:`<button class="btn btn-sm" onclick="startIO(${p.id})">입출고</button>`}</td>
@@ -1658,7 +1675,7 @@ function renderRgPeriod(){
     return;
   }
   const sel = [...rgSel].map(id=>rgProds.find(x=>x.id===id)).filter(Boolean);
-  if(!sel.length){ if(rgProds.length) rgSel=new Set([rgProds[0].id]); return; }
+  if(!sel.length){ if(rgChart){rgChart.destroy();rgChart=null;} document.getElementById('rgSum').innerHTML=''; document.getElementById('rgCurLbl').textContent=''; document.getElementById('rgLegend').innerHTML=''; return; }
   const def=getPeriodDef(rgYear,rgPeriod);
   const ds=[];let i=0;
   sel.forEach(p=>{
@@ -1683,16 +1700,22 @@ function renderRgTbody(){
   }
   document.getElementById('rgTbody').innerHTML=rgProds.map(p=>{
     const m=getRgMonthly(p.code,CUR_YEAR);
-    const cur=m[MONTH]||0, prev=m[Math.max(0,MONTH-1)]||0;
-    const g=prev>0?Math.round(((cur-prev)/prev)*100):(cur>0?100:0);
+    const cur=m[MONTH]||0;
+    const prevM=MONTH>0?(m[MONTH-1]||0):(getRgMonthly(p.code,CUR_YEAR-1)[11]||0);
+    // 당월은 일부만 경과 → 일평균으로 비교
+    const daysElapsed=now.getDate();
+    const daysInPrevMonth=MONTH>0?new Date(CUR_YEAR,MONTH,0).getDate():31;
+    const curRate=daysElapsed>0?cur/daysElapsed:0;
+    const prevRate=daysInPrevMonth>0?prevM/daysInPrevMonth:0;
+    const g=prevRate>0?Math.round(((curRate-prevRate)/prevRate)*100):(cur>0?100:0);
     return `<tr>
       <td><span class="code-chip">${p.code}</span></td>
       <td style="font-weight:500;">${p.name}</td>
       <td><span class="badge b-gy">${p.type}</span></td>
       <td style="text-align:right;font-weight:500;">${p.stock.toLocaleString()}개</td>
-      <td style="text-align:right;">${cur.toLocaleString()}개</td>
-      <td style="text-align:right;">${prev.toLocaleString()}개</td>
-      <td style="text-align:right;"><span style="color:${g>0?'#059669':g<0?'#DC2626':'var(--tx2)'};">${g>0?'+':''}${g}%</span></td>
+      <td style="text-align:right;">${cur.toLocaleString()}개 <span style="font-size:9px;color:var(--tx2);">(${daysElapsed}일)</span></td>
+      <td style="text-align:right;">${prevM.toLocaleString()}개</td>
+      <td style="text-align:right;"><span style="color:${g>0?'#059669':g<0?'#DC2626':'var(--tx2)'};" title="일평균 비교: 당월 ${Math.round(curRate*10)/10}개/일 vs 전월 ${Math.round(prevRate*10)/10}개/일">${g>0?'+':''}${g}%</span></td>
       <td style="text-align:center;"><button class="btn btn-sm" onclick="focusRgProd(${p.id})">그래프</button></td>
       <td style="text-align:center;"><span style="font-size:10px;color:var(--tx2);">재고관리 연동</span></td>
     </tr>`;
@@ -1742,8 +1765,6 @@ async function confirmRgUpload(pendingRows){
   await addHistory({menu:'로켓그로스',type:'upload',code:'MULTI',name:`${pendingRows.length}건`,desc:'로켓그로스 출고 업로드',before:'-',after:`${pendingRows.length}건`,user:'업로드'});
   await loadRgDailyCache();
   if(currentPage==='rg'){
-    const rgProds=getRgProducts();
-    if(rgProds.length) rgSel=new Set([rgProds[0].id]);
     renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5();
   }
 }
