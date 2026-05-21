@@ -294,6 +294,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </select>
         </div>
         <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨긴제품만 보기</button>
+        <button class="btn btn-sm" onclick="openDataDiagModal()" style="color:#D97706;border-color:#D97706;" title="월별집계가 하루치로 등록된 오류 데이터를 찾아 정상화">🔍 데이터 진단</button>
       </div>
     </div>
     <div class="tw-scroll"><table>
@@ -677,6 +678,33 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 데이터 정상화 진단 모달 -->
+<div class="modal-overlay" id="dataDiagModal">
+  <div class="modal" style="max-width:560px;">
+    <h3>🔍 월별집계 오류 감지</h3>
+    <div class="modal-sub" style="margin-bottom:10px;">
+      아래 항목은 <b>월별 총계가 하루치로 등록된 것으로 의심</b>되는 데이터입니다.<br>
+      선택 후 <b>정상화 실행</b>을 클릭하면 해당 월의 일별 균등 분산으로 교체됩니다.
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:var(--bg2);">
+          <th style="padding:6px;text-align:left;"><input type="checkbox" id="diagChkAll" onchange="document.querySelectorAll('.diag-chk').forEach(c=>c.checked=this.checked)"></th>
+          <th style="padding:6px;text-align:left;">제품명</th>
+          <th style="padding:6px;text-align:left;">날짜</th>
+          <th style="padding:6px;text-align:right;">의심수량</th>
+          <th style="padding:6px;text-align:right;">정상화 결과</th>
+        </tr></thead>
+        <tbody id="diagBody"></tbody>
+      </table>
+    </div>
+    <div class="ma" style="margin-top:12px;">
+      <button class="btn" onclick="closeModal('dataDiagModal')">닫기</button>
+      <button class="btn btn-pr" id="diagFixBtn" onclick="runDataDiagFix()">✅ 정상화 실행</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -978,50 +1006,46 @@ function calcNeeded(p){
     const cut28 = fmtDate(new Date(latest.getTime()-28*86400000));
     const cut7  = fmtDate(new Date(latest.getTime()-7*86400000));
 
-    // ── 주말/공휴일 누적 정규화 ──
-    // 월요일·공휴일 다음 영업일은 직전 비영업일 수량이 합산됨
-    // → qty / 누적일수 로 일별 평균으로 변환
-    const normEntries = entries.map(([d,q]) => {
-      const ad = _getAccumDays(d);
-      return [d, ad>1 ? q/ad : q, ad]; // [날짜, 정규화일평균, 누적일수]
-    });
+    // ── 스마트 이상치 제거 ──
+    // 월요일/공휴일 다음 영업일(누적주문)은 이상치 판단 자체를 건너뜀
+    // → 나머지는 IQR 기준으로 진짜 반짝 이상치만 제거
+    const allVals = entries.map(([,q])=>q);
+    const sorted = [...allVals].sort((a,b)=>a-b);
+    const q1=sorted[Math.floor(sorted.length*0.25)];
+    const q3=sorted[Math.floor(sorted.length*0.75)];
+    const iqrUpper=q3+(q3-q1)*1.5;
 
-    // ── 스마트 이상치 제거 (정규화 값 기준) ──
-    const allNormVals = normEntries.map(([,nq])=>nq);
-    const sortedN = [...allNormVals].sort((a,b)=>a-b);
-    const q1n=sortedN[Math.floor(sortedN.length*0.25)];
-    const q3n=sortedN[Math.floor(sortedN.length*0.75)];
-    const iqrUpperN=q3n+(q3n-q1n)*1.5;
-
-    const isOutlier = (idx, nq) => {
-      if(nq<=iqrUpperN) return false;
-      const next3=normEntries.slice(idx+1,idx+4);
+    const isOutlier = (idx, qty) => {
+      // 누적 주문일(월요일, 공휴일 다음날)은 절대 이상치 아님
+      if(_getAccumDays(entries[idx][0]) > 1) return false;
+      if(qty<=iqrUpper) return false;
+      const next3=entries.slice(idx+1,idx+4);
       const next3avg=next3.length>0?next3.reduce((a,e)=>a+e[1],0)/next3.length:0;
-      if(next3avg>=nq*0.2) return false;
-      const median=sortedN[Math.floor(sortedN.length/2)];
+      if(next3avg>=qty*0.2) return false;
+      const median=sorted[Math.floor(sorted.length/2)];
       if(next3avg>median*1.5) return false;
       return true;
     };
 
-    // 최근 30일 / 7일 (정규화 일평균 기준)
+    // 최근 30일 / 7일 값 (원시값 그대로 — 월요일 포함해야 총량 정확)
     const vals30=[],vals7=[];
     let rec14=0,prev14=0;
-    normEntries.forEach(([d,nq,ad],idx)=>{
-      const outlier = isOutlier(idx,nq);
-      if(d>=cut30){ if(!outlier){ vals30.push(nq); _dataPoints30+=ad; } }
-      if(d>=cut7) { if(!outlier) vals7.push(nq); }
-      if(d>=cut14)      rec14+=(outlier?0:nq);
-      else if(d>=cut28) prev14+=(outlier?0:nq);
+    entries.forEach(([d,q],idx)=>{
+      const outlier = isOutlier(idx,q);
+      if(d>=cut30){ if(!outlier){ vals30.push(q); _dataPoints30++; } }
+      if(d>=cut7) { if(!outlier) vals7.push(q); }
+      if(d>=cut14)      rec14+=(outlier?0:q);
+      else if(d>=cut28) prev14+=(outlier?0:q);
     });
 
     const avg7  = vals7.reduce((a,b)=>a+b,0)/7;
     const avg30 = vals30.reduce((a,b)=>a+b,0)/30;
     const accel = prev14>0 ? rec14/prev14 : (rec14>0?1.2:1.0);
 
-    // ── 트렌드 상승 감지 (정규화 값 기준) ──
+    // ── 트렌드 상승 감지 ──
     const midCut = fmtDate(new Date(latest.getTime()-15*86400000));
-    const front15sum = normEntries.filter(([d,nq],i)=>d>=cut30&&d<midCut&&!isOutlier(i,nq)).reduce((a,[,nq])=>a+nq,0);
-    const back15sum  = normEntries.filter(([d,nq],i)=>d>=midCut&&!isOutlier(i,nq)).reduce((a,[,nq])=>a+nq,0);
+    const front15sum = entries.filter(([d,q],i)=>d>=cut30&&d<midCut&&!isOutlier(i,q)).reduce((a,[,q])=>a+q,0);
+    const back15sum  = entries.filter(([d,q],i)=>d>=midCut&&!isOutlier(i,q)).reduce((a,[,q])=>a+q,0);
     const front15avg = front15sum/15;
     const back15avg  = back15sum/15;
     const isTrendUp  = front15avg>0 && back15avg>=front15avg*2 && back15avg>=0.3;
@@ -2005,6 +2029,113 @@ function startTgPolling(){
 
 function stopTgPolling(){
   if(_tgPollTimer){clearInterval(_tgPollTimer);_tgPollTimer=null;}
+}
+
+// ══════════════════════════════════════════════
+// 월별집계 일별데이터 오류 감지 & 정상화
+// ══════════════════════════════════════════════
+function _detectMonthlyBatch(){
+  const issues=[];
+  for(const [code,dateData] of Object.entries(_dCache)){
+    const p=products.find(x=>x.code===code);
+    if(!p||p.hidden) continue;
+    const entries=Object.entries(dateData).sort(([a],[b])=>a.localeCompare(b));
+    if(entries.length<2) continue;
+
+    // 전체 일별 중앙값(일 판매량 기준선)
+    const allQtys=entries.map(([,q])=>q).sort((a,b)=>a-b);
+    const median=allQtys[Math.floor(allQtys.length/2)]||1;
+
+    // 월별 그룹화
+    const byMonth={};
+    entries.forEach(([d,q])=>{
+      const ym=d.slice(0,7);
+      if(!byMonth[ym])byMonth[ym]=[];
+      byMonth[ym].push([d,q]);
+    });
+
+    for(const [ym,mEntries] of Object.entries(byMonth)){
+      // 해당 월 데이터가 5일 이하이면서
+      if(mEntries.length>5) continue;
+      const [yr,mo]=ym.split('-').map(Number);
+      const daysInMonth=new Date(yr,mo,0).getDate();
+
+      for(const [d,q] of mEntries){
+        // q가 중앙값의 15배 이상이고
+        if(q < median*15) continue;
+        // q를 일수로 나눈 값이 중앙값의 0.3~5배 사이이면 → 월집계를 하루에 넣은 것
+        const impliedDaily=q/daysInMonth;
+        if(impliedDaily>=median*0.3 && impliedDaily<=median*5){
+          issues.push({code,name:p.name,date:d,qty:q,daysInMonth,impliedDaily:Math.round(impliedDaily),ym});
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+async function applyMonthlyBatchFix(selected){
+  let fixed=0,failed=0;
+  for(const issue of selected){
+    const {code,date,qty,daysInMonth,ym}=issue;
+    const [yr,mo]=ym.split('-').map(Number);
+    const dailyQty=Math.round(qty/daysInMonth);
+    try{
+      // 기존 집계 행 삭제
+      await sb.from('daily_sales').delete()
+        .eq('code',code).eq('sale_date',date).eq('is_rg',false);
+      // 해당 월 전체에 일별 분산 삽입
+      const rows=[];
+      for(let day=1;day<=daysInMonth;day++){
+        const ds=`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        rows.push({code,sale_date:ds,qty:dailyQty,is_rg:false});
+      }
+      await sb.from('daily_sales').upsert(rows,{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
+      // _dCache 인메모리 갱신
+      delete _dCache[code][date];
+      rows.forEach(r=>{ _dCache[code][r.sale_date]=((_dCache[code][r.sale_date]||0)+r.qty); });
+      fixed++;
+    }catch(e){ console.error('fix error',code,date,e); failed++; }
+  }
+  return {fixed,failed};
+}
+
+function openDataDiagModal(){
+  const issues=_detectMonthlyBatch();
+  const modal=document.getElementById('dataDiagModal');
+  const tbody=document.getElementById('diagBody');
+  if(!issues.length){
+    alert('✅ 의심 데이터가 없습니다.\n모든 제품의 일별 데이터가 정상으로 보입니다.');
+    return;
+  }
+  tbody.innerHTML=issues.map((it,i)=>`
+    <tr>
+      <td><input type="checkbox" class="diag-chk" data-i="${i}" checked></td>
+      <td style="font-size:12px;font-weight:500;">${it.name}</td>
+      <td style="font-size:11px;color:var(--tx2);">${it.date}</td>
+      <td style="text-align:right;color:#DC2626;font-weight:600;">${it.qty.toLocaleString()}</td>
+      <td style="text-align:right;color:var(--tx2);">${it.daysInMonth}일 → <b>${it.impliedDaily}</b>/일</td>
+    </tr>`).join('');
+  modal._issues=issues;
+  openModal('dataDiagModal');
+}
+
+async function runDataDiagFix(){
+  const modal=document.getElementById('dataDiagModal');
+  const issues=modal._issues||[];
+  const selected=issues.filter((_,i)=>{
+    const chk=document.querySelector(`.diag-chk[data-i="${i}"]`);
+    return chk&&chk.checked;
+  });
+  if(!selected.length){alert('선택된 항목이 없습니다.');return;}
+  if(!confirm(`${selected.length}개 항목을 정상화하시겠습니까?\n집계 데이터를 일별 분산 데이터로 교체합니다.`))return;
+  const btn=document.getElementById('diagFixBtn');
+  btn.disabled=true; btn.textContent='처리 중...';
+  const {fixed,failed}=await applyMonthlyBatchFix(selected);
+  btn.disabled=false; btn.textContent='✅ 정상화 실행';
+  closeModal('dataDiagModal');
+  renderInv(); updateFloat();
+  alert(`완료: ${fixed}개 정상화 / ${failed}개 실패\n재고 계산이 업데이트되었습니다.`);
 }
 
 // ══════════════════════════════════════════════
