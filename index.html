@@ -655,6 +655,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <option value="24">하루 1회</option>
       </select>
     </div>
+    <div class="field" style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+      <input type="checkbox" id="tg_groq_enabled" style="width:auto;accent-color:var(--pr);">
+      <label for="tg_groq_enabled" style="margin:0;font-size:12px;color:var(--tx2);">🤖 Groq AI 자동응답 — 브라우저가 열려있을 때 봇에게 보낸 메시지에 AI가 자동 답변합니다</label>
+    </div>
     <div class="ma">
       <button class="btn" onclick="closeModal('telegramModal')">닫기</button>
       <button class="btn" onclick="testTelegram()">🧪 테스트 전송</button>
@@ -904,6 +908,11 @@ function getStatus(p){
 function calcNeeded(p){
   const dayData = _dCache[p.code]||{};
   const entries = Object.entries(dayData).sort((a,b)=>a[0].localeCompare(b[0]));
+  // 일별 데이터 없거나 판매 실적 없으면 → 데이터 쌓는 중
+  const totalSales = entries.reduce((s,[,q])=>s+q,0);
+  if(entries.length < 3 || totalSales === 0)
+    return {needed:0,boxes:0,expM:0,sr:1,corrLabel:'',noData:true};
+
   const dates = entries.map(([d])=>d);
   let base = 0;
 
@@ -979,29 +988,36 @@ function calcNeeded(p){
     if(accel<0.8)  base=Math.round(base*Math.max(0.85,accel));
   }
 
-  // 일별 데이터 없으면 월별 폴백
-  if(base<=0){
-    const mData=getYearData(p,CUR_YEAR).data;
-    for(let i=0;i<=3;i++){const idx=Math.max(0,MONTH-i);if(mData[idx]>0){base=mData[idx];break;}}
-    if(base<=0){const ly=getYearData(p,CUR_YEAR-1).data;base=ly[MONTH]||ly.reduce((a,b)=>Math.max(a,b),0);}
-  }
+  // 일별 데이터로 base 0이면 → 미산출 (월별 폴백 제거)
+  if(base<=0) return {needed:0,boxes:0,expM:0,sr:1,corrLabel:'',noData:true};
   base=Math.max(base,1);
 
-  // 시즌 보정: 일별 데이터 있으면 약하게(20%), 없으면 강하게(70%)
-  const best=getYearData(p,CUR_YEAR-1).data;
-  const lastYrTotal=best.reduce((a,b)=>a+b,0);
-  const prevAvg=lastYrTotal/12||1;
-  const arrM=Math.round(MONTH+p.leadTime)%12;
-  const rawSr=(best[arrM]||0)/prevAvg;
-  const hasDailyData=entries.length>=5;
-  const seasonWeight=hasDailyData?0.2:0.7;
-  const sr=Math.min(1.4,Math.max(0.8,1+(rawSr-1)*seasonWeight));
-  const expM=sr>1.05?Math.round(base*sr):base;
+  // 시즌 보정: 전년도(CUR_YEAR-1) 데이터 있는 제품만 적용
+  const prevYrData=getTotalM(p,CUR_YEAR-1);
+  const prevYrTotal=prevYrData.reduce((a,b)=>a+b,0);
+  let expM=base, sr=1, corrLabel='';
+  if(prevYrTotal>0){
+    const prevAvg=prevYrTotal/12;
+    const arrM=Math.round(MONTH+p.leadTime)%12;
+    const rawSr=(prevYrData[arrM]||0)/prevAvg;
+    const hasDailyData=entries.length>=5;
+    sr=Math.min(1.4,Math.max(0.8,1+(rawSr-1)*(hasDailyData?0.2:0.7)));
+    expM=sr>1.05?Math.round(base*sr):base;
+    const cp=Math.round((sr-1)*100);
+    corrLabel=cp>5?`성수기 +${cp}%`:cp<-5?`비수기 ${cp}%`:'보정없음';
+  } else {
+    corrLabel='작년 데이터 없음';
+  }
 
   const needed=Math.max(0,Math.round(expM*(p.leadTime+0.5)-p.stock));
   const boxes=Math.ceil(needed/(p.boxQty||1));
-  const corrPct=Math.round((sr-1)*100);
-  return {needed,boxes,expM,sr,corrLabel:corrPct>5?`성수기 +${corrPct}%`:corrPct<-5?`비수기 ${corrPct}%`:'보정없음'};
+  return {needed,boxes,expM,sr,corrLabel,noData:false};
+}
+// ── 일별 데이터 부족 여부 판단 (calcNeeded 진입 전 사전 체크용)
+function _hasEnoughDailyData(p){
+  const dc=_dCache[p.code]||{};
+  const entries=Object.entries(dc);
+  return entries.length>=3 && entries.some(([,q])=>q>0);
 }
 
 function renderInv(){
@@ -1035,13 +1051,14 @@ function renderInv(){
       <td style="text-align:right;color:var(--tx2);">${p.boxQty}개</td>
       <td><span class="badge b-gy">${p.leadTime}개월</span></td>
       <td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td>
-      <td style="text-align:right;font-size:11px;color:${show?'#EA580C':'var(--tx2)'};">${(()=>{
-        if(!show) return '-';
-        const hasDailyData=Object.keys(_dCache[p.code]||{}).length>=3;
+      <td style="text-align:right;font-size:11px;">${(()=>{
+        if(st==='단종') return '<span style="color:var(--tx2);">-</span>';
+        if(ord.noData) return '<span style="color:#94A3B8;font-size:10px;">데이터 쌓는 중</span>';
+        if(!show) return '<span style="color:var(--tx2);">-</span>';
         const days=calcOrderDeadlineDays(p);
         const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
-        const fallbackWarn=!hasDailyData?` <span title="일별 판매 데이터 없음 — 월별 데이터 기반 추정치" style="cursor:help;color:#94A3B8;">※</span>`:'';
-        return `${ord.needed.toLocaleString()}개 (${ord.boxes}박스)${dlStr}${fallbackWarn}`;
+        const seasonBadge=ord.corrLabel&&ord.corrLabel!=='보정없음'&&ord.corrLabel!=='작년 데이터 없음'?` <span style="font-size:9px;color:${ord.sr>1.05?'#DC2626':'#059669'}">${ord.corrLabel}</span>`:'';
+        return `<span style="color:#EA580C;">${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}`;
       })()}</td>
       <td id="iotd-${p.id}">${ioTarget===p.id?`<div style="display:flex;gap:3px;align-items:center;"><input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button></div>`:`<button class="btn btn-sm" onclick="startIO(${p.id})">입출고</button>`}</td>
       <td><div style="display:flex;gap:3px;"><button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button><button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button><button class="btn btn-sm ${p.disc?'btn-or':'btn-gy'}" onclick="discProd(${p.id})" title="${p.disc?'단종 해제':'단종 처리'}">${p.disc?'↩단종':'단종'}</button><button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button></div></td>
@@ -1766,7 +1783,7 @@ function updateFloat(){
     return`<div class="fc-row" style="flex-direction:column;align-items:flex-start;gap:2px;padding:5px 0;">
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
         <div class="fc-rname">${p.name}</div>
-        <div class="fc-rqty">${c.boxes}박스</div>
+        <div class="fc-rqty">${c.noData?'수량 미산출':c.boxes+'박스'}</div>
       </div>
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
         <div class="fc-rmeta">재고 ${p.stock}개 / 시점 ${p.reorderPoint}개</div>
@@ -1784,6 +1801,7 @@ function openTelegramSettings(){
   document.getElementById('tg_token').value=localStorage.getItem('tg_token')||'';
   document.getElementById('tg_chat').value=localStorage.getItem('tg_chat')||'';
   document.getElementById('tg_interval').value=localStorage.getItem('tg_interval')||'8';
+  document.getElementById('tg_groq_enabled').checked=!!localStorage.getItem('tg_groq_enabled');
   const btn=document.getElementById('tgBtn');
   btn.style.background=localStorage.getItem('tg_token')?'#ECFDF5':'';
   btn.style.color=localStorage.getItem('tg_token')?'#059669':'';
@@ -1794,14 +1812,21 @@ function saveTelegramSettings(){
   const tok=document.getElementById('tg_token').value.trim();
   const chat=document.getElementById('tg_chat').value.trim();
   const interval=document.getElementById('tg_interval').value;
+  const groqOn=document.getElementById('tg_groq_enabled').checked;
   if(!tok||!chat){alert('Bot Token과 Chat ID를 모두 입력해주세요.');return;}
   localStorage.setItem('tg_token',tok);
   localStorage.setItem('tg_chat',chat);
   localStorage.setItem('tg_interval',interval);
+  if(groqOn) localStorage.setItem('tg_groq_enabled','1');
+  else localStorage.removeItem('tg_groq_enabled');
   const btn=document.getElementById('tgBtn');
   btn.style.background='#ECFDF5';btn.style.color='#059669';
   closeModal('telegramModal');
-  alert('✅ 저장되었습니다. 발주 임박 제품이 있으면 텔레그램으로 알림을 받습니다.');
+  startTgPolling();
+  const msg=groqOn
+    ?'✅ 저장되었습니다.\n📱 발주 알림 + 🤖 Groq AI 자동응답이 활성화되었습니다.\n브라우저가 열려있는 동안 봇에게 보낸 메시지에 AI가 답변합니다.'
+    :'✅ 저장되었습니다. 발주 임박 제품이 있으면 텔레그램으로 알림을 받습니다.';
+  alert(msg);
 }
 
 async function _tgPost(token,chat,text){
@@ -1843,7 +1868,8 @@ async function checkTelegramAlert(){
     const c=calcNeeded(p);
     const days=calcOrderDeadlineDays(p);
     const urgTag=days===null?'':(days<=0?'\n    🚨 <b>지금 당장 발주!</b>':(days<=7?`\n    ⏰ <b>${days}일 이내 발주 필요</b>`:`\n    📅 ${days}일 이내 발주`));
-    return `${i+1}. <b>${p.name}</b>\n    재고: ${p.stock}개 | 발주시점: ${p.reorderPoint}개\n    필요발주: <b>${c.boxes}박스</b> (${c.needed.toLocaleString()}개)${urgTag}`;
+    const qtyStr = c.noData ? '데이터 쌓는 중' : `<b>${c.boxes}박스</b> (${c.needed.toLocaleString()}개)`;
+    return `${i+1}. <b>${p.name}</b>\n    재고: ${p.stock}개 | 발주시점: ${p.reorderPoint}개\n    필요발주: ${qtyStr}${urgTag}`;
   });
 
   const more=urg.length>10?`\n...외 ${urg.length-10}개 제품`:'';
@@ -1853,6 +1879,68 @@ async function checkTelegramAlert(){
     const d=await _tgPost(tok,chat,text);
     if(d.ok) localStorage.setItem('tg_last_sent',Date.now().toString());
   }catch(e){console.warn('TG alert error',e);}
+}
+
+// ── 텔레그램 ↔ Groq 양방향 채팅 ──────────────────────
+let _tgPollTimer = null;
+let _tgChatHistory = []; // Telegram용 대화 이력
+
+async function _tgGroqReply(userText) {
+  const key = localStorage.getItem('groq_api_key');
+  if (!key) return null;
+  const isInv = _isInventoryQ(userText);
+  const model = isInv ? GROQ_MODEL_INV : GROQ_MODEL_FAST;
+  const sys = isInv
+    ? `재고관리 AI. 아래 실시간 데이터 기반으로 분석. 수치 명시, 박스수 포함, 한국어 답변. 텔레그램용이므로 간결하게.\n${_buildSmartContext(userText)}`
+    : `재고관리 앱 AI. 한국어로 간결하게 답변.`;
+  _tgChatHistory.push({role:'user',content:userText});
+  if(_tgChatHistory.length>10) _tgChatHistory=_tgChatHistory.slice(-10);
+  try {
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+      body:JSON.stringify({model,messages:[{role:'system',content:sys},..._tgChatHistory.slice(-6)],temperature:0.2,max_tokens:500})
+    });
+    if(!res.ok) return null;
+    const data=await res.json();
+    const reply=data.choices[0].message.content;
+    _tgChatHistory.push({role:'assistant',content:reply});
+    if(data.usage) _recordTokens(data.usage.total_tokens,isInv);
+    return reply;
+  } catch(e){ console.warn('TG Groq error',e); return null; }
+}
+
+async function _tgPollLoop() {
+  const tok=localStorage.getItem('tg_token');
+  const chat=localStorage.getItem('tg_chat');
+  if(!tok||!chat||!localStorage.getItem('tg_groq_enabled')) return;
+  let offset=parseInt(localStorage.getItem('tg_update_offset')||'0');
+  try {
+    const r=await fetch(`https://api.telegram.org/bot${tok}/getUpdates?offset=${offset}&timeout=3`);
+    const data=await r.json();
+    if(!data.ok||!data.result.length) return;
+    for(const upd of data.result){
+      offset=upd.update_id+1;
+      const msg=upd.message;
+      if(!msg||msg.chat.id.toString()!==chat||!msg.text) continue;
+      // 봇 자신의 메시지 무시 (from.is_bot)
+      if(msg.from&&msg.from.is_bot) continue;
+      const reply=await _tgGroqReply(msg.text);
+      if(reply) await _tgPost(tok,chat,reply);
+    }
+    localStorage.setItem('tg_update_offset',offset.toString());
+  } catch(e){ console.warn('TG poll error',e); }
+}
+
+function startTgPolling(){
+  stopTgPolling();
+  if(!localStorage.getItem('tg_token')||!localStorage.getItem('tg_groq_enabled')) return;
+  _tgPollTimer=setInterval(_tgPollLoop,8000);
+  console.log('🤖 TG polling started');
+}
+
+function stopTgPolling(){
+  if(_tgPollTimer){clearInterval(_tgPollTimer);_tgPollTimer=null;}
 }
 
 // ══════════════════════════════════════════════
@@ -2344,7 +2432,7 @@ document.getElementById('inDate').value=fmtDate(now);
 document.getElementById('salesUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 buildYearSelects();
-loadAll().then(()=>{ checkTelegramAlert(); });
+loadAll().then(()=>{ checkTelegramAlert(); startTgPolling(); });
 
 
 
