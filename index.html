@@ -2282,7 +2282,10 @@ setInterval(_updateTokenGauge, 2000);
 
 // ── 스마트 컨텍스트 (키워드별 필요한 것만) ────
 function _isInventoryQ(msg) {
-  return /재고|판매|발주|제품|상품|수량|출고|입고|주문|박스|팔린|팔리|부족|임박|긴급|로켓|리스트|목록|분석|현황|어제|최근|이번주|지난주|얼마나|순위|top/i.test(msg);
+  if (/재고|판매|발주|제품|상품|수량|출고|입고|주문|박스|팔린|팔리|부족|임박|긴급|로켓|리스트|목록|분석|현황|어제|최근|이번주|지난주|얼마나|순위|top/i.test(msg)) return true;
+  // 제품명 4글자 이상 직접 언급 시 재고 컨텍스트 사용
+  const ml = msg.toLowerCase();
+  return products.some(p => !p.hidden && !p.disc && p.name.length >= 4 && ml.includes(p.name.toLowerCase().slice(0,4)));
 }
 
 function _buildSmartContext(msg) {
@@ -2299,39 +2302,56 @@ function _buildSmartContext(msg) {
     const needed = calcNeeded(p);
     const nb = needed.needed>0&&p.boxQty>0 ? Math.ceil(needed.needed/p.boxQty) : 0;
     const st = p.stock<=0?'없음':p.stock<=p.reorderPoint*0.5?'긴급':p.stock<=p.reorderPoint?'임박':'정상';
-    return { name:p.name, stock:p.stock, reorder:p.reorderPoint, st, s7, nb, yday:dc[yday]||0 };
+    return { p, name:p.name, stock:p.stock, reorder:p.reorderPoint, st, s7, nb, yday:dc[yday]||0, needed };
   });
 
   const parts = [`날짜:${fmtDate(today)} 총${activeProds.length}개제품`];
 
-  // 어제 관련
+  // ── 제품명 직접 매칭 (가장 우선) ──
+  // 메시지에서 2글자 이상 단어 추출 후 제품명 부분매칭
+  const msgWords = m.replace(/[?？!！.,]/g,'').split(/\s+/).filter(w=>w.length>=2);
+  const matchedStats = stats.filter(s =>
+    msgWords.some(w => s.name.includes(w)) ||
+    msgWords.join('').length >= 4 && s.name.includes(msgWords.join(''))
+  );
+  if (matchedStats.length > 0) {
+    const info = matchedStats.map(s => {
+      const days = calcOrderDeadlineDays(s.p);
+      const dlStr = days===null?'':(days<=0?' [지금발주필요]':` [발주까지${days}일]`);
+      const ordStr = s.needed.noData ? '데이터부족' : `${s.needed.boxes}박스(${s.needed.needed}개)`;
+      return `${s.name}: 재고${s.stock}개 | 발주시점${s.reorder}개 | 상태:${s.st} | 7일판매:${s.s7}개 | 필요발주:${ordStr}${dlStr}`;
+    });
+    parts.push(`[조회제품]\n${info.join('\n')}`);
+  }
+
+  // ── 어제 관련 ──
   if (/어제|yesterday/.test(m)) {
     const top = [...stats].sort((a,b)=>b.yday-a.yday).filter(x=>x.yday>0).slice(0,8);
     parts.push(`어제판매TOP:${top.map(x=>`${x.name}:${x.yday}개`).join(', ')||'없음'}`);
   }
 
-  // 발주 관련
+  // ── 발주 관련 ──
   if (/발주|주문|order|부족|임박|긴급/.test(m)) {
     const urg = stats.filter(x=>x.stock<=x.reorder);
     parts.push(`발주필요(${urg.length}개):${urg.map(x=>`${x.name}(재고${x.stock}/시점${x.reorder}/필요${x.nb}박스)`).join(' | ')||'없음'}`);
   }
 
-  // 판매순위/분석
+  // ── 판매순위/분석 ──
   if (/판매|팔|분석|많이|순위|top|최근|이번주|지난주/i.test(m)) {
     const top = [...stats].sort((a,b)=>b.s7-a.s7).slice(0,10);
     parts.push(`7일판매TOP10:${top.map(x=>`${x.name}:${x.s7}개`).join(', ')}`);
   }
 
-  // 재고 현황
+  // ── 재고 현황 (전체 제품 포함, 간략 포맷) ──
   if (/재고|현황|상태|수량/.test(m)) {
     const issues = stats.filter(x=>x.st!=='정상');
     parts.push(`이슈제품(${issues.length}개):${issues.map(x=>`${x.name}(${x.st},재고${x.stock})`).join(' | ')||'없음'}`);
-    // 정상 제품은 간략히
-    const normals = stats.filter(x=>x.st==='정상').slice(0,12);
-    parts.push(`정상제품:${normals.map(x=>`${x.name}:${x.stock}`).join(', ')}`);
+    // 전체 정상 제품 간략 포맷 (이름:재고 형식으로 압축)
+    const normals = stats.filter(x=>x.st==='정상');
+    parts.push(`정상제품(${normals.length}개):${normals.map(x=>`${x.name}:${x.stock}`).join(', ')}`);
   }
 
-  // 키워드 미매칭 → 최소 요약만
+  // ── 키워드 미매칭 → 최소 요약 ──
   if (parts.length === 1) {
     const urg = stats.filter(x=>x.stock<=x.reorder);
     parts.push(`발주임박:${urg.length}개 / 7일TOP5:${[...stats].sort((a,b)=>b.s7-a.s7).slice(0,5).map(x=>`${x.name}:${x.s7}`).join(',')}`);
