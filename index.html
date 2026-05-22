@@ -399,8 +399,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="tc active" id="rtc-a">
       <div class="tw-recv"><table class="tab-table">
         <thead><tr>
-          <th>주문날짜</th>
-          <th>업로드시간</th>
+          <th onclick="sortRecv('orderDate')" style="cursor:pointer;user-select:none;" id="rth-orderDate">주문날짜 <span id="rs-orderDate">▼</span></th>
+          <th onclick="sortRecv('uploadTime')" style="cursor:pointer;user-select:none;" id="rth-uploadTime">업로드시간 <span id="rs-uploadTime" style="color:var(--tx2);font-size:9px;"></span></th>
           <th>코드</th>
           <th style="min-width:140px;">상품명</th>
           <th style="text-align:right;">주문수량</th>
@@ -807,6 +807,7 @@ function _initOrderCycleSel(){
 // ══════════════════════════════════════════════
 let products=[], receiveList=[], doneList=[], rgProducts=[], historyLog=[];
 let invSort='code', invDir=1, ioTarget=null, _showHidden=false, editProdId=null;
+let recvSort='orderDate', recvDir=-1; // 발주관리 정렬 (기본: 주문날짜 최신순)
 let salesPeriod='monthly', salesYear=CUR_YEAR, salesSel=new Set(), salesChart=null;
 let rgPeriod='monthly',    rgYear=CUR_YEAR,    rgSel=new Set(),    rgChart=null;
 let orderList=[], inTarget=null, floatOpen=false;
@@ -1545,6 +1546,7 @@ async function saveIn(){
   await addHistory({menu:'발주관리',type:'order',code:p.code,name:p.name,desc:'입고등록',before:'-',after:`${qty}개`,user:'수동'});
   closeModal('inModal');renderRecv();
 }
+function sortRecv(col){ recvSort===col ? recvDir*=-1 : (recvSort=col, recvDir=-1); renderRecv(); }
 function isDup(item){return[...receiveList,...doneList].some(r=>r.orderDate===item.orderDate&&r.code===item.code&&r.name===item.name&&r.orderQty===item.orderQty);}
 function getRecvSt(r){const t=r.in1+r.in2;if(t>=r.orderQty)return{l:'입고완료',c:'b-su'};if(t>0)return{l:'부분입고',c:'b-wa'};return{l:'대기',c:'b-gy'};}
 function renderRecv(){
@@ -1553,6 +1555,17 @@ function renderRecv(){
   let list=receiveList;
   if(filter) list=list.filter(r=>getRecvSt(r).l===filter);
   if(srch) list=list.filter(r=>r.name.toLowerCase().includes(srch)||r.code.toLowerCase().includes(srch));
+  // 정렬
+  list=[...list].sort((a,b)=>{
+    const av=a[recvSort]||'', bv=b[recvSort]||'';
+    return av.localeCompare(bv)*recvDir;
+  });
+  // 정렬 아이콘 업데이트
+  ['orderDate','uploadTime'].forEach(k=>{
+    const el=document.getElementById('rs-'+k);
+    if(el) el.textContent=recvSort===k?(recvDir===1?'▲':'▼'):'';
+    if(el&&recvSort!==k) el.style.color='var(--tx2)';
+  });
   document.getElementById('raCnt').textContent=`(${receiveList.length})`;
   document.getElementById('rdCnt').textContent=`(${doneList.length})`;
   // 1차/2차 입고 칸 너비 줄이고 상품명 넓게
