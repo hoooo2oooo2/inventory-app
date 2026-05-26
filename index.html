@@ -1148,16 +1148,27 @@ function calcNeeded(p){
     // ── 월별 총량 기반 자동 검증 (배치 오염·희소 데이터 부풀림 방지) ──
     // 트렌드 상승 없이 30일 데이터가 적을 때, 이전 달 또는 90일 기준으로 base 검증
     if(!isTrendUp && _dataPoints30 < 12 && base > 0) {
+      // CV(변동계수) 계산: 값이 지나치게 균일하면 인위적 batch 스프레드 의심
+      // CV < 0.2 → 거의 동일한 값으로 분산됨 = 인위적, CV >= 0.2 → 자연 변동
+      const cv30 = (() => {
+        if(vals30.length < 2) return 0;
+        const mean = vals30.reduce((a,b)=>a+b,0) / vals30.length;
+        if(mean <= 0) return 0;
+        const variance = vals30.reduce((a,b)=>a+(b-mean)**2,0) / vals30.length;
+        return Math.sqrt(variance) / mean;
+      })();
+      const isLikelyArtificial = cv30 < 0.2;
+
       const mTotals = {};
       entries.forEach(([d,q]) => { const ym=d.substring(0,7); mTotals[ym]=(mTotals[ym]||0)+q; });
       const allYMs = Object.keys(mTotals).sort();
       const curYM  = latestDate.substring(0,7);
       const priorYMs = allYMs.filter(ym => ym < curYM).slice(-4);
       if(priorYMs.length >= 1) {
-        // 이전 달 1개 이상: 중앙값으로 검증
+        // 이전 달 1개 이상: 중앙값으로 검증 — 단, 자연 변동 데이터(CV >= 0.2)는 dampening 생략
         const priorArr = priorYMs.map(ym=>mTotals[ym]).sort((a,b)=>a-b);
         const mPrior   = priorArr[Math.floor(priorArr.length/2)];
-        if(mPrior > 0) {
+        if(mPrior > 0 && isLikelyArtificial) {
           if(base > mPrior * 4) {
             // 4배 초과: 명백한 데이터 이상 → 이전 달의 3배로 cap
             base = Math.round(mPrior * 3);
@@ -1166,8 +1177,8 @@ function calcNeeded(p){
             base = Math.round((base + mPrior * 2) / 2);
           }
         }
-      } else {
-        // 이전 달 데이터 없음: 전체 합계를 최소 90일 기준으로 평활화
+      } else if(isLikelyArtificial) {
+        // 이전 달 데이터 없음 + 인위적 데이터: 전체 합계를 최소 90일 기준으로 평활화
         // (30일치 데이터만 있으면 90일로 나눠 3개월 분산 보정)
         const totalAll = entries.reduce((s,[,q])=>s+q,0);
         const spanDays = Math.round((latest - new Date(entries[0][0])) / 86400000) + 1;
