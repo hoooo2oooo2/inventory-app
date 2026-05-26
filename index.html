@@ -1399,7 +1399,7 @@ function renderSalesPeriod(){
         salesChart=makeChart('salesChart',def.labels,ds);updateSalesSummary(ds);
       } else {
         const dInM=new Date(new Date().getFullYear(),MONTH+1,0).getDate();
-        const ds=sel.map((p,i)=>{const m=getYearData(p,salesYear).data;const v=Math.round((m[MONTH]||0)/dInM);return{label:p.name,data:def.labels.map(()=>v),borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};});
+        const ds=sel.map((p,i)=>{const m=getTotalM(p,salesYear);const v=Math.round((m[MONTH]||0)/dInM);return{label:p.name,data:def.labels.map(()=>v),borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};});
         if(salesChart) salesChart.destroy();
         salesChart=makeChart('salesChart',def.labels,ds);updateSalesSummary(ds);
       }
@@ -1448,7 +1448,7 @@ function renderSalesPeriod(){
             return sum;
           });
         } else {
-          const m=getYearData(p,salesYear).data;
+          const m=getTotalM(p,salesYear);
           data=weeks.map(w=>{const mi=new Date(w.start).getMonth();const dim=new Date(new Date(w.start).getFullYear(),mi+1,0).getDate();return Math.round((m[mi]||0)/dim*7);});
         }
         return{label:p.name,data,borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};
@@ -1464,7 +1464,7 @@ function renderSalesPeriod(){
   const def=getPeriodDef(salesYear,salesPeriod);
   const sorted=MNAMES.map((mn,mi)=>({mn,mi})).sort((a,b)=>b.mn.length-a.mn.length);
   const ds=sel.map((p,i)=>{
-    const {data:m}=getYearData(p,salesYear);
+    const m=getTotalM(p,salesYear);
     const data=def.labels.map(lbl=>{const found=sorted.find(({mn})=>lbl.includes(mn));return found?(m[found.mi]||0):0;}).slice(0,def.len);
     return{label:p.name,data,borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};
   });
