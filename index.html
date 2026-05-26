@@ -592,6 +592,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="field"><label>리드타임</label><select id="pm_lead"><option value="1">1개월</option><option value="1.5">1.5개월</option><option value="2">2개월</option></select></div>
       <div class="field"><label>발주시점 재고</label><input id="pm_reorder" type="number" placeholder="50"></div>
       <div class="field"><label>단종여부</label><select id="pm_disc"><option value="0">정상</option><option value="1">단종</option></select></div>
+      <div class="field" style="grid-column:1/-1;">
+        <label>📌 월소진 고정값 <span style="font-weight:400;color:var(--tx2);">(데이터 부정확할 때 직접 입력 — 비우면 자동계산)</span></label>
+        <input id="pm_fixed_expm" type="number" placeholder="예: 20  (월 20개 판매 시)" min="0">
+      </div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('prodModal')">취소</button><button class="btn btn-pr" onclick="saveProd()">저장</button></div>
   </div>
@@ -793,6 +797,9 @@ let YEARS = [CUR_YEAR-1, CUR_YEAR];
 
 // ── 주문주기 설정 (localStorage) ──────────────
 function getOrderCycle(){ return parseFloat(localStorage.getItem('order_cycle_months')||'2.5'); }
+// 제품별 월소진 고정값 (데이터 부정확 시 직접 설정)
+function getFixedExpM(code){ try{ const d=JSON.parse(localStorage.getItem('fixedExpM')||'{}'); return parseInt(d[code])||0; }catch{return 0;} }
+function setFixedExpM(code,v){ try{ const d=JSON.parse(localStorage.getItem('fixedExpM')||'{}'); if(v>0) d[code]=v; else delete d[code]; localStorage.setItem('fixedExpM',JSON.stringify(d)); }catch{} }
 function saveOrderCycle(v){
   localStorage.setItem('order_cycle_months', v);
   renderInv(); updateFloat();
@@ -1021,6 +1028,18 @@ function getStatus(p){
   if(r<=0.3) return '부족'; if(r<=0.6) return '긴급'; if(r<=1) return '임박'; return '정상';
 }
 function calcNeeded(p){
+  // 월소진 고정값이 설정된 경우 데이터 계산 생략
+  const _fixedExpM = getFixedExpM(p.code);
+  if(_fixedExpM > 0){
+    const orderCycle = getOrderCycle();
+    const stockAtDelivery = Math.max(0, p.stock - _fixedExpM * p.leadTime);
+    const needed = Math.max(0, Math.round(_fixedExpM * (orderCycle + 0.5) - stockAtDelivery));
+    const boxes = Math.ceil(needed / (p.boxQty||1));
+    const avgDay = Math.round(_fixedExpM/30*10)/10;
+    return {needed, boxes, expM:_fixedExpM, sr:1, corrLabel:'📌고정값', noData:false,
+            orderCycle, avgDay, dataPoints30:0, suspect:false, fixedExpM:true};
+  }
+
   const dayData = _dCache[p.code]||{};
   const entries = Object.entries(dayData).sort((a,b)=>a[0].localeCompare(b[0]));
   // 일별 데이터 없거나 판매 실적 없으면 → 데이터 쌓는 중
@@ -1199,7 +1218,9 @@ function renderInv(){
         const _sad=Math.max(0,p.stock-ord.expM*p.leadTime);
         const cycleTip=`title="계산식: 예상월소진${ord.expM}개 × (주문주기${ord.orderCycle}+안전0.5개월) - 도착시잔여${_sad}개\n※현재고${p.stock}개는 리드타임${p.leadTime}개월내 소진→도착시${_sad}개 예상\n근거: 최근30일 데이터 ${ord.dataPoints30}일치 / 일평균 ${ord.avgDay}개"`;
         const suspectBadge=ord.suspect?`<span style="font-size:9px;color:#F59E0B;display:block;">⚠ 데이터 확인필요</span>`:'';
-        const diagLine=`<span style="font-size:9px;color:var(--tx2);display:block;">일평균 ${ord.avgDay}개 · ${ord.dataPoints30}일치</span>`;
+        const diagLine=ord.fixedExpM
+          ? `<span style="font-size:9px;color:#9333EA;display:block;">📌 월소진 고정값 ${ord.expM}개 적용중</span>`
+          : `<span style="font-size:9px;color:var(--tx2);display:block;">일평균 ${ord.avgDay}개 · ${ord.dataPoints30}일치</span>`;
         // 진행중 주문이 필요량을 충족하는 경우
         if(pending>0&&pending>=ord.needed){
           return `<span style="color:#059669;font-weight:600;">✓ 주문진행 중</span><span style="font-size:9px;color:#059669;display:block;">${pending.toLocaleString()}개 입고예정</span>${diagLine}`;
@@ -1226,13 +1247,16 @@ async function applyIO(id){
   if(p){const b=p.stock;p.stock=Math.max(0,p.stock+inn-out);await sb.from('products').update({stock:p.stock}).eq('id',id);await addHistory({menu:'재고관리',type:'io',code:p.code,name:p.name,desc:`입고+${inn}/출고-${out}`,before:String(b),after:String(p.stock),user:'수동'});}
   ioTarget=null;renderInv();updateFloat();
 }
-function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='1';document.getElementById('pm_disc').value='0';openModal('prodModal');}
-function openEditProd(id){editProdId=id;const p=products.find(x=>x.id===id);if(!p)return;document.getElementById('prodModalTitle').textContent='상품 수정';document.getElementById('pm_code').value=p.code;document.getElementById('pm_name').value=p.name;document.getElementById('pm_type').value=p.type;document.getElementById('pm_stock').value=p.stock;document.getElementById('pm_boxqty').value=p.boxQty;document.getElementById('pm_lead').value=p.leadTime;document.getElementById('pm_reorder').value=p.reorderPoint;document.getElementById('pm_disc').value=p.disc?'1':'0';openModal('prodModal');}
+function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder','pm_fixed_expm'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='1';document.getElementById('pm_disc').value='0';openModal('prodModal');}
+function openEditProd(id){editProdId=id;const p=products.find(x=>x.id===id);if(!p)return;document.getElementById('prodModalTitle').textContent='상품 수정';document.getElementById('pm_code').value=p.code;document.getElementById('pm_name').value=p.name;document.getElementById('pm_type').value=p.type;document.getElementById('pm_stock').value=p.stock;document.getElementById('pm_boxqty').value=p.boxQty;document.getElementById('pm_lead').value=p.leadTime;document.getElementById('pm_reorder').value=p.reorderPoint;document.getElementById('pm_disc').value=p.disc?'1':'0';document.getElementById('pm_fixed_expm').value=getFixedExpM(p.code)||'';openModal('prodModal');}
 async function saveProd(){
   const code=document.getElementById('pm_code').value.trim();
   const name=document.getElementById('pm_name').value.trim();
   if(!code||!name){alert('코드와 상품명을 입력해주세요.');return;}
   const d={code,name,type:document.getElementById('pm_type').value,stock:parseInt(document.getElementById('pm_stock').value)||0,box_qty:parseInt(document.getElementById('pm_boxqty').value)||1,lead_time:parseFloat(document.getElementById('pm_lead').value)||1,reorder_point:parseInt(document.getElementById('pm_reorder').value)||0,discontinued:document.getElementById('pm_disc').value==='1'};
+  // 월소진 고정값 저장 (localStorage)
+  const fixedVal = parseInt(document.getElementById('pm_fixed_expm').value)||0;
+  setFixedExpM(code, fixedVal);
   if(editProdId){await sb.from('products').update(d).eq('id',editProdId);await addHistory({menu:'재고관리',type:'edit',code,name,desc:'상품수정',before:'-',after:'수정완료',user:'수동'});await loadProducts();}
   else{await sb.from('products').insert({...d,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)});await addHistory({menu:'재고관리',type:'edit',code,name,desc:'신규등록',before:'-',after:'등록',user:'수동'});await loadProducts();if(products.length===1)salesSel=new Set([products[0].id]);}
   closeModal('prodModal');renderInv();updateFloat();
