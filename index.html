@@ -1118,15 +1118,15 @@ function calcNeeded(p){
     if(prev14>0 && accel<0.8)  base=Math.round(base*Math.max(0.85,accel));
 
     // ── 월별 총량 기반 자동 검증 (배치 오염·희소 데이터 부풀림 방지) ──
-    // 트렌드 상승 없이 30일 데이터가 적을 때, 이전 달 실적으로 base 검증
+    // 트렌드 상승 없이 30일 데이터가 적을 때, 이전 달 또는 90일 기준으로 base 검증
     if(!isTrendUp && _dataPoints30 < 12 && base > 0) {
       const mTotals = {};
       entries.forEach(([d,q]) => { const ym=d.substring(0,7); mTotals[ym]=(mTotals[ym]||0)+q; });
       const allYMs = Object.keys(mTotals).sort();
       const curYM  = latestDate.substring(0,7);
       const priorYMs = allYMs.filter(ym => ym < curYM).slice(-4);
-      if(priorYMs.length >= 2) {
-        // 이전 달 중앙값으로 검증: 이전 달보다 3배 이상 부풀면 cap
+      if(priorYMs.length >= 1) {
+        // 이전 달 1개 이상: 중앙값으로 검증 — 3배 초과 시 cap
         const priorArr = priorYMs.map(ym=>mTotals[ym]).sort((a,b)=>a-b);
         const mPrior   = priorArr[Math.floor(priorArr.length/2)];
         if(mPrior > 0) {
@@ -1136,15 +1136,15 @@ function calcNeeded(p){
             base = Math.round((base + mPrior) / 2); // 점진적 dampening
           }
         }
-      } else if(allYMs.length >= 1) {
-        // 이전 달 없어도 전체 데이터 기간이 45일 이상이면 전체 평균 사용
+      } else {
+        // 이전 달 데이터 없음: 전체 합계를 최소 90일 기준으로 평활화
+        // (30일치 데이터만 있으면 90일로 나눠 3개월 분산 보정)
+        const totalAll = entries.reduce((s,[,q])=>s+q,0);
         const spanDays = Math.round((latest - new Date(entries[0][0])) / 86400000) + 1;
-        if(spanDays >= 45) {
-          const totalAll = entries.reduce((s,[,q])=>s+q,0);
-          const altBase  = Math.round(totalAll / spanDays * 30);
-          if(altBase > 0 && altBase < base * 0.6) {
-            base = Math.round(base * 0.3 + altBase * 0.7);
-          }
+        const effectiveDays = Math.max(90, spanDays);
+        const altBase = Math.round(totalAll / effectiveDays * 30);
+        if(altBase > 0 && altBase < base * 0.7) {
+          base = altBase;
         }
       }
     }
