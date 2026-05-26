@@ -1126,14 +1126,16 @@ function calcNeeded(p){
       const curYM  = latestDate.substring(0,7);
       const priorYMs = allYMs.filter(ym => ym < curYM).slice(-4);
       if(priorYMs.length >= 1) {
-        // 이전 달 1개 이상: 중앙값으로 검증 — 3배 초과 시 cap
+        // 이전 달 1개 이상: 중앙값으로 검증
         const priorArr = priorYMs.map(ym=>mTotals[ym]).sort((a,b)=>a-b);
         const mPrior   = priorArr[Math.floor(priorArr.length/2)];
         if(mPrior > 0) {
-          if(base > mPrior * 3) {
-            base = Math.round(mPrior * 1.25); // 이전 달 기준으로 hard cap
+          if(base > mPrior * 4) {
+            // 4배 초과: 명백한 데이터 이상 → 이전 달의 3배로 cap
+            base = Math.round(mPrior * 3);
           } else if(base > mPrior * 2) {
-            base = Math.round((base + mPrior) / 2); // 점진적 dampening
+            // 2~4배: 점진적 dampening (이전 달 2배 쪽으로 조정)
+            base = Math.round((base + mPrior * 2) / 2);
           }
         }
       } else {
