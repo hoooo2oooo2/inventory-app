@@ -592,10 +592,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="field"><label>리드타임</label><select id="pm_lead"><option value="1">1개월</option><option value="1.5">1.5개월</option><option value="2">2개월</option></select></div>
       <div class="field"><label>발주시점 재고</label><input id="pm_reorder" type="number" placeholder="50"></div>
       <div class="field"><label>단종여부</label><select id="pm_disc"><option value="0">정상</option><option value="1">단종</option></select></div>
-      <div class="field" style="grid-column:1/-1;">
-        <label>📌 월소진 고정값 <span style="font-weight:400;color:var(--tx2);">(데이터 부정확할 때 직접 입력 — 비우면 자동계산)</span></label>
-        <input id="pm_fixed_expm" type="number" placeholder="예: 20  (월 20개 판매 시)" min="0">
-      </div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('prodModal')">취소</button><button class="btn btn-pr" onclick="saveProd()">저장</button></div>
   </div>
@@ -1120,6 +1116,38 @@ function calcNeeded(p){
     // 가속도 반영 (최대 +20% / -15%) — prev14>0일 때만 적용
     if(prev14>0 && accel>=1.2) base=Math.round(base*Math.min(1.2,1+(accel-1)*0.5));
     if(prev14>0 && accel<0.8)  base=Math.round(base*Math.max(0.85,accel));
+
+    // ── 월별 총량 기반 자동 검증 (배치 오염·희소 데이터 부풀림 방지) ──
+    // 트렌드 상승 없이 30일 데이터가 적을 때, 이전 달 실적으로 base 검증
+    if(!isTrendUp && _dataPoints30 < 12 && base > 0) {
+      const mTotals = {};
+      entries.forEach(([d,q]) => { const ym=d.substring(0,7); mTotals[ym]=(mTotals[ym]||0)+q; });
+      const allYMs = Object.keys(mTotals).sort();
+      const curYM  = latestDate.substring(0,7);
+      const priorYMs = allYMs.filter(ym => ym < curYM).slice(-4);
+      if(priorYMs.length >= 2) {
+        // 이전 달 중앙값으로 검증: 이전 달보다 3배 이상 부풀면 cap
+        const priorArr = priorYMs.map(ym=>mTotals[ym]).sort((a,b)=>a-b);
+        const mPrior   = priorArr[Math.floor(priorArr.length/2)];
+        if(mPrior > 0) {
+          if(base > mPrior * 3) {
+            base = Math.round(mPrior * 1.25); // 이전 달 기준으로 hard cap
+          } else if(base > mPrior * 2) {
+            base = Math.round((base + mPrior) / 2); // 점진적 dampening
+          }
+        }
+      } else if(allYMs.length >= 1) {
+        // 이전 달 없어도 전체 데이터 기간이 45일 이상이면 전체 평균 사용
+        const spanDays = Math.round((latest - new Date(entries[0][0])) / 86400000) + 1;
+        if(spanDays >= 45) {
+          const totalAll = entries.reduce((s,[,q])=>s+q,0);
+          const altBase  = Math.round(totalAll / spanDays * 30);
+          if(altBase > 0 && altBase < base * 0.6) {
+            base = Math.round(base * 0.3 + altBase * 0.7);
+          }
+        }
+      }
+    }
   }
 
   // 일별 데이터로 base 0이면 → 미산출 (월별 폴백 제거)
@@ -1247,16 +1275,13 @@ async function applyIO(id){
   if(p){const b=p.stock;p.stock=Math.max(0,p.stock+inn-out);await sb.from('products').update({stock:p.stock}).eq('id',id);await addHistory({menu:'재고관리',type:'io',code:p.code,name:p.name,desc:`입고+${inn}/출고-${out}`,before:String(b),after:String(p.stock),user:'수동'});}
   ioTarget=null;renderInv();updateFloat();
 }
-function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder','pm_fixed_expm'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='1';document.getElementById('pm_disc').value='0';openModal('prodModal');}
-function openEditProd(id){editProdId=id;const p=products.find(x=>x.id===id);if(!p)return;document.getElementById('prodModalTitle').textContent='상품 수정';document.getElementById('pm_code').value=p.code;document.getElementById('pm_name').value=p.name;document.getElementById('pm_type').value=p.type;document.getElementById('pm_stock').value=p.stock;document.getElementById('pm_boxqty').value=p.boxQty;document.getElementById('pm_lead').value=p.leadTime;document.getElementById('pm_reorder').value=p.reorderPoint;document.getElementById('pm_disc').value=p.disc?'1':'0';document.getElementById('pm_fixed_expm').value=getFixedExpM(p.code)||'';openModal('prodModal');}
+function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='1';document.getElementById('pm_disc').value='0';openModal('prodModal');}
+function openEditProd(id){editProdId=id;const p=products.find(x=>x.id===id);if(!p)return;document.getElementById('prodModalTitle').textContent='상품 수정';document.getElementById('pm_code').value=p.code;document.getElementById('pm_name').value=p.name;document.getElementById('pm_type').value=p.type;document.getElementById('pm_stock').value=p.stock;document.getElementById('pm_boxqty').value=p.boxQty;document.getElementById('pm_lead').value=p.leadTime;document.getElementById('pm_reorder').value=p.reorderPoint;document.getElementById('pm_disc').value=p.disc?'1':'0';openModal('prodModal');}
 async function saveProd(){
   const code=document.getElementById('pm_code').value.trim();
   const name=document.getElementById('pm_name').value.trim();
   if(!code||!name){alert('코드와 상품명을 입력해주세요.');return;}
   const d={code,name,type:document.getElementById('pm_type').value,stock:parseInt(document.getElementById('pm_stock').value)||0,box_qty:parseInt(document.getElementById('pm_boxqty').value)||1,lead_time:parseFloat(document.getElementById('pm_lead').value)||1,reorder_point:parseInt(document.getElementById('pm_reorder').value)||0,discontinued:document.getElementById('pm_disc').value==='1'};
-  // 월소진 고정값 저장 (localStorage)
-  const fixedVal = parseInt(document.getElementById('pm_fixed_expm').value)||0;
-  setFixedExpM(code, fixedVal);
   if(editProdId){await sb.from('products').update(d).eq('id',editProdId);await addHistory({menu:'재고관리',type:'edit',code,name,desc:'상품수정',before:'-',after:'수정완료',user:'수동'});await loadProducts();}
   else{await sb.from('products').insert({...d,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)});await addHistory({menu:'재고관리',type:'edit',code,name,desc:'신규등록',before:'-',after:'등록',user:'수동'});await loadProducts();if(products.length===1)salesSel=new Set([products[0].id]);}
   closeModal('prodModal');renderInv();updateFloat();
