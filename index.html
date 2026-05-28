@@ -260,20 +260,30 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 /* ── 오늘 주문 체크 박스 ── */
 #orderCheckBox{margin-bottom:10px;}
-.ocb-wrap{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-outer{display:flex;gap:10px;align-items:flex-start;}
+.ocb-wrap{flex:1 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
 .ocb-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:0.5px solid var(--bd);cursor:pointer;user-select:none;}
 .ocb-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
 .ocb-toggle{font-size:11px;color:var(--tx2);}
 .ocb-body{padding:4px 0;}
-.ocb-row{display:grid;grid-template-columns:1fr 80px 80px 90px 80px;align-items:center;gap:6px;padding:7px 14px;border-bottom:0.5px solid var(--bd);font-size:12px;}
+.ocb-row{display:grid;grid-template-columns:1fr 58px 58px 88px 62px;align-items:center;gap:4px;padding:7px 12px;border-bottom:0.5px solid var(--bd);font-size:12px;}
 .ocb-row:last-child{border:none;}
-.ocb-hrow{font-size:10px;color:var(--tx2);font-weight:600;letter-spacing:.4px;padding:6px 14px 4px;display:grid;grid-template-columns:1fr 80px 80px 90px 80px;gap:6px;}
+.ocb-hrow{font-size:10px;color:var(--tx2);font-weight:600;letter-spacing:.4px;padding:6px 12px 4px;display:grid;grid-template-columns:1fr 58px 58px 88px 62px;gap:4px;}
 .ocb-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ocb-stock{text-align:right;}
 .ocb-days{text-align:center;}
 .ocb-qty{text-align:right;font-weight:700;}
 .ocb-btn{text-align:right;}
 .ocb-empty{padding:14px;text-align:center;font-size:12px;color:var(--tx2);}
+/* TOP6 패널 */
+.ocb-top6{flex:0 0 178px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-top6-head{font-size:12px;font-weight:600;padding:9px 12px;border-bottom:0.5px solid var(--bd);color:var(--tx);}
+.ocb-t6row{display:grid;grid-template-columns:16px 1fr auto;gap:5px;padding:6px 12px;border-bottom:0.5px solid var(--bd);font-size:12px;align-items:center;}
+.ocb-t6row:last-child{border:none;}
+.ocb-t6rank{font-size:11px;font-weight:700;text-align:center;}
+.ocb-t6name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.ocb-t6val{font-weight:700;color:var(--pr);white-space:nowrap;font-size:11px;}
+@media(max-width:560px){.ocb-outer{flex-direction:column;}.ocb-top6{flex:none;width:100%;}}
 
 /* ── 보고 탭 ── */
 #page-report .rep-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
@@ -1412,20 +1422,46 @@ function renderOrderCheck(){
     return (ord[a.st]??3) - (ord[b.st]??3);
   });
 
-  if(!urgent.length){
-    el.innerHTML=`<div class="ocb-wrap"><div class="ocb-head" onclick="toggleOcb()">
-      <div class="ocb-title">✅ 오늘 주문할 것</div>
-      <div class="ocb-toggle">▲</div></div>
-      <div class="ocb-body" style="display:${_ocbOpen?'block':'none'}">
-        <div class="ocb-empty" style="color:#059669;">모든 제품 재고 정상입니다 🎉</div>
-      </div></div>`;
-    return;
-  }
+  // ── 이번달 판매 TOP6 계산 ──
+  const _now = new Date();
+  const _curYM = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
+  const _rankColors = ['#F59E0B','#94A3B8','#B45309','#3182F6','#3182F6','#3182F6'];
+  const top6 = products
+    .filter(p=>!p.hidden&&!p.disc)
+    .map(p=>{
+      const dd = _dCache[p.code]||{};
+      const total = Object.entries(dd).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
+      return {name:p.name, total};
+    })
+    .filter(x=>x.total>0)
+    .sort((a,b)=>b.total-a.total)
+    .slice(0,6);
+  const top6HTML = `<div class="ocb-top6">
+    <div class="ocb-top6-head">📊 이번달 판매 TOP6</div>
+    ${top6.length===0
+      ? '<div class="ocb-empty">데이터 없음</div>'
+      : top6.map((x,i)=>`<div class="ocb-t6row">
+          <span class="ocb-t6rank" style="color:${_rankColors[i]||'var(--tx2)'};">${i+1}</span>
+          <span class="ocb-t6name">${x.name}</span>
+          <span class="ocb-t6val">${x.total.toLocaleString()}개</span>
+        </div>`).join('')
+    }
+  </div>`;
 
   const stIcon = {부족:'🔴', 긴급:'🟠', 임박:'🟡'};
   const stColor = {부족:'#DC2626', 긴급:'#EA580C', 임박:'#D97706'};
 
-  el.innerHTML=`<div class="ocb-wrap">
+  if(!urgent.length){
+    el.innerHTML=`<div class="ocb-outer"><div class="ocb-wrap"><div class="ocb-head" onclick="toggleOcb()">
+      <div class="ocb-title">✅ 오늘 주문할 것</div>
+      <div class="ocb-toggle">▲</div></div>
+      <div class="ocb-body" style="display:${_ocbOpen?'block':'none'}">
+        <div class="ocb-empty" style="color:#059669;">모든 제품 재고 정상입니다 🎉</div>
+      </div></div>${top6HTML}</div>`;
+    return;
+  }
+
+  el.innerHTML=`<div class="ocb-outer"><div class="ocb-wrap">
     <div class="ocb-head" onclick="toggleOcb()">
       <div class="ocb-title">
         📋 오늘 주문 체크리스트
@@ -1451,7 +1487,7 @@ function renderOrderCheck(){
           <span class="ocb-btn"><button class="btn btn-sm btn-pr" onclick="goPage('order')" style="font-size:10px;padding:2px 8px;">발주하기</button></span>
         </div>`).join('')}
     </div>
-  </div>`;
+  </div>${top6HTML}</div>`;
 }
 function toggleOcb(){
   _ocbOpen=!_ocbOpen;
