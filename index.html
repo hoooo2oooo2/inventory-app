@@ -299,6 +299,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--bd);border-radius:7px;padding:3px 7px;font-size:11px;background:var(--bg2);">
           <span style="color:var(--tx2);white-space:nowrap;">📦 주문주기</span>
           <select id="orderCycleSel" onchange="saveOrderCycle(this.value)" style="border:none;background:transparent;font-size:11px;padding:0;color:var(--tx);cursor:pointer;">
+            <option value="1">1개월</option>
             <option value="1.5">1.5개월</option>
             <option value="2">2개월</option>
             <option value="2.5">2.5개월</option>
@@ -792,7 +793,7 @@ function _getAccumDays(ds){
 let YEARS = [CUR_YEAR-1, CUR_YEAR];
 
 // ── 주문주기 설정 (localStorage) ──────────────
-function getOrderCycle(){ return parseFloat(localStorage.getItem('order_cycle_months')||'2.5'); }
+function getOrderCycle(){ return parseFloat(localStorage.getItem('order_cycle_months')||'1'); }
 // 제품별 월소진 고정값 (데이터 부정확 시 직접 설정)
 function getFixedExpM(code){ try{ const d=JSON.parse(localStorage.getItem('fixedExpM')||'{}'); return parseInt(d[code])||0; }catch{return 0;} }
 function setFixedExpM(code,v){ try{ const d=JSON.parse(localStorage.getItem('fixedExpM')||'{}'); if(v>0) d[code]=v; else delete d[code]; localStorage.setItem('fixedExpM',JSON.stringify(d)); }catch{} }
@@ -1523,7 +1524,7 @@ function recalcOrders(){
     if(p.stock>effectiveReorder) return false;
     // 진행중 주문이 있을 경우: 재고+주문수량이 필요량을 충족하면 제외
     const pending=pendingByCode[p.code]||0;
-    const oc=parseFloat(localStorage.getItem('order_cycle_months')||'2.5');
+    const oc=parseFloat(localStorage.getItem('order_cycle_months')||'1');
     // 발주목록 제품은 stock<=reorderPoint이므로 도착시 재고=0 가정
     const neededTotal=Math.round(c.expM*(oc+0.5));
     // 진행중 주문이 이미 필요량을 충족하면 목록에서 제외
@@ -1533,7 +1534,7 @@ function recalcOrders(){
     const c=calcNeeded(p),s=detectSeason(getYearData(p,getBestYear(p)).data);
     const effectiveReorder=getEffectiveReorder(p);
     const pending=pendingByCode[p.code]||0;
-    const oc=parseFloat(localStorage.getItem('order_cycle_months')||'2.5');
+    const oc=parseFloat(localStorage.getItem('order_cycle_months')||'1');
     const neededTotal=Math.round(c.expM*(oc+0.5));
     // 추가발주 필요량: 목표 - 진행중주문
     const addNeeded=Math.max(0,neededTotal-pending);
