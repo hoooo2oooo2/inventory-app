@@ -1375,20 +1375,38 @@ let _ocbOpen = true;
 function renderOrderCheck(){
   const el = document.getElementById('orderCheckBox');
   if(!el) return;
-  // 발주 필요 제품: 상태가 부족/긴급/임박이면서 needed > 0
+
+  // 진행중 발주 미입고 수량 코드별 합산
+  const pendingByCode = {};
+  receiveList.forEach(r=>{
+    const miss = Math.max(0, r.orderQty - (r.in1 + r.in2));
+    if(miss > 0) pendingByCode[r.code] = (pendingByCode[r.code]||0) + miss;
+  });
+
+  const oc = parseFloat(localStorage.getItem('order_cycle_months')||'1');
+
   const urgent = products.filter(p=>{
     if(p.hidden||p.disc) return false;
     const st = getStatus(p);
     if(!['부족','긴급','임박'].includes(st)) return false;
     const c = calcNeeded(p);
-    return !c.noData && c.needed > 0;
+    if(c.noData || c.expM <= 0) return false;
+    // 진행중 발주가 이미 목표 수량을 충족하면 제외
+    const pending = pendingByCode[p.code]||0;
+    const neededTotal = Math.round(c.expM * (oc + 0.5));
+    if(pending >= neededTotal) return false;
+    return true;
   }).map(p=>{
     const c = calcNeeded(p);
     const st = getStatus(p);
-    // 재고 소진 예상 일수 = 현재고 / 일평균
+    const pending = pendingByCode[p.code]||0;
+    const neededTotal = Math.round(c.expM * (oc + 0.5));
+    // 추가로 더 필요한 수량 (이미 진행중인 발주 차감)
+    const addNeeded = Math.max(0, neededTotal - pending);
+    const addBoxes = Math.ceil(addNeeded / (p.boxQty||1));
     const dailyRate = c.expM / 30;
     const daysLeft = dailyRate > 0 ? Math.round(p.stock / dailyRate) : null;
-    return {p, c, st, daysLeft};
+    return {p, c, st, daysLeft, pending, addNeeded, addBoxes};
   }).sort((a,b)=>{
     const ord = {부족:0, 긴급:1, 임박:2};
     return (ord[a.st]??3) - (ord[b.st]??3);
@@ -1422,14 +1440,14 @@ function renderOrderCheck(){
         <span style="text-align:right;">권장 주문량</span>
         <span></span>
       </div>
-      ${urgent.map(({p,c,st,daysLeft})=>`
+      ${urgent.map(({p,c,st,daysLeft,pending,addNeeded,addBoxes})=>`
         <div class="ocb-row">
-          <span class="ocb-name">${stIcon[st]} ${p.name}</span>
+          <span class="ocb-name">${stIcon[st]} ${p.name}${pending>0?` <span style="font-size:10px;color:#9333EA;font-weight:600;">(진행중 ${pending}개)</span>`:''}</span>
           <span class="ocb-stock" style="color:${stColor[st]};font-weight:600;">${p.stock}개</span>
           <span class="ocb-days" style="color:${stColor[st]};font-weight:600;">
             ${daysLeft===null?'-':daysLeft<=0?'⚠ 즉시':daysLeft+'일'}
           </span>
-          <span class="ocb-qty" style="color:${stColor[st]};">${c.needed}개 (${c.boxes}박스)</span>
+          <span class="ocb-qty" style="color:${stColor[st]};">${addNeeded}개 (${addBoxes}박스)</span>
           <span class="ocb-btn"><button class="btn btn-sm btn-pr" onclick="goPage('order')" style="font-size:10px;padding:2px 8px;">발주하기</button></span>
         </div>`).join('')}
     </div>
