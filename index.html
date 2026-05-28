@@ -257,6 +257,41 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 @media(max-width:700px){.sum-row{grid-template-columns:repeat(2,1fr)!important;}.main{padding:8px;gap:8px;}}
 @media(max-width:500px){.period-row .ptab{padding:2px 5px;font-size:10px;}}
+
+/* ── 오늘 주문 체크 박스 ── */
+#orderCheckBox{margin-bottom:10px;}
+.ocb-wrap{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:0.5px solid var(--bd);cursor:pointer;user-select:none;}
+.ocb-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.ocb-toggle{font-size:11px;color:var(--tx2);}
+.ocb-body{padding:4px 0;}
+.ocb-row{display:grid;grid-template-columns:1fr 80px 80px 90px 80px;align-items:center;gap:6px;padding:7px 14px;border-bottom:0.5px solid var(--bd);font-size:12px;}
+.ocb-row:last-child{border:none;}
+.ocb-hrow{font-size:10px;color:var(--tx2);font-weight:600;letter-spacing:.4px;padding:6px 14px 4px;display:grid;grid-template-columns:1fr 80px 80px 90px 80px;gap:6px;}
+.ocb-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ocb-stock{text-align:right;}
+.ocb-days{text-align:center;}
+.ocb-qty{text-align:right;font-weight:700;}
+.ocb-btn{text-align:right;}
+.ocb-empty{padding:14px;text-align:center;font-size:12px;color:var(--tx2);}
+
+/* ── 보고 탭 ── */
+#page-report .rep-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+#page-report .rep-kpi-card{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;padding:16px 18px;}
+#page-report .rep-kpi-lbl{font-size:11px;color:var(--tx2);margin-bottom:6px;}
+#page-report .rep-kpi-val{font-size:26px;font-weight:800;letter-spacing:-0.5px;}
+#page-report .rep-kpi-sub{font-size:11px;margin-top:5px;font-weight:500;}
+#page-report .rep-grid{display:grid;grid-template-columns:1fr 340px;gap:14px;margin-bottom:14px;}
+#page-report .rep-card{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;padding:16px 18px;}
+#page-report .rep-card-title{font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+#page-report .rep-chart-wrap{height:200px;position:relative;}
+#page-report .rep-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+#page-report .rep-tbl th{font-size:10px;font-weight:600;color:var(--tx2);letter-spacing:.4px;text-align:left;padding:0 0 8px;border-bottom:0.5px solid var(--bd);}
+#page-report .rep-tbl td{padding:8px 0;border-bottom:0.5px solid var(--bd);vertical-align:middle;}
+#page-report .rep-tbl tr:last-child td{border:none;}
+#page-report .rep-date{font-size:11px;color:var(--tx2);margin-bottom:14px;}
+#page-report .rep-section{margin-bottom:14px;}
+@media(max-width:900px){#page-report .rep-kpi{grid-template-columns:repeat(2,1fr);}#page-report .rep-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -283,12 +318,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-order" onclick="goPage('order')">발주관리 <span class="nbadge" id="orderBadge">0</span><span class="pulse-wrap" id="navPulse" style="display:none;"><span class="pdot"></span><span class="pring"></span><span class="pring pring2"></span></span></div>
   <div class="ni" id="nav-rg" onclick="goPage('rg')">로켓그로스</div>
   <div class="ni" id="nav-hist" onclick="goPage('hist')">변동이력</div>
+  <div class="ni" id="nav-report" onclick="goPage('report')">📋 보고</div>
 </nav>
 
 <!-- ═══ 재고관리 ═══ -->
 <div class="page active" id="page-inv">
 <div class="main">
   <div class="sum-row" id="invSum" style="padding:0;"></div>
+  <!-- 오늘 주문 체크 -->
+  <div id="orderCheckBox"></div>
   <div class="card">
     <div class="ch">
       <span class="ct">재고 목록</span>
@@ -520,6 +558,57 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <button class="btn btn-sm" onclick="histPageChange(1)">›</button>
     </div>
   </div>
+</div>
+</div>
+
+<!-- ═══ 보고 ═══ -->
+<div class="page" id="page-report">
+<div class="main">
+  <div class="rep-date" id="repDate"></div>
+
+  <!-- KPI 요약 -->
+  <div class="rep-kpi" id="repKpi"></div>
+
+  <!-- 차트 + 긴급발주 -->
+  <div class="rep-grid">
+    <div class="rep-card">
+      <div class="rep-card-title">
+        <span>📊 최근 6개월 출고 추이</span>
+        <span style="font-size:11px;color:var(--tx2);" id="repChartSub"></span>
+      </div>
+      <div class="rep-chart-wrap"><canvas id="repChart"></canvas></div>
+    </div>
+    <div class="rep-card">
+      <div class="rep-card-title">
+        <span>🚨 지금 발주 필요</span>
+        <span id="repOrderCnt" style="font-size:11px;font-weight:700;color:#EA580C;"></span>
+      </div>
+      <div id="repOrderList"></div>
+    </div>
+  </div>
+
+  <!-- 제품별 이번달 판매 -->
+  <div class="rep-section">
+    <div class="rep-card">
+      <div class="rep-card-title">
+        <span>📦 제품별 이번달 판매 현황</span>
+        <span style="font-size:11px;color:var(--tx2);">판매 많은 순</span>
+      </div>
+      <table class="rep-tbl">
+        <thead><tr>
+          <th>제품명</th>
+          <th style="text-align:right;">이번달</th>
+          <th style="text-align:right;">전월</th>
+          <th style="text-align:right;">증감</th>
+          <th style="text-align:right;">현재고</th>
+          <th style="text-align:center;">재고상태</th>
+          <th style="text-align:right;">권장발주</th>
+        </tr></thead>
+        <tbody id="repProdTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -988,7 +1077,7 @@ function rgYrChange(){ rgYear=parseInt(document.getElementById('rgYrSel').value)
 // ══════════════════════════════════════════════
 function goPage(p){
   currentPage=p;
-  ['inv','sales','order','rg','hist'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===p);
   });
@@ -1006,6 +1095,7 @@ function goPage(p){
   }
   if(p==='rg'){ loadRgDailyCache().then(()=>{ renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
   if(p==='hist') renderHist();
+  if(p==='report') loadDailyCache().then(()=>renderReport());
 }
 
 // ══════════════════════════════════════════════
@@ -1221,6 +1311,7 @@ function renderInv(){
   const wn=products.filter(p=>!p.hidden&&['임박','긴급'].includes(getStatus(p))).length;
   const cr=products.filter(p=>!p.hidden&&getStatus(p)==='부족').length;
   document.getElementById('invSum').innerHTML=`<div class="sc"><div class="sl">전체</div><div class="sv">${products.length}</div></div><div class="sc"><div class="sl" style="color:#059669;">정상</div><div class="sv" style="color:#059669;">${ok}</div></div><div class="sc"><div class="sl" style="color:#D97706;">임박/긴급</div><div class="sv" style="color:#D97706;">${wn}</div></div><div class="sc"><div class="sl" style="color:#DC2626;">부족</div><div class="sv" style="color:#DC2626;">${cr}</div></div>`;
+  renderOrderCheck();
   if(!data.length){document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--tx2);">상품이 없습니다.</td></tr>`;return;}
   // 코드별 진행중 주문 합산 (재고목록 필요발주 셀용)
   const pendingByCode={};
@@ -1278,6 +1369,231 @@ function renderInv(){
   }).join('');
 }
 function sortInv(c){invSort===c?invDir*=-1:(invSort=c,invDir=1);renderInv();}
+
+// ── 오늘 주문 체크 박스 ──────────────────────────
+let _ocbOpen = true;
+function renderOrderCheck(){
+  const el = document.getElementById('orderCheckBox');
+  if(!el) return;
+  // 발주 필요 제품: 상태가 부족/긴급/임박이면서 needed > 0
+  const urgent = products.filter(p=>{
+    if(p.hidden||p.disc) return false;
+    const st = getStatus(p);
+    if(!['부족','긴급','임박'].includes(st)) return false;
+    const c = calcNeeded(p);
+    return !c.noData && c.needed > 0;
+  }).map(p=>{
+    const c = calcNeeded(p);
+    const st = getStatus(p);
+    // 재고 소진 예상 일수 = 현재고 / 일평균
+    const dailyRate = c.expM / 30;
+    const daysLeft = dailyRate > 0 ? Math.round(p.stock / dailyRate) : null;
+    return {p, c, st, daysLeft};
+  }).sort((a,b)=>{
+    const ord = {부족:0, 긴급:1, 임박:2};
+    return (ord[a.st]??3) - (ord[b.st]??3);
+  });
+
+  if(!urgent.length){
+    el.innerHTML=`<div class="ocb-wrap"><div class="ocb-head" onclick="toggleOcb()">
+      <div class="ocb-title">✅ 오늘 주문할 것</div>
+      <div class="ocb-toggle">▲</div></div>
+      <div class="ocb-body" style="display:${_ocbOpen?'block':'none'}">
+        <div class="ocb-empty" style="color:#059669;">모든 제품 재고 정상입니다 🎉</div>
+      </div></div>`;
+    return;
+  }
+
+  const stIcon = {부족:'🔴', 긴급:'🟠', 임박:'🟡'};
+  const stColor = {부족:'#DC2626', 긴급:'#EA580C', 임박:'#D97706'};
+
+  el.innerHTML=`<div class="ocb-wrap">
+    <div class="ocb-head" onclick="toggleOcb()">
+      <div class="ocb-title">
+        📋 오늘 주문 체크리스트
+        <span style="background:#EA580C;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;">${urgent.length}건</span>
+      </div>
+      <div class="ocb-toggle">${_ocbOpen?'▲':'▼'} ${_ocbOpen?'접기':'펼치기'}</div>
+    </div>
+    <div class="ocb-body" id="ocbBody" style="display:${_ocbOpen?'block':'none'}">
+      <div class="ocb-hrow">
+        <span>제품명</span><span style="text-align:right;">현재고</span>
+        <span style="text-align:center;">소진까지</span>
+        <span style="text-align:right;">권장 주문량</span>
+        <span></span>
+      </div>
+      ${urgent.map(({p,c,st,daysLeft})=>`
+        <div class="ocb-row">
+          <span class="ocb-name">${stIcon[st]} ${p.name}</span>
+          <span class="ocb-stock" style="color:${stColor[st]};font-weight:600;">${p.stock}개</span>
+          <span class="ocb-days" style="color:${stColor[st]};font-weight:600;">
+            ${daysLeft===null?'-':daysLeft<=0?'⚠ 즉시':daysLeft+'일'}
+          </span>
+          <span class="ocb-qty" style="color:${stColor[st]};">${c.needed}개 (${c.boxes}박스)</span>
+          <span class="ocb-btn"><button class="btn btn-sm btn-pr" onclick="goPage('order')" style="font-size:10px;padding:2px 8px;">발주하기</button></span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+function toggleOcb(){
+  _ocbOpen=!_ocbOpen;
+  const body=document.getElementById('ocbBody');
+  if(body) body.style.display=_ocbOpen?'block':'none';
+  renderOrderCheck();
+}
+
+// ── 보고 탭 렌더링 ─────────────────────────────
+let _repChart=null;
+function renderReport(){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const mn=now.getMonth(); // 0-indexed
+  const yr=CUR_YEAR;
+  const MNAMES_KO=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+  document.getElementById('repDate').textContent=
+    `${yr}년 ${MNAMES_KO[mn]} 기준 · ${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} 생성`;
+
+  const acts = products.filter(p=>!p.hidden&&!p.disc);
+
+  // ── 이번달 / 전월 출고 합산 ──
+  // 이번달: _dCache daily sum for current month
+  const curYM = `${yr}-${pad(mn+1)}`;
+  const prevMn = mn>0?mn-1:11;
+  const prevYr = mn>0?yr:yr-1;
+  const prevYM = `${prevYr}-${pad(prevMn+1)}`;
+
+  let thisMonthTotal=0, lastMonthTotal=0;
+  acts.forEach(p=>{
+    const cache=_dCache[p.code]||{};
+    Object.entries(cache).forEach(([d,q])=>{
+      if(d.startsWith(curYM)) thisMonthTotal+=q;
+      if(d.startsWith(prevYM)) lastMonthTotal+=q;
+    });
+    // monthly 배열 폴백 (daily 없는 달)
+    const m=getTotalM(p,yr);
+    if(!Object.values(_dCache[p.code]||{}).length){
+      thisMonthTotal += m[mn]||0;
+      const pm=getTotalM(p,prevYr);
+      lastMonthTotal += pm[prevMn]||0;
+    }
+  });
+  // daily 없으면 monthly 배열로 대체
+  if(thisMonthTotal===0) acts.forEach(p=>{ thisMonthTotal+=(getTotalM(p,yr)[mn]||0); });
+  if(lastMonthTotal===0) acts.forEach(p=>{ lastMonthTotal+=(getTotalM(p,prevYr)[prevMn]||0); });
+
+  const growth = lastMonthTotal>0?Math.round((thisMonthTotal-lastMonthTotal)/lastMonthTotal*100):0;
+  const urgentCnt = acts.filter(p=>{const st=getStatus(p);return ['부족','긴급','임박'].includes(st);}).length;
+  const normalCnt = acts.filter(p=>getStatus(p)==='정상').length;
+  const normalPct = acts.length>0?Math.round(normalCnt/acts.length*100):0;
+
+  // ── KPI ──
+  const kpiData=[
+    {lbl:'이번달 총 출고', val:`${thisMonthTotal.toLocaleString()}개`,
+     sub: lastMonthTotal>0?(growth>=0?`▲ 전월 대비 +${thisMonthTotal-lastMonthTotal}개 (${growth}%)`:`▼ 전월 대비 ${thisMonthTotal-lastMonthTotal}개 (${growth}%)`):'-',
+     color: growth>=0?'#059669':'#DC2626', valColor:'var(--pr)'},
+    {lbl:'전월 출고', val:`${lastMonthTotal.toLocaleString()}개`,
+     sub:`${MNAMES_KO[prevMn]} 기준`, color:'var(--tx2)', valColor:'var(--tx)'},
+    {lbl:'발주 필요 제품', val:`${urgentCnt}건`,
+     sub: urgentCnt>0?'즉시 확인 필요':'재고 모두 정상', color:urgentCnt>0?'#EA580C':'#059669', valColor:urgentCnt>0?'#EA580C':'#059669'},
+    {lbl:'재고 정상률', val:`${normalPct}%`,
+     sub:`${acts.length}개 제품 중 ${normalCnt}개 정상`, color:'var(--tx2)', valColor:'var(--tx)'},
+  ];
+  document.getElementById('repKpi').innerHTML=kpiData.map(k=>`
+    <div class="rep-kpi-card">
+      <div class="rep-kpi-lbl">${k.lbl}</div>
+      <div class="rep-kpi-val" style="color:${k.valColor}">${k.val}</div>
+      <div class="rep-kpi-sub" style="color:${k.color}">${k.sub}</div>
+    </div>`).join('');
+
+  // ── 6개월 차트 ──
+  const labels6=[],vals6=[];
+  for(let i=5;i>=0;i--){
+    let m6=mn-i, y6=yr;
+    if(m6<0){m6+=12;y6--;}
+    labels6.push(MNAMES_KO[m6]);
+    // daily cache first, fallback to monthly array
+    let total6=0;
+    const ym6=`${y6}-${pad(m6+1)}`;
+    acts.forEach(p=>{
+      const cache=_dCache[p.code]||{};
+      let hasDays=false;
+      Object.entries(cache).forEach(([d,q])=>{ if(d.startsWith(ym6)){total6+=q;hasDays=true;} });
+      if(!hasDays) total6+=(getTotalM(p,y6)[m6]||0);
+    });
+    vals6.push(total6);
+  }
+  document.getElementById('repChartSub').textContent=`${labels6[0]} ~ ${labels6[5]}`;
+
+  if(_repChart) _repChart.destroy();
+  const ctx=document.getElementById('repChart').getContext('2d');
+  const bg=vals6.map((_,i)=>i===5?'var(--pr)':'rgba(99,102,241,.25)');
+  _repChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:labels6,datasets:[{data:vals6,backgroundColor:bg,borderRadius:6,borderSkipped:false}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'var(--bg2)',borderColor:'var(--bd)',borderWidth:1,
+          titleColor:'var(--tx)',bodyColor:'var(--tx2)',
+          callbacks:{label:c=>` ${c.parsed.y.toLocaleString()}개`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:11}}},
+        y:{grid:{color:'rgba(100,100,120,.15)'},ticks:{color:'var(--tx2)',font:{size:11},callback:v=>v+'개'}},
+      }
+    }
+  });
+
+  // ── 발주 필요 목록 ──
+  const urgentProds = acts.filter(p=>['부족','긴급','임박'].includes(getStatus(p)))
+    .map(p=>({p,c:calcNeeded(p),st:getStatus(p)}))
+    .sort((a,b)=>{const o={부족:0,긴급:1,임박:2};return (o[a.st]??3)-(o[b.st]??3);});
+  const stIcon2={부족:'🔴',긴급:'🟠',임박:'🟡'};
+  const stColor2={부족:'#DC2626',긴급:'#EA580C',임박:'#D97706'};
+  document.getElementById('repOrderCnt').textContent=urgentProds.length?`${urgentProds.length}건 확인 필요`:'없음';
+  document.getElementById('repOrderList').innerHTML=urgentProds.length?
+    urgentProds.map(({p,c,st})=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--bd);font-size:12px;">
+        <span style="font-weight:600;">${stIcon2[st]} ${p.name}</span>
+        <span style="color:${stColor2[st]};font-weight:700;">재고 ${p.stock}개 → ${c.needed}개 주문</span>
+      </div>`).join('')
+    :`<div style="padding:20px;text-align:center;font-size:12px;color:#059669;">발주 필요 제품 없음 ✅</div>`;
+
+  // ── 제품별 이번달 판매 테이블 ──
+  const prodRows = acts.map(p=>{
+    let tm=0, pm2=0;
+    const cache=_dCache[p.code]||{};
+    let hasCurDays=false, hasPrevDays=false;
+    Object.entries(cache).forEach(([d,q])=>{
+      if(d.startsWith(curYM)){tm+=q;hasCurDays=true;}
+      if(d.startsWith(prevYM)){pm2+=q;hasPrevDays=true;}
+    });
+    if(!hasCurDays) tm=getTotalM(p,yr)[mn]||0;
+    if(!hasPrevDays) pm2=getTotalM(p,prevYr)[prevMn]||0;
+    const diff=tm-pm2;
+    const c=calcNeeded(p);
+    const st=getStatus(p);
+    return {p,tm,pm2,diff,c,st};
+  }).filter(r=>r.tm>0||r.c.needed>0).sort((a,b)=>b.tm-a.tm);
+
+  const stBadge2={정상:'color:#059669',임박:'color:#D97706',긴급:'color:#EA580C',부족:'color:#DC2626',단종:'color:var(--tx2)'};
+  document.getElementById('repProdTbody').innerHTML=prodRows.length?prodRows.map(({p,tm,pm2,diff,c,st})=>`
+    <tr>
+      <td style="font-weight:500;">${p.name}</td>
+      <td style="text-align:right;font-weight:700;">${tm>0?tm.toLocaleString()+' 개':'-'}</td>
+      <td style="text-align:right;color:var(--tx2);">${pm2>0?pm2.toLocaleString()+' 개':'-'}</td>
+      <td style="text-align:right;font-weight:600;${diff>0?'color:#059669':diff<0?'color:#DC2626':'color:var(--tx2)'};">
+        ${diff>0?'▲ +'+diff:diff<0?'▼ '+diff:'-'}
+      </td>
+      <td style="text-align:right;">${p.stock.toLocaleString()}개</td>
+      <td style="text-align:center;font-size:11px;font-weight:600;${stBadge2[st]||''}">${st}</td>
+      <td style="text-align:right;font-weight:600;color:${c.needed>0?'#EA580C':'var(--tx2)'};">
+        ${c.needed>0?c.needed.toLocaleString()+'개':'-'}
+      </td>
+    </tr>`).join('')
+    :`<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--tx2);">판매 데이터를 불러오는 중...</td></tr>`;
+}
+
 function startIO(id){ioTarget=id;renderInv();}
 async function applyIO(id){
   const p=products.find(x=>x.id===id);
