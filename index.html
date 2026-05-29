@@ -369,6 +369,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-submit{display:block;width:100%;padding:13px;background:var(--pr);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-top:16px;transition:background .15s;}
 #page-revenue .rev-submit:hover{background:#2171E5;}
 #page-revenue .rev-empty{text-align:center;padding:40px;color:var(--tx2);font-size:13px;}
+#page-revenue .rev-uni-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 300px);}
+#page-revenue .rev-uni-scroll thead th{position:sticky;top:0;z-index:5;background:var(--bg2);}
+#page-revenue .rev-mask{display:inline-block;background:#F1F5F9;color:#94A3B8;border-radius:4px;padding:0 5px;font-size:10px;letter-spacing:1px;}
+#page-revenue .rev-margin-pos{color:#059669;font-weight:600;}
+#page-revenue .rev-margin-neg{color:#DC2626;font-weight:600;}
 @media(max-width:900px){#page-revenue .rev-kpi{grid-template-columns:repeat(2,1fr);}#page-revenue .rev-chart-grid{grid-template-columns:1fr;}#page-revenue .rev-up-grid{grid-template-columns:repeat(2,1fr);}}
 </style>
 </head>
@@ -701,6 +706,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="rsni" id="rsni-monthly" onclick="goRevPage('monthly')">📅 월별</div>
     <div class="rsni" id="rsni-backdata" onclick="goRevPage('backdata')">🗂 백데이터</div>
     <div class="rsni" id="rsni-upload" onclick="goRevPage('upload')">📤 데이터 업로드</div>
+    <div class="rsni" id="rsni-unified" onclick="goRevPage('unified')">📋 통합</div>
   </div>
   <div class="rmain">
 
@@ -884,6 +890,73 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         ℹ️ 백데이터에 없는 상품이 포함된 경우 업로드 후 팝업으로 안내됩니다.
       </div>
       <button class="rev-submit" onclick="submitRevUpload()">선택한 파일 업로드</button>
+    </div>
+
+    <!-- ── 통합 탭 ── -->
+    <div class="rpage" id="rpage-unified">
+      <!-- 필터 바 + 마스킹 토글 -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+        <div class="rev-filter" style="flex:1;min-width:0;">
+          <span class="rev-filter-lbl">년도</span>
+          <div class="rev-filter-group" id="revUniYearBtns">
+            <button class="rfbtn active" onclick="setUniFilter('year',this,'ALL')">전체</button>
+          </div>
+          <span class="rev-filter-lbl" style="margin-left:6px;">월</span>
+          <div class="rev-filter-group" id="revUniMonthBtns">
+            <button class="rfbtn active" onclick="setUniFilter('month',this,'ALL')">전체</button>
+          </div>
+          <span class="rev-filter-lbl" style="margin-left:6px;">판매처</span>
+          <div class="rev-filter-group" id="revUniChBtns">
+            <button class="rfbtn active" onclick="setUniFilter('ch',this,'ALL')">전체</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;padding:8px 14px;font-size:12px;white-space:nowrap;flex-shrink:0;">
+          <span id="revMaskStatus">🔒 개인정보 마스킹 중</span>
+          <button class="btn btn-sm" id="revMaskBtn" onclick="toggleRevMask()">🔑 관리자 해제</button>
+        </div>
+      </div>
+      <!-- 검색 + 건수 -->
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="search-box">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <input type="text" id="revUniSrch" placeholder="주문번호, 상품명, 구매자..." oninput="renderUnifiedTable()">
+        </div>
+        <span style="font-size:11px;color:var(--tx2);" id="revUniCount">0건</span>
+      </div>
+      <!-- 테이블 -->
+      <div class="rev-tbl-card">
+        <div class="tw rev-uni-scroll" id="revUniScroll">
+          <table class="dt" id="revUniTable" style="min-width:2000px;">
+            <thead><tr>
+              <th style="min-width:50px;">년도</th>
+              <th style="min-width:70px;">날짜</th>
+              <th style="min-width:90px;">판매처</th>
+              <th style="min-width:130px;">주문번호</th>
+              <th style="min-width:70px;">구매자명</th>
+              <th style="min-width:70px;">수취인</th>
+              <th style="min-width:110px;">연락처1</th>
+              <th style="min-width:110px;">연락처2</th>
+              <th style="min-width:70px;">우편번호</th>
+              <th style="min-width:160px;">주소</th>
+              <th style="min-width:100px;">상품번호</th>
+              <th style="min-width:70px;">제품구분</th>
+              <th style="min-width:90px;">상품코드</th>
+              <th style="min-width:180px;">모델명</th>
+              <th style="min-width:60px;text-align:right;">주문수량</th>
+              <th style="min-width:55px;text-align:right;">출고수</th>
+              <th style="min-width:65px;text-align:right;">배송비</th>
+              <th style="min-width:75px;text-align:right;">판매가</th>
+              <th style="min-width:85px;text-align:right;">정산금액</th>
+              <th style="min-width:75px;text-align:right;">매입액</th>
+              <th style="min-width:70px;text-align:right;">마진</th>
+              <th style="min-width:60px;text-align:right;">마진율</th>
+              <th style="min-width:70px;text-align:right;">개당단가</th>
+            </tr></thead>
+            <tbody id="revUniTbody"></tbody>
+          </table>
+        </div>
+        <div class="rev-empty" id="revUniEmpty">업로드된 데이터가 없습니다<br><span style="font-size:12px;">데이터 업로드 탭에서 판매 데이터를 업로드하세요</span></div>
+      </div>
     </div>
 
   </div>
@@ -1979,18 +2052,167 @@ const REV_CHANNELS = ['이베이','11번가','스마트스토어','쿠팡','오�
 
 function goRevPage(p){
   _revPage = p;
-  ['summary','monthly','backdata','upload'].forEach(x=>{
+  ['summary','monthly','backdata','upload','unified'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
   if(p==='upload') renderRevUpSlots();
   if(p==='backdata') renderBdTable();
+  if(p==='unified') renderUnifiedTable();
 }
 
 function setRevCh(btn, ch){
   _revSelCh = ch;
   document.querySelectorAll('#revChBtns .rfbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+}
+
+// ── 통합 탭 ──
+let _uniFilter = {year:'ALL', month:'ALL', ch:'ALL'};
+let _revMaskOn = true; // 기본: 마스킹 ON
+
+// 개인정보 마스킹 함수
+function maskPhone(v){
+  if(!v) return '';
+  if(!_revMaskOn) return v;
+  // 010-1234-5678 → 010-****-5678
+  return String(v).replace(/(\d{2,4})[-.\s](\d{3,4})[-.\s](\d{4})/, '$1-****-$3')
+                   .replace(/(\d{2,4})(\d{3,4})(\d{4})/, '$1-****-$3');
+}
+function maskAddr(v){
+  if(!v) return '';
+  if(!_revMaskOn) return v;
+  // "서울시 강남구 역삼동 123" → "서울시 강남구 ****"
+  const m = String(v).match(/^(.{2,5}[시도]\s*.{1,6}[시군구])/);
+  if(m) return m[1] + ' <span class="rev-mask">****</span>';
+  // 매칭 안될 경우 앞 8자만 표시
+  const s = String(v);
+  if(s.length>8) return s.slice(0,8)+'<span class="rev-mask">****</span>';
+  return s;
+}
+function maskName(v){
+  if(!v||!_revMaskOn) return v||'';
+  const s=String(v);
+  if(s.length<=1) return s;
+  return s[0]+'<span class="rev-mask">'+('*'.repeat(s.length-1))+'</span>';
+}
+
+function toggleRevMask(){
+  if(_revMaskOn){
+    // 비밀번호 확인 (추후 설정된 비밀번호로 교체)
+    const pw = prompt('관리자 비밀번호를 입력하세요:');
+    const savedPw = localStorage.getItem('rev_admin_pw')||'1234';
+    if(pw===savedPw){
+      _revMaskOn=false;
+      document.getElementById('revMaskStatus').textContent='🔓 마스킹 해제됨';
+      document.getElementById('revMaskBtn').textContent='🔒 마스킹 적용';
+      renderUnifiedTable();
+    } else if(pw!==null){
+      alert('비밀번호가 올바르지 않습니다.');
+    }
+  } else {
+    _revMaskOn=true;
+    document.getElementById('revMaskStatus').textContent='🔒 개인정보 마스킹 중';
+    document.getElementById('revMaskBtn').textContent='🔑 관리자 해제';
+    renderUnifiedTable();
+  }
+}
+
+function setUniFilter(type, btn, val){
+  _uniFilter[type]=val;
+  const groupId = type==='year'?'revUniYearBtns':type==='month'?'revUniMonthBtns':'revUniChBtns';
+  document.querySelectorAll('#'+groupId+' .rfbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderUnifiedTable();
+}
+
+function buildUniFilterBtns(){
+  // 년도 버튼 동적 생성 (데이터 기반, 현재는 고정)
+  const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort();
+  const months=[...new Set(_revData.map(r=>r.month).filter(Boolean))].sort((a,b)=>a-b);
+  const chs=[...new Set(_revData.map(r=>r.ch).filter(Boolean))].sort();
+
+  const yEl=document.getElementById('revUniYearBtns');
+  if(yEl) yEl.innerHTML=`<button class="rfbtn ${_uniFilter.year==='ALL'?'active':''}" onclick="setUniFilter('year',this,'ALL')">전체</button>`
+    +years.map(y=>`<button class="rfbtn ${_uniFilter.year===y?'active':''}" onclick="setUniFilter('year',this,'${y}')">${y}</button>`).join('');
+
+  const mEl=document.getElementById('revUniMonthBtns');
+  if(mEl) mEl.innerHTML=`<button class="rfbtn ${_uniFilter.month==='ALL'?'active':''}" onclick="setUniFilter('month',this,'ALL')">전체</button>`
+    +months.map(m=>`<button class="rfbtn ${_uniFilter.month==m?'active':''}" onclick="setUniFilter('month',this,${m})">${m}월</button>`).join('');
+
+  const cEl=document.getElementById('revUniChBtns');
+  if(cEl) cEl.innerHTML=`<button class="rfbtn ${_uniFilter.ch==='ALL'?'active':''}" onclick="setUniFilter('ch',this,'ALL')">전체</button>`
+    +chs.map(c=>`<button class="rfbtn ${_uniFilter.ch===c?'active':''}" onclick="setUniFilter('ch',this,'${c}')">${c}</button>`).join('');
+}
+
+const UNI_PAGE_SIZE = 200; // 한 번에 표시할 최대 행 수
+function renderUnifiedTable(){
+  buildUniFilterBtns();
+  const srch=(document.getElementById('revUniSrch')?.value||'').toLowerCase();
+  const empty=document.getElementById('revUniEmpty');
+  const scroll=document.getElementById('revUniScroll');
+
+  // 필터 적용
+  let rows=_revData.filter(r=>{
+    if(_uniFilter.year!=='ALL'&&String(r.year)!==String(_uniFilter.year)) return false;
+    if(_uniFilter.month!=='ALL'&&String(r.month)!==String(_uniFilter.month)) return false;
+    if(_uniFilter.ch!=='ALL'&&r.ch!==_uniFilter.ch) return false;
+    if(srch&&!JSON.stringify(r).toLowerCase().includes(srch)) return false;
+    return true;
+  });
+
+  const total=rows.length;
+  document.getElementById('revUniCount').textContent=`${total.toLocaleString()}건`;
+
+  if(total===0){
+    if(empty) empty.style.display='block';
+    if(scroll) scroll.style.display='none';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  if(scroll) scroll.style.display='';
+
+  // 최대 UNI_PAGE_SIZE 행만 표시 (성능)
+  const display=rows.slice(0,UNI_PAGE_SIZE);
+
+  const tbody=document.getElementById('revUniTbody');
+  if(!tbody) return;
+  tbody.innerHTML=display.map(r=>{
+    const margin=r.margin??0;
+    const marginRate=r.marginRate!=null?r.marginRate:null;
+    return `<tr>
+      <td>${r.year||''}</td>
+      <td>${r.date||''}</td>
+      <td>${r.ch||''}</td>
+      <td style="font-size:10px;">${r.orderNo||''}</td>
+      <td>${maskName(r.buyer)}</td>
+      <td>${maskName(r.receiver)}</td>
+      <td>${maskPhone(r.phone1)}</td>
+      <td>${maskPhone(r.phone2)}</td>
+      <td>${r.zip||''}</td>
+      <td style="font-size:10px;">${maskAddr(r.addr)}</td>
+      <td style="font-size:10px;">${r.itemNo||''}</td>
+      <td>${r.itemType||''}</td>
+      <td style="font-size:10px;">${r.itemCode||''}</td>
+      <td style="font-weight:500;">${r.modelName||''}</td>
+      <td style="text-align:right;">${r.orderQty!=null?r.orderQty:''}</td>
+      <td style="text-align:right;">${r.shipQty!=null?r.shipQty:''}</td>
+      <td style="text-align:right;">${r.shipping!=null?r.shipping.toLocaleString():''}</td>
+      <td style="text-align:right;">${r.salePrice!=null?r.salePrice.toLocaleString():''}</td>
+      <td style="text-align:right;font-weight:600;">${r.settlement!=null?r.settlement.toLocaleString():''}</td>
+      <td style="text-align:right;">${r.costPrice!=null?r.costPrice.toLocaleString():''}</td>
+      <td style="text-align:right;" class="${margin>0?'rev-margin-pos':margin<0?'rev-margin-neg':''}">${margin!=null?margin.toLocaleString():''}</td>
+      <td style="text-align:right;">${marginRate!=null?(marginRate*100).toFixed(1)+'%':''}</td>
+      <td style="text-align:right;">${r.unitCost!=null?r.unitCost.toLocaleString():''}</td>
+    </tr>`;
+  }).join('');
+
+  // 잘림 표시
+  if(total>UNI_PAGE_SIZE){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td colspan="23" style="text-align:center;padding:10px;font-size:11px;color:var(--tx2);">표시: 최신 ${UNI_PAGE_SIZE}건 / 전체 ${total.toLocaleString()}건 (필터를 좁혀 전체 보기)</td>`;
+    tbody.appendChild(tr);
+  }
 }
 
 // ── 백데이터 ──
