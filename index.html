@@ -261,29 +261,41 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* ── 오늘 주문 체크 박스 ── */
 #orderCheckBox{margin-bottom:10px;}
 .ocb-outer{display:flex;gap:10px;align-items:flex-start;}
-.ocb-wrap{width:340px;flex-shrink:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+/* 왼쪽: 체크리스트 */
+.ocb-wrap{width:370px;flex-shrink:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
 .ocb-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:0.5px solid var(--bd);cursor:pointer;user-select:none;}
 .ocb-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
 .ocb-toggle{font-size:11px;color:var(--tx2);}
 .ocb-body{padding:4px 0;}
-.ocb-row{display:grid;grid-template-columns:1fr 42px 42px 84px 40px;align-items:center;gap:3px;padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:11px;}
+.ocb-row{display:grid;grid-template-columns:1fr 42px 42px 84px 38px;align-items:start;gap:3px;padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:11px;}
 .ocb-row:last-child{border:none;}
-.ocb-hrow{font-size:9px;color:var(--tx2);font-weight:600;letter-spacing:.4px;padding:5px 10px 3px;display:grid;grid-template-columns:1fr 42px 42px 84px 40px;gap:3px;}
-.ocb-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ocb-stock{text-align:right;}
-.ocb-days{text-align:center;}
-.ocb-qty{text-align:right;font-weight:700;}
-.ocb-btn{text-align:right;}
+.ocb-hrow{font-size:9px;color:var(--tx2);font-weight:600;letter-spacing:.4px;padding:5px 10px 3px;display:grid;grid-template-columns:1fr 42px 42px 84px 38px;gap:3px;}
+.ocb-name{font-weight:600;word-break:keep-all;line-height:1.4;}
+.ocb-stock{text-align:right;padding-top:1px;}
+.ocb-days{text-align:center;padding-top:1px;}
+.ocb-qty{text-align:right;font-weight:700;padding-top:1px;}
+.ocb-btn{text-align:right;padding-top:1px;}
 .ocb-empty{padding:14px;text-align:center;font-size:12px;color:var(--tx2);}
-/* TOP6 패널 */
-.ocb-top6{flex:1 1 0;max-width:340px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
-.ocb-top6-head{font-size:13px;font-weight:600;padding:9px 14px;border-bottom:0.5px solid var(--bd);color:var(--tx);}
-.ocb-t6row{display:grid;grid-template-columns:22px 1fr auto;gap:6px;padding:7px 14px;border-bottom:0.5px solid var(--bd);font-size:13px;align-items:center;}
-.ocb-t6row:last-child{border:none;}
-.ocb-t6rank{font-size:12px;font-weight:700;text-align:center;}
-.ocb-t6name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
-.ocb-t6val{font-weight:700;color:var(--pr);white-space:nowrap;font-size:12px;}
-@media(max-width:560px){.ocb-outer{flex-direction:column;}.ocb-top6{width:100%;max-width:none;}}
+/* 가운데: TOP6 + RG TOP10 세로스택 */
+.ocb-mid{width:270px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;}
+.ocb-top6,.ocb-rg10{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-top6-head,.ocb-rg10-head{font-size:12px;font-weight:600;padding:8px 12px;border-bottom:0.5px solid var(--bd);color:var(--tx);}
+.ocb-t6row,.ocb-rg-row{display:grid;grid-template-columns:18px 1fr auto;gap:5px;padding:6px 12px;border-bottom:0.5px solid var(--bd);font-size:12px;align-items:center;}
+.ocb-t6row:last-child,.ocb-rg-row:last-child{border:none;}
+.ocb-t6rank,.ocb-rg-rank{font-size:11px;font-weight:700;text-align:center;}
+.ocb-t6name,.ocb-rg-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.ocb-t6val{font-weight:700;color:var(--pr);white-space:nowrap;font-size:11px;}
+.ocb-rg-val{font-weight:700;color:#7C3AED;white-space:nowrap;font-size:11px;}
+/* 오른쪽: 진행중 발주 */
+.ocb-right{flex:1 1 0;min-width:140px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-right-head{font-size:12px;font-weight:600;padding:8px 12px;border-bottom:0.5px solid var(--bd);color:var(--tx);display:flex;align-items:center;gap:6px;}
+.ocb-pend-row{display:grid;grid-template-columns:1fr auto;gap:6px;padding:6px 12px;border-bottom:0.5px solid var(--bd);font-size:11px;align-items:start;}
+.ocb-pend-row:last-child{border:none;}
+.ocb-pend-name{font-weight:600;word-break:keep-all;line-height:1.3;margin-bottom:1px;}
+.ocb-pend-date{font-size:9px;color:var(--tx2);}
+.ocb-pend-miss{font-weight:700;color:#7C3AED;font-size:11px;text-align:right;white-space:nowrap;}
+.ocb-pend-total{font-size:9px;color:var(--tx2);text-align:right;}
+@media(max-width:700px){.ocb-outer{flex-direction:column;}.ocb-mid,.ocb-right,.ocb-wrap{width:100%!important;}}
 
 /* ── 보고 탭 ── */
 #page-report .rep-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
@@ -1386,7 +1398,7 @@ function renderOrderCheck(){
   const el = document.getElementById('orderCheckBox');
   if(!el) return;
 
-  // 진행중 발주 미입고 수량 코드별 합산
+  // ── 진행중 발주 코드별 합산 ──
   const pendingByCode = {};
   receiveList.forEach(r=>{
     const miss = Math.max(0, r.orderQty - (r.in1 + r.in2));
@@ -1395,13 +1407,13 @@ function renderOrderCheck(){
 
   const oc = parseFloat(localStorage.getItem('order_cycle_months')||'1');
 
+  // ── 주문 필요 목록 ──
   const urgent = products.filter(p=>{
     if(p.hidden||p.disc) return false;
     const st = getStatus(p);
     if(!['부족','긴급','임박'].includes(st)) return false;
     const c = calcNeeded(p);
     if(c.noData || c.expM <= 0) return false;
-    // 진행중 발주가 이미 목표 수량을 충족하면 제외
     const pending = pendingByCode[p.code]||0;
     const neededTotal = Math.round(c.expM * (oc + 0.5));
     if(pending >= neededTotal) return false;
@@ -1411,83 +1423,107 @@ function renderOrderCheck(){
     const st = getStatus(p);
     const pending = pendingByCode[p.code]||0;
     const neededTotal = Math.round(c.expM * (oc + 0.5));
-    // 추가로 더 필요한 수량 (이미 진행중인 발주 차감)
     const addNeeded = Math.max(0, neededTotal - pending);
     const addBoxes = Math.ceil(addNeeded / (p.boxQty||1));
     const dailyRate = c.expM / 30;
     const daysLeft = dailyRate > 0 ? Math.round(p.stock / dailyRate) : null;
     return {p, c, st, daysLeft, pending, addNeeded, addBoxes};
-  }).sort((a,b)=>{
-    const ord = {부족:0, 긴급:1, 임박:2};
-    return (ord[a.st]??3) - (ord[b.st]??3);
-  });
+  }).sort((a,b)=>{ const ord={부족:0,긴급:1,임박:2}; return (ord[a.st]??3)-(ord[b.st]??3); });
 
-  // ── 이번달 판매 TOP6 계산 ──
+  // ── 이번달 YM ──
   const _now = new Date();
   const _curYM = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
-  const _rankColors = ['#F59E0B','#94A3B8','#B45309','#3182F6','#3182F6','#3182F6'];
-  const top6 = products
-    .filter(p=>!p.hidden&&!p.disc)
-    .map(p=>{
-      const dd = _dCache[p.code]||{};
-      const total = Object.entries(dd).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
-      return {name:p.name, total};
-    })
-    .filter(x=>x.total>0)
-    .sort((a,b)=>b.total-a.total)
-    .slice(0,6);
-  const top6HTML = `<div class="ocb-top6">
-    <div class="ocb-top6-head">📊 이번달 판매 TOP6</div>
-    ${top6.length===0
-      ? '<div class="ocb-empty">데이터 없음</div>'
-      : top6.map((x,i)=>`<div class="ocb-t6row">
-          <span class="ocb-t6rank" style="color:${_rankColors[i]||'var(--tx2)'};">${i+1}</span>
-          <span class="ocb-t6name">${x.name}</span>
-          <span class="ocb-t6val">${x.total.toLocaleString()}개</span>
-        </div>`).join('')
-    }
-  </div>`;
+  const _rc = ['#F59E0B','#94A3B8','#B45309','#3182F6','#3182F6','#3182F6','#6B7280','#6B7280','#6B7280','#6B7280'];
 
-  const stIcon = {부족:'🔴', 긴급:'🟠', 임박:'🟡'};
-  const stColor = {부족:'#DC2626', 긴급:'#EA580C', 임박:'#D97706'};
+  // ── 이번달 판매 TOP6 ──
+  const top6 = products.filter(p=>!p.hidden&&!p.disc).map(p=>{
+    const total = Object.entries(_dCache[p.code]||{}).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
+    return {name:p.name, total};
+  }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,6);
 
-  if(!urgent.length){
-    el.innerHTML=`<div class="ocb-outer"><div class="ocb-wrap"><div class="ocb-head" onclick="toggleOcb()">
-      <div class="ocb-title">✅ 오늘 주문할 것</div>
-      <div class="ocb-toggle">▲</div></div>
-      <div class="ocb-body" style="display:${_ocbOpen?'block':'none'}">
-        <div class="ocb-empty" style="color:#059669;">모든 제품 재고 정상입니다 🎉</div>
-      </div></div>${top6HTML}</div>`;
-    return;
-  }
+  // ── 로켓그로스 TOP10 ──
+  const rg10 = products.filter(p=>!p.hidden&&!p.disc).map(p=>{
+    const total = Object.entries(_rgDailyCache[p.code]||{}).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
+    return {name:p.name, total};
+  }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,10);
 
-  el.innerHTML=`<div class="ocb-outer"><div class="ocb-wrap">
+  // ── 진행중 발주 목록 ──
+  const activePend = receiveList.filter(r=>!r.doneTime&&(r.orderQty-(r.in1||0)-(r.in2||0))>0)
+    .sort((a,b)=>a.orderDate<b.orderDate?-1:1);
+
+  const stIcon={부족:'🔴',긴급:'🟠',임박:'🟡'};
+  const stColor={부족:'#DC2626',긴급:'#EA580C',임박:'#D97706'};
+
+  // ── HTML 빌드 ──
+  const checkHTML = `<div class="ocb-wrap">
     <div class="ocb-head" onclick="toggleOcb()">
       <div class="ocb-title">
         📋 오늘 주문 체크리스트
-        <span style="background:#EA580C;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;">${urgent.length}건</span>
+        ${urgent.length?`<span style="background:#EA580C;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;">${urgent.length}건</span>`:''}
       </div>
-      <div class="ocb-toggle">${_ocbOpen?'▲':'▼'} ${_ocbOpen?'접기':'펼치기'}</div>
+      <div class="ocb-toggle">${_ocbOpen?'▲ 접기':'▼ 펼치기'}</div>
     </div>
     <div class="ocb-body" id="ocbBody" style="display:${_ocbOpen?'block':'none'}">
-      <div class="ocb-hrow">
-        <span>제품명</span><span style="text-align:right;">현재고</span>
-        <span style="text-align:center;">소진까지</span>
-        <span style="text-align:right;">권장 주문량</span>
-        <span></span>
-      </div>
-      ${urgent.map(({p,c,st,daysLeft,pending,addNeeded,addBoxes})=>`
-        <div class="ocb-row">
-          <span class="ocb-name">${stIcon[st]} ${p.name}${pending>0?` <span style="font-size:10px;color:#9333EA;font-weight:600;">(진행중 ${pending}개)</span>`:''}</span>
-          <span class="ocb-stock" style="color:${stColor[st]};font-weight:600;">${p.stock}개</span>
-          <span class="ocb-days" style="color:${stColor[st]};font-weight:600;">
-            ${daysLeft===null?'-':daysLeft<=0?'⚠ 즉시':daysLeft+'일'}
-          </span>
-          <span class="ocb-qty" style="color:${stColor[st]};">${addNeeded}개 (${addBoxes}박스)</span>
-          <span class="ocb-btn"><button class="btn btn-sm btn-pr" onclick="goPage('order')" style="font-size:9px;padding:2px 5px;">발주</button></span>
+      ${urgent.length===0
+        ? `<div class="ocb-empty" style="color:#059669;">모든 제품 재고 정상입니다 🎉</div>`
+        : `<div class="ocb-hrow"><span>제품명</span><span style="text-align:right;">현재고</span>
+            <span style="text-align:center;">소진까지</span>
+            <span style="text-align:right;">권장 주문량</span><span></span></div>
+           ${urgent.map(({p,c,st,daysLeft,pending,addNeeded,addBoxes})=>`
+            <div class="ocb-row">
+              <span class="ocb-name">${stIcon[st]} ${p.name}${pending>0?` <span style="font-size:10px;color:#9333EA;font-weight:600;">(진행중 ${pending}개)</span>`:''}</span>
+              <span class="ocb-stock" style="color:${stColor[st]};font-weight:600;">${p.stock}개</span>
+              <span class="ocb-days" style="color:${stColor[st]};font-weight:600;">${daysLeft===null?'-':daysLeft<=0?'⚠즉시':daysLeft+'일'}</span>
+              <span class="ocb-qty" style="color:${stColor[st]};">${addNeeded}개 (${addBoxes}박스)</span>
+              <span class="ocb-btn"><button class="btn btn-sm btn-pr" onclick="goPage('order')" style="font-size:9px;padding:2px 5px;">발주</button></span>
+            </div>`).join('')}`
+      }
+    </div>
+  </div>`;
+
+  const midHTML = `<div class="ocb-mid">
+    <div class="ocb-top6">
+      <div class="ocb-top6-head">📊 이번달 판매 TOP6</div>
+      ${top6.length===0?'<div class="ocb-empty">데이터 없음</div>'
+        :top6.map((x,i)=>`<div class="ocb-t6row">
+          <span class="ocb-t6rank" style="color:${_rc[i]};">${i+1}</span>
+          <span class="ocb-t6name">${x.name}</span>
+          <span class="ocb-t6val">${x.total.toLocaleString()}개</span>
         </div>`).join('')}
     </div>
-  </div>${top6HTML}</div>`;
+    <div class="ocb-rg10">
+      <div class="ocb-rg10-head">🚀 로켓그로스 TOP10</div>
+      ${rg10.length===0?'<div class="ocb-empty">이번달 데이터 없음</div>'
+        :rg10.map((x,i)=>`<div class="ocb-rg-row">
+          <span class="ocb-rg-rank" style="color:${_rc[i]};">${i+1}</span>
+          <span class="ocb-rg-name">${x.name}</span>
+          <span class="ocb-rg-val">${x.total.toLocaleString()}박스</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+
+  const rightHTML = `<div class="ocb-right">
+    <div class="ocb-right-head">📦 진행중 발주
+      <span style="background:var(--pr);color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;">${activePend.length}건</span>
+    </div>
+    ${activePend.length===0?'<div class="ocb-empty">진행중인 발주 없음</div>'
+      :activePend.map(r=>{
+        const miss=r.orderQty-(r.in1||0)-(r.in2||0);
+        const md=r.orderDate?r.orderDate.substring(5).replace('-','/'):'';
+        return `<div class="ocb-pend-row">
+          <div>
+            <div class="ocb-pend-name">${r.name}</div>
+            <div class="ocb-pend-date">${md} 발주</div>
+          </div>
+          <div>
+            <div class="ocb-pend-miss">${miss.toLocaleString()}개</div>
+            <div class="ocb-pend-total">/ ${r.orderQty.toLocaleString()}개</div>
+          </div>
+        </div>`;
+      }).join('')}
+  </div>`;
+
+  el.innerHTML=`<div class="ocb-outer">${checkHTML}${midHTML}${rightHTML}</div>`;
 }
 function toggleOcb(){
   _ocbOpen=!_ocbOpen;
