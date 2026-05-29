@@ -1465,6 +1465,7 @@ function goPage(p){
   if(p==='rg'){ loadRgDailyCache().then(()=>{ renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
   if(p==='hist') renderHist();
   if(p==='report') loadDailyCache().then(()=>renderReport());
+  if(p==='revenue') loadRevenuePage();
 }
 
 // ══════════════════════════════════════════════
@@ -2042,11 +2043,123 @@ function renderReport(){
 let _revPage = 'summary';
 let _revSelMonth = null;
 let _revSelCh = 'ALL';
-let _revData = [];    // 추후 Supabase에서 로드
-let _bdData = [];     // 백데이터 (추후 Supabase)
+let _revData = [];
+let _bdData = [];
 let _revTrendChart = null;
 let _revDnutChart = null;
 let _revDailyChart = null;
+let _bdLoaded = false;
+let _revLoaded = false;
+
+// ── 매출관리 페이지 진입 ──
+async function loadRevenuePage(){
+  // 백데이터 로드 (처음 한 번만)
+  if(!_bdLoaded) await loadBackdata();
+  // 통합 탭이 열려있으면 revenue도 로드
+  if(_revPage==='unified' && !_revLoaded) await loadRevenueData();
+  if(_revPage==='backdata') renderBdTable();
+  if(_revPage==='unified') renderUnifiedTable();
+}
+
+// ── 백데이터 Supabase CRUD ──
+async function loadBackdata(){
+  try {
+    const {data,error} = await sb.from('backdata').select('*').order('code');
+    if(error){ console.warn('backdata 로드 오류:',error.message); return; }
+    _bdData = (data||[]).map(r=>({
+      id: r.id,
+      code: r.code,
+      supplier: r.supplier||'',
+      type: r.item_type||'',
+      name: r.name||'',
+      price: r.price
+    }));
+    _bdLoaded = true;
+    renderBdTable();
+  } catch(e){ console.warn('backdata 로드 실패:',e); }
+}
+
+async function saveBdToSupabase(row, isEdit){
+  const d = {
+    code: row.code,
+    supplier: row.supplier||null,
+    item_type: row.type||null,
+    name: row.name,
+    price: row.price!=null?row.price:null,
+    updated_at: new Date().toISOString()
+  };
+  if(isEdit && row.id){
+    const {error} = await sb.from('backdata').update(d).eq('id',row.id);
+    if(error) throw error;
+  } else {
+    const {data,error} = await sb.from('backdata').insert(d).select().single();
+    if(error) throw error;
+    row.id = data.id;
+  }
+}
+
+async function deleteBdFromSupabase(id){
+  const {error} = await sb.from('backdata').delete().eq('id',id);
+  if(error) throw error;
+}
+
+// ── revenue 데이터 Supabase 로드 ──
+async function loadRevenueData(opts={}){
+  try{
+    showRevLoading(true);
+    let q = sb.from('revenue').select('*', {count:'exact'});
+    if(opts.year) q = q.eq('year', opts.year);
+    if(opts.channel) q = q.eq('channel', opts.channel);
+    q = q.order('year',{ascending:false}).order('sale_date',{ascending:false}).limit(2000);
+    const {data,error,count} = await q;
+    if(error){ console.warn('revenue 로드 오류:',error.message); showRevLoading(false); return; }
+    _revData = (data||[]).map(r=>({
+      id: r.id,
+      year: r.year,
+      date: r.sale_date,
+      month: r.sale_date?parseInt(r.sale_date.split('-')[0]):null,
+      ch: r.channel,
+      orderNo: r.order_no,
+      buyer: r.buyer,
+      receiver: r.receiver,
+      phone1: r.phone1,
+      phone2: r.phone2,
+      zip: r.zip,
+      addr: r.address,
+      itemNo: r.item_no,
+      itemType: r.item_type,
+      itemCode: r.item_code,
+      modelName: r.model_name,
+      orderQty: r.order_qty,
+      shipQty: r.ship_qty,
+      shipping: r.shipping_fee,
+      salePrice: r.sale_price,
+      settlement: r.settlement,
+      costPrice: r.cost_price,
+      margin: r.margin,
+      marginRate: r.margin_rate,
+      unitCost: r.unit_cost
+    }));
+    _revLoaded = true;
+    showRevLoading(false);
+    renderUnifiedTable();
+  } catch(e){ console.warn('revenue 로드 실패:',e); showRevLoading(false); }
+}
+
+function showRevLoading(on){
+  const cnt = document.getElementById('revUniCount');
+  if(cnt) cnt.textContent = on ? '로딩 중...' : '';
+}
+
+// revenue 데이터 bulk insert (업로드 시 사용)
+async function insertRevenueRows(rows){
+  const CHUNK = 500;
+  for(let i=0;i<rows.length;i+=CHUNK){
+    const chunk = rows.slice(i,i+CHUNK);
+    const {error} = await sb.from('revenue').insert(chunk);
+    if(error) throw error;
+  }
+}
 
 const REV_CHANNELS = ['이베이','11번가','스마트스토어','쿠팡','오늘의집','카페24','오너클랜','톡스토어','에이블리','올웨이즈'];
 
@@ -2058,7 +2171,10 @@ function goRevPage(p){
   });
   if(p==='upload') renderRevUpSlots();
   if(p==='backdata') renderBdTable();
-  if(p==='unified') renderUnifiedTable();
+  if(p==='unified'){
+    if(!_revLoaded) loadRevenueData();
+    else renderUnifiedTable();
+  }
 }
 
 function setRevCh(btn, ch){
@@ -2267,7 +2383,7 @@ function openBdEdit(code){
   openModal('bdModal');
 }
 
-function saveBdModal(){
+async function saveBdModal(){
   const code = document.getElementById('bdCode').value.trim();
   const supplier = document.getElementById('bdSupplier').value.trim();
   const type = document.getElementById('bdType').value.trim();
@@ -2276,16 +2392,32 @@ function saveBdModal(){
   const editKey = document.getElementById('bdEditKey').value;
   if(!code){alert('전체상품코드를 입력하세요.');return;}
   if(!name){alert('상품명을 입력하세요.');return;}
-  if(editKey){
-    const idx = _bdData.findIndex(x=>x.code===editKey);
-    if(idx>=0) _bdData[idx]={..._bdData[idx],supplier,type,name,price};
-  } else {
-    if(_bdData.find(x=>x.code===code)){alert('이미 존재하는 코드입니다.');return;}
-    _bdData.push({code,supplier,type,name,price});
+
+  const saveBtn = document.querySelector('#bdModal .btn-pr');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='저장 중...';}
+
+  try{
+    let row;
+    if(editKey){
+      const idx = _bdData.findIndex(x=>x.code===editKey);
+      if(idx>=0){
+        row = {..._bdData[idx],supplier,type,name,price};
+        await saveBdToSupabase(row, true);
+        _bdData[idx] = row;
+      }
+    } else {
+      if(_bdData.find(x=>x.code===code)){alert('이미 존재하는 코드입니다.');return;}
+      row = {code,supplier,type,name,price};
+      await saveBdToSupabase(row, false);
+      _bdData.push(row);
+    }
+    closeModal('bdModal');
+    renderBdTable();
+  } catch(e){
+    alert('저장 실패: '+e.message);
+  } finally {
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='저장';}
   }
-  closeModal('bdModal');
-  renderBdTable();
-  // TODO: Supabase 저장
 }
 
 // ── 업로드 슬롯 ──
