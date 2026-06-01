@@ -2059,12 +2059,17 @@ let _revLoaded = false;
 
 // ── 매출관리 페이지 진입 ──
 async function loadRevenuePage(){
-  // 백데이터 로드 (처음 한 번만)
   if(!_bdLoaded) await loadBackdata();
-  // 통합 탭이 열려있으면 revenue도 로드
-  if(_revPage==='unified' && !_revLoaded) await loadRevenueData();
+  if(!_revLoaded) await loadRevenueData();
+  _renderRevCurrentPage();
+}
+
+function _renderRevCurrentPage(){
+  if(_revPage==='summary')  renderRevSummary();
+  if(_revPage==='monthly')  renderRevMonthly();
   if(_revPage==='backdata') renderBdTable();
-  if(_revPage==='unified') renderUnifiedTable();
+  if(_revPage==='upload')   renderRevUpSlots();
+  if(_revPage==='unified')  renderUnifiedTable();
 }
 
 // ── 백데이터 Supabase CRUD ──
@@ -2120,45 +2125,39 @@ async function deleteBdFromSupabase(id){
 }
 
 // ── revenue 데이터 Supabase 로드 ──
-async function loadRevenueData(opts={}){
+async function loadRevenueData(){
   try{
     showRevLoading(true);
-    let q = sb.from('revenue').select('*', {count:'exact'});
-    if(opts.year) q = q.eq('year', opts.year);
-    if(opts.channel) q = q.eq('channel', opts.channel);
-    q = q.order('year',{ascending:false}).order('sale_date',{ascending:false}).limit(2000);
-    const {data,error,count} = await q;
-    if(error){ console.warn('revenue 로드 오류:',error.message); showRevLoading(false); return; }
-    _revData = (data||[]).map(r=>({
-      id: r.id,
-      year: r.year,
-      date: r.sale_date,
+    const COLS = 'year,sale_date,channel,order_no,buyer,receiver,phone1,phone2,zip,address,item_no,item_type,item_code,model_name,order_qty,ship_qty,shipping_fee,sale_price,settlement,cost_price,margin,margin_rate,unit_cost';
+    const PAGE = 1000;
+    let all = [], from = 0;
+    while(true){
+      const {data,error} = await sb.from('revenue').select(COLS)
+        .order('year',{ascending:true}).order('sale_date',{ascending:true})
+        .range(from, from+PAGE-1);
+      if(error){ console.warn('revenue 오류:',error.message); break; }
+      if(!data||data.length===0) break;
+      all = all.concat(data);
+      if(data.length < PAGE) break;
+      from += PAGE;
+    }
+    _revData = all.map(r=>({
+      year: r.year, date: r.sale_date,
       month: r.sale_date?parseInt(r.sale_date.split('-')[0]):null,
-      ch: r.channel,
-      orderNo: r.order_no,
-      buyer: r.buyer,
-      receiver: r.receiver,
-      phone1: r.phone1,
-      phone2: r.phone2,
-      zip: r.zip,
-      addr: r.address,
-      itemNo: r.item_no,
-      itemType: r.item_type,
-      itemCode: r.item_code,
-      modelName: r.model_name,
-      orderQty: r.order_qty,
-      shipQty: r.ship_qty,
-      shipping: r.shipping_fee,
-      salePrice: r.sale_price,
-      settlement: r.settlement,
-      costPrice: r.cost_price,
-      margin: r.margin,
-      marginRate: r.margin_rate,
-      unitCost: r.unit_cost
+      ch: r.channel, orderNo: r.order_no,
+      buyer: r.buyer, receiver: r.receiver,
+      phone1: r.phone1, phone2: r.phone2,
+      zip: r.zip, addr: r.address,
+      itemNo: r.item_no, itemType: r.item_type,
+      itemCode: r.item_code, modelName: r.model_name,
+      orderQty: r.order_qty, shipQty: r.ship_qty,
+      shipping: r.shipping_fee, salePrice: r.sale_price,
+      settlement: r.settlement, costPrice: r.cost_price,
+      margin: r.margin, marginRate: r.margin_rate, unitCost: r.unit_cost
     }));
     _revLoaded = true;
     showRevLoading(false);
-    renderUnifiedTable();
+    _renderRevCurrentPage();
   } catch(e){ console.warn('revenue 로드 실패:',e); showRevLoading(false); }
 }
 
@@ -2185,18 +2184,316 @@ function goRevPage(p){
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
-  if(p==='upload') renderRevUpSlots();
-  if(p==='backdata') renderBdTable();
-  if(p==='unified'){
-    if(!_revLoaded) loadRevenueData();
-    else renderUnifiedTable();
-  }
+  _renderRevCurrentPage();
 }
 
 function setRevCh(btn, ch){
   _revSelCh = ch;
   document.querySelectorAll('#revChBtns .rfbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  renderRevMonthly();
+}
+
+// ── 요약 탭 렌더링 ──
+function renderRevSummary(){
+  if(!_revData.length){ return; }
+
+  const now   = new Date();
+  const curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const [cy, cm] = curYM.split('-').map(Number);
+
+  // 이번달 데이터
+  const thisMonth = _revData.filter(r=>r.year===cy && r.date && r.date.startsWith(String(cm).padStart(2,'0')));
+  const prevM = cm===1?12:cm-1, prevY = cm===1?cy-1:cy;
+  const lastMonth = _revData.filter(r=>r.year===prevY && r.date && r.date.startsWith(String(prevM).padStart(2,'0')));
+
+  const sum = arr=>({
+    settle: arr.reduce((s,r)=>s+(r.settlement||0),0),
+    margin: arr.reduce((s,r)=>s+(r.margin||0),0),
+    cnt:    arr.length
+  });
+  const cur=sum(thisMonth), prv=sum(lastMonth);
+  const marginRate = cur.settle>0?(cur.margin/cur.settle*100):0;
+  const prevRate   = prv.settle>0?(prv.margin/prv.settle*100):0;
+
+  const fmt = n=>n>=100000000?`${(n/100000000).toFixed(1)}억`
+               :n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
+  const diff = (a,b)=>{
+    if(!b) return '';
+    const p=((a-b)/Math.abs(b)*100).toFixed(1);
+    return p>=0?`<span style="color:#DC2626;">▲ ${p}% 전월대비</span>`
+               :`<span style="color:#059669;">▼ ${Math.abs(p)}% 전월대비</span>`;
+  };
+
+  // KPI 카드
+  const kpis=[
+    {id:'revKpi0',val:fmt(cur.settle),sub:diff(cur.settle,prv.settle)||`전월 ${fmt(prv.settle)}`},
+    {id:'revKpi1',val:fmt(cur.margin),sub:diff(cur.margin,prv.margin)||`전월 ${fmt(prv.margin)}`},
+    {id:'revKpi2',val:marginRate.toFixed(1)+'%',sub:`전월 ${prevRate.toFixed(1)}%`},
+    {id:'revKpi3',val:cur.cnt.toLocaleString()+'건',sub:diff(cur.cnt,prv.cnt)||`전월 ${prv.cnt.toLocaleString()}건`},
+  ];
+  kpis.forEach(k=>{
+    const el=document.getElementById(k.id); if(!el) return;
+    el.textContent=k.val;
+    const sub=el.parentElement.querySelector('.rev-kpi-sub');
+    if(sub) sub.innerHTML=k.sub;
+  });
+
+  // 월별 집계 (추이 차트용)
+  const byYM = {};
+  _revData.forEach(r=>{
+    if(!r.year||!r.date) return;
+    const mon = r.date.substring(0,2);
+    const key = `${r.year}-${mon}`;
+    if(!byYM[key]) byYM[key]={settle:0,margin:0,cnt:0};
+    byYM[key].settle += r.settlement||0;
+    byYM[key].margin += r.margin||0;
+    byYM[key].cnt++;
+  });
+  const ymKeys = Object.keys(byYM).sort();
+  const rangeEl = document.getElementById('revChartRange');
+  if(rangeEl && ymKeys.length) rangeEl.textContent=`${ymKeys[0]} ~ ${ymKeys[ymKeys.length-1]}`;
+
+  // 추이 차트
+  const trendEmpty=document.getElementById('revTrendEmpty');
+  const trendCtx=document.getElementById('revTrendChart');
+  if(trendCtx){
+    if(_revTrendChart){_revTrendChart.destroy();_revTrendChart=null;}
+    if(ymKeys.length){
+      if(trendEmpty) trendEmpty.style.display='none';
+      trendCtx.style.display='';
+      _revTrendChart=new Chart(trendCtx.getContext('2d'),{
+        data:{
+          labels:ymKeys.map(k=>{const[y,m]=k.split('-');return `${y.slice(2)}/${m}`;}),
+          datasets:[
+            {type:'bar',label:'정산금액',data:ymKeys.map(k=>Math.round(byYM[k].settle/10000)),
+             backgroundColor:'rgba(49,130,246,0.25)',borderRadius:4,borderSkipped:false,yAxisID:'y'},
+            {type:'line',label:'마진',data:ymKeys.map(k=>Math.round(byYM[k].margin/10000)),
+             borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.1)',tension:0.3,
+             pointBackgroundColor:'#059669',pointRadius:4,fill:true,yAxisID:'y'},
+          ]
+        },
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:true,position:'top',labels:{font:{size:11}}},
+            tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toLocaleString()}만원`}}},
+          scales:{
+            x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:11}}},
+            y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:11},callback:v=>v+'만'}}
+          }
+        }
+      });
+    } else {
+      if(trendEmpty) trendEmpty.style.display='block';
+      trendCtx.style.display='none';
+    }
+  }
+
+  // 이번달 채널별 집계 (도넛 + 막대)
+  const byCh={};
+  thisMonth.forEach(r=>{
+    const ch=r.ch||'기타';
+    if(!byCh[ch]) byCh[ch]={settle:0,cnt:0};
+    byCh[ch].settle+=r.settlement||0; byCh[ch].cnt++;
+  });
+  const chEntries=Object.entries(byCh).sort((a,b)=>b[1].settle-a[1].settle);
+  const CH_COLORS=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
+
+  // 도넛
+  const dnutCtx=document.getElementById('revDnutChart');
+  const dnutEmpty=document.getElementById('revDnutEmpty');
+  if(dnutCtx){
+    if(_revDnutChart){_revDnutChart.destroy();_revDnutChart=null;}
+    if(chEntries.length){
+      if(dnutEmpty) dnutEmpty.style.display='none';
+      dnutCtx.style.display='';
+      _revDnutChart=new Chart(dnutCtx.getContext('2d'),{
+        type:'doughnut',
+        data:{labels:chEntries.map(([k])=>k),datasets:[{
+          data:chEntries.map(([,v])=>Math.round(v.settle/10000)),
+          backgroundColor:CH_COLORS.slice(0,chEntries.length),borderWidth:2,borderColor:'#fff'
+        }]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},
+            tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}만원`}}}
+        }
+      });
+      // 범례
+      const legend=document.getElementById('revChLegend');
+      if(legend) legend.innerHTML=chEntries.slice(0,5).map(([k,v],i)=>`
+        <div class="rev-ch-row">
+          <div class="rev-ch-name" style="display:flex;align-items:center;gap:6px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:${CH_COLORS[i]};display:inline-block;flex-shrink:0;"></span>${k}
+          </div>
+          <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v.settle/chEntries[0][1].settle*100)}%;background:${CH_COLORS[i]};"></div></div>
+          <div class="rev-ch-val">${fmt(v.settle)}</div>
+        </div>`).join('');
+    } else {
+      if(dnutEmpty) dnutEmpty.style.display='block';
+      dnutCtx.style.display='none';
+    }
+  }
+
+  // 채널 막대 (요약 탭 오른쪽)
+  const barsEl=document.getElementById('revSumChBars');
+  if(barsEl) barsEl.innerHTML=chEntries.length
+    ? chEntries.map(([k,v],i)=>`
+      <div class="rev-ch-row">
+        <div class="rev-ch-name">${k}</div>
+        <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v.settle/chEntries[0][1].settle*100)}%;background:${CH_COLORS[i%CH_COLORS.length]};"></div></div>
+        <div class="rev-ch-val">${fmt(v.settle)}</div>
+      </div>`).join('')
+    : '<div class="rev-empty" style="padding:20px;">데이터 없음</div>';
+
+  // TOP10 상품
+  const byProd={};
+  thisMonth.forEach(r=>{
+    const k=r.modelName||r.itemCode||'미상';
+    if(!byProd[k]) byProd[k]={qty:0,settle:0,margin:0};
+    byProd[k].qty+=r.orderQty||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
+  });
+  const top10=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle).slice(0,10);
+  const t10Tbl=document.getElementById('revTop10Tbl');
+  const t10Empty=document.getElementById('revTop10Empty');
+  const t10Body=document.getElementById('revTop10Tbody');
+  if(t10Body){
+    if(top10.length){
+      if(t10Empty) t10Empty.style.display='none';
+      if(t10Tbl) t10Tbl.style.display='';
+      t10Body.innerHTML=top10.map(([name,v],i)=>`
+        <tr>
+          <td><span class="rank-badge ${i<3?['rank-1','rank-2','rank-3'][i]:''}">${i+1}</span></td>
+          <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;">${name}</td>
+          <td style="text-align:right;">${v.qty.toLocaleString()}</td>
+          <td style="text-align:right;font-weight:600;">${fmt(v.settle)}</td>
+          <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':v.margin<0?'rev-margin-neg':''}">${fmt(v.margin)}</td>
+          <td style="text-align:right;color:var(--tx2);">${v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-'}</td>
+        </tr>`).join('');
+    } else {
+      if(t10Empty) t10Empty.style.display='block';
+      if(t10Tbl) t10Tbl.style.display='none';
+    }
+  }
+
+  // 월별 요약 테이블
+  const mTbl=document.getElementById('revMonthlyTbl');
+  const mEmpty=document.getElementById('revMonthlySumEmpty');
+  const mBody=document.getElementById('revMonthlyTbody');
+  if(mBody && ymKeys.length){
+    if(mEmpty) mEmpty.style.display='none';
+    if(mTbl) mTbl.style.display='';
+    mBody.innerHTML=ymKeys.slice().reverse().map((k,i,arr)=>{
+      const v=byYM[k];
+      const prev=arr[i+1]?byYM[arr[i+1]]:null;
+      const rate=v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-';
+      const gr=prev&&prev.settle>0?((v.settle-prev.settle)/prev.settle*100).toFixed(1):null;
+      return `<tr>
+        <td style="font-weight:600;">${k}</td>
+        <td style="text-align:right;">${fmt(v.settle)}</td>
+        <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':''}">${fmt(v.margin)}</td>
+        <td style="text-align:right;">${rate}</td>
+        <td style="text-align:right;">${v.cnt.toLocaleString()}건</td>
+        <td style="text-align:right;font-size:11px;">${gr!==null?(gr>=0?`<span style="color:#DC2626;">▲${gr}%</span>`:`<span style="color:#059669;">▼${Math.abs(gr)}%</span>`):'-'}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ── 월별 탭 렌더링 ──
+function renderRevMonthly(){
+  if(!_revData.length) return;
+
+  // 월 버튼 생성 (데이터 기반)
+  const months=[...new Set(_revData.map(r=>r.year&&r.date?`${r.year}-${r.date.substring(0,2)}`:null).filter(Boolean))].sort();
+  if(!_revSelMonth || !months.includes(_revSelMonth)) _revSelMonth=months[months.length-1];
+
+  const mBtns=document.getElementById('revMonthBtns');
+  if(mBtns) mBtns.innerHTML=months.map(m=>`
+    <button class="rfbtn${m===_revSelMonth?' active':''}" onclick="setRevMonth(this,'${m}')">${m.replace('-','/')}월</button>`).join('');
+
+  const [sy,sm]=_revSelMonth.split('-').map(Number);
+  let rows=_revData.filter(r=>r.year===sy && r.date && r.date.startsWith(String(sm).padStart(2,'0')));
+  if(_revSelCh!=='ALL') rows=rows.filter(r=>r.ch===_revSelCh);
+
+  const settle=rows.reduce((s,r)=>s+(r.settlement||0),0);
+  const margin=rows.reduce((s,r)=>s+(r.margin||0),0);
+  const rate=settle>0?(margin/settle*100):0;
+  const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
+
+  const setKpi=(id,val,sub)=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.textContent=val;
+    const s=el.parentElement.querySelector('.rev-kpi-sub'); if(s) s.textContent=sub;
+  };
+  setKpi('revMonKpi0',fmt(settle),`${_revSelMonth} 정산`);
+  setKpi('revMonKpi1',fmt(margin),`${_revSelMonth} 마진`);
+  setKpi('revMonKpi2',rate.toFixed(1)+'%','마진율');
+  setKpi('revMonKpi3',rows.length.toLocaleString()+'건','주문건수');
+
+  // 일별 추이 차트
+  const byDay={};
+  rows.forEach(r=>{ if(r.date){byDay[r.date]=(byDay[r.date]||0)+(r.settlement||0);} });
+  const dayKeys=Object.keys(byDay).sort();
+  const dCtx=document.getElementById('revDailyChart');
+  const dEmpty=document.getElementById('revDailyEmpty');
+  if(dCtx){
+    if(_revDailyChart){_revDailyChart.destroy();_revDailyChart=null;}
+    if(dayKeys.length){
+      if(dEmpty) dEmpty.style.display='none'; dCtx.style.display='';
+      _revDailyChart=new Chart(dCtx.getContext('2d'),{
+        type:'bar',
+        data:{labels:dayKeys.map(d=>`${parseInt(d.split('-')[1])}일`),
+              datasets:[{data:dayKeys.map(k=>Math.round(byDay[k]/10000)),
+               backgroundColor:'rgba(49,130,246,0.35)',borderRadius:3,borderSkipped:false}]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y.toLocaleString()}만원`}}},
+          scales:{x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:10}}},
+                  y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:10},callback:v=>v+'만'}}}
+        }
+      });
+    } else { if(dEmpty) dEmpty.style.display='block'; dCtx.style.display='none'; }
+  }
+
+  // 채널 막대
+  const CH_COLORS=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
+  const byCh={};
+  rows.forEach(r=>{const k=r.ch||'기타';if(!byCh[k])byCh[k]=0;byCh[k]+=r.settlement||0;});
+  const chE=Object.entries(byCh).sort((a,b)=>b[1]-a[1]);
+  const mChBars=document.getElementById('revMonChBars');
+  if(mChBars) mChBars.innerHTML=chE.length
+    ?chE.map(([k,v],i)=>`<div class="rev-ch-row"><div class="rev-ch-name">${k}</div>
+       <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v/chE[0][1]*100)}%;background:${CH_COLORS[i%10]};"></div></div>
+       <div class="rev-ch-val">${fmt(v)}</div></div>`).join('')
+    :'<div class="rev-empty" style="padding:20px;">데이터 없음</div>';
+
+  // TOP15
+  const byP={};
+  rows.forEach(r=>{const k=r.modelName||r.itemCode||'미상';if(!byP[k])byP[k]={qty:0,settle:0,margin:0};byP[k].qty+=r.orderQty||0;byP[k].settle+=r.settlement||0;byP[k].margin+=r.margin||0;});
+  const top15=Object.entries(byP).sort((a,b)=>b[1].settle-a[1].settle).slice(0,15);
+  const tBody=document.getElementById('revMonTopTbody');
+  const tTbl=document.getElementById('revMonTopTbl');
+  const tEmpty=document.getElementById('revMonTopEmpty');
+  const sub=document.getElementById('revMonTblSub');
+  if(sub) sub.textContent=`${_revSelMonth} ${_revSelCh==='ALL'?'전체':_revSelCh}`;
+  if(tBody){
+    if(top15.length){
+      if(tEmpty) tEmpty.style.display='none'; if(tTbl) tTbl.style.display='';
+      tBody.innerHTML=top15.map(([name,v],i)=>`<tr>
+        <td><span class="rank-badge ${i<3?['rank-1','rank-2','rank-3'][i]:''}">${i+1}</span></td>
+        <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;">${name}</td>
+        <td style="text-align:right;">${v.qty.toLocaleString()}</td>
+        <td style="text-align:right;font-weight:600;">${fmt(v.settle)}</td>
+        <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':''}">${fmt(v.margin)}</td>
+        <td style="text-align:right;color:var(--tx2);">${v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-'}</td>
+      </tr>`).join('');
+    } else { if(tEmpty) tEmpty.style.display='block'; if(tTbl) tTbl.style.display='none'; }
+  }
+}
+
+function setRevMonth(btn, ym){
+  _revSelMonth=ym;
+  document.querySelectorAll('#revMonthBtns .rfbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRevMonthly();
 }
 
 // ── 통합 탭 ──
