@@ -2198,12 +2198,16 @@ function setRevCh(btn, ch){
 function renderRevSummary(){
   if(!_revData.length){ return; }
 
-  const now   = new Date();
-  const curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const [cy, cm] = curYM.split('-').map(Number);
-
-  // 이번달 데이터
-  const thisMonth = _revData.filter(r=>r.year===cy && r.date && r.date.startsWith(String(cm).padStart(2,'0')));
+  // 데이터가 있는 가장 최근 월 찾기 (현재월 우선, 없으면 직전 월)
+  const _now = new Date();
+  let cy = _now.getFullYear(), cm = _now.getMonth()+1;
+  let thisMonth = _revData.filter(r=>r.year===cy && r.date && r.date.startsWith(String(cm).padStart(2,'0')));
+  if(!thisMonth.length){
+    // 현재월 데이터 없으면 직전 달로
+    const prevM0 = cm===1?12:cm-1, prevY0 = cm===1?cy-1:cy;
+    thisMonth = _revData.filter(r=>r.year===prevY0 && r.date && r.date.startsWith(String(prevM0).padStart(2,'0')));
+    cy = prevY0; cm = prevM0;
+  }
   const prevM = cm===1?12:cm-1, prevY = cm===1?cy-1:cy;
   const lastMonth = _revData.filter(r=>r.year===prevY && r.date && r.date.startsWith(String(prevM).padStart(2,'0')));
 
