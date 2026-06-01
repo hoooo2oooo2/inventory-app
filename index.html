@@ -6,6 +6,7 @@
 <title>재고관리 시스템</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
@@ -799,9 +800,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <!-- ── 월별 탭 ── -->
     <div class="rpage" id="rpage-monthly">
       <div class="rev-filter">
-        <span class="rev-filter-lbl">월</span>
-        <div class="rev-filter-group" id="revMonthBtns">
+        <span class="rev-filter-lbl">년도</span>
+        <div class="rev-filter-group" id="revMonYearBtns">
           <span style="font-size:12px;color:var(--tx2);">데이터 없음</span>
+        </div>
+        <span class="rev-filter-lbl" style="margin-left:6px;">월</span>
+        <div class="rev-filter-group" id="revMonthBtns">
+          <span style="font-size:12px;color:var(--tx2);">년도를 선택하세요</span>
         </div>
         <span class="rev-filter-lbl" style="margin-left:8px;">판매처</span>
         <div class="rev-filter-group" id="revChBtns">
@@ -925,7 +930,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="search-box">
           <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <input type="text" id="revUniSrch" placeholder="주문번호, 상품명, 구매자..." oninput="renderUnifiedTable()">
+          <input type="text" id="revUniSrch" placeholder="주문번호, 상품명, 구매자..." oninput="_uniPage=0;renderUnifiedTable()">
         </div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniCount">0건</span>
       </div>
@@ -963,7 +968,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
         <div class="rev-empty" id="revUniEmpty">업로드된 데이터가 없습니다<br><span style="font-size:12px;">데이터 업로드 탭에서 판매 데이터를 업로드하세요</span></div>
       </div>
+      <!-- 페이지네이션 -->
+      <div id="revUniPager" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid var(--bd);font-size:12px;"></div>
     </div>
+  </div>
 
   </div>
 </div>
@@ -2271,15 +2279,24 @@ function renderRevSummary(){
           labels:ymKeys.map(k=>{const[y,m]=k.split('-');return `${y.slice(2)}/${m}`;}),
           datasets:[
             {type:'bar',label:'정산금액',data:ymKeys.map(k=>Math.round(byYM[k].settle/10000)),
-             backgroundColor:'rgba(49,130,246,0.25)',borderRadius:4,borderSkipped:false,yAxisID:'y'},
+             backgroundColor:'rgba(49,130,246,0.25)',borderColor:'rgba(49,130,246,0.6)',borderWidth:1,
+             borderRadius:4,borderSkipped:false,yAxisID:'y',
+             datalabels:{anchor:'end',align:'end',color:'#3182F6',font:{size:10,weight:'600'},
+               formatter:v=>v>=10000?`${(v/10000).toFixed(1)}억`:v+'만'}},
             {type:'line',label:'마진',data:ymKeys.map(k=>Math.round(byYM[k].margin/10000)),
-             borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.1)',tension:0.3,
-             pointBackgroundColor:'#059669',pointRadius:4,fill:true,yAxisID:'y'},
+             borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.08)',tension:0.3,
+             pointBackgroundColor:'#059669',pointRadius:5,pointHoverRadius:7,fill:true,yAxisID:'y',
+             datalabels:{anchor:'top',align:'top',offset:4,color:'#059669',font:{size:10,weight:'700'},
+               formatter:v=>v+'만'}},
           ]
         },
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:true,position:'top',labels:{font:{size:11}}},
-            tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toLocaleString()}만원`}}},
+          layout:{padding:{top:28}},
+          plugins:{
+            legend:{display:true,position:'top',labels:{font:{size:11}}},
+            tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toLocaleString()}만원`}},
+            datalabels:{display:true}
+          },
           scales:{
             x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:11}}},
             y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:11},callback:v=>v+'만'}}
@@ -2403,16 +2420,38 @@ function renderRevSummary(){
 }
 
 // ── 월별 탭 렌더링 ──
+let _revSelYear = null; // 선택된 년도
+
 function renderRevMonthly(){
   if(!_revData.length) return;
 
-  // 월 버튼 생성 (데이터 기반)
-  const months=[...new Set(_revData.map(r=>r.year&&r.date?`${r.year}-${r.date.substring(0,2)}`:null).filter(Boolean))].sort();
-  if(!_revSelMonth || !months.includes(_revSelMonth)) _revSelMonth=months[months.length-1];
+  // 년도 목록
+  const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a);
+  if(!_revSelYear||!years.includes(_revSelYear)) _revSelYear=years[0]; // 최신년도 기본
 
+  // 선택년도에 있는 월 목록
+  const monthsInYear=[...new Set(
+    _revData.filter(r=>r.year===_revSelYear&&r.date)
+            .map(r=>parseInt(r.date.substring(0,2)))
+  )].sort((a,b)=>b-a); // 최신월 먼저
+
+  // _revSelMonth 검증
+  const allYM=_revData.filter(r=>r.year===_revSelYear).map(r=>r.date?.substring(0,2)).filter(Boolean);
+  const validMonths=[...new Set(allYM)].map(m=>parseInt(m));
+  if(!_revSelMonth||!validMonths.includes(parseInt(_revSelMonth?.split('-')[1]||0))){
+    _revSelMonth=`${_revSelYear}-${String(monthsInYear[0]).padStart(2,'0')}`;
+  }
+  const curMonNum=parseInt(_revSelMonth.split('-')[1]);
+
+  // 년도 버튼 렌더링
+  const yBtns=document.getElementById('revMonYearBtns');
+  if(yBtns) yBtns.innerHTML=years.map(y=>`
+    <button class="rfbtn${y===_revSelYear?' active':''}" onclick="setRevYear(this,${y})">${y}년</button>`).join('');
+
+  // 월 버튼 렌더링 (선택된 년도의 월만)
   const mBtns=document.getElementById('revMonthBtns');
-  if(mBtns) mBtns.innerHTML=months.map(m=>`
-    <button class="rfbtn${m===_revSelMonth?' active':''}" onclick="setRevMonth(this,'${m}')">${m.replace('-','/')}월</button>`).join('');
+  if(mBtns) mBtns.innerHTML=monthsInYear.map(m=>`
+    <button class="rfbtn${m===curMonNum?' active':''}" onclick="setRevMonthNum(this,${m})">${m}월</button>`).join('');
 
   const [sy,sm]=_revSelMonth.split('-').map(Number);
   let rows=_revData.filter(r=>r.year===sy && r.date && r.date.startsWith(String(sm).padStart(2,'0')));
@@ -2493,8 +2532,14 @@ function renderRevMonthly(){
   }
 }
 
-function setRevMonth(btn, ym){
-  _revSelMonth=ym;
+function setRevYear(btn, y){
+  _revSelYear=y; _revSelMonth=null;
+  document.querySelectorAll('#revMonYearBtns .rfbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRevMonthly();
+}
+function setRevMonthNum(btn, m){
+  _revSelMonth=`${_revSelYear}-${String(m).padStart(2,'0')}`;
   document.querySelectorAll('#revMonthBtns .rfbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderRevMonthly();
@@ -2552,7 +2597,7 @@ function toggleRevMask(){
 }
 
 function setUniFilter(type, btn, val){
-  _uniFilter[type]=val;
+  _uniFilter[type]=val; _uniPage=0;
   const groupId = type==='year'?'revUniYearBtns':type==='month'?'revUniMonthBtns':'revUniChBtns';
   document.querySelectorAll('#'+groupId+' .rfbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
@@ -2578,7 +2623,9 @@ function buildUniFilterBtns(){
     +chs.map(c=>`<button class="rfbtn ${_uniFilter.ch===c?'active':''}" onclick="setUniFilter('ch',this,'${c}')">${c}</button>`).join('');
 }
 
-const UNI_PAGE_SIZE = 200; // 한 번에 표시할 최대 행 수
+const UNI_PAGE_SIZE = 300;
+let _uniPage = 0; // 현재 페이지 (0-based)
+
 function renderUnifiedTable(){
   buildUniFilterBtns();
   const srch=(document.getElementById('revUniSrch')?.value||'').toLowerCase();
@@ -2590,8 +2637,17 @@ function renderUnifiedTable(){
     if(_uniFilter.year!=='ALL'&&String(r.year)!==String(_uniFilter.year)) return false;
     if(_uniFilter.month!=='ALL'&&String(r.month)!==String(_uniFilter.month)) return false;
     if(_uniFilter.ch!=='ALL'&&r.ch!==_uniFilter.ch) return false;
-    if(srch&&!JSON.stringify(r).toLowerCase().includes(srch)) return false;
+    if(srch){
+      const hay=`${r.year}${r.date}${r.ch}${r.orderNo}${r.buyer}${r.modelName}${r.itemCode}`.toLowerCase();
+      if(!hay.includes(srch)) return false;
+    }
     return true;
+  });
+
+  // ★ 최신순 정렬
+  rows.sort((a,b)=>{
+    if(a.year!==b.year) return b.year-a.year;
+    return (b.date||'')>(a.date||'')?1:-1;
   });
 
   const total=rows.length;
@@ -2605,8 +2661,11 @@ function renderUnifiedTable(){
   if(empty) empty.style.display='none';
   if(scroll) scroll.style.display='';
 
-  // 최대 UNI_PAGE_SIZE 행만 표시 (성능)
-  const display=rows.slice(0,UNI_PAGE_SIZE);
+  // 페이지 범위 클램프
+  const maxPage = Math.ceil(total/UNI_PAGE_SIZE)-1;
+  if(_uniPage>maxPage) _uniPage=maxPage;
+  const start=_uniPage*UNI_PAGE_SIZE;
+  const display=rows.slice(start, start+UNI_PAGE_SIZE);
 
   const tbody=document.getElementById('revUniTbody');
   if(!tbody) return;
@@ -2640,11 +2699,20 @@ function renderUnifiedTable(){
     </tr>`;
   }).join('');
 
-  // 잘림 표시
-  if(total>UNI_PAGE_SIZE){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td colspan="23" style="text-align:center;padding:10px;font-size:11px;color:var(--tx2);">표시: 최신 ${UNI_PAGE_SIZE}건 / 전체 ${total.toLocaleString()}건 (필터를 좁혀 전체 보기)</td>`;
-    tbody.appendChild(tr);
+  // 페이지네이션 푸터
+  const maxP = Math.ceil(total/UNI_PAGE_SIZE);
+  const pagerEl = document.getElementById('revUniPager');
+  if(pagerEl){
+    const from=start+1, to=Math.min(start+UNI_PAGE_SIZE,total);
+    pagerEl.innerHTML=`
+      <span style="font-size:11px;color:var(--tx2);">${from.toLocaleString()}–${to.toLocaleString()} / 전체 ${total.toLocaleString()}건</span>
+      <div style="display:flex;gap:4px;align-items:center;">
+        <button class="btn btn-sm" onclick="_uniPage=0;renderUnifiedTable()" ${_uniPage===0?'disabled':''}>처음</button>
+        <button class="btn btn-sm" onclick="_uniPage--;renderUnifiedTable()" ${_uniPage===0?'disabled':''}>◀</button>
+        <span style="font-size:11px;padding:0 6px;">${_uniPage+1} / ${maxP}</span>
+        <button class="btn btn-sm" onclick="_uniPage++;renderUnifiedTable()" ${_uniPage>=maxP-1?'disabled':''}>▶</button>
+        <button class="btn btn-sm" onclick="_uniPage=${maxP-1};renderUnifiedTable()" ${_uniPage>=maxP-1?'disabled':''}>끝</button>
+      </div>`;
   }
 }
 
