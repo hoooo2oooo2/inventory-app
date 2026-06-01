@@ -347,7 +347,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-filter-group{display:flex;gap:4px;flex-wrap:wrap;}
 #page-revenue .rfbtn{padding:4px 12px;border-radius:16px;border:0.5px solid var(--bd);background:var(--bg2);font-size:12px;cursor:pointer;transition:all .15s;}
 #page-revenue .rfbtn:hover{border-color:var(--pr);color:var(--pr);}
-#page-revenue .rfbtn.active{background:var(--pr);color:#fff;border-color:var(--pr);}
+#page-revenue .rfbtn.active{background:var(--pr);color:#fff;border-color:var(--pr);font-weight:700;box-shadow:0 2px 8px rgba(49,130,246,0.35);}
 #page-revenue .rev-tbl-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 #page-revenue .rev-tbl-head{padding:12px 16px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
 #page-revenue .rev-tbl-title{font-size:13px;font-weight:600;}
@@ -714,6 +714,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="rsni" id="rsni-backdata" onclick="goRevPage('backdata')">🗂 백데이터</div>
     <div class="rsni" id="rsni-upload" onclick="goRevPage('upload')">📤 데이터 업로드</div>
     <div class="rsni" id="rsni-unified" onclick="goRevPage('unified')">📋 통합</div>
+    <div class="rsni" id="rsni-daily" onclick="goRevPage('daily')">📄 일일보고</div>
   </div>
   <div class="rmain">
 
@@ -937,31 +938,27 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <!-- 테이블 -->
       <div class="rev-tbl-card">
         <div class="tw rev-uni-scroll" id="revUniScroll">
-          <table class="dt" id="revUniTable" style="min-width:2000px;">
+          <table class="dt" id="revUniTable" style="width:100%;table-layout:fixed;min-width:1280px;">
+            <colgroup>
+              <col style="width:42px"><col style="width:50px"><col style="width:68px">
+              <col style="width:106px"><col style="width:52px"><col style="width:52px">
+              <col style="width:106px"><col style="width:96px"><col style="width:48px">
+              <col style="width:108px"><!-- 상품번호 숨김 --><col style="width:0;display:none">
+              <col style="width:52px"><col style="width:62px"><col style="width:130px">
+              <col style="width:48px"><col style="width:42px"><col style="width:48px">
+              <col style="width:58px"><col style="width:60px"><col style="width:54px">
+              <col style="width:54px"><col style="width:50px"><col style="width:56px">
+            </colgroup>
             <thead><tr>
-              <th style="min-width:50px;">년도</th>
-              <th style="min-width:70px;">날짜</th>
-              <th style="min-width:90px;">판매처</th>
-              <th style="min-width:130px;">주문번호</th>
-              <th style="min-width:70px;">구매자명</th>
-              <th style="min-width:70px;">수취인</th>
-              <th style="min-width:110px;">연락처1</th>
-              <th style="min-width:110px;">연락처2</th>
-              <th style="min-width:70px;">우편번호</th>
-              <th style="min-width:160px;">주소</th>
-              <th style="min-width:100px;">상품번호</th>
-              <th style="min-width:70px;">제품구분</th>
-              <th style="min-width:90px;">상품코드</th>
-              <th style="min-width:180px;">모델명</th>
-              <th style="min-width:60px;text-align:right;">주문수량</th>
-              <th style="min-width:55px;text-align:right;">출고수</th>
-              <th style="min-width:65px;text-align:right;">배송비</th>
-              <th style="min-width:75px;text-align:right;">판매가</th>
-              <th style="min-width:85px;text-align:right;">정산금액</th>
-              <th style="min-width:75px;text-align:right;">매입액</th>
-              <th style="min-width:70px;text-align:right;">마진</th>
-              <th style="min-width:60px;text-align:right;">마진율</th>
-              <th style="min-width:70px;text-align:right;">개당단가</th>
+              <th>년도</th><th>날짜</th><th>판매처</th><th>주문번호</th>
+              <th>구매자</th><th>수취인</th><th>연락처1</th><th>연락처2</th>
+              <th>우편</th><th>주소</th><th style="display:none;">상품번호</th>
+              <th>구분</th><th>코드</th><th>모델명</th>
+              <th style="text-align:right;">수량</th><th style="text-align:right;">출고</th>
+              <th style="text-align:right;">배송비</th><th style="text-align:right;">판매가</th>
+              <th style="text-align:right;">정산</th><th style="text-align:right;">매입</th>
+              <th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
+              <th style="text-align:right;">단가</th>
             </tr></thead>
             <tbody id="revUniTbody"></tbody>
           </table>
@@ -972,6 +969,59 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div id="revUniPager" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid var(--bd);font-size:12px;"></div>
     </div>
   </div>
+
+    <!-- ── 일일 보고 탭 ── -->
+    <div class="rpage" id="rpage-daily">
+      <!-- 필터 -->
+      <div class="rev-filter" style="flex-wrap:wrap;">
+        <span class="rev-filter-lbl">년도</span>
+        <div class="rev-filter-group" id="revDlyYearBtns"></div>
+        <span class="rev-filter-lbl" style="margin-left:6px;">월</span>
+        <div class="rev-filter-group" id="revDlyMonthBtns"></div>
+        <span class="rev-filter-lbl" style="margin-left:6px;">일</span>
+        <div class="rev-filter-group" id="revDlyDayBtns"></div>
+        <span class="rev-filter-lbl" style="margin-left:6px;">판매처</span>
+        <div class="rev-filter-group" id="revDlyChBtns"></div>
+      </div>
+      <!-- KPI -->
+      <div class="rev-kpi" id="revDlyKpi">
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 정산금액</div><div class="rev-kpi-val" id="revDlyK0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK0s"></div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revDlyK1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK1s"></div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revDlyK2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK2s"></div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 택배건수</div><div class="rev-kpi-val" id="revDlyK3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK3s"></div></div>
+      </div>
+      <!-- 상품 테이블 + 도넛 -->
+      <div class="rev-chart-grid">
+        <div class="rev-tbl-card">
+          <div class="rev-tbl-head">
+            <span class="rev-tbl-title">📦 제품별 판매 현황</span>
+            <span style="font-size:11px;color:var(--tx2);" id="revDlyTblSub"></span>
+          </div>
+          <div class="rev-empty" id="revDlyEmpty">날짜와 판매처를 선택하세요</div>
+          <div class="tw"><table class="dt" id="revDlyTbl" style="display:none;">
+            <thead><tr>
+              <th>모델명</th><th>구분</th>
+              <th style="text-align:right;">주문수량</th>
+              <th style="text-align:right;">택배건수</th>
+              <th style="text-align:right;">판매가 합</th>
+              <th style="text-align:right;">정산금액</th>
+              <th style="text-align:right;">마진</th>
+              <th style="text-align:right;">마진율</th>
+            </tr></thead>
+            <tbody id="revDlyTbody"></tbody>
+            <tfoot id="revDlyTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
+          </table></div>
+        </div>
+        <div class="rev-card">
+          <div class="rev-card-title"><span>🍩 제품구분 비중</span></div>
+          <div style="position:relative;height:200px;display:flex;align-items:center;justify-content:center;">
+            <canvas id="revDlyDnut"></canvas>
+          </div>
+          <div id="revDlyDnutLegend" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;"></div>
+          <div class="rev-empty" id="revDlyDnutEmpty" style="padding:16px;">데이터 없음</div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </div>
@@ -2078,6 +2128,7 @@ function _renderRevCurrentPage(){
   if(_revPage==='backdata') renderBdTable();
   if(_revPage==='upload')   renderRevUpSlots();
   if(_revPage==='unified')  renderUnifiedTable();
+  if(_revPage==='daily')    renderDailyReport();
 }
 
 // ── 백데이터 Supabase CRUD ──
@@ -2188,7 +2239,7 @@ const REV_CHANNELS = ['이베이','11번가','스마트스토어','쿠팡','오�
 
 function goRevPage(p){
   _revPage = p;
-  ['summary','monthly','backdata','upload','unified'].forEach(x=>{
+  ['summary','monthly','backdata','upload','unified','daily'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
@@ -2596,6 +2647,148 @@ function toggleRevMask(){
   }
 }
 
+// ── 일일 보고 ──
+let _dlyFilter={year:null,month:null,day:null,ch:'ALL'};
+let _revDlyDnut=null;
+const CH_COLORS_DLY=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
+
+function renderDailyReport(){
+  if(!_revData.length) return;
+  // 기본값: 데이터 내 가장 최근 날짜
+  const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a);
+  if(!_dlyFilter.year||!years.includes(_dlyFilter.year)) _dlyFilter.year=years[0];
+  const monthsInYear=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date).map(r=>parseInt(r.date.substring(0,2))))].sort((a,b)=>b-a);
+  if(!_dlyFilter.month||!monthsInYear.includes(_dlyFilter.month)) _dlyFilter.month=monthsInYear[0];
+  const daysInMonth=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(String(_dlyFilter.month).padStart(2,'0'))).map(r=>parseInt(r.date.split('-')[1]))).values()].sort((a,b)=>b-a);
+  if(!_dlyFilter.day||!daysInMonth.includes(_dlyFilter.day)) _dlyFilter.day=daysInMonth[0];
+
+  const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
+
+  // 버튼 렌더
+  const yEl=document.getElementById('revDlyYearBtns');
+  if(yEl) yEl.innerHTML=years.map(y=>`<button class="rfbtn${y===_dlyFilter.year?' active':''}" onclick="setDlyFilter('year',${y})">${y}년</button>`).join('');
+  const mEl=document.getElementById('revDlyMonthBtns');
+  if(mEl) mEl.innerHTML=monthsInYear.map(m=>`<button class="rfbtn${m===_dlyFilter.month?' active':''}" onclick="setDlyFilter('month',${m})">${m}월</button>`).join('');
+  const dEl=document.getElementById('revDlyDayBtns');
+  if(dEl) dEl.innerHTML=daysInMonth.map(d=>`<button class="rfbtn${d===_dlyFilter.day?' active':''}" onclick="setDlyFilter('day',${d})">${d}일</button>`).join('');
+  const chs=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(String(_dlyFilter.month).padStart(2,'0')+'-'+String(_dlyFilter.day).padStart(2,'0'))).map(r=>r.ch).filter(Boolean))].sort();
+  const cEl=document.getElementById('revDlyChBtns');
+  if(cEl) cEl.innerHTML=`<button class="rfbtn${_dlyFilter.ch==='ALL'?' active':''}" onclick="setDlyFilter('ch','ALL')">전체</button>`
+    +chs.map(c=>`<button class="rfbtn${_dlyFilter.ch===c?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('');
+
+  // 데이터 필터
+  const dayStr=`${String(_dlyFilter.month).padStart(2,'0')}-${String(_dlyFilter.day).padStart(2,'0')}`;
+  let rows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date===dayStr);
+  if(_dlyFilter.ch!=='ALL') rows=rows.filter(r=>r.ch===_dlyFilter.ch);
+
+  const totalSettle=rows.reduce((s,r)=>s+(r.settlement||0),0);
+  const totalMargin=rows.reduce((s,r)=>s+(r.margin||0),0);
+  const totalRate=totalSettle>0?(totalMargin/totalSettle*100):0;
+  const totalOrders=rows.length;
+
+  document.getElementById('revDlyK0').textContent=fmt(totalSettle);
+  document.getElementById('revDlyK0s').textContent=`${_dlyFilter.year}-${dayStr}`;
+  document.getElementById('revDlyK1').textContent=fmt(totalMargin);
+  document.getElementById('revDlyK1s').textContent='';
+  document.getElementById('revDlyK2').textContent=totalRate.toFixed(1)+'%';
+  document.getElementById('revDlyK2s').textContent='';
+  document.getElementById('revDlyK3').textContent=totalOrders.toLocaleString()+'건';
+  document.getElementById('revDlyK3s').textContent='';
+
+  const empty=document.getElementById('revDlyEmpty');
+  const tbl=document.getElementById('revDlyTbl');
+  const tbody=document.getElementById('revDlyTbody');
+  const tfoot=document.getElementById('revDlyTfoot');
+  const sub=document.getElementById('revDlyTblSub');
+  if(sub) sub.textContent=`${_dlyFilter.year}-${dayStr} ${_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch}`;
+
+  if(!rows.length){
+    if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return;
+  }
+  if(empty) empty.style.display='none'; if(tbl) tbl.style.display='';
+
+  // 제품별 집계
+  const byProd={};
+  rows.forEach(r=>{
+    const k=r.modelName||r.itemCode||'미상';
+    if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
+    byProd[k].qty+=r.orderQty||0; byProd[k].cnt++;
+    byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
+  });
+  const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
+
+  if(tbody) tbody.innerHTML=prodList.map(([name,v])=>{
+    const rate=v.settle>0?(v.margin/v.settle*100):0;
+    const rCls=rate<0?'rev-margin-neg':rate>0?'rev-margin-pos':'';
+    return `<tr>
+      <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</td>
+      <td>${v.type}</td>
+      <td style="text-align:right;">${v.qty.toLocaleString()}</td>
+      <td style="text-align:right;">${v.cnt.toLocaleString()}</td>
+      <td style="text-align:right;">${fmt(v.saleTotal)}</td>
+      <td style="text-align:right;font-weight:600;">${fmt(v.settle)}</td>
+      <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':v.margin<0?'rev-margin-neg':''}">${fmt(v.margin)}</td>
+      <td style="text-align:right;" class="${rCls}">${rate.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+
+  // 합계 행
+  const totSettle=prodList.reduce((s,[,v])=>s+v.settle,0);
+  const totMargin=prodList.reduce((s,[,v])=>s+v.margin,0);
+  const totQty=prodList.reduce((s,[,v])=>s+v.qty,0);
+  const totCnt=prodList.reduce((s,[,v])=>s+v.cnt,0);
+  const totSale=prodList.reduce((s,[,v])=>s+v.saleTotal,0);
+  const totRate=totSettle>0?(totMargin/totSettle*100):0;
+  if(tfoot) tfoot.innerHTML=`<tr>
+    <td colspan="2">합계</td>
+    <td style="text-align:right;">${totQty.toLocaleString()}</td>
+    <td style="text-align:right;">${totCnt.toLocaleString()}</td>
+    <td style="text-align:right;">${fmt(totSale)}</td>
+    <td style="text-align:right;">${fmt(totSettle)}</td>
+    <td style="text-align:right;">${fmt(totMargin)}</td>
+    <td style="text-align:right;">${totRate.toFixed(1)}%</td>
+  </tr>`;
+
+  // 제품구분 도넛
+  const byType={};
+  rows.forEach(r=>{const t=r.itemType||'기타';if(!byType[t])byType[t]=0;byType[t]+=r.settlement||0;});
+  const typeEntries=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+  const dnutCtx=document.getElementById('revDlyDnut');
+  const dnutEmpty=document.getElementById('revDlyDnutEmpty');
+  if(dnutCtx){
+    if(_revDlyDnut){_revDlyDnut.destroy();_revDlyDnut=null;}
+    if(typeEntries.length){
+      if(dnutEmpty) dnutEmpty.style.display='none'; dnutCtx.style.display='';
+      _revDlyDnut=new Chart(dnutCtx.getContext('2d'),{
+        type:'doughnut',
+        data:{labels:typeEntries.map(([k])=>k),datasets:[{
+          data:typeEntries.map(([,v])=>Math.round(v/10000)),
+          backgroundColor:CH_COLORS_DLY.slice(0,typeEntries.length),borderWidth:2,borderColor:'#fff'
+        }]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}만원`}},datalabels:{display:false}}}
+      });
+      const leg=document.getElementById('revDlyDnutLegend');
+      if(leg) leg.innerHTML=typeEntries.map(([k,v],i)=>`
+        <div class="rev-ch-row">
+          <div class="rev-ch-name" style="display:flex;align-items:center;gap:6px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:${CH_COLORS_DLY[i]};display:inline-block;flex-shrink:0;"></span>${k}
+          </div>
+          <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v/typeEntries[0][1]*100)}%;background:${CH_COLORS_DLY[i]};"></div></div>
+          <div class="rev-ch-val">${fmt(v)}</div>
+        </div>`).join('');
+    } else { if(dnutEmpty) dnutEmpty.style.display='block'; dnutCtx.style.display='none'; }
+  }
+}
+
+function setDlyFilter(type, val){
+  if(type==='year'){_dlyFilter.year=val;_dlyFilter.month=null;_dlyFilter.day=null;}
+  else if(type==='month'){_dlyFilter.month=val;_dlyFilter.day=null;}
+  else if(type==='day') _dlyFilter.day=val;
+  else _dlyFilter.ch=val;
+  renderDailyReport();
+}
+
 function setUniFilter(type, btn, val){
   _uniFilter[type]=val; _uniPage=0;
   const groupId = type==='year'?'revUniYearBtns':type==='month'?'revUniMonthBtns':'revUniChBtns';
@@ -2605,18 +2798,18 @@ function setUniFilter(type, btn, val){
 }
 
 function buildUniFilterBtns(){
-  // 년도 버튼 동적 생성 (데이터 기반, 현재는 고정)
   const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort();
-  const months=[...new Set(_revData.map(r=>r.month).filter(Boolean))].sort((a,b)=>a-b);
+  // 월은 항상 1~12 전체 표시
+  const allMonths=[1,2,3,4,5,6,7,8,9,10,11,12];
   const chs=[...new Set(_revData.map(r=>r.ch).filter(Boolean))].sort();
 
   const yEl=document.getElementById('revUniYearBtns');
   if(yEl) yEl.innerHTML=`<button class="rfbtn ${_uniFilter.year==='ALL'?'active':''}" onclick="setUniFilter('year',this,'ALL')">전체</button>`
-    +years.map(y=>`<button class="rfbtn ${_uniFilter.year===y?'active':''}" onclick="setUniFilter('year',this,'${y}')">${y}</button>`).join('');
+    +years.map(y=>`<button class="rfbtn ${String(_uniFilter.year)===String(y)?'active':''}" onclick="setUniFilter('year',this,'${y}')">${y}</button>`).join('');
 
   const mEl=document.getElementById('revUniMonthBtns');
   if(mEl) mEl.innerHTML=`<button class="rfbtn ${_uniFilter.month==='ALL'?'active':''}" onclick="setUniFilter('month',this,'ALL')">전체</button>`
-    +months.map(m=>`<button class="rfbtn ${_uniFilter.month==m?'active':''}" onclick="setUniFilter('month',this,${m})">${m}월</button>`).join('');
+    +allMonths.map(m=>`<button class="rfbtn ${String(_uniFilter.month)===String(m)?'active':''}" onclick="setUniFilter('month',this,${m})">${m}월</button>`).join('');
 
   const cEl=document.getElementById('revUniChBtns');
   if(cEl) cEl.innerHTML=`<button class="rfbtn ${_uniFilter.ch==='ALL'?'active':''}" onclick="setUniFilter('ch',this,'ALL')">전체</button>`
@@ -2644,10 +2837,10 @@ function renderUnifiedTable(){
     return true;
   });
 
-  // ★ 최신순 정렬
+  // ★ 과거순 정렬 (오래된 것부터, 마지막 페이지가 최신)
   rows.sort((a,b)=>{
-    if(a.year!==b.year) return b.year-a.year;
-    return (b.date||'')>(a.date||'')?1:-1;
+    if(a.year!==b.year) return a.year-b.year;
+    return (a.date||'')>(b.date||'')?1:-1;
   });
 
   const total=rows.length;
@@ -2669,32 +2862,35 @@ function renderUnifiedTable(){
 
   const tbody=document.getElementById('revUniTbody');
   if(!tbody) return;
+  const TC='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'; // truncate helper
   tbody.innerHTML=display.map(r=>{
-    const margin=r.margin??0;
-    const marginRate=r.marginRate!=null?r.marginRate:null;
+    const mg=r.margin??0;
+    const mr=r.marginRate!=null?r.marginRate:null;
+    const mrCls=mr!=null&&mr<0?'rev-margin-neg':mr!=null&&mr>0?'rev-margin-pos':'';
+    const mgCls=mg>0?'rev-margin-pos':mg<0?'rev-margin-neg':'';
     return `<tr>
-      <td>${r.year||''}</td>
-      <td>${r.date||''}</td>
-      <td>${r.ch||''}</td>
-      <td style="font-size:10px;">${r.orderNo||''}</td>
-      <td>${maskName(r.buyer)}</td>
-      <td>${maskName(r.receiver)}</td>
-      <td>${maskPhone(r.phone1)}</td>
-      <td>${maskPhone(r.phone2)}</td>
-      <td>${r.zip||''}</td>
-      <td style="font-size:10px;">${maskAddr(r.addr)}</td>
-      <td style="font-size:10px;">${r.itemNo||''}</td>
-      <td>${r.itemType||''}</td>
-      <td style="font-size:10px;">${r.itemCode||''}</td>
-      <td style="font-weight:500;">${r.modelName||''}</td>
+      <td style="${TC}">${r.year||''}</td>
+      <td style="${TC}">${r.date||''}</td>
+      <td style="${TC}">${r.ch||''}</td>
+      <td style="font-size:10px;${TC}">${r.orderNo||''}</td>
+      <td style="${TC}" title="${r.buyer||''}">${maskName(r.buyer)}</td>
+      <td style="${TC}" title="${r.receiver||''}">${maskName(r.receiver)}</td>
+      <td style="${TC}">${maskPhone(r.phone1)}</td>
+      <td style="${TC}">${maskPhone(r.phone2)}</td>
+      <td style="${TC}">${r.zip||''}</td>
+      <td style="font-size:10px;${TC}" title="${_revMaskOn?'':r.addr||''}">${maskAddr(r.addr)}</td>
+      <td style="display:none;"></td>
+      <td style="${TC}">${r.itemType||''}</td>
+      <td style="font-size:10px;${TC}">${r.itemCode||''}</td>
+      <td style="font-weight:500;${TC}" title="${r.modelName||''}">${r.modelName||''}</td>
       <td style="text-align:right;">${r.orderQty!=null?r.orderQty:''}</td>
       <td style="text-align:right;">${r.shipQty!=null?r.shipQty:''}</td>
       <td style="text-align:right;">${r.shipping!=null?r.shipping.toLocaleString():''}</td>
       <td style="text-align:right;">${r.salePrice!=null?r.salePrice.toLocaleString():''}</td>
       <td style="text-align:right;font-weight:600;">${r.settlement!=null?r.settlement.toLocaleString():''}</td>
       <td style="text-align:right;">${r.costPrice!=null?r.costPrice.toLocaleString():''}</td>
-      <td style="text-align:right;" class="${margin>0?'rev-margin-pos':margin<0?'rev-margin-neg':''}">${margin!=null?margin.toLocaleString():''}</td>
-      <td style="text-align:right;">${marginRate!=null?(marginRate*100).toFixed(1)+'%':''}</td>
+      <td style="text-align:right;" class="${mgCls}">${mg!=null?mg.toLocaleString():''}</td>
+      <td style="text-align:right;" class="${mrCls}">${mr!=null?(mr*100).toFixed(1)+'%':''}</td>
       <td style="text-align:right;">${r.unitCost!=null?r.unitCost.toLocaleString():''}</td>
     </tr>`;
   }).join('');
