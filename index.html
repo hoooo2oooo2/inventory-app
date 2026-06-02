@@ -3223,7 +3223,8 @@ function readXlsxRows(file){
 }
 
 // 백데이터 조회 맵 (code → row)
-function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[r.code, r])); }
+// 대소문자 무시 조회: 키를 소문자로 저장
+function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[(r.code||'').toLowerCase(), r])); }
 
 // 채널 파일 파싱 → revenue 행 배열 반환
 async function parseChannelFile(file, channelName){
@@ -3249,7 +3250,7 @@ async function parseChannelFile(file, channelName){
 
     const itemCode  = _s(r[map.itemCode]);
     const modelRaw  = _s(r[map.modelName]);
-    const bdRow     = itemCode ? bdMap[itemCode] : null;
+    const bdRow     = itemCode ? bdMap[itemCode.toLowerCase()] : null;
 
     // 모델명: 엑셀 값 우선, 없으면 백데이터에서
     const modelName = modelRaw || (bdRow ? bdRow.name : '');
