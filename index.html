@@ -2718,14 +2718,16 @@ function renderDailyReport(){
   if(_dlyFilter.day!==null) prevRows=prevRows.filter(r=>r.date===`${prevMonStr}-${pad(_dlyFilter.day)}`);
   if(_dlyFilter.ch!=='ALL') prevRows=prevRows.filter(r=>r.ch===_dlyFilter.ch);
 
+  // 택배건수 = 합포장 기준 고유 배송 건수 (날짜+판매처+주문번호+수취인+연락처1+주소)
+  const pkgKey=r=>`${r.date}|${r.ch}|${r.orderNo}|${r.receiver}|${r.phone1}|${r.addr}`;
   const totalSettle=rows.reduce((s,r)=>s+(r.settlement||0),0);
   const totalMargin=rows.reduce((s,r)=>s+(r.margin||0),0);
   const totalRate=totalSettle>0?(totalMargin/totalSettle*100):0;
-  const totalOrders=rows.length;
+  const totalOrders=new Set(rows.map(pkgKey)).size;
   const prevSettle=prevRows.reduce((s,r)=>s+(r.settlement||0),0);
   const prevMargin=prevRows.reduce((s,r)=>s+(r.margin||0),0);
   const prevRate=prevSettle>0?(prevMargin/prevSettle*100):0;
-  const prevOrders=prevRows.length;
+  const prevOrders=new Set(prevRows.map(pkgKey)).size;
 
   // 전월 대비 텍스트 생성
   const diffHtml=(cur,prv,unit='')=>{
@@ -2761,14 +2763,16 @@ function renderDailyReport(){
   }
   if(empty) empty.style.display='none'; if(tbl) tbl.style.display='';
 
-  // 제품별 집계
+  // 제품별 집계 (택배건수 = 합포장 기준 고유 배송 건수)
   const byProd={};
   rows.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
-    if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
-    byProd[k].qty+=r.orderQty||0; byProd[k].cnt++;
+    if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
+    byProd[k].qty+=r.orderQty||0; byProd[k].pkgs.add(pkgKey(r));
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
+  // cnt = 고유 배송 건수
+  Object.values(byProd).forEach(v=>{ v.cnt=v.pkgs.size; });
   const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
 
   if(tbody) tbody.innerHTML=prodList.map(([name,v])=>{
@@ -2861,18 +2865,21 @@ function downloadDailyExcel(){
   const wb=XLSX.utils.book_new();
 
   // ── 시트1: 요약 ──
+  const pkgKey=r=>`${r.date}|${r.ch}|${r.orderNo}|${r.receiver}|${r.phone1}|${r.addr}`;
   const totalSettle=rawRows.reduce((s,r)=>s+(r.settlement||0),0);
   const totalMargin=rawRows.reduce((s,r)=>s+(r.margin||0),0);
   const totalRate=totalSettle>0?(totalMargin/totalSettle*100):0;
+  const totalPkgs=new Set(rawRows.map(pkgKey)).size;
 
-  // 제품별 집계
+  // 제품별 집계 (택배건수 = 합포장 기준 고유 배송 건수)
   const byProd={};
   rawRows.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
-    if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
-    byProd[k].qty+=r.orderQty||0; byProd[k].cnt++;
+    if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
+    byProd[k].qty+=r.orderQty||0; byProd[k].pkgs.add(pkgKey(r));
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
+  Object.values(byProd).forEach(v=>{ v.cnt=v.pkgs.size; });
   const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
 
   // 제품구분 집계
@@ -2886,7 +2893,7 @@ function downloadDailyExcel(){
   // KPI
   s1.push(['■ 핵심 지표']);
   s1.push(['정산금액','마진','마진율','택배건수']);
-  s1.push([totalSettle, totalMargin, parseFloat(totalRate.toFixed(2))/100, rawRows.length]);
+  s1.push([totalSettle, totalMargin, parseFloat(totalRate.toFixed(2))/100, totalPkgs]);
   s1.push([]);
   // 제품별 현황
   s1.push(['■ 제품별 판매 현황']);
@@ -2993,10 +3000,13 @@ function renderUnifiedTable(){
     return true;
   });
 
-  // ★ 과거순 정렬 (오래된 것부터, 마지막 페이지가 최신)
+  // ★ 과거순 + 채널별 정렬 (년도→날짜→판매처→주문번호)
+  // 같은 날짜 안에서 사이트별로 묶이고, 합포장(같은 주문) 행이 인접
   rows.sort((a,b)=>{
     if(a.year!==b.year) return a.year-b.year;
-    return (a.date||'')>(b.date||'')?1:-1;
+    if((a.date||'')!==(b.date||'')) return (a.date||'')>(b.date||'')?1:-1;
+    if((a.ch||'')!==(b.ch||'')) return (a.ch||'')<(b.ch||'')?-1:1;
+    return String(a.orderNo||'')<String(b.orderNo||'')?-1:1;
   });
 
   const total=rows.length;
@@ -3193,7 +3203,7 @@ function removeRevFile(ch){delete _revUpFiles[ch];renderRevUpSlots();}
 
 // ── 채널별 컬럼 매핑 (0-indexed, 헤더는 행0, 데이터는 행1~) ──
 const CH_MAPS = {
-  '이베이':       { orderNo:4,  buyer:16, receiver:16, phone1:17, phone2:18, zip:19, addr:20, itemNo:5,  itemCode:9,  modelName:10, orderQty:11, salePrice:14, settlement:15,  settleFn:null },
+  '이베이':       { orderNo:4,  buyer:31, receiver:16, phone1:17, phone2:18, zip:19, addr:20, itemNo:5,  itemCode:9,  modelName:10, orderQty:11, salePrice:14, settlement:15,  settleFn:null },
   '11번가':       { orderNo:10, buyer:11, receiver:12, phone1:13, phone2:14, zip:15, addr:16, itemNo:27, itemCode:2,  modelName:3,  orderQty:4,  salePrice:5,  settlement:6,   settleFn:null },
   '스마트스토어': { orderNo:1,  buyer:22, receiver:23, phone1:24, phone2:25, zip:26, addr:27, itemNo:12, itemCode:17, modelName:18, orderQty:19, salePrice:20, settlement:21,  settleFn:null },
   '쿠팡':         { orderNo:2,  buyer:26, receiver:27, phone1:28, phone2:29, zip:30, addr:31, itemNo:14, itemCode:16, modelName:17, orderQty:23, salePrice:19, settlement:19,  settleFn:v=>v*0.88 },
@@ -3227,6 +3237,22 @@ function readXlsxRows(file){
 // 백데이터 조회 맵 (code → row)
 // 대소문자 무시 조회: 키를 소문자로 저장
 function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[(r.code||'').toLowerCase(), r])); }
+
+// 배송비 계산 (2025판매일보 함수와 동일)
+//  - (스마트스토어 & 정원등) or (스마트스토어 & 센서등/벽등) or 누룽지 or 국수기 or 마사지베드 or 판매가>=50000 → 3000
+//  - 스마트스토어 & 부착가로등 → 5150
+//  - 그 외 → 0
+function calcShippingFee(channel, itemType, salePrice){
+  const t = itemType||'';
+  if( (channel==='스마트스토어' && t==='정원등') ||
+      (channel==='스마트스토어' && t==='센서등/벽등') ||
+      t==='누룽지' || t==='국수기' || t==='마사지베드' ||
+      (salePrice>=50000) ){
+    return 3000;
+  }
+  if(channel==='스마트스토어' && t==='부착가로등') return 5150;
+  return 0;
+}
 
 // 채널 파일 파싱 → revenue 행 배열 반환
 async function parseChannelFile(file, channelName){
@@ -3270,8 +3296,12 @@ async function parseChannelFile(file, channelName){
     if(map.settleFn) settle = map.settleFn(settle);
     settle = Math.round(settle);
 
+    // 배송비 (판매일보 함수)
+    const shipping  = calcShippingFee(channelName, itemType, salePrice);
+
     const costPrice = Math.round(unitCost * orderQty);
-    const margin    = Math.round(settle - costPrice);
+    // 마진 = 정산 - 매입 - 배송비
+    const margin    = Math.round(settle - costPrice - shipping);
     const marginRate= settle > 0 ? Math.round(margin/settle*10000)/10000 : 0;
 
     rows.push({
@@ -3290,8 +3320,8 @@ async function parseChannelFile(file, channelName){
       item_code:    itemCode,
       model_name:   modelName,
       order_qty:    orderQty,
-      ship_qty:     orderQty,   // 출고수 = 주문수량
-      shipping_fee: 0,
+      ship_qty:     0,           // 아래에서 합포장 dedup 후 1/0 설정
+      shipping_fee: shipping,
       sale_price:   salePrice,
       settlement:   settle,
       cost_price:   costPrice,
@@ -3300,6 +3330,16 @@ async function parseChannelFile(file, channelName){
       unit_cost:    unitCost
     });
   }
+
+  // ── 출고건수(택배건수) 합포장 처리 ──
+  // 키(주문번호+수취인+연락처1+주소) 동일 → 첫 행만 ship_qty=1, 나머지(합포장)=0
+  const seenShip = new Set();
+  for(const row of rows){
+    const key = `${row.order_no}|${row.receiver}|${row.phone1}|${row.address}`;
+    if(!seenShip.has(key)){ seenShip.add(key); row.ship_qty = 1; }
+    else { row.ship_qty = 0; }
+  }
+
   return { rows, missing };
 }
 
