@@ -326,7 +326,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 /* ── 매출관리 ── */
 #page-revenue{padding:0;}
-#page-revenue .rev-subnav{background:var(--bg);border-bottom:0.5px solid var(--bd);padding:0 16px;display:flex;gap:4px;position:sticky;top:95px;z-index:98;}
+#page-revenue .rev-subnav{background:var(--bg);border-bottom:0.5px solid var(--bd);padding:0 16px;display:flex;gap:4px;position:sticky;top:94px;z-index:98;}
+#page-revenue .rev-filter-sticky{position:sticky;top:132px;z-index:90;background:var(--bg2);padding-bottom:2px;}
 #page-revenue .rsni{padding:9px 14px;font-size:12px;cursor:pointer;color:var(--tx2);border-radius:6px 6px 0 0;margin-bottom:-0.5px;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;user-select:none;}
 #page-revenue .rsni:hover{color:var(--tx);background:var(--bg2);}
 #page-revenue .rsni.active{color:var(--pr);border-bottom-color:var(--pr);font-weight:600;}
@@ -800,7 +801,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- ── 월별 탭 ── -->
     <div class="rpage" id="rpage-monthly">
-      <div class="rev-filter">
+      <div class="rev-filter rev-filter-sticky">
         <span class="rev-filter-lbl">년도</span>
         <div class="rev-filter-group" id="revMonYearBtns">
           <span style="font-size:12px;color:var(--tx2);">데이터 없음</span>
@@ -893,9 +894,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- ── 데이터 업로드 탭 ── -->
     <div class="rpage" id="rpage-upload">
-      <div>
-        <p style="font-size:13px;font-weight:600;margin-bottom:4px;">📤 판매 데이터 업로드</p>
-        <p style="font-size:11px;color:var(--tx2);">판매처별 엑셀 파일을 드래그하거나 클릭해서 등록 후 업로드 버튼을 누르세요. 주문이 없는 판매처는 생략 가능합니다.</p>
+      <div style="display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;">
+        <div>
+          <p style="font-size:13px;font-weight:600;margin-bottom:4px;">📤 판매 데이터 업로드</p>
+          <p style="font-size:11px;color:var(--tx2);">판매처별 엑셀 파일을 드래그하거나 클릭해서 등록 후 업로드 버튼을 누르세요.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;padding:10px 16px;flex-shrink:0;">
+          <span style="font-size:12px;font-weight:600;">📅 업로드 날짜</span>
+          <input type="date" id="revUpDate" style="border:0.5px solid var(--bd);border-radius:7px;padding:6px 10px;font-size:12px;background:var(--bg);color:var(--tx);outline:none;cursor:pointer;">
+          <span style="font-size:11px;color:var(--tx2);">미선택 시 오늘 날짜 적용</span>
+        </div>
       </div>
       <div class="rev-up-grid" id="revUpGrid"></div>
       <div style="background:var(--prl);border-radius:10px;padding:10px 14px;font-size:11px;color:#185FA5;">
@@ -907,7 +915,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <!-- ── 통합 탭 ── -->
     <div class="rpage" id="rpage-unified">
       <!-- 필터 바 + 마스킹 토글 -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+      <div class="rev-filter-sticky" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">
         <div class="rev-filter" style="flex:1;min-width:0;">
           <span class="rev-filter-lbl">년도</span>
           <div class="rev-filter-group" id="revUniYearBtns">
@@ -973,7 +981,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <!-- ── 일일 보고 탭 ── -->
     <div class="rpage" id="rpage-daily">
       <!-- 필터 -->
-      <div class="rev-filter" style="flex-wrap:wrap;">
+      <div class="rev-filter rev-filter-sticky" style="flex-wrap:wrap;">
         <span class="rev-filter-lbl">년도</span>
         <div class="rev-filter-group" id="revDlyYearBtns"></div>
         <span class="rev-filter-lbl" style="margin-left:6px;">월</span>
@@ -996,6 +1004,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-tbl-head">
             <span class="rev-tbl-title">📦 제품별 판매 현황</span>
             <span style="font-size:11px;color:var(--tx2);" id="revDlyTblSub"></span>
+            <button class="btn btn-sm" onclick="downloadDailyExcel()" style="background:#059669;color:#fff;border:none;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;">📥 엑셀 다운로드</button>
           </div>
           <div class="rev-empty" id="revDlyEmpty">날짜와 판매처를 선택하세요</div>
           <div class="tw"><table class="dt" id="revDlyTbl" style="display:none;">
@@ -2789,6 +2798,107 @@ function setDlyFilter(type, val){
   renderDailyReport();
 }
 
+function downloadDailyExcel(){
+  if(!_dlyFilter.year||!_dlyFilter.month||!_dlyFilter.day){
+    alert('년도, 월, 일을 선택하세요.'); return;
+  }
+  const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만원`:`${Math.round(n).toLocaleString()}원`;
+  const dayStr=`${String(_dlyFilter.month).padStart(2,'0')}-${String(_dlyFilter.day).padStart(2,'0')}`;
+  const chLabel=_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch;
+  const dateLabel=`${_dlyFilter.year}-${dayStr}`;
+  const fileName=`일일보고_${dateLabel}_${chLabel}.xlsx`;
+
+  // 필터링된 원본 데이터
+  let rawRows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date===dayStr);
+  if(_dlyFilter.ch!=='ALL') rawRows=rawRows.filter(r=>r.ch===_dlyFilter.ch);
+
+  const wb=XLSX.utils.book_new();
+
+  // ── 시트1: 요약 ──
+  const totalSettle=rawRows.reduce((s,r)=>s+(r.settlement||0),0);
+  const totalMargin=rawRows.reduce((s,r)=>s+(r.margin||0),0);
+  const totalRate=totalSettle>0?(totalMargin/totalSettle*100):0;
+
+  // 제품별 집계
+  const byProd={};
+  rawRows.forEach(r=>{
+    const k=r.modelName||r.itemCode||'미상';
+    if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
+    byProd[k].qty+=r.orderQty||0; byProd[k].cnt++;
+    byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
+  });
+  const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
+
+  // 제품구분 집계
+  const byType={};
+  rawRows.forEach(r=>{const t=r.itemType||'기타';if(!byType[t])byType[t]=0;byType[t]+=r.settlement||0;});
+  const typeList=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+
+  const s1=[];
+  s1.push([`일일보고 - ${dateLabel} [${chLabel}]`]);
+  s1.push([]);
+  // KPI
+  s1.push(['■ 핵심 지표']);
+  s1.push(['정산금액','마진','마진율','택배건수']);
+  s1.push([totalSettle, totalMargin, parseFloat(totalRate.toFixed(2))/100, rawRows.length]);
+  s1.push([]);
+  // 제품별 현황
+  s1.push(['■ 제품별 판매 현황']);
+  s1.push(['모델명','구분','주문수량','택배건수','판매가 합','정산금액','마진','마진율']);
+  prodList.forEach(([name,v])=>{
+    const rate=v.settle>0?(v.margin/v.settle):0;
+    s1.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.settle,v.margin,parseFloat(rate.toFixed(4))]);
+  });
+  // 합계
+  const tQ=prodList.reduce((s,[,v])=>s+v.qty,0);
+  const tC=prodList.reduce((s,[,v])=>s+v.cnt,0);
+  const tS=prodList.reduce((s,[,v])=>s+v.saleTotal,0);
+  const tSt=prodList.reduce((s,[,v])=>s+v.settle,0);
+  const tM=prodList.reduce((s,[,v])=>s+v.margin,0);
+  s1.push(['합계','',tQ,tC,tS,tSt,tM,tSt>0?parseFloat((tM/tSt).toFixed(4)):0]);
+  s1.push([]);
+  // 제품구분 비중
+  s1.push(['■ 제품구분별 비중']);
+  s1.push(['구분','정산금액','비중']);
+  typeList.forEach(([t,v])=>{
+    s1.push([t,v,tSt>0?parseFloat((v/tSt).toFixed(4)):0]);
+  });
+
+  const ws1=XLSX.utils.aoa_to_sheet(s1);
+  // 컬럼 폭 설정
+  ws1['!cols']=[{wch:35},{wch:10},{wch:10},{wch:10},{wch:14},{wch:14},{wch:12},{wch:10}];
+  // 숫자 포맷 (마진율, 비중 → 백분율)
+  const pctFmt='0.0%', wonFmt='#,##0';
+  ['E5','F5','G5'].forEach(ref=>{if(ws1[ref])ws1[ref].z=wonFmt;});
+  if(ws1['D5']) ws1['D5'].z=pctFmt;
+  XLSX.utils.book_append_sheet(wb,ws1,'요약');
+
+  // ── 시트2: 상세 데이터 ──
+  const s2=[];
+  s2.push([`상세 데이터 - ${dateLabel} [${chLabel}]`]);
+  s2.push([]);
+  s2.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2',
+    '우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수',
+    '배송비','판매가','정산금액','매입액','마진','마진율','개당단가']);
+  rawRows.forEach(r=>{
+    s2.push([
+      r.year, r.date, r.ch, r.orderNo,
+      r.buyer, r.receiver, r.phone1, r.phone2,
+      r.zip, r.addr, r.itemType, r.itemCode, r.modelName,
+      r.orderQty, r.shipQty, r.shipping,
+      r.salePrice, r.settlement, r.costPrice,
+      r.margin, r.marginRate, r.unitCost
+    ]);
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(s2);
+  ws2['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},
+    {wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},
+    {wch:8},{wch:10},{wch:12},{wch:10},{wch:10},{wch:8},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws2,'상세데이터');
+
+  XLSX.writeFile(wb, fileName);
+}
+
 function setUniFilter(type, btn, val){
   _uniFilter[type]=val; _uniPage=0;
   const groupId = type==='year'?'revUniYearBtns':type==='month'?'revUniMonthBtns':'revUniChBtns';
@@ -3076,7 +3186,8 @@ async function parseChannelFile(file, channelName){
 
   const xlsxRows = await readXlsxRows(file);
   const bdMap = getBdMap();
-  const today = new Date();
+  const dateVal = document.getElementById('revUpDate')?.value;
+  const today = dateVal ? new Date(dateVal) : new Date();
   const year = today.getFullYear();
   const saleDate = `${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
