@@ -3143,7 +3143,9 @@ async function saveBdModal(){
         _bdData[idx] = row;
       }
     } else {
-      if(_bdData.find(x=>x.code===code)){alert('이미 존재하는 코드입니다.');return;}
+      // ss소장 코드만 중복 허용 (다른 코드는 중복 불가)
+      const isDuplicate = _bdData.find(x=>x.code===code);
+      if(isDuplicate && code!=='ss소장'){alert('이미 존재하는 코드입니다.');return;}
       row = {code,supplier,type,name,price};
       await saveBdToSupabase(row, false);
       _bdData.push(row);
