@@ -3358,10 +3358,23 @@ async function submitRevUpload(){
   let totalRows=0, allMissing=[], errors=[];
 
   try{
+    let skipped=[];
     for(const [ch, file] of files){
       try{
         const {rows, missing} = await parseChannelFile(file, ch);
         if(rows.length===0){ console.log(ch+': 데이터 없음'); continue; }
+
+        // ── 중복 업로드 가드: 같은 년도·날짜·채널 기존 데이터 확인 ──
+        const upYear = rows[0].year, upDate = rows[0].sale_date;
+        const {count:existCnt} = await sb.from('revenue')
+          .select('*',{count:'exact',head:true})
+          .eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
+        if(existCnt>0){
+          const ok = confirm(`⚠️ 이미 ${upYear}-${upDate} [${ch}] 데이터가 ${existCnt}건 등록되어 있습니다.\n\n[확인] 기존 ${existCnt}건을 삭제하고 새로 등록 (덮어쓰기)\n[취소] 이 채널 건너뛰기`);
+          if(!ok){ skipped.push(`${ch}(${existCnt}건 유지)`); continue; }
+          // 기존 삭제
+          await sb.from('revenue').delete().eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
+        }
 
         await insertRevenueRows(rows);
         totalRows += rows.length;
@@ -3372,6 +3385,7 @@ async function submitRevUpload(){
         console.error(ch, e);
       }
     }
+    if(skipped.length) errors.push('건너뜀: '+skipped.join(', '));
 
     // 결과 처리
     _revUpFiles = {};
