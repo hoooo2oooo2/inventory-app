@@ -1550,6 +1550,9 @@ function goPage(p){
   if(p==='hist') renderHist();
   if(p==='report') loadDailyCache().then(()=>renderReport());
   if(p==='revenue') loadRevenuePage();
+  // 매출관리 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
+  const fw=document.getElementById('floatWrap');
+  if(fw) fw.style.visibility = p==='revenue' ? 'hidden' : '';
 }
 
 // ══════════════════════════════════════════════
