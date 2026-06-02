@@ -2677,15 +2677,16 @@ const CH_COLORS_DLY=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899'
 
 function renderDailyReport(){
   if(!_revData.length) return;
-  // 기본값: 데이터 내 가장 최근 날짜
   const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a);
   if(!_dlyFilter.year||!years.includes(_dlyFilter.year)) _dlyFilter.year=years[0];
   const monthsInYear=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date).map(r=>parseInt(r.date.substring(0,2))))].sort((a,b)=>b-a);
   if(!_dlyFilter.month||!monthsInYear.includes(_dlyFilter.month)) _dlyFilter.month=monthsInYear[0];
   const daysInMonth=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(String(_dlyFilter.month).padStart(2,'0'))).map(r=>parseInt(r.date.split('-')[1]))).values()].sort((a,b)=>b-a);
-  if(!_dlyFilter.day||!daysInMonth.includes(_dlyFilter.day)) _dlyFilter.day=daysInMonth[0];
+  // day는 null 허용 (해제 시 월 전체)
+  if(_dlyFilter.day!==null&&(!_dlyFilter.day||!daysInMonth.includes(_dlyFilter.day))) _dlyFilter.day=daysInMonth[0];
 
   const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
+  const pad=v=>String(v).padStart(2,'0');
 
   // 버튼 렌더
   const yEl=document.getElementById('revDlyYearBtns');
@@ -2693,37 +2694,67 @@ function renderDailyReport(){
   const mEl=document.getElementById('revDlyMonthBtns');
   if(mEl) mEl.innerHTML=monthsInYear.map(m=>`<button class="rfbtn${m===_dlyFilter.month?' active':''}" onclick="setDlyFilter('month',${m})">${m}월</button>`).join('');
   const dEl=document.getElementById('revDlyDayBtns');
-  if(dEl) dEl.innerHTML=daysInMonth.map(d=>`<button class="rfbtn${d===_dlyFilter.day?' active':''}" onclick="setDlyFilter('day',${d})">${d}일</button>`).join('');
-  const chs=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(String(_dlyFilter.month).padStart(2,'0')+'-'+String(_dlyFilter.day).padStart(2,'0'))).map(r=>r.ch).filter(Boolean))].sort();
+  // 일 버튼: 토글 가능 (재클릭 시 해제 → 월 전체)
+  if(dEl) dEl.innerHTML=`<button class="rfbtn${_dlyFilter.day===null?' active':''}" onclick="setDlyFilter('day',null)" style="font-size:10px;">월전체</button>`
+    +daysInMonth.map(d=>`<button class="rfbtn${d===_dlyFilter.day?' active':''}" onclick="setDlyFilter('day',${d===_dlyFilter.day?'null':d})">${d}일</button>`).join('');
+  // 판매처 버튼: 선택된 기간 기준
+  const monPfx=pad(_dlyFilter.month)+(_dlyFilter.day?('-'+pad(_dlyFilter.day)):'');
+  const chs=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(monPfx)).map(r=>r.ch).filter(Boolean))].sort();
   const cEl=document.getElementById('revDlyChBtns');
   if(cEl) cEl.innerHTML=`<button class="rfbtn${_dlyFilter.ch==='ALL'?' active':''}" onclick="setDlyFilter('ch','ALL')">전체</button>`
     +chs.map(c=>`<button class="rfbtn${_dlyFilter.ch===c?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('');
 
-  // 데이터 필터
-  const dayStr=`${String(_dlyFilter.month).padStart(2,'0')}-${String(_dlyFilter.day).padStart(2,'0')}`;
-  let rows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date===dayStr);
+  // ── 현재 기간 데이터 ──
+  const monStr=pad(_dlyFilter.month);
+  let rows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date?.startsWith(monStr));
+  if(_dlyFilter.day!==null) rows=rows.filter(r=>r.date===`${monStr}-${pad(_dlyFilter.day)}`);
   if(_dlyFilter.ch!=='ALL') rows=rows.filter(r=>r.ch===_dlyFilter.ch);
+
+  // ── 전월 동기간 데이터 (전월 대비) ──
+  const prevM=_dlyFilter.month===1?12:_dlyFilter.month-1;
+  const prevY=_dlyFilter.month===1?_dlyFilter.year-1:_dlyFilter.year;
+  const prevMonStr=pad(prevM);
+  let prevRows=_revData.filter(r=>r.year===prevY&&r.date?.startsWith(prevMonStr));
+  if(_dlyFilter.day!==null) prevRows=prevRows.filter(r=>r.date===`${prevMonStr}-${pad(_dlyFilter.day)}`);
+  if(_dlyFilter.ch!=='ALL') prevRows=prevRows.filter(r=>r.ch===_dlyFilter.ch);
 
   const totalSettle=rows.reduce((s,r)=>s+(r.settlement||0),0);
   const totalMargin=rows.reduce((s,r)=>s+(r.margin||0),0);
   const totalRate=totalSettle>0?(totalMargin/totalSettle*100):0;
   const totalOrders=rows.length;
+  const prevSettle=prevRows.reduce((s,r)=>s+(r.settlement||0),0);
+  const prevMargin=prevRows.reduce((s,r)=>s+(r.margin||0),0);
+  const prevRate=prevSettle>0?(prevMargin/prevSettle*100):0;
+  const prevOrders=prevRows.length;
+
+  // 전월 대비 텍스트 생성
+  const diffHtml=(cur,prv,unit='')=>{
+    if(!prv) return `<span style="color:var(--tx2);">전월 데이터 없음</span>`;
+    const d=cur-prv, pct=Math.abs(d/prv*100).toFixed(1);
+    const up=d>=0;
+    return `<span style="color:${up?'#DC2626':'#059669'};font-weight:600;">${up?'▲':'▼'} ${pct}%</span>&nbsp;<span style="color:var(--tx2);">전월 ${fmt(prv)}${unit}</span>`;
+  };
 
   document.getElementById('revDlyK0').textContent=fmt(totalSettle);
-  document.getElementById('revDlyK0s').textContent=`${_dlyFilter.year}-${dayStr}`;
+  document.getElementById('revDlyK0s').innerHTML=diffHtml(totalSettle,prevSettle);
   document.getElementById('revDlyK1').textContent=fmt(totalMargin);
-  document.getElementById('revDlyK1s').textContent='';
+  document.getElementById('revDlyK1s').innerHTML=diffHtml(totalMargin,prevMargin);
   document.getElementById('revDlyK2').textContent=totalRate.toFixed(1)+'%';
-  document.getElementById('revDlyK2s').textContent='';
+  document.getElementById('revDlyK2s').innerHTML=prevSettle?`<span style="color:${totalRate>=prevRate?'#DC2626':'#059669'};font-weight:600;">${totalRate>=prevRate?'▲':'▼'} ${Math.abs(totalRate-prevRate).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">전월 ${prevRate.toFixed(1)}%</span>`:'<span style="color:var(--tx2);">전월 데이터 없음</span>';
   document.getElementById('revDlyK3').textContent=totalOrders.toLocaleString()+'건';
-  document.getElementById('revDlyK3s').textContent='';
+  document.getElementById('revDlyK3s').innerHTML=diffHtml(totalOrders,prevOrders,'건');
+
+  // 기간 라벨
+  const periodLabel=_dlyFilter.day!==null
+    ?`${_dlyFilter.year}-${monStr}-${pad(_dlyFilter.day)}`
+    :`${_dlyFilter.year}-${monStr} 월전체`;
 
   const empty=document.getElementById('revDlyEmpty');
   const tbl=document.getElementById('revDlyTbl');
   const tbody=document.getElementById('revDlyTbody');
   const tfoot=document.getElementById('revDlyTfoot');
   const sub=document.getElementById('revDlyTblSub');
-  if(sub) sub.textContent=`${_dlyFilter.year}-${dayStr} ${_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch}`;
+  if(sub) sub.textContent=`${periodLabel} ${_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch}`;
 
   if(!rows.length){
     if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return;
@@ -2807,23 +2838,24 @@ function renderDailyReport(){
 function setDlyFilter(type, val){
   if(type==='year'){_dlyFilter.year=val;_dlyFilter.month=null;_dlyFilter.day=null;}
   else if(type==='month'){_dlyFilter.month=val;_dlyFilter.day=null;}
-  else if(type==='day') _dlyFilter.day=val;
+  else if(type==='day') _dlyFilter.day=(val===null||val==='null')?null:Number(val);
   else _dlyFilter.ch=val;
   renderDailyReport();
 }
 
 function downloadDailyExcel(){
-  if(!_dlyFilter.year||!_dlyFilter.month||!_dlyFilter.day){
-    alert('년도, 월, 일을 선택하세요.'); return;
-  }
+  if(!_dlyFilter.year||!_dlyFilter.month){ alert('년도와 월을 선택하세요.'); return; }
   const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만원`:`${Math.round(n).toLocaleString()}원`;
-  const dayStr=`${String(_dlyFilter.month).padStart(2,'0')}-${String(_dlyFilter.day).padStart(2,'0')}`;
+  const pad=v=>String(v).padStart(2,'0');
+  const monStr=pad(_dlyFilter.month);
+  const dayStr=_dlyFilter.day!==null?`${monStr}-${pad(_dlyFilter.day)}`:null;
   const chLabel=_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch;
-  const dateLabel=`${_dlyFilter.year}-${dayStr}`;
+  const dateLabel=dayStr?`${_dlyFilter.year}-${dayStr}`:`${_dlyFilter.year}-${monStr}(월전체)`;
   const fileName=`일일보고_${dateLabel}_${chLabel}.xlsx`;
 
   // 필터링된 원본 데이터
-  let rawRows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date===dayStr);
+  let rawRows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date?.startsWith(monStr));
+  if(dayStr) rawRows=rawRows.filter(r=>r.date===dayStr);
   if(_dlyFilter.ch!=='ALL') rawRows=rawRows.filter(r=>r.ch===_dlyFilter.ch);
 
   const wb=XLSX.utils.book_new();
