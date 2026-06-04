@@ -364,6 +364,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #rpage-backdata .rev-tbl-card{width:fit-content;}
 #rpage-backdata .rev-tbl-card .tw{overflow-x:visible;}
 #rpage-backdata #bdTable{width:fit-content;white-space:nowrap;}
+#rpage-backdata .bd-layout{display:flex;gap:18px;align-items:flex-start;width:100%;}
+#rpage-backdata .bd-left{flex-shrink:0;}
+#rpage-backdata .bd-right{flex:1;min-width:440px;position:sticky;top:140px;}
+#rpage-backdata .bd-right .rev-tbl-card{width:100%;}
+#rpage-backdata .bd-right #shipTable{width:100%;white-space:normal;}
 #rpage-backdata #bdEmpty{width:fit-content;min-width:400px;}
 #page-revenue .rev-up-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
 #page-revenue .rev-up-slot{background:var(--bg);border:1.5px dashed var(--bd);border-radius:12px;padding:18px 12px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
@@ -861,6 +866,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- ── 백데이터 탭 ── -->
     <div class="rpage" id="rpage-backdata">
+     <div class="bd-layout">
+      <!-- 왼쪽: 백데이터 -->
+      <div class="bd-left">
       <div class="rev-bd-topbar">
         <div>
           <span style="font-size:14px;font-weight:600;">🗂 백데이터</span>
@@ -890,6 +898,39 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
         <div class="rev-empty" id="bdEmpty">백데이터가 없습니다.<br><span style="font-size:12px;">+ 새 코드 추가 버튼으로 등록하거나 데이터 업로드 탭에서 불러오세요.</span></div>
       </div>
+      </div>
+      <!-- 오른쪽: 택배비 -->
+      <div class="bd-right">
+        <div class="rev-bd-topbar" style="width:100%;min-width:0;">
+          <div>
+            <span style="font-size:14px;font-weight:600;">🚚 택배비</span>
+            <span style="font-size:11px;color:var(--tx2);margin-left:8px;">판매처·상품번호별 택배비 (통합 배송비/마진 반영)</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="search-box">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <input type="text" id="shipSrch" placeholder="상품번호, 상품명..." oninput="renderShipTable()">
+            </div>
+            <button class="btn btn-pr btn-sm" onclick="openShipAdd()">+ 칸 추가</button>
+          </div>
+        </div>
+        <div class="rev-tbl-card">
+          <div class="tw">
+            <table class="dt" id="shipTable">
+              <thead><tr>
+                <th style="width:90px;">판매처</th>
+                <th style="width:110px;">상품번호</th>
+                <th>상품명</th>
+                <th style="text-align:right;width:90px;">택배비</th>
+                <th class="ns" style="text-align:center;width:90px;">관리</th>
+              </tr></thead>
+              <tbody id="shipTbody"></tbody>
+            </table>
+          </div>
+          <div class="rev-empty" id="shipEmpty">등록된 택배비가 없습니다.<br><span style="font-size:12px;">+ 칸 추가 버튼으로 판매처·상품번호별 택배비를 입력하세요.</span></div>
+        </div>
+      </div>
+     </div>
     </div>
 
     <!-- ── 데이터 업로드 탭 ── -->
@@ -1162,6 +1203,31 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ma">
       <button class="btn" onclick="closeModal('bdModal')">취소</button>
       <button class="btn btn-pr" onclick="saveBdModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="shipModal">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="shipModalTitle">택배비 추가</h3>
+    <input type="hidden" id="shipEditId">
+    <div class="field-grid">
+      <div class="field"><label>판매처 *</label>
+        <select id="shipChannel">
+          <option value="">선택</option>
+          <option>스마트스토어</option><option>쿠팡</option><option>11번가</option>
+          <option>이베이</option><option>오늘의집</option><option>카페24</option>
+          <option>오너클랜</option><option>톡스토어</option><option>에이블리</option><option>올웨이즈</option>
+        </select>
+      </div>
+      <div class="field"><label>상품번호 *</label><input id="shipItemNo" placeholder="예: 350749468"></div>
+    </div>
+    <div class="field"><label>상품명</label><input id="shipName" placeholder="상품명 (선택)"></div>
+    <div class="field"><label>택배비 (원) *</label><input id="shipFee" type="number" min="0" placeholder="예: 3000"></div>
+    <p style="font-size:11px;color:var(--tx2);margin:6px 0 0;">저장 시 해당 판매처·상품번호의 기존 통합 데이터 배송비·마진이 즉시 재계산됩니다.</p>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('shipModal')">취소</button>
+      <button class="btn btn-pr" onclick="saveShipModal()">저장</button>
     </div>
   </div>
 </div>
@@ -2132,6 +2198,10 @@ let _revSelMonth = null;
 let _revSelCh = 'ALL';
 let _revData = [];
 let _bdData = [];
+let _shipData = [];          // 택배비 [{id,channel,item_no,item_name,fee}]
+let _shipMap = {};           // `channel|item_no` → fee
+let _shipLoaded = false;
+let _shipTableExists = true; // shipping_fees 테이블 존재 여부
 let _revTrendChart = null;
 let _revDnutChart = null;
 let _revDailyChart = null;
@@ -2141,6 +2211,7 @@ let _revLoaded = false;
 // ── 매출관리 페이지 진입 ──
 async function loadRevenuePage(){
   if(!_bdLoaded) await loadBackdata();
+  if(!_shipLoaded) await loadShippingFees();
   if(!_revLoaded) await loadRevenueData();
   _renderRevCurrentPage();
 }
@@ -2148,10 +2219,119 @@ async function loadRevenuePage(){
 function _renderRevCurrentPage(){
   if(_revPage==='summary')  renderRevSummary();
   if(_revPage==='monthly')  renderRevMonthly();
-  if(_revPage==='backdata') renderBdTable();
+  if(_revPage==='backdata'){ renderBdTable(); renderShipTable(); }
   if(_revPage==='upload')   renderRevUpSlots();
   if(_revPage==='unified')  renderUnifiedTable();
   if(_revPage==='daily')    renderDailyReport();
+}
+
+// ── 택배비 CRUD ──
+async function loadShippingFees(){
+  try{
+    const {data,error}=await sb.from('shipping_fees').select('*').order('channel',{ascending:true}).order('item_no',{ascending:true});
+    if(error){ _shipTableExists=false; _shipData=[]; _shipMap={}; _shipLoaded=true; console.warn('shipping_fees 테이블 없음:',error.message); return; }
+    _shipTableExists=true;
+    _shipData=data||[];
+    _shipMap={};
+    _shipData.forEach(r=>{ _shipMap[`${r.channel}|${r.item_no}`]=r.fee; });
+    _shipLoaded=true;
+  }catch(e){ _shipTableExists=false; _shipLoaded=true; console.warn(e); }
+}
+
+function renderShipTable(){
+  const tb=document.getElementById('shipTbody');
+  const empty=document.getElementById('shipEmpty');
+  if(!tb) return;
+  if(!_shipTableExists){
+    if(empty){ empty.style.display='block'; empty.innerHTML='⚠️ shipping_fees 테이블이 아직 생성되지 않았습니다.<br><span style="font-size:12px;">Supabase SQL 에디터에서 테이블 생성 후 사용하세요.</span>'; }
+    tb.innerHTML=''; return;
+  }
+  const srch=(document.getElementById('shipSrch')?.value||'').toLowerCase();
+  const rows=_shipData.filter(r=>!srch||`${r.channel}${r.item_no}${r.item_name||''}`.toLowerCase().includes(srch));
+  if(!rows.length){ if(empty)empty.style.display='block'; tb.innerHTML=''; return; }
+  if(empty) empty.style.display='none';
+  tb.innerHTML=rows.map(r=>`<tr>
+    <td>${r.channel}</td>
+    <td style="font-size:11px;">${r.item_no}</td>
+    <td style="font-size:11px;">${r.item_name||''}</td>
+    <td style="text-align:right;font-weight:600;">${(r.fee||0).toLocaleString()}원</td>
+    <td style="text-align:center;white-space:nowrap;">
+      <button class="btn btn-sm" onclick="openShipEdit(${r.id})">수정</button>
+      <button class="btn btn-sm" style="color:#DC2626;" onclick="deleteShip(${r.id})">삭제</button>
+    </td>
+  </tr>`).join('');
+}
+
+function openShipAdd(){
+  if(!_shipTableExists){ alert('shipping_fees 테이블을 먼저 생성해주세요.'); return; }
+  document.getElementById('shipModalTitle').textContent='택배비 추가';
+  document.getElementById('shipEditId').value='';
+  document.getElementById('shipChannel').value='';
+  document.getElementById('shipItemNo').value='';
+  document.getElementById('shipName').value='';
+  document.getElementById('shipFee').value='';
+  openModal('shipModal');
+}
+function openShipEdit(id){
+  const r=_shipData.find(x=>x.id===id); if(!r) return;
+  document.getElementById('shipModalTitle').textContent='택배비 수정';
+  document.getElementById('shipEditId').value=id;
+  document.getElementById('shipChannel').value=r.channel||'';
+  document.getElementById('shipItemNo').value=r.item_no||'';
+  document.getElementById('shipName').value=r.item_name||'';
+  document.getElementById('shipFee').value=r.fee||0;
+  openModal('shipModal');
+}
+async function saveShipModal(){
+  const id=document.getElementById('shipEditId').value;
+  const channel=document.getElementById('shipChannel').value.trim();
+  const item_no=document.getElementById('shipItemNo').value.trim();
+  const item_name=document.getElementById('shipName').value.trim();
+  const fee=parseInt(document.getElementById('shipFee').value)||0;
+  if(!channel||!item_no){ alert('판매처와 상품번호는 필수입니다.'); return; }
+  const btn=document.querySelector('#shipModal .btn-pr');
+  if(btn){ btn.disabled=true; btn.textContent='저장 중...'; }
+  try{
+    const row={channel,item_no,item_name,fee};
+    if(id){ await sb.from('shipping_fees').update(row).eq('id',Number(id)); }
+    else  { await sb.from('shipping_fees').insert(row); }
+    await loadShippingFees();
+    renderShipTable();
+    closeModal('shipModal');
+    // 해당 판매처·상품번호의 통합 데이터 배송비·마진 즉시 재계산
+    const n=await recalcShippingForKey(channel,item_no,fee);
+    alert(`저장 완료. 통합 데이터 ${n}건의 배송비·마진을 재계산했습니다.`);
+  }catch(e){ alert('저장 실패: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='저장'; } }
+}
+async function deleteShip(id){
+  const r=_shipData.find(x=>x.id===id); if(!r) return;
+  if(!confirm(`[${r.channel}] ${r.item_no} 택배비를 삭제할까요?\n(통합 데이터 배송비는 기본 규칙으로 재계산됩니다)`)) return;
+  await sb.from('shipping_fees').delete().eq('id',Number(id));
+  await loadShippingFees(); renderShipTable();
+  // 기본 규칙(공식)으로 재계산
+  const n=await recalcShippingForKey(r.channel,r.item_no,null);
+  alert(`삭제 완료. 통합 데이터 ${n}건을 기본 배송비 규칙으로 재계산했습니다.`);
+}
+
+// 특정 판매처·상품번호의 revenue 배송비·마진 재계산
+// fee=null이면 기본 공식 적용
+async function recalcShippingForKey(channel,item_no,fee){
+  let all=[],from=0;
+  while(true){
+    const {data}=await sb.from('revenue').select('id,settlement,cost_price,item_type,sale_price,shipping_fee,margin')
+      .eq('channel',channel).eq('item_no',item_no).range(from,from+999);
+    if(!data||!data.length)break; all=all.concat(data); if(data.length<1000)break; from+=1000;
+  }
+  const upd=[];
+  for(const r of all){
+    const newFee = fee!=null ? fee : calcShippingFee(channel,r.item_type,r.sale_price||0);
+    const newMargin = Math.round((r.settlement||0)-(r.cost_price||0)-newFee);
+    if(newFee!==r.shipping_fee || newMargin!==r.margin) upd.push({id:r.id,shipping_fee:newFee,margin:newMargin});
+  }
+  for(let i=0;i<upd.length;i+=500){ await sb.from('revenue').upsert(upd.slice(i,i+500)); }
+  if(upd.length){ _revLoaded=false; await loadRevenueData(); }  // 메모리 갱신
+  return upd.length;
 }
 
 // ── 백데이터 Supabase CRUD ──
@@ -2276,6 +2456,9 @@ function setRevCh(btn, ch){
   renderRevMonthly();
 }
 
+// 만 단위 값 → 1억(=10000만) 이상이면 억 표기
+function fmtMan(v){ return v>=10000 ? `${(v/10000).toFixed(1)}억` : `${Math.round(v).toLocaleString()}만`; }
+
 // ── 요약 탭 렌더링 ──
 function renderRevSummary(){
   if(!_revData.length){ return; }
@@ -2356,24 +2539,24 @@ function renderRevSummary(){
              backgroundColor:'rgba(49,130,246,0.25)',borderColor:'rgba(49,130,246,0.6)',borderWidth:1,
              borderRadius:4,borderSkipped:false,yAxisID:'y',
              datalabels:{anchor:'end',align:'end',color:'#3182F6',font:{size:10,weight:'600'},
-               formatter:v=>v>=10000?`${(v/10000).toFixed(1)}억`:v+'만'}},
+               formatter:v=>fmtMan(v)}},
             {type:'line',label:'마진',data:ymKeys.map(k=>Math.round(byYM[k].margin/10000)),
              borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.08)',tension:0.3,
              pointBackgroundColor:'#059669',pointRadius:5,pointHoverRadius:7,fill:true,yAxisID:'y',
              datalabels:{anchor:'top',align:'top',offset:4,color:'#059669',font:{size:10,weight:'700'},
-               formatter:v=>v+'만'}},
+               formatter:v=>fmtMan(v)}},
           ]
         },
         options:{responsive:true,maintainAspectRatio:false,
           layout:{padding:{top:28}},
           plugins:{
             legend:{display:true,position:'top',labels:{font:{size:11}}},
-            tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toLocaleString()}만원`}},
+            tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmtMan(c.parsed.y)}원`}},
             datalabels:{display:true}
           },
           scales:{
             x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:11}}},
-            y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:11},callback:v=>v+'만'}}
+            y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:11},callback:v=>fmtMan(v)}}
           }
         }
       });
@@ -2409,7 +2592,7 @@ function renderRevSummary(){
         }]},
         options:{responsive:true,maintainAspectRatio:false,
           plugins:{legend:{display:false},
-            tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}만원`}}}
+            tooltip:{callbacks:{label:c=>`${c.label}: ${fmtMan(c.parsed)}원`}}}
         }
       });
       // 범례
@@ -2562,9 +2745,9 @@ function renderRevMonthly(){
               datasets:[{data:dayKeys.map(k=>Math.round(byDay[k]/10000)),
                backgroundColor:'rgba(49,130,246,0.35)',borderRadius:3,borderSkipped:false}]},
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y.toLocaleString()}만원`}}},
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmtMan(c.parsed.y)}원`}}},
           scales:{x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:10}}},
-                  y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:10},callback:v=>v+'만'}}}
+                  y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:10},callback:v=>fmtMan(v)}}}
         }
       });
     } else { if(dEmpty) dEmpty.style.display='block'; dCtx.style.display='none'; }
@@ -2824,7 +3007,7 @@ function renderDailyReport(){
           backgroundColor:CH_COLORS_DLY.slice(0,typeEntries.length),borderWidth:2,borderColor:'#fff'
         }]},
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}만원`}},datalabels:{display:false}}}
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtMan(c.parsed)}원`}},datalabels:{display:false}}}
       });
       const leg=document.getElementById('revDlyDnutLegend');
       if(leg) leg.innerHTML=typeEntries.map(([k,v],i)=>`
@@ -3296,8 +3479,10 @@ async function parseChannelFile(file, channelName){
     if(map.settleFn) settle = map.settleFn(settle);
     settle = Math.round(settle);
 
-    // 배송비 (판매일보 함수)
-    const shipping  = calcShippingFee(channelName, itemType, salePrice);
+    // 배송비: 택배비 테이블(판매처+상품번호) 우선, 없으면 판매일보 함수
+    const itemNo    = _s(r[map.itemNo]);
+    const manualFee = _shipMap[`${channelName}|${itemNo}`];
+    const shipping  = (manualFee!=null) ? manualFee : calcShippingFee(channelName, itemType, salePrice);
 
     const costPrice = Math.round(unitCost * orderQty);
     // 마진 = 정산 - 매입 - 배송비
@@ -3315,7 +3500,7 @@ async function parseChannelFile(file, channelName){
       phone2:       _s(r[map.phone2]),
       zip:          _s(r[map.zip]),
       address:      _s(r[map.addr]),
-      item_no:      _s(r[map.itemNo]),
+      item_no:      itemNo,
       item_type:    itemType,
       item_code:    itemCode,
       model_name:   modelName,
