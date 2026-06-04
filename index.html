@@ -3564,12 +3564,16 @@ function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[(r.code||'').toLo
 function normName(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
 // 공유코드(ss소장 직접 소싱) — 상품명으로 매칭
 const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
-// 상품명 매칭 맵: 코드 없거나 ss소장 코드인 백데이터를 상품명으로 매칭
+// 상품명 매칭 맵: ss소장/코드없음 판매건을 백데이터 "전체 상품명"으로 매칭
+//  (특수항목=코드없음·ss소장 은 동일 상품명 충돌 시 우선)
 function getBdNameMap(){
   const m={};
   _bdData.forEach(r=>{
+    if(!r.name) return;
+    const k=normName(r.name);
     const ck=(r.code||'').toLowerCase();
-    if((!r.code || SHARED_BD_CODES.has(ck)) && r.name){ m[normName(r.name)] = r; }
+    const special=(!r.code || SHARED_BD_CODES.has(ck));
+    if(!(k in m) || special) m[k]=r;   // 미존재면 등록, 특수항목이면 덮어써서 우선
   });
   return m;
 }
