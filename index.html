@@ -916,6 +916,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               <input type="text" id="shipSrch" placeholder="상품번호, 상품명..." oninput="renderShipTable()">
             </div>
+            <button class="btn btn-sm" onclick="applyAllShipping()" style="background:#7C3AED;color:#fff;border:none;">↻ 전체 재적용</button>
             <button class="btn btn-pr btn-sm" onclick="openShipAdd()">+ 칸 추가</button>
           </div>
         </div>
@@ -2346,6 +2347,17 @@ async function deleteShip(id){
   alert(`삭제 완료. 통합 데이터 ${n}건을 기본 배송비 규칙으로 재계산했습니다.`);
 }
 
+// 입력된 모든 택배비를 통합 데이터 전체(과거 포함)에 재적용
+async function applyAllShipping(){
+  if(!_shipData.length){ alert('입력된 택배비가 없습니다.'); return; }
+  if(!confirm(`입력된 택배비 ${_shipData.length}건을 통합 데이터 전체(과거 날짜 포함)에 재적용할까요?`)) return;
+  let total=0;
+  for(const r of _shipData){
+    total += await recalcShippingForKey(r.channel, r.item_no, r.fee);
+  }
+  alert(`완료. 통합 데이터 ${total}건의 배송비·마진을 재계산했습니다.`);
+}
+
 // 특정 판매처·상품번호의 revenue 배송비·마진 재계산
 // fee=null이면 기본 공식 적용
 async function recalcShippingForKey(channel,item_no,fee){
@@ -3653,10 +3665,18 @@ async function submitRevUpload(){
   let totalRows=0, allMissing=[], errors=[];
 
   try{
-    let skipped=[];
+    let skipped=[], rejected=[];
     for(const [ch, file] of files){
       try{
         const {rows, missing} = await parseChannelFile(file, ch);
+
+        // ★ 오류(백데이터 코드 없음)가 1건이라도 있으면 이 파일은 통째로 미저장
+        if(missing.length>0){
+          rejected.push(`${ch}(오류 ${missing.length}건)`);
+          allMissing = allMissing.concat(missing);
+          console.warn(`${ch}: 오류 ${missing.length}건 → 파일 전체 미저장`);
+          continue;
+        }
         if(rows.length===0){ console.log(ch+': 데이터 없음'); continue; }
 
         // ── 중복 업로드 가드: 같은 년도·날짜·채널 기존 데이터 확인 ──
@@ -3673,13 +3693,15 @@ async function submitRevUpload(){
 
         await insertRevenueRows(rows);
         totalRows += rows.length;
-        allMissing = allMissing.concat(missing);
         console.log(`${ch}: ${rows.length}건 업로드 완료`);
       }catch(e){
+        // 엑셀 파싱/저장 오류 → 이 파일 전체 미저장
+        rejected.push(`${ch}(엑셀오류)`);
         errors.push(`${ch}: ${e.message}`);
         console.error(ch, e);
       }
     }
+    if(rejected.length) errors.unshift('⛔ 미저장 파일: '+rejected.join(', '));
     if(skipped.length) errors.push('건너뜀: '+skipped.join(', '));
 
     // 결과 처리
@@ -3705,9 +3727,9 @@ function showUploadResult(totalRows, missing, errors){
   const missHtml = missing.length ? `
     <div style="margin-top:12px;">
       <div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:6px;">
-        ⛔ 백데이터 코드 없어 미저장 (${missing.length}건) — 매출에 반영 안 됨
+        ⛔ 백데이터 코드 누락 (${missing.length}건) — 해당 파일은 전체 미저장
       </div>
-      <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;">아래 코드를 백데이터에 추가한 뒤 해당 파일을 다시 업로드하세요.</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;">오류가 있는 파일은 한 줄도 저장되지 않았습니다. 아래 코드를 백데이터에 추가한 뒤 그 파일을 다시 업로드하세요.</div>
       <div style="max-height:200px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;">
         ${missing.map(m=>`
           <div style="display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:11px;">
