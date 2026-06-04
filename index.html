@@ -831,11 +831,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <button class="rfbtn" onclick="setRevCh(this,'올웨이즈')">올웨이즈</button>
         </div>
       </div>
-      <div class="rev-kpi">
+      <div class="rev-kpi" id="revMonKpiRow" style="grid-template-columns:repeat(5,1fr);">
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 정산금액</div><div class="rev-kpi-val" id="revMonKpi0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi0Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revMonKpi1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi1Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revMonKpi2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi2Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">🛒 주문건수</div><div class="rev-kpi-val" id="revMonKpi3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi3Sub">데이터 없음</div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📉 손실금액</div><div class="rev-kpi-val" id="revMonKpi4" style="color:#DC2626;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi4Sub">마진 마이너스 합계</div></div>
       </div>
       <div class="rev-chart-grid">
         <div class="rev-card">
@@ -2852,6 +2853,9 @@ function renderRevMonthly(){
   const settle=rows.reduce((s,r)=>s+(r.settlement||0),0);
   const margin=rows.reduce((s,r)=>s+(r.margin||0),0);
   const rate=settle>0?(margin/settle*100):0;
+  // 손실금액 = 마진이 마이너스인 건들의 손실 합계(절댓값)
+  const lossRows=rows.filter(r=>(r.margin||0)<0);
+  const loss=lossRows.reduce((s,r)=>s+(r.margin||0),0); // 음수
   const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
 
   const setKpi=(id,val,sub)=>{
@@ -2863,6 +2867,7 @@ function renderRevMonthly(){
   setKpi('revMonKpi1',fmt(margin),`${_revSelMonth} 마진`);
   setKpi('revMonKpi2',rate.toFixed(1)+'%','마진율');
   setKpi('revMonKpi3',rows.length.toLocaleString()+'건','주문건수');
+  setKpi('revMonKpi4', loss<0?'-'+fmt(Math.abs(loss)):'0', lossRows.length?`마이너스 ${lossRows.length}건`:'손실 없음');
 
   // 일별 추이 차트
   const byDay={};
