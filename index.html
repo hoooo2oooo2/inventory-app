@@ -882,6 +882,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <button class="btn btn-pr btn-sm" onclick="openBdAdd()">+ 새 코드 추가</button>
         </div>
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn btn-sm" onclick="downloadBackdataExcel()" style="background:#059669;color:#fff;border:none;">📥 엑셀 다운로드</button>
+        <button class="btn btn-sm" onclick="openBdUpload()" style="background:#3182F6;color:#fff;border:none;">📤 엑셀 수정·업로드</button>
+      </div>
       <div class="rev-tbl-card">
         <div class="tw">
           <table class="dt" id="bdTable">
@@ -1228,6 +1232,28 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ma">
       <button class="btn" onclick="closeModal('shipModal')">취소</button>
       <button class="btn btn-pr" onclick="saveShipModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bdUploadModal">
+  <div class="modal" style="max-width:520px;">
+    <h3>📤 백데이터 엑셀 수정·업로드</h3>
+    <p style="font-size:12px;color:var(--tx2);margin:4px 0 12px;line-height:1.6;">
+      📥 엑셀 다운로드로 받은 파일을 수정해서 올리세요.<br>
+      • <b>ID</b>가 있는 행 → 해당 코드 수정 &nbsp; • <b>ID</b> 비어있는 행 → 새로 추가<br>
+      <span style="color:#DC2626;">※ 컬럼 순서: ID · 공급자명 · 전체상품코드 · 구분 · 상품명 · 공급가</span>
+    </p>
+    <div id="bdDropZone" style="border:2px dashed var(--bd);border-radius:12px;padding:34px 16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg);">
+      <div style="font-size:30px;margin-bottom:6px;">📁</div>
+      <div style="font-size:13px;font-weight:600;" id="bdDropText">엑셀 파일을 드래그하거나 클릭해서 선택</div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:4px;">.xlsx 파일</div>
+      <input type="file" id="bdUploadInput" accept=".xlsx,.xls" style="display:none;">
+    </div>
+    <div id="bdUploadPreview" style="margin-top:12px;font-size:12px;"></div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('bdUploadModal')">취소</button>
+      <button class="btn btn-pr" id="bdUploadApplyBtn" onclick="applyBdUpload()" disabled>적용</button>
     </div>
   </div>
 </div>
@@ -2332,6 +2358,83 @@ async function recalcShippingForKey(channel,item_no,fee){
   for(let i=0;i<upd.length;i+=500){ await sb.from('revenue').upsert(upd.slice(i,i+500)); }
   if(upd.length){ _revLoaded=false; await loadRevenueData(); }  // 메모리 갱신
   return upd.length;
+}
+
+// ── 백데이터 엑셀 다운로드 / 업로드 ──
+function downloadBackdataExcel(){
+  if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
+  const aoa=[['ID','공급자명','전체상품코드','구분','상품명','공급가']];
+  _bdData.forEach(r=>aoa.push([r.id, r.supplier||'', r.code||'', r.type||'', r.name||'', r.price!=null?r.price:'']));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:8},{wch:14},{wch:16},{wch:10},{wch:40},{wch:12}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'백데이터');
+  const d=new Date();
+  XLSX.writeFile(wb,`백데이터_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+}
+
+let _bdUploadParsed=null;
+function openBdUpload(){
+  _bdUploadParsed=null;
+  document.getElementById('bdUploadPreview').innerHTML='';
+  document.getElementById('bdDropText').textContent='엑셀 파일을 드래그하거나 클릭해서 선택';
+  document.getElementById('bdUploadApplyBtn').disabled=true;
+  const inp=document.getElementById('bdUploadInput'); if(inp) inp.value='';
+  openModal('bdUploadModal');
+  setupBdDropZone();
+}
+let _bdDropSetup=false;
+function setupBdDropZone(){
+  if(_bdDropSetup) return; _bdDropSetup=true;
+  const zone=document.getElementById('bdDropZone');
+  const inp=document.getElementById('bdUploadInput');
+  zone.addEventListener('click',()=>inp.click());
+  inp.addEventListener('change',e=>{ if(e.target.files[0]) _readBdUpload(e.target.files[0]); });
+  zone.addEventListener('dragover',e=>{ e.preventDefault(); zone.style.borderColor='#3182F6'; zone.style.background='var(--prl)'; });
+  zone.addEventListener('dragleave',e=>{ e.preventDefault(); zone.style.borderColor='var(--bd)'; zone.style.background='var(--bg)'; });
+  zone.addEventListener('drop',e=>{
+    e.preventDefault(); zone.style.borderColor='var(--bd)'; zone.style.background='var(--bg)';
+    const f=e.dataTransfer.files[0]; if(f) _readBdUpload(f);
+  });
+}
+async function _readBdUpload(file){
+  try{
+    const rows=await readXlsxRows(file);
+    if(!rows.length){ alert('빈 파일입니다.'); return; }
+    // 컬럼: ID, 공급자명, 전체상품코드, 구분, 상품명, 공급가
+    const updates=[], inserts=[]; let bad=0;
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i]; if(!r||r.every(v=>v===''||v==null)) continue;
+      const id=_s(r[0]), supplier=_s(r[1]), code=_s(r[2]), type=_s(r[3]), name=_s(r[4]);
+      const price=_n(r[5]);
+      if(!code||!name){ bad++; continue; }
+      const rec={ code, supplier:supplier||null, item_type:type||null, name, price:price!=null?price:null, updated_at:new Date().toISOString() };
+      if(id && /^\d+$/.test(id)){ rec.id=Number(id); updates.push(rec); }
+      else inserts.push(rec);
+    }
+    _bdUploadParsed={updates,inserts,bad};
+    document.getElementById('bdDropText').textContent=`✅ ${file.name}`;
+    document.getElementById('bdUploadPreview').innerHTML=
+      `<div style="padding:10px 12px;background:var(--bg);border:0.5px solid var(--bd);border-radius:8px;">
+        수정 <b style="color:#3182F6;">${updates.length}</b>건 · 신규 추가 <b style="color:#059669;">${inserts.length}</b>건${bad?` · <span style="color:#DC2626;">코드/상품명 누락 ${bad}건 제외</span>`:''}
+      </div>`;
+    document.getElementById('bdUploadApplyBtn').disabled=(updates.length+inserts.length===0);
+  }catch(e){ alert('파일 읽기 실패: '+e.message); }
+}
+async function applyBdUpload(){
+  if(!_bdUploadParsed){ return; }
+  const {updates,inserts}=_bdUploadParsed;
+  const btn=document.getElementById('bdUploadApplyBtn');
+  btn.disabled=true; btn.textContent='적용 중...';
+  try{
+    // 수정(id 기준 upsert)
+    for(let i=0;i<updates.length;i+=500){ const {error}=await sb.from('backdata').upsert(updates.slice(i,i+500)); if(error) throw error; }
+    // 신규 insert
+    for(let i=0;i<inserts.length;i+=500){ const {error}=await sb.from('backdata').insert(inserts.slice(i,i+500)); if(error) throw error; }
+    _bdLoaded=false; await loadBackdata(); renderBdTable();
+    closeModal('bdUploadModal');
+    alert(`적용 완료\n수정 ${updates.length}건 · 신규 ${inserts.length}건`);
+  }catch(e){ alert('적용 실패: '+e.message); btn.disabled=false; btn.textContent='적용'; }
 }
 
 // ── 백데이터 Supabase CRUD ──
