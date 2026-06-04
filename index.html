@@ -260,11 +260,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 @media(max-width:500px){.period-row .ptab{padding:2px 5px;font-size:10px;}}
 
 /* ── 오늘 주문 체크 박스 ── */
-#ocb-section{display:flex;flex-direction:column;gap:10px;width:fit-content;margin-bottom:10px;}
+#ocb-section{display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:10px;}
 #orderCheckBox{margin-bottom:0;}
-.ocb-outer{display:flex;gap:10px;align-items:flex-start;}
+.ocb-outer{display:flex;gap:14px;align-items:flex-start;width:100%;}
 /* 왼쪽: 체크리스트 */
-.ocb-wrap{flex-shrink:0;width:fit-content;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-wrap{flex:1.5 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
 .ocb-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:0.5px solid var(--bd);cursor:pointer;user-select:none;}
 .ocb-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
 .ocb-toggle{font-size:11px;color:var(--tx2);}
@@ -272,31 +272,32 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .ocb-row{display:grid;grid-template-columns:auto 42px 42px 84px 38px;align-items:center;gap:3px;padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:11px;}
 .ocb-row:last-child{border:none;}
 .ocb-hrow{font-size:9px;color:var(--tx2);font-weight:600;letter-spacing:.4px;padding:5px 10px 3px;display:grid;grid-template-columns:auto 42px 42px 84px 38px;gap:3px;position:sticky;top:0;background:var(--bg2);z-index:1;}
-.ocb-name{font-weight:600;white-space:nowrap;}
+.ocb-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ocb-stock{text-align:right;}
 .ocb-days{text-align:center;}
 .ocb-qty{text-align:right;font-weight:700;}
 .ocb-btn{text-align:right;}
 .ocb-empty{padding:14px;text-align:center;font-size:12px;color:var(--tx2);}
 /* 가운데: TOP6 + RG TOP10 세로스택 */
-.ocb-mid{flex-shrink:0;width:fit-content;display:flex;flex-direction:column;gap:8px;}
-.ocb-top6,.ocb-rg10{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;width:fit-content;}
+.ocb-mid{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px;}
+.ocb-top6,.ocb-rg10{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;width:auto;}
 .ocb-top6-head,.ocb-rg10-head{font-size:12px;font-weight:600;padding:8px 12px;border-bottom:0.5px solid var(--bd);color:var(--tx);}
 .ocb-t6body{max-height:200px;overflow-y:auto;}
 .ocb-rg-body{max-height:280px;overflow-y:auto;}
 .ocb-t6row,.ocb-rg-row{display:grid;grid-template-columns:18px auto auto;gap:5px;padding:6px 12px;border-bottom:0.5px solid var(--bd);font-size:12px;align-items:center;}
 .ocb-t6row:last-child,.ocb-rg-row:last-child{border:none;}
 .ocb-t6rank,.ocb-rg-rank{font-size:11px;font-weight:700;text-align:center;}
-.ocb-t6name,.ocb-rg-name{font-weight:500;white-space:nowrap;}
+.ocb-t6name,.ocb-rg-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ocb-t6val{font-weight:700;color:var(--pr);white-space:nowrap;font-size:11px;}
 .ocb-rg-val{font-weight:700;color:#7C3AED;white-space:nowrap;font-size:11px;}
 /* 오른쪽: 진행중 발주 */
-.ocb-right{flex-shrink:0;width:fit-content;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-right{flex:1.1 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
 .ocb-right-head{font-size:12px;font-weight:600;padding:9px 14px;border-bottom:0.5px solid var(--bd);color:var(--tx);display:flex;align-items:center;gap:6px;}
 .ocb-pend-body{max-height:340px;overflow-y:auto;}
-.ocb-pend-row{display:grid;grid-template-columns:auto auto;gap:16px;padding:6px 14px;border-bottom:0.5px solid var(--bd);font-size:11px;align-items:center;}
+.ocb-pend-row{display:grid;grid-template-columns:1fr auto;gap:16px;padding:6px 14px;border-bottom:0.5px solid var(--bd);font-size:11px;align-items:center;}
+.ocb-pend-row>div:first-child{min-width:0;}
 .ocb-pend-row:last-child{border:none;}
-.ocb-pend-name{font-weight:600;white-space:nowrap;}
+.ocb-pend-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ocb-pend-date{font-size:9px;color:var(--tx2);margin-top:1px;}
 .ocb-pend-miss{font-weight:700;color:#7C3AED;font-size:11px;text-align:right;white-space:nowrap;}
 .ocb-pend-total{font-size:9px;color:var(--tx2);text-align:right;}
@@ -3571,15 +3572,16 @@ async function parseChannelFile(file, channelName){
     const modelRaw  = _s(r[map.modelName]);
     const bdRow     = itemCode ? bdMap[itemCode.toLowerCase()] : null;
 
-    // 모델명: 엑셀 값 우선, 없으면 백데이터에서
-    const modelName = modelRaw || (bdRow ? bdRow.name : '');
-    const itemType  = bdRow ? bdRow.type : '';
-    const unitCost  = bdRow ? (bdRow.price||0) : 0;
-
-    // 백데이터 없는 경우 기록
-    if(itemCode && !bdRow){
-      missing.push({ channel: channelName, name: modelRaw||itemCode, code: itemCode });
+    // ★ 백데이터에 코드가 없으면 DB에 저장하지 않고 누락 목록에만 기록 (매출 오염 방지)
+    if(!bdRow){
+      missing.push({ channel: channelName, name: modelRaw||itemCode||'(코드없음)', code: itemCode||'(코드없음)' });
+      continue; // insert 대상에서 제외
     }
+
+    // 모델명: 엑셀 값 우선, 없으면 백데이터에서
+    const modelName = modelRaw || bdRow.name || '';
+    const itemType  = bdRow.type || '';
+    const unitCost  = bdRow.price || 0;
 
     const orderQty  = _n(r[map.orderQty]) || 0;
     const salePrice = _n(r[map.salePrice]) || 0;
@@ -3703,8 +3705,9 @@ function showUploadResult(totalRows, missing, errors){
   const missHtml = missing.length ? `
     <div style="margin-top:12px;">
       <div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:6px;">
-        ⚠️ 백데이터 코드 생성 필요 (${missing.length}건)
+        ⛔ 백데이터 코드 없어 미저장 (${missing.length}건) — 매출에 반영 안 됨
       </div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;">아래 코드를 백데이터에 추가한 뒤 해당 파일을 다시 업로드하세요.</div>
       <div style="max-height:200px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;">
         ${missing.map(m=>`
           <div style="display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:11px;">
