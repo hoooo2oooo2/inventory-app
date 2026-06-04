@@ -3541,6 +3541,16 @@ function readXlsxRows(file){
 // 백데이터 조회 맵 (code → row)
 // 대소문자 무시 조회: 키를 소문자로 저장
 function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[(r.code||'').toLowerCase(), r])); }
+// 상품명 정규화 (소문자+공백제거)
+function normName(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
+// 코드 없는 백데이터 → 상품명 매칭 맵
+function getBdNameMap(){
+  const m={};
+  _bdData.forEach(r=>{ if(!r.code && r.name){ m[normName(r.name)] = r; } });
+  return m;
+}
+// 공유코드(소장 직접 소싱) — 상품명 우선 매칭
+const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
 
 // 배송비 계산 (2025판매일보 함수와 동일)
 //  - (스마트스토어 & 정원등) or (스마트스토어 & 센서등/벽등) or 누룽지 or 국수기 or 마사지베드 or 판매가>=50000 → 3000
@@ -3565,6 +3575,7 @@ async function parseChannelFile(file, channelName){
 
   const xlsxRows = await readXlsxRows(file);
   const bdMap = getBdMap();
+  const bdNameMap = getBdNameMap();
   const dateVal = document.getElementById('revUpDate')?.value;
   const today = dateVal ? new Date(dateVal) : new Date();
   const year = today.getFullYear();
@@ -3582,11 +3593,17 @@ async function parseChannelFile(file, channelName){
 
     const itemCode  = _s(r[map.itemCode]);
     const modelRaw  = _s(r[map.modelName]);
-    const bdRow     = itemCode ? bdMap[itemCode.toLowerCase()] : null;
+    // 매칭: ① 일반코드 → 코드매칭  ② 공유코드(ss소장)/코드없음 → 상품명매칭  ③ 공유코드 fallback
+    const codeKey   = itemCode.toLowerCase();
+    const nameKey   = normName(modelRaw);
+    const isShared  = SHARED_BD_CODES.has(codeKey) || !itemCode;
+    let bdRow = (!isShared) ? bdMap[codeKey] : null;
+    if(!bdRow && nameKey) bdRow = bdNameMap[nameKey];   // 코드없는 백데이터 = 상품명 매칭
+    if(!bdRow && itemCode) bdRow = bdMap[codeKey];      // 공유코드 fallback (ss소장 부속 등)
 
-    // ★ 백데이터에 코드가 없으면 DB에 저장하지 않고 누락 목록에만 기록 (매출 오염 방지)
+    // ★ 백데이터에 없으면 DB에 저장하지 않고 누락 목록에만 기록 (매출 오염 방지)
     if(!bdRow){
-      missing.push({ channel: channelName, name: modelRaw||itemCode||'(코드없음)', code: itemCode||'(코드없음)' });
+      missing.push({ channel: channelName, name: modelRaw||itemCode||'(코드없음)', code: itemCode||'(상품명:'+(modelRaw||'?')+')' });
       continue; // insert 대상에서 제외
     }
 
@@ -3665,58 +3682,61 @@ async function submitRevUpload(){
   let totalRows=0, allMissing=[], errors=[];
 
   try{
-    let skipped=[], rejected=[];
+    // ── 1단계: 전체 파일 파싱·검증 (저장 전) ──
+    const parsedList=[]; let rejected=[];
     for(const [ch, file] of files){
       try{
         const {rows, missing} = await parseChannelFile(file, ch);
-
-        // ★ 오류(백데이터 코드 없음)가 1건이라도 있으면 이 파일은 통째로 미저장
         if(missing.length>0){
-          rejected.push(`${ch}(오류 ${missing.length}건)`);
+          rejected.push(`${ch}(코드없음 ${missing.length}건)`);
           allMissing = allMissing.concat(missing);
-          console.warn(`${ch}: 오류 ${missing.length}건 → 파일 전체 미저장`);
-          continue;
+        } else if(rows.length===0){
+          console.log(ch+': 데이터 없음 (건너뜀)');
+        } else {
+          parsedList.push({ch, rows});
         }
-        if(rows.length===0){ console.log(ch+': 데이터 없음'); continue; }
-
-        // ── 중복 업로드 가드: 같은 년도·날짜·채널 기존 데이터 확인 ──
-        const upYear = rows[0].year, upDate = rows[0].sale_date;
-        const {count:existCnt} = await sb.from('revenue')
-          .select('*',{count:'exact',head:true})
-          .eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
-        if(existCnt>0){
-          const ok = confirm(`⚠️ 이미 ${upYear}-${upDate} [${ch}] 데이터가 ${existCnt}건 등록되어 있습니다.\n\n[확인] 기존 ${existCnt}건을 삭제하고 새로 등록 (덮어쓰기)\n[취소] 이 채널 건너뛰기`);
-          if(!ok){ skipped.push(`${ch}(${existCnt}건 유지)`); continue; }
-          // 기존 삭제
-          await sb.from('revenue').delete().eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
-        }
-
-        await insertRevenueRows(rows);
-        totalRows += rows.length;
-        console.log(`${ch}: ${rows.length}건 업로드 완료`);
       }catch(e){
-        // 엑셀 파싱/저장 오류 → 이 파일 전체 미저장
         rejected.push(`${ch}(엑셀오류)`);
         errors.push(`${ch}: ${e.message}`);
         console.error(ch, e);
       }
     }
-    if(rejected.length) errors.unshift('⛔ 미저장 파일: '+rejected.join(', '));
+
+    // ★ 한 파일이라도 오류면 전체 미저장 (아무것도 DB에 안 넣음)
+    if(rejected.length>0){
+      errors.unshift(`⛔ 오류로 전체 업로드 취소 — 아무 파일도 저장되지 않았습니다.\n수정 후 전체를 다시 업로드하세요.`);
+      _revUpFiles = {}; renderRevUpSlots();
+      showUploadResult(0, allMissing, errors);
+      if(btn){ btn.disabled=false; btn.textContent='선택한 파일 업로드'; }
+      return;
+    }
+
+    // ── 2단계: 전부 정상 → 저장 ──
+    let skipped=[];
+    for(const {ch, rows} of parsedList){
+      const upYear = rows[0].year, upDate = rows[0].sale_date;
+      const {count:existCnt} = await sb.from('revenue')
+        .select('*',{count:'exact',head:true})
+        .eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
+      if(existCnt>0){
+        const ok = confirm(`⚠️ 이미 ${upYear}-${upDate} [${ch}] 데이터가 ${existCnt}건 등록되어 있습니다.\n\n[확인] 기존 ${existCnt}건을 삭제하고 새로 등록 (덮어쓰기)\n[취소] 이 채널 건너뛰기`);
+        if(!ok){ skipped.push(`${ch}(${existCnt}건 유지)`); continue; }
+        await sb.from('revenue').delete().eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
+      }
+      await insertRevenueRows(rows);
+      totalRows += rows.length;
+      console.log(`${ch}: ${rows.length}건 업로드 완료`);
+    }
     if(skipped.length) errors.push('건너뜀: '+skipped.join(', '));
 
-    // 결과 처리
     _revUpFiles = {};
     renderRevUpSlots();
-    _revLoaded = false; // 다음 통합 탭 진입 시 재로드
+    _revLoaded = false;
 
-    // 성공 알림
     let msg = `✅ ${totalRows}건 업로드 완료`;
-    if(errors.length) msg += `\n\n⚠️ 오류 (${errors.length}건):\n` + errors.join('\n');
-    if(allMissing.length===0 && !errors.length){
-      alert(msg);
-    } else {
-      showUploadResult(totalRows, allMissing, errors);
-    }
+    if(errors.length) msg += `\n\n${errors.join('\n')}`;
+    if(!errors.length) alert(msg);
+    else showUploadResult(totalRows, [], errors);
   } finally {
     if(btn){ btn.disabled=false; btn.textContent='선택한 파일 업로드'; }
   }
