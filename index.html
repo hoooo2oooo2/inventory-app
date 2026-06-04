@@ -2251,27 +2251,25 @@ function _renderRevCurrentPage(){
   if(_revPage==='daily')    renderDailyReport();
 }
 
-// ── 택배비 CRUD ──
+// ── 택배비 CRUD (브라우저 로컬 저장소 기반, 설정 불필요) ──
+const SHIP_LS_KEY='shipping_fees_v1';
+function _shipPersist(){ try{ localStorage.setItem(SHIP_LS_KEY, JSON.stringify(_shipData)); }catch(e){ console.warn(e); } }
 async function loadShippingFees(){
   try{
-    const {data,error}=await sb.from('shipping_fees').select('*').order('channel',{ascending:true}).order('item_no',{ascending:true});
-    if(error){ _shipTableExists=false; _shipData=[]; _shipMap={}; _shipLoaded=true; console.warn('shipping_fees 테이블 없음:',error.message); return; }
-    _shipTableExists=true;
-    _shipData=data||[];
-    _shipMap={};
-    _shipData.forEach(r=>{ _shipMap[`${r.channel}|${r.item_no}`]=r.fee; });
-    _shipLoaded=true;
-  }catch(e){ _shipTableExists=false; _shipLoaded=true; console.warn(e); }
+    const raw=localStorage.getItem(SHIP_LS_KEY);
+    _shipData = raw ? JSON.parse(raw) : [];
+  }catch(e){ _shipData=[]; }
+  _shipData.sort((a,b)=> (a.channel||'')!==(b.channel||'') ? ((a.channel||'')<(b.channel||'')?-1:1) : (String(a.item_no)<String(b.item_no)?-1:1));
+  _shipMap={};
+  _shipData.forEach(r=>{ _shipMap[`${r.channel}|${r.item_no}`]=r.fee; });
+  _shipTableExists=true;
+  _shipLoaded=true;
 }
 
 function renderShipTable(){
   const tb=document.getElementById('shipTbody');
   const empty=document.getElementById('shipEmpty');
   if(!tb) return;
-  if(!_shipTableExists){
-    if(empty){ empty.style.display='block'; empty.innerHTML='⚠️ shipping_fees 테이블이 아직 생성되지 않았습니다.<br><span style="font-size:12px;">Supabase SQL 에디터에서 테이블 생성 후 사용하세요.</span>'; }
-    tb.innerHTML=''; return;
-  }
   const srch=(document.getElementById('shipSrch')?.value||'').toLowerCase();
   const rows=_shipData.filter(r=>!srch||`${r.channel}${r.item_no}${r.item_name||''}`.toLowerCase().includes(srch));
   if(!rows.length){ if(empty)empty.style.display='block'; tb.innerHTML=''; return; }
@@ -2289,7 +2287,6 @@ function renderShipTable(){
 }
 
 function openShipAdd(){
-  if(!_shipTableExists){ alert('shipping_fees 테이블을 먼저 생성해주세요.'); return; }
   document.getElementById('shipModalTitle').textContent='택배비 추가';
   document.getElementById('shipEditId').value='';
   document.getElementById('shipChannel').value='';
@@ -2318,9 +2315,16 @@ async function saveShipModal(){
   const btn=document.querySelector('#shipModal .btn-pr');
   if(btn){ btn.disabled=true; btn.textContent='저장 중...'; }
   try{
-    const row={channel,item_no,item_name,fee};
-    if(id){ await sb.from('shipping_fees').update(row).eq('id',Number(id)); }
-    else  { await sb.from('shipping_fees').insert(row); }
+    if(id){
+      const r=_shipData.find(x=>String(x.id)===String(id));
+      if(r){ r.channel=channel; r.item_no=item_no; r.item_name=item_name; r.fee=fee; }
+    } else {
+      // 같은 (판매처+상품번호) 있으면 덮어쓰기
+      const ex=_shipData.find(x=>x.channel===channel&&x.item_no===item_no);
+      if(ex){ ex.item_name=item_name; ex.fee=fee; }
+      else _shipData.push({id:Date.now()+Math.floor(Math.random()*1000),channel,item_no,item_name,fee});
+    }
+    _shipPersist();
     await loadShippingFees();
     renderShipTable();
     closeModal('shipModal');
@@ -2331,9 +2335,10 @@ async function saveShipModal(){
   finally{ if(btn){ btn.disabled=false; btn.textContent='저장'; } }
 }
 async function deleteShip(id){
-  const r=_shipData.find(x=>x.id===id); if(!r) return;
+  const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
   if(!confirm(`[${r.channel}] ${r.item_no} 택배비를 삭제할까요?\n(통합 데이터 배송비는 기본 규칙으로 재계산됩니다)`)) return;
-  await sb.from('shipping_fees').delete().eq('id',Number(id));
+  _shipData=_shipData.filter(x=>String(x.id)!==String(id));
+  _shipPersist();
   await loadShippingFees(); renderShipTable();
   // 기본 규칙(공식)으로 재계산
   const n=await recalcShippingForKey(r.channel,r.item_no,null);
