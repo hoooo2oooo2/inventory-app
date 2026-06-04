@@ -1204,7 +1204,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="field-grid">
       <div class="field"><label>전체상품코드 *</label><input id="bdCode" placeholder="예: ABC-001"></div>
       <div class="field"><label>공급자명</label><input id="bdSupplier" placeholder="예: OEM제조사"></div>
-      <div class="field"><label>구분</label><input id="bdType" placeholder="예: 의류, 잡화 등"></div>
+      <div class="field"><label>구분</label><select id="bdType"></select></div>
       <div class="field"><label>공급가(단가, 원)</label><input id="bdPrice" type="number" min="0" placeholder="0"></div>
     </div>
     <div class="field"><label>상품명 *</label><input id="bdName" placeholder="상품명을 입력하세요"></div>
@@ -3427,12 +3427,30 @@ function renderBdTable(){
     </tr>`).join('');
 }
 
+// 구분 select 채우기 (기존 구분 + 직접입력 옵션)
+function fillBdTypeOptions(selected){
+  const sel=document.getElementById('bdType'); if(!sel) return;
+  const types=[...new Set(_bdData.map(r=>r.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(selected && !types.includes(selected)) types.unshift(selected);
+  sel.innerHTML='<option value="">구분 선택</option>'
+    + types.map(t=>`<option value="${t}">${t}</option>`).join('')
+    + '<option value="__custom__">+ 직접 입력…</option>';
+  sel.value = selected||'';
+  sel.onchange=function(){
+    if(this.value==='__custom__'){
+      const nv=(prompt('새 구분명을 입력하세요')||'').trim();
+      if(nv){ if(![...this.options].some(o=>o.value===nv)){ const o=document.createElement('option'); o.value=nv; o.textContent=nv; this.insertBefore(o,this.options[this.options.length-1]); } this.value=nv; }
+      else this.value='';
+    }
+  };
+}
+
 function openBdAdd(){
   document.getElementById('bdModalTitle').textContent='새 코드 추가';
   document.getElementById('bdCode').value='';
   document.getElementById('bdCode').disabled=false;
   document.getElementById('bdSupplier').value='';
-  document.getElementById('bdType').value='';
+  fillBdTypeOptions('');
   document.getElementById('bdName').value='';
   document.getElementById('bdPrice').value='';
   document.getElementById('bdEditKey').value='';
@@ -3446,7 +3464,7 @@ function openBdEdit(code){
   document.getElementById('bdCode').value=r.code||'';
   document.getElementById('bdCode').disabled=true;
   document.getElementById('bdSupplier').value=r.supplier||'';
-  document.getElementById('bdType').value=r.type||'';
+  fillBdTypeOptions(r.type||'');
   document.getElementById('bdName').value=r.name||'';
   document.getElementById('bdPrice').value=r.price!=null?r.price:'';
   document.getElementById('bdEditKey').value=code;
