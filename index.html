@@ -927,7 +927,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
                 <th style="width:90px;">판매처</th>
                 <th style="width:110px;">상품번호</th>
                 <th>상품명</th>
-                <th style="text-align:right;width:90px;">택배비</th>
+                <th style="text-align:right;width:80px;">택배비</th>
+                <th class="ns" style="text-align:center;width:64px;">수량×</th>
                 <th class="ns" style="text-align:center;width:90px;">관리</th>
               </tr></thead>
               <tbody id="shipTbody"></tbody>
@@ -2263,7 +2264,7 @@ async function loadShippingFees(){
   }catch(e){ _shipData=[]; }
   _shipData.sort((a,b)=> (a.channel||'')!==(b.channel||'') ? ((a.channel||'')<(b.channel||'')?-1:1) : (String(a.item_no)<String(b.item_no)?-1:1));
   _shipMap={};
-  _shipData.forEach(r=>{ _shipMap[`${r.channel}|${r.item_no}`]=r.fee; });
+  _shipData.forEach(r=>{ _shipMap[`${r.channel}|${r.item_no}`]={fee:r.fee||0, perUnit:!!r.perUnit}; });
   _shipTableExists=true;
   _shipLoaded=true;
 }
@@ -2281,11 +2282,21 @@ function renderShipTable(){
     <td style="font-size:11px;">${r.item_no}</td>
     <td style="font-size:11px;">${r.item_name||''}</td>
     <td style="text-align:right;font-weight:600;">${(r.fee||0).toLocaleString()}원</td>
+    <td style="text-align:center;"><input type="checkbox" ${r.perUnit?'checked':''} onchange="toggleShipPerUnit(${r.id},this.checked)" title="체크 시 구매수량×배송비"></td>
     <td style="text-align:center;white-space:nowrap;">
       <button class="btn btn-sm" onclick="openShipEdit(${r.id})">수정</button>
       <button class="btn btn-sm" style="color:#DC2626;" onclick="deleteShip(${r.id})">삭제</button>
     </td>
   </tr>`).join('');
+}
+
+async function toggleShipPerUnit(id, checked){
+  const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
+  r.perUnit=checked; _shipPersist(); await loadShippingFees();
+  const n=await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:checked});
+  renderShipTable();
+  // 조용히 반영 (alert 생략)
+  console.log(`${r.channel} ${r.item_no} 수량비례=${checked} → ${n}건 재계산`);
 }
 
 function openShipAdd(){
@@ -2317,21 +2328,22 @@ async function saveShipModal(){
   const btn=document.querySelector('#shipModal .btn-pr');
   if(btn){ btn.disabled=true; btn.textContent='저장 중...'; }
   try{
+    let perUnit=false;
     if(id){
       const r=_shipData.find(x=>String(x.id)===String(id));
-      if(r){ r.channel=channel; r.item_no=item_no; r.item_name=item_name; r.fee=fee; }
+      if(r){ r.channel=channel; r.item_no=item_no; r.item_name=item_name; r.fee=fee; perUnit=!!r.perUnit; }
     } else {
       // 같은 (판매처+상품번호) 있으면 덮어쓰기
       const ex=_shipData.find(x=>x.channel===channel&&x.item_no===item_no);
-      if(ex){ ex.item_name=item_name; ex.fee=fee; }
-      else _shipData.push({id:Date.now()+Math.floor(Math.random()*1000),channel,item_no,item_name,fee});
+      if(ex){ ex.item_name=item_name; ex.fee=fee; perUnit=!!ex.perUnit; }
+      else _shipData.push({id:Date.now()+Math.floor(Math.random()*1000),channel,item_no,item_name,fee,perUnit:false});
     }
     _shipPersist();
     await loadShippingFees();
     renderShipTable();
     closeModal('shipModal');
     // 해당 판매처·상품번호의 통합 데이터 배송비·마진 즉시 재계산
-    const n=await recalcShippingForKey(channel,item_no,fee);
+    const n=await recalcShippingForKey(channel,item_no,{fee,perUnit});
     alert(`저장 완료. 통합 데이터 ${n}건의 배송비·마진을 재계산했습니다.`);
   }catch(e){ alert('저장 실패: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='저장'; } }
@@ -2353,23 +2365,25 @@ async function applyAllShipping(){
   if(!confirm(`입력된 택배비 ${_shipData.length}건을 통합 데이터 전체(과거 날짜 포함)에 재적용할까요?`)) return;
   let total=0;
   for(const r of _shipData){
-    total += await recalcShippingForKey(r.channel, r.item_no, r.fee);
+    total += await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:!!r.perUnit});
   }
   alert(`완료. 통합 데이터 ${total}건의 배송비·마진을 재계산했습니다.`);
 }
 
 // 특정 판매처·상품번호의 revenue 배송비·마진 재계산
-// fee=null이면 기본 공식 적용
-async function recalcShippingForKey(channel,item_no,fee){
+// feeObj={fee,perUnit} | null(=기본 공식)
+async function recalcShippingForKey(channel,item_no,feeObj){
   let all=[],from=0;
   while(true){
-    const {data}=await sb.from('revenue').select('id,settlement,cost_price,item_type,sale_price,shipping_fee,margin')
+    const {data}=await sb.from('revenue').select('id,settlement,cost_price,item_type,sale_price,shipping_fee,margin,order_qty')
       .eq('channel',channel).eq('item_no',item_no).range(from,from+999);
     if(!data||!data.length)break; all=all.concat(data); if(data.length<1000)break; from+=1000;
   }
   const upd=[];
   for(const r of all){
-    const newFee = fee!=null ? fee : calcShippingFee(channel,r.item_type,r.sale_price||0);
+    let newFee;
+    if(feeObj!=null){ newFee = feeObj.perUnit ? (feeObj.fee||0)*(r.order_qty||0) : (feeObj.fee||0); }
+    else newFee = calcShippingFee(channel,r.item_type,r.sale_price||0);
     const newMargin = Math.round((r.settlement||0)-(r.cost_price||0)-newFee);
     if(newFee!==r.shipping_fee || newMargin!==r.margin) upd.push({id:r.id,shipping_fee:newFee,margin:newMargin});
   }
@@ -3543,14 +3557,17 @@ function readXlsxRows(file){
 function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[(r.code||'').toLowerCase(), r])); }
 // 상품명 정규화 (소문자+공백제거)
 function normName(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
-// 코드 없는 백데이터 → 상품명 매칭 맵
+// 공유코드(ss소장 직접 소싱) — 상품명으로 매칭
+const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
+// 상품명 매칭 맵: 코드 없거나 ss소장 코드인 백데이터를 상품명으로 매칭
 function getBdNameMap(){
   const m={};
-  _bdData.forEach(r=>{ if(!r.code && r.name){ m[normName(r.name)] = r; } });
+  _bdData.forEach(r=>{
+    const ck=(r.code||'').toLowerCase();
+    if((!r.code || SHARED_BD_CODES.has(ck)) && r.name){ m[normName(r.name)] = r; }
+  });
   return m;
 }
-// 공유코드(소장 직접 소싱) — 상품명 우선 매칭
-const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
 
 // 배송비 계산 (2025판매일보 함수와 동일)
 //  - (스마트스토어 & 정원등) or (스마트스토어 & 센서등/벽등) or 누룽지 or 국수기 or 마사지베드 or 판매가>=50000 → 3000
@@ -3593,13 +3610,12 @@ async function parseChannelFile(file, channelName){
 
     const itemCode  = _s(r[map.itemCode]);
     const modelRaw  = _s(r[map.modelName]);
-    // 매칭: ① 일반코드 → 코드매칭  ② 공유코드(ss소장)/코드없음 → 상품명매칭  ③ 공유코드 fallback
+    // 매칭: ss소장/코드없음 → 무조건 상품명 매칭(fallback 없음), 일반코드 → 코드 매칭
     const codeKey   = itemCode.toLowerCase();
     const nameKey   = normName(modelRaw);
     const isShared  = SHARED_BD_CODES.has(codeKey) || !itemCode;
-    let bdRow = (!isShared) ? bdMap[codeKey] : null;
-    if(!bdRow && nameKey) bdRow = bdNameMap[nameKey];   // 코드없는 백데이터 = 상품명 매칭
-    if(!bdRow && itemCode) bdRow = bdMap[codeKey];      // 공유코드 fallback (ss소장 부속 등)
+    let bdRow = isShared ? (nameKey ? bdNameMap[nameKey] : null)
+                         : bdMap[codeKey];
 
     // ★ 백데이터에 없으면 DB에 저장하지 않고 누락 목록에만 기록 (매출 오염 방지)
     if(!bdRow){
@@ -3619,9 +3635,11 @@ async function parseChannelFile(file, channelName){
     settle = Math.round(settle);
 
     // 배송비: 택배비 테이블(판매처+상품번호) 우선, 없으면 판매일보 함수
+    //  - 수량비례(perUnit) 체크 시: 배송비 × 구매수량
     const itemNo    = _s(r[map.itemNo]);
-    const manualFee = _shipMap[`${channelName}|${itemNo}`];
-    const shipping  = (manualFee!=null) ? manualFee : calcShippingFee(channelName, itemType, salePrice);
+    const manual    = _shipMap[`${channelName}|${itemNo}`];
+    const shipping  = manual ? (manual.perUnit ? (manual.fee||0)*orderQty : (manual.fee||0))
+                             : calcShippingFee(channelName, itemType, salePrice);
 
     const costPrice = Math.round(unitCost * orderQty);
     // 마진 = 정산 - 매입 - 배송비
