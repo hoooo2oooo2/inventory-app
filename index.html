@@ -1977,10 +1977,10 @@ function renderOrderCheck(){
     return {name:p.name, total};
   }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,6);
 
-  // ── 로켓그로스 TOP10 (개 단위 = 박스 × 박스당수량) ──
+  // ── 로켓그로스 TOP10 (데이터가 개 단위로 기입됨 → 라벨만 개) ──
   const rg10 = products.filter(p=>!p.hidden&&!p.disc).map(p=>{
-    const boxes = Object.entries(_rgDailyCache[p.code]||{}).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
-    return {name:p.name, total:boxes*(p.boxQty||1)};
+    const total = Object.entries(_rgDailyCache[p.code]||{}).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
+    return {name:p.name, total};
   }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,10);
 
   // ── 진행중 발주 목록 ──
@@ -3333,7 +3333,12 @@ function updateUniSelUI(){
 async function deleteSelectedUni(){
   const ids=[..._uniSel];
   if(!ids.length){ alert('선택된 행이 없습니다.'); return; }
-  if(!confirm(`선택한 ${ids.length}건을 통합 데이터에서 삭제할까요?\n(되돌릴 수 없습니다)`)) return;
+  // 관리자 비밀번호 확인
+  const pw=prompt(`선택한 ${ids.length}건을 삭제합니다.\n관리자 비밀번호를 입력하세요:`);
+  if(pw===null) return;
+  const savedPw=localStorage.getItem('rev_admin_pw')||'1234';
+  if(pw!==savedPw){ alert('비밀번호가 올바르지 않습니다.'); return; }
+  if(!confirm(`정말 ${ids.length}건을 삭제할까요? (되돌릴 수 없습니다)`)) return;
   const btn=document.getElementById('revUniDelBtn');
   if(btn){ btn.disabled=true; btn.textContent='삭제 중...'; }
   try{
@@ -3640,8 +3645,11 @@ function readXlsxRows(file){
 // 백데이터 조회 맵 (code → row)
 // 대소문자 무시 조회: 키를 소문자로 저장
 function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[(r.code||'').toLowerCase(), r])); }
-// 상품명 정규화 (소문자+공백제거)
-function normName(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
+// 상품명 정규화 (소문자+공백제거+전각괄호→반각)
+function normName(s){ return String(s||'').toLowerCase()
+  .replace(/[【〔]/g,'[').replace(/[】〕]/g,']')
+  .replace(/（/g,'(').replace(/）/g,')')
+  .replace(/\s+/g,''); }
 // 공유코드(ss소장 직접 소싱) — 상품명으로 매칭
 const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
 // 상품명 매칭 맵: ss소장/코드없음 판매건을 백데이터 "전체 상품명"으로 매칭
@@ -3714,8 +3722,9 @@ async function parseChannelFile(file, channelName){
     const codeKey   = itemCode.toLowerCase();
     const nameKey   = normName(modelRaw);
     const isShared  = SHARED_BD_CODES.has(codeKey) || !itemCode;
+    // 공유코드(ss소장)·코드없음 → 상품명 매칭 / 일반코드 → 코드 매칭(실패 시 상품명 fallback)
     let bdRow = isShared ? (nameKey ? bdNameMap[nameKey] : null)
-                         : bdMap[codeKey];
+                         : (bdMap[codeKey] || (nameKey ? bdNameMap[nameKey] : null));
 
     // ★ 백데이터에 없으면 DB에 저장하지 않고 누락 목록에만 기록 (매출 오염 방지)
     if(!bdRow){
