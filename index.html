@@ -991,12 +991,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <input type="text" id="revUniSrch" placeholder="주문번호, 상품명, 구매자..." oninput="_uniPage=0;renderUnifiedTable()">
         </div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniCount">0건</span>
+        <span style="flex:1;"></span>
+        <span style="font-size:11px;color:var(--tx2);" id="revUniSelCount"></span>
+        <button class="btn btn-sm" id="revUniDelBtn" onclick="deleteSelectedUni()" style="background:#DC2626;color:#fff;border:none;display:none;">🗑 선택 삭제</button>
       </div>
       <!-- 테이블 -->
       <div class="rev-tbl-card">
         <div class="tw rev-uni-scroll" id="revUniScroll">
           <table class="dt" id="revUniTable" style="width:100%;table-layout:fixed;">
             <colgroup>
+              <col style="width:26px"><!-- 체크박스 -->
               <!-- 년도·날짜·판매처 -->
               <col style="width:34px"><col style="width:44px"><col style="width:62px">
               <!-- 주문번호 압축 -->
@@ -1018,6 +1022,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <col style="width:44px"><col style="width:40px"><col style="width:40px">
             </colgroup>
             <thead><tr>
+              <th style="text-align:center;"><input type="checkbox" id="revUniSelAll" onchange="toggleUniSelAll(this.checked)" title="이 페이지 전체 선택"></th>
               <th>년도</th><th>날짜</th><th>판매처</th><th>주문번호</th>
               <th>구매자</th><th>수취인</th><th>연락처1</th><th>연락처2</th>
               <th>우편</th><th>주소</th><th>상품번호</th>
@@ -1972,10 +1977,10 @@ function renderOrderCheck(){
     return {name:p.name, total};
   }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,6);
 
-  // ── 로켓그로스 TOP10 ──
+  // ── 로켓그로스 TOP10 (개 단위 = 박스 × 박스당수량) ──
   const rg10 = products.filter(p=>!p.hidden&&!p.disc).map(p=>{
-    const total = Object.entries(_rgDailyCache[p.code]||{}).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
-    return {name:p.name, total};
+    const boxes = Object.entries(_rgDailyCache[p.code]||{}).filter(([d])=>d.startsWith(_curYM)).reduce((s,[,q])=>s+q,0);
+    return {name:p.name, total:boxes*(p.boxQty||1)};
   }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,10);
 
   // ── 진행중 발주 목록 ──
@@ -2031,7 +2036,7 @@ function renderOrderCheck(){
           :rg10.map((x,i)=>`<div class="ocb-rg-row">
             <span class="ocb-rg-rank" style="color:${_rc[i]};">${i+1}</span>
             <span class="ocb-rg-name">${x.name}</span>
-            <span class="ocb-rg-val">${x.total.toLocaleString()}박스</span>
+            <span class="ocb-rg-val">${x.total.toLocaleString()}개</span>
           </div>`).join('')}
       </div>
     </div>
@@ -2526,7 +2531,7 @@ async function deleteBdFromSupabase(id){
 async function loadRevenueData(){
   try{
     showRevLoading(true);
-    const COLS = 'year,sale_date,channel,order_no,buyer,receiver,phone1,phone2,zip,address,item_no,item_type,item_code,model_name,order_qty,ship_qty,shipping_fee,sale_price,settlement,cost_price,margin,margin_rate,unit_cost';
+    const COLS = 'id,year,sale_date,channel,order_no,buyer,receiver,phone1,phone2,zip,address,item_no,item_type,item_code,model_name,order_qty,ship_qty,shipping_fee,sale_price,settlement,cost_price,margin,margin_rate,unit_cost';
     const PAGE = 1000;
     let all = [], from = 0;
     while(true){
@@ -2540,6 +2545,7 @@ async function loadRevenueData(){
       from += PAGE;
     }
     _revData = all.map(r=>({
+      id: r.id,
       year: r.year, date: r.sale_date,
       month: r.sale_date?parseInt(r.sale_date.split('-')[0]):null,
       ch: r.channel, orderNo: r.order_no,
@@ -2574,7 +2580,7 @@ async function insertRevenueRows(rows){
   }
 }
 
-const REV_CHANNELS = ['이베이','11번가','스마트스토어','쿠팡','오늘의집','카페24','오너클랜','톡스토어','에이블리','올웨이즈'];
+const REV_CHANNELS = ['이베이','11번가','스마트스토어','쿠팡','오늘의집','카페24','오너클랜','톡스토어','에이블리','올웨이즈','전화구매건'];
 
 function goRevPage(p){
   _revPage = p;
@@ -3304,6 +3310,44 @@ function buildUniFilterBtns(){
 
 const UNI_PAGE_SIZE = 300;
 let _uniPage = 0; // 현재 페이지 (0-based)
+let _uniSel = new Set(); // 통합 탭 선택된 행 id
+
+function toggleUniSel(id, checked){
+  if(checked) _uniSel.add(id); else _uniSel.delete(id);
+  updateUniSelUI();
+}
+function toggleUniSelAll(checked){
+  document.querySelectorAll('#revUniTbody input[data-uid]').forEach(cb=>{
+    const id=Number(cb.dataset.uid); cb.checked=checked;
+    if(checked) _uniSel.add(id); else _uniSel.delete(id);
+  });
+  updateUniSelUI();
+}
+function updateUniSelUI(){
+  const n=_uniSel.size;
+  const cnt=document.getElementById('revUniSelCount');
+  const btn=document.getElementById('revUniDelBtn');
+  if(cnt) cnt.textContent = n?`${n}건 선택됨`:'';
+  if(btn) btn.style.display = n?'':'none';
+}
+async function deleteSelectedUni(){
+  const ids=[..._uniSel];
+  if(!ids.length){ alert('선택된 행이 없습니다.'); return; }
+  if(!confirm(`선택한 ${ids.length}건을 통합 데이터에서 삭제할까요?\n(되돌릴 수 없습니다)`)) return;
+  const btn=document.getElementById('revUniDelBtn');
+  if(btn){ btn.disabled=true; btn.textContent='삭제 중...'; }
+  try{
+    for(let i=0;i<ids.length;i+=200){
+      const {error}=await sb.from('revenue').delete().in('id',ids.slice(i,i+200));
+      if(error) throw error;
+    }
+    _uniSel.clear();
+    _revLoaded=false; await loadRevenueData();
+    goRevPage('unified');
+    alert(`${ids.length}건 삭제 완료`);
+  }catch(e){ alert('삭제 실패: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='🗑 선택 삭제'; } }
+}
 
 function renderUnifiedTable(){
   buildUniFilterBtns();
@@ -3357,7 +3401,9 @@ function renderUnifiedTable(){
     const mr=r.marginRate!=null?r.marginRate:null;
     const mrCls=mr!=null&&mr<0?'rev-margin-neg':mr!=null&&mr>0?'rev-margin-pos':'';
     const mgCls=mg>0?'rev-margin-pos':mg<0?'rev-margin-neg':'';
+    const checked=_uniSel.has(r.id)?'checked':'';
     return `<tr>
+      <td style="text-align:center;"><input type="checkbox" data-uid="${r.id}" ${checked} onchange="toggleUniSel(${r.id},this.checked)"></td>
       <td style="${TC}">${r.year||''}</td>
       <td style="${TC}">${r.date||''}</td>
       <td style="${TC}">${r.ch||''}</td>
@@ -3383,6 +3429,11 @@ function renderUnifiedTable(){
       <td style="text-align:right;">${r.unitCost!=null?r.unitCost.toLocaleString():''}</td>
     </tr>`;
   }).join('');
+
+  // 선택 UI 갱신
+  updateUniSelUI();
+  const selAll=document.getElementById('revUniSelAll');
+  if(selAll) selAll.checked = display.length>0 && display.every(r=>_uniSel.has(r.id));
 
   // 페이지네이션 푸터
   const maxP = Math.ceil(total/UNI_PAGE_SIZE);
@@ -3551,12 +3602,23 @@ const CH_MAPS = {
   '오늘의집':     { orderNo:0,  buyer:15, receiver:16, phone1:17, phone2:18, zip:19, addr:20, itemNo:4,  itemCode:8,  modelName:9,  orderQty:10, salePrice:13, settlement:14,  settleFn:null },
   '카페24':       { orderNo:2,  buyer:14, receiver:15, phone1:16, phone2:17, zip:18, addr:19, itemNo:6,  itemCode:9,  modelName:10, orderQty:11, salePrice:12, settlement:12,  settleFn:null },
   '올웨이즈':     { orderNo:0,  buyer:16, receiver:17, phone1:18, phone2:19, zip:20, addr:21, itemNo:3,  itemCode:6,  modelName:7,  orderQty:8,  salePrice:14, settlement:15,  settleFn:null },
+  // 전화구매건: 이미 통합 포맷 / 날짜는 행마다(0열) / 주문번호·상품번호 없음(공란)
+  '전화구매건':   { dateCol:0, orderNo:null, buyer:3, receiver:4, phone1:5, phone2:6, zip:7, addr:8, itemNo:null, itemCode:10, modelName:11, orderQty:12, salePrice:13, settlement:14, settleFn:null, perRowDate:true },
 };
 
 // 셀 값 → 숫자 변환
 function _n(v){ if(v==null||v==='') return null; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?null:n; }
 // 셀 값 → 문자열 변환
 function _s(v){ return v==null||v===''?'':String(v).trim(); }
+// 셀 값 → Date (엑셀serial / 문자열 / Date) — 타임존 영향 없이 UTC로 정규화. caller는 getUTC* 사용
+function parseCellDate(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d)?null:d; }
+  if(v instanceof Date){ return isNaN(v)?null:new Date(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate())); }
+  const s=String(v); const m=s.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if(m) return new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  const d=new Date(s); return isNaN(d)?null:d;
+}
 
 // 파일 → XLSX rows 변환
 function readXlsxRows(file){
@@ -3632,10 +3694,21 @@ async function parseChannelFile(file, channelName){
     const r = xlsxRows[i];
     if(!r || r.every(v=>v===''||v==null)) continue; // 빈 행 스킵
 
-    const orderNo   = _s(r[map.orderNo]);
-    if(!orderNo) continue; // 주문번호 없으면 스킵
+    // 주문번호: map.orderNo가 null이면 공란 (전화구매건)
+    const orderNo   = (map.orderNo==null) ? '' : _s(r[map.orderNo]);
 
     const itemCode  = _s(r[map.itemCode]);
+
+    // 행 유효성: 주문번호 없는 채널(전화구매건)은 코드/모델명으로 판단
+    if(map.orderNo==null){ if(!itemCode && !_s(r[map.modelName])) continue; }
+    else if(!orderNo) continue;
+
+    // 날짜: 행별 날짜(전화구매건) 또는 업로드 날짜
+    let rowYear=year, rowDate=saleDate;
+    if(map.perRowDate){
+      const d=parseCellDate(r[map.dateCol]);
+      if(d){ rowYear=d.getUTCFullYear(); rowDate=`${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; }
+    }
     const modelRaw  = _s(r[map.modelName]);
     // 매칭: ss소장/코드없음 → 무조건 상품명 매칭(fallback 없음), 일반코드 → 코드 매칭
     const codeKey   = itemCode.toLowerCase();
@@ -3663,7 +3736,7 @@ async function parseChannelFile(file, channelName){
 
     // 배송비: 택배비 테이블(판매처+상품번호) 우선, 없으면 판매일보 함수
     //  - 수량비례(perUnit) 체크 시: 배송비 × 구매수량
-    const itemNo    = _s(r[map.itemNo]);
+    const itemNo    = (map.itemNo==null) ? '' : _s(r[map.itemNo]);
     const manual    = _shipMap[`${channelName}|${itemNo}`];
     const shipping  = manual ? (manual.perUnit ? (manual.fee||0)*orderQty : (manual.fee||0))
                              : calcShippingFee(channelName, itemType, salePrice);
@@ -3674,8 +3747,8 @@ async function parseChannelFile(file, channelName){
     const marginRate= settle > 0 ? Math.round(margin/settle*10000)/10000 : 0;
 
     rows.push({
-      year,
-      sale_date:    saleDate,
+      year:         rowYear,
+      sale_date:    rowDate,
       channel:      channelName,
       order_no:     orderNo,
       buyer:        _s(r[map.buyer]),
@@ -3759,14 +3832,23 @@ async function submitRevUpload(){
     // ── 2단계: 전부 정상 → 저장 ──
     let skipped=[];
     for(const {ch, rows} of parsedList){
-      const upYear = rows[0].year, upDate = rows[0].sale_date;
-      const {count:existCnt} = await sb.from('revenue')
-        .select('*',{count:'exact',head:true})
-        .eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
+      // 파일에 포함된 (년도, 날짜) 조합 전체
+      const ymSet=[...new Set(rows.map(r=>`${r.year}|${r.sale_date}`))];
+      // 기존 데이터 존재 건수 (해당 채널의 업로드 날짜들)
+      let existCnt=0;
+      for(const ym of ymSet){
+        const [y,d]=ym.split('|');
+        const {count}=await sb.from('revenue').select('*',{count:'exact',head:true}).eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+        existCnt+=count||0;
+      }
       if(existCnt>0){
-        const ok = confirm(`⚠️ 이미 ${upYear}-${upDate} [${ch}] 데이터가 ${existCnt}건 등록되어 있습니다.\n\n[확인] 기존 ${existCnt}건을 삭제하고 새로 등록 (덮어쓰기)\n[취소] 이 채널 건너뛰기`);
+        const dateLabel = ymSet.length===1 ? ymSet[0].replace('|','-') : `${ymSet.length}개 날짜`;
+        const ok = confirm(`⚠️ 이미 [${ch}] ${dateLabel} 데이터가 ${existCnt}건 등록되어 있습니다.\n\n[확인] 기존 ${existCnt}건 삭제 후 새로 등록 (덮어쓰기)\n[취소] 이 채널 건너뛰기`);
         if(!ok){ skipped.push(`${ch}(${existCnt}건 유지)`); continue; }
-        await sb.from('revenue').delete().eq('year',upYear).eq('sale_date',upDate).eq('channel',ch);
+        for(const ym of ymSet){
+          const [y,d]=ym.split('|');
+          await sb.from('revenue').delete().eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+        }
       }
       await insertRevenueRows(rows);
       totalRows += rows.length;
