@@ -390,11 +390,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-margin-neg{color:#DC2626;font-weight:600;}
 @media(max-width:900px){#page-revenue .rev-kpi{grid-template-columns:repeat(2,1fr);}#page-revenue .rev-chart-grid{grid-template-columns:1fr;}#page-revenue .rev-up-grid{grid-template-columns:repeat(2,1fr);}}
 /* 단가계산기 */
-#page-price .main{max-width:640px;}
 .pc-lbl{font-size:11px;color:var(--tx2);font-weight:500;margin-bottom:5px;}
 .pc-inp{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 11px;font-size:13px;color:var(--tx);background:var(--bg2);outline:none;font-family:inherit;}
 .pc-inp:focus{border-color:#3182F6;background:var(--bg);}
 .pc-res{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:9px 11px;font-size:14px;font-weight:600;color:var(--tx);min-height:38px;display:flex;align-items:center;}
+.pc-th{padding:8px 10px;text-align:right;border-bottom:0.5px solid var(--bd);white-space:nowrap;font-weight:600;color:var(--tx2);font-size:11px;}
+.pc-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:300;display:none;align-items:center;justify-content:center;}
 </style>
 </head>
 <body>
@@ -478,142 +479,209 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 <!-- ═══ 단가계산기 ═══ -->
 <div class="page" id="page-price">
-<div class="main" style="max-width:640px;padding-bottom:80px;">
-  <div style="font-size:16px;font-weight:700;color:var(--tx);padding:4px 0 8px;">🧮 단가 계산기</div>
+<div style="display:flex;height:calc(100vh - 102px);overflow:hidden;">
 
-  <!-- ① 상품 정보 -->
-  <div class="card" style="padding:16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:12px;">📦 상품 정보</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+  <!-- ─── 좌측: 계산기 ─── -->
+  <div id="pc-left-panel" style="width:460px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--bd);padding:12px 14px 80px;">
+    <div style="font-size:15px;font-weight:700;color:var(--tx);padding:2px 0 10px;">🧮 단가 계산기</div>
 
-      <!-- 상품코드 검색 -->
-      <div style="position:relative;">
-        <div class="pc-lbl">상품코드</div>
-        <input type="text" id="pc-code" placeholder="코드 또는 상품명 검색"
-          oninput="pcSearchCode(this.value)" autocomplete="off" class="pc-inp"/>
-        <div id="pc-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--bd);border-top:none;border-radius:0 0 8px 8px;z-index:60;max-height:200px;overflow-y:auto;box-shadow:0 6px 16px rgba(0,0,0,.12);"></div>
+    <!-- 상품 정보 -->
+    <div class="card" style="padding:13px;margin-bottom:9px;">
+      <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">📦 상품 정보</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="position:relative;">
+          <div class="pc-lbl">상품코드</div>
+          <input type="text" id="pc-code" placeholder="코드/상품명 검색" oninput="pcSearchCode(this.value)" autocomplete="off" class="pc-inp"/>
+          <div id="pc-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--bd);border-top:none;border-radius:0 0 8px 8px;z-index:60;max-height:200px;overflow-y:auto;box-shadow:0 6px 16px rgba(0,0,0,.12);"></div>
+        </div>
+        <div>
+          <div class="pc-lbl">상품명</div>
+          <input type="text" id="pc-name" placeholder="자동 또는 직접 입력" class="pc-inp" oninput="pcCalc()"/>
+        </div>
+        <div>
+          <div class="pc-lbl">할증 (%)</div>
+          <input type="number" id="pc-sur" placeholder="0" min="0" class="pc-inp" oninput="pcApplySur()"/>
+        </div>
+        <div>
+          <div class="pc-lbl">개당단가 (원)</div>
+          <input type="number" id="pc-unit" placeholder="자동 또는 직접 입력" class="pc-inp" oninput="pcCalc()"/>
+          <div id="pc-unit-note" style="font-size:10px;color:#D97706;margin-top:2px;min-height:13px;"></div>
+        </div>
       </div>
+    </div>
 
-      <!-- 상품명 -->
-      <div>
-        <div class="pc-lbl">상품명</div>
-        <input type="text" id="pc-name" placeholder="자동입력 또는 직접 입력" class="pc-inp" oninput="pcCalc()"/>
+    <!-- 수량 & 판매가 -->
+    <div class="card" style="padding:13px;margin-bottom:9px;">
+      <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">💰 수량 &amp; 판매가</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <div class="pc-lbl">수량</div>
+          <input type="number" id="pc-qty" placeholder="0" min="0" class="pc-inp" oninput="pcCalc()"/>
+        </div>
+        <div>
+          <div class="pc-lbl">단가합계 (자동)</div>
+          <div id="pc-cost-total" class="pc-res">—</div>
+        </div>
+        <div>
+          <div class="pc-lbl">판매가 (원)</div>
+          <input type="number" id="pc-sale" placeholder="0" min="0" class="pc-inp" oninput="pcCalc()"/>
+        </div>
+        <div>
+          <div class="pc-lbl">할인가 (%)</div>
+          <input type="number" id="pc-disc" placeholder="0" min="0" max="100" class="pc-inp" oninput="pcCalc()"/>
+        </div>
+        <div style="grid-column:1/-1;">
+          <div class="pc-lbl">판매가합계 (자동)</div>
+          <div id="pc-sale-total" class="pc-res" style="font-size:16px;color:#3182F6;font-weight:700;">—</div>
+          <div id="pc-sale-note" style="font-size:10px;color:var(--tx2);margin-top:2px;"></div>
+        </div>
       </div>
+    </div>
 
-      <!-- 할증여부 -->
-      <div>
-        <div class="pc-lbl">할증 (%)</div>
-        <input type="number" id="pc-sur" placeholder="0" min="0" class="pc-inp" oninput="pcApplySur()"/>
+    <!-- 배송비 -->
+    <div class="card" style="padding:13px;margin-bottom:9px;">
+      <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">🚚 배송비</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="grid-column:1/-1;">
+          <div class="pc-lbl">규격 선택</div>
+          <select id="pc-ship" class="pc-inp" style="cursor:pointer;" onchange="pcCalc()">
+            <option value="0">선택 안 함 (0원)</option>
+            <option value="1900">A 80cm — 1,900원</option>
+            <option value="2400">B 100cm — 2,400원</option>
+            <option value="2800">C 120cm — 2,800원</option>
+            <option value="3500">D 140cm — 3,500원</option>
+            <option value="4900">E 160cm — 4,900원</option>
+            <option value="12100">F 이형 190cm — 12,100원</option>
+          </select>
+        </div>
+        <div>
+          <div class="pc-lbl">배송비 수량</div>
+          <input type="number" id="pc-ship-qty" placeholder="0" min="0" class="pc-inp" oninput="pcCalc()"/>
+        </div>
+        <div>
+          <div class="pc-lbl">배송비합계 (자동)</div>
+          <div id="pc-ship-total" class="pc-res" style="color:#D97706;">—</div>
+        </div>
       </div>
+    </div>
 
-      <!-- 개당단가 -->
-      <div>
-        <div class="pc-lbl">개당단가 (원)</div>
-        <input type="number" id="pc-unit" placeholder="자동입력 또는 직접 입력" class="pc-inp" oninput="pcCalc()"/>
-        <div id="pc-unit-note" style="font-size:10px;color:#D97706;margin-top:3px;min-height:14px;"></div>
+    <!-- 마진 -->
+    <div class="card" style="padding:13px;border:1.5px solid #3182F6;background:#EEF4FF;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:600;color:#3182F6;margin-bottom:9px;">📊 마진 분석</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
+        <div style="background:#fff;border-radius:7px;padding:8px;">
+          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">단가합계</div>
+          <div id="pc-m-cost" style="font-size:12px;font-weight:600;color:var(--tx);">—</div>
+        </div>
+        <div style="background:#fff;border-radius:7px;padding:8px;">
+          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">판매가합계</div>
+          <div id="pc-m-sale" style="font-size:12px;font-weight:600;color:#3182F6;">—</div>
+        </div>
+        <div style="background:#fff;border-radius:7px;padding:8px;">
+          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">배송비합계</div>
+          <div id="pc-m-ship" style="font-size:12px;font-weight:600;color:#D97706;">—</div>
+        </div>
       </div>
+      <div style="background:#fff;border-radius:7px;padding:11px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">마진 (판매−단가−배송)</div>
+          <div id="pc-m-margin" style="font-size:20px;font-weight:700;color:var(--tx);">—</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">마진율</div>
+          <div id="pc-m-rate" style="font-size:17px;font-weight:700;color:var(--tx);">—</div>
+        </div>
+      </div>
+    </div>
 
+    <!-- 버튼 -->
+    <div style="display:flex;gap:8px;">
+      <button onclick="pcReset()" style="padding:8px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:11px;cursor:pointer;flex-shrink:0;">초기화</button>
+      <button id="pc-add-btn" onclick="pcAddOrUpdate()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#3182F6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">➕ 추가하기</button>
     </div>
   </div>
 
-  <!-- ② 수량 & 판매가 -->
-  <div class="card" style="padding:16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:12px;">💰 수량 &amp; 판매가</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+  <!-- ─── 우측: 견적 목록 ─── -->
+  <div style="flex:1;min-width:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;">
 
-      <div>
-        <div class="pc-lbl">수량</div>
-        <input type="number" id="pc-qty" placeholder="0" min="0" class="pc-inp" oninput="pcCalc()"/>
+    <!-- 항목 목록 카드 -->
+    <div class="card" style="overflow:hidden;">
+      <div style="padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:13px;font-weight:600;color:var(--tx);">📋 견적 항목</span>
+        <span id="pc-count" style="font-size:11px;color:var(--tx2);background:var(--bg2);padding:2px 8px;border-radius:10px;">0개</span>
       </div>
-
-      <div>
-        <div class="pc-lbl">단가합계 (자동)</div>
-        <div id="pc-cost-total" class="pc-res">—</div>
+      <div style="overflow-x:auto;">
+        <div id="pc-empty" style="padding:28px;text-align:center;color:var(--tx2);font-size:12px;">← 좌측 계산기에서 항목을 추가하세요</div>
+        <table id="pc-tbl" style="display:none;width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
+          <thead>
+            <tr style="background:var(--bg2);">
+              <th class="pc-th" style="text-align:center;width:28px;">#</th>
+              <th class="pc-th" style="text-align:left;min-width:110px;">상품명</th>
+              <th class="pc-th">개당단가</th>
+              <th class="pc-th">수량</th>
+              <th class="pc-th">단가합계</th>
+              <th class="pc-th">판매가(할인%)</th>
+              <th class="pc-th">판매가합계</th>
+              <th class="pc-th">배송수량</th>
+              <th class="pc-th">배송비</th>
+              <th class="pc-th">마진</th>
+              <th class="pc-th">마진율</th>
+              <th class="pc-th" style="text-align:center;width:88px;">수정/삭제</th>
+            </tr>
+          </thead>
+          <tbody id="pc-tbody"></tbody>
+        </table>
       </div>
-
-      <div>
-        <div class="pc-lbl">판매가 (원)</div>
-        <input type="number" id="pc-sale" placeholder="0" min="0" class="pc-inp" oninput="pcCalc()"/>
-      </div>
-
-      <div>
-        <div class="pc-lbl">할인가 (%)</div>
-        <input type="number" id="pc-disc" placeholder="0" min="0" max="100" class="pc-inp" oninput="pcCalc()"/>
-      </div>
-
-      <div style="grid-column:1/-1;">
-        <div class="pc-lbl">판매가합계 (자동)</div>
-        <div id="pc-sale-total" class="pc-res" style="font-size:17px;color:#3182F6;font-weight:700;">—</div>
-        <div id="pc-sale-note" style="font-size:10px;color:var(--tx2);margin-top:2px;"></div>
-      </div>
-
     </div>
+
+    <!-- 합계 + 저장 -->
+    <div id="pc-totals" class="card" style="display:none;padding:12px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+          <div><div style="font-size:10px;color:var(--tx2);">단가합계 합산</div><div id="pc-tot-cost" style="font-size:13px;font-weight:700;color:var(--tx);">—</div></div>
+          <div><div style="font-size:10px;color:var(--tx2);">판매가합계 합산</div><div id="pc-tot-sale" style="font-size:13px;font-weight:700;color:#3182F6;">—</div></div>
+          <div><div style="font-size:10px;color:var(--tx2);">배송비 합산</div><div id="pc-tot-ship" style="font-size:13px;font-weight:700;color:#D97706;">—</div></div>
+          <div><div style="font-size:10px;color:var(--tx2);">마진 합계</div><div id="pc-tot-margin" style="font-size:13px;font-weight:700;">—</div></div>
+          <div><div style="font-size:10px;color:var(--tx2);">마진율</div><div id="pc-tot-rate" style="font-size:13px;font-weight:700;">—</div></div>
+        </div>
+        <button onclick="pcOpenSaveModal()" style="padding:9px 16px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 견적 저장하기</button>
+      </div>
+    </div>
+
+    <!-- 저장된 견적 -->
+    <div class="card" style="overflow:hidden;">
+      <div style="padding:10px 14px;border-bottom:0.5px solid var(--bd);">
+        <span style="font-size:13px;font-weight:600;color:var(--tx);">📁 저장된 견적</span>
+      </div>
+      <div id="pc-est-list"></div>
+    </div>
+
   </div>
-
-  <!-- ③ 배송비 -->
-  <div class="card" style="padding:16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--tx);margin-bottom:12px;">🚚 배송비</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-
-      <div style="grid-column:1/-1;">
-        <div class="pc-lbl">규격 선택</div>
-        <select id="pc-ship" class="pc-inp" style="cursor:pointer;" onchange="pcCalc()">
-          <option value="0">선택 안 함 (0원)</option>
-          <option value="1900">A 80cm — 1,900원</option>
-          <option value="2400">B 100cm — 2,400원</option>
-          <option value="2800">C 120cm — 2,800원</option>
-          <option value="3500">D 140cm — 3,500원</option>
-          <option value="4900">E 160cm — 4,900원</option>
-          <option value="12100">F 이형 190cm — 12,100원</option>
-        </select>
-      </div>
-
-      <div>
-        <div class="pc-lbl">배송비 수량</div>
-        <input type="number" id="pc-ship-qty" placeholder="0" min="0" class="pc-inp" oninput="pcCalc()"/>
-      </div>
-
-      <div>
-        <div class="pc-lbl">배송비합계 (자동)</div>
-        <div id="pc-ship-total" class="pc-res" style="color:#D97706;">—</div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ④ 마진 결과 -->
-  <div class="card" style="padding:16px;border:1.5px solid #3182F6;background:#EEF4FF;">
-    <div style="font-size:13px;font-weight:600;color:#3182F6;margin-bottom:12px;">📊 마진 분석</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div style="background:#fff;border-radius:8px;padding:11px;">
-        <div style="font-size:10px;color:var(--tx2);margin-bottom:3px;">단가합계</div>
-        <div id="pc-m-cost" style="font-size:13px;font-weight:600;color:var(--tx);">—</div>
-      </div>
-      <div style="background:#fff;border-radius:8px;padding:11px;">
-        <div style="font-size:10px;color:var(--tx2);margin-bottom:3px;">판매가합계</div>
-        <div id="pc-m-sale" style="font-size:13px;font-weight:600;color:#3182F6;">—</div>
-      </div>
-      <div style="background:#fff;border-radius:8px;padding:11px;">
-        <div style="font-size:10px;color:var(--tx2);margin-bottom:3px;">배송비합계</div>
-        <div id="pc-m-ship" style="font-size:13px;font-weight:600;color:#D97706;">—</div>
-      </div>
-    </div>
-    <div style="background:#fff;border-radius:8px;padding:14px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;">
-      <div>
-        <div style="font-size:10px;color:var(--tx2);margin-bottom:4px;">마진 = 판매가합계 − 단가합계 − 배송비합계</div>
-        <div id="pc-m-margin" style="font-size:26px;font-weight:700;color:var(--tx);">—</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:10px;color:var(--tx2);margin-bottom:4px;">마진율</div>
-        <div id="pc-m-rate" style="font-size:22px;font-weight:700;color:var(--tx);">—</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 초기화 -->
-  <button onclick="pcReset()" style="width:100%;padding:11px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">초기화</button>
-
 </div>
+</div>
+
+<!-- 견적 저장 모달 -->
+<div id="pcSaveModal" class="pc-modal-bg">
+  <div style="background:var(--bg);border-radius:14px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:16px;">💾 견적 저장</div>
+    <div class="pc-lbl" style="margin-bottom:6px;">견적명</div>
+    <input type="text" id="pc-est-name-inp" placeholder="예: 거래처A 2026년 6월 견적" class="pc-inp" style="margin-bottom:16px;" onkeydown="if(event.key==='Enter')pcConfirmSave()"/>
+    <div style="display:flex;gap:8px;">
+      <button onclick="pcCloseSaveModal()" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
+      <button onclick="pcConfirmSave()" style="flex:2;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 견적 조회 모달 -->
+<div id="pcViewModal" class="pc-modal-bg">
+  <div style="background:var(--bg);border-radius:14px;width:min(95vw,880px);max-height:82vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="padding:13px 18px;border-bottom:0.5px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
+      <div id="pcViewTitle" style="font-size:14px;font-weight:700;color:var(--tx);"></div>
+      <button onclick="document.getElementById('pcViewModal').style.display='none'" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--tx2);line-height:1;padding:0 4px;">✕</button>
+    </div>
+    <div id="pcViewContent" style="overflow:auto;padding:14px;flex:1;"></div>
+  </div>
 </div>
 
 <!-- ═══ 판매분석 ═══ -->
@@ -1824,15 +1892,26 @@ function goPage(p){
   if(p==='hist') renderHist();
   if(p==='report') loadDailyCache().then(()=>renderReport());
   if(p==='revenue') loadRevenuePage();
+  if(p==='price') pcRenderEstimates();
   // 매출관리/단가계산기 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
   if(fw) fw.style.visibility = (p==='revenue'||p==='price') ? 'hidden' : '';
 }
 
 // ══════════════════════════════════════════════
-// 단가 계산기 v2
+// 단가 계산기 v3
 // ══════════════════════════════════════════════
-let _pcRawPrice = null; // 백데이터에서 가져온 원본 단가
+let _pcRawPrice  = null;
+let _pcItems     = [];
+let _pcItemNextId= 1;
+let _pcEditId    = null;
+let _pcEstimates = [];
+let _pcEstNextId = 1;
+try{
+  const _s = JSON.parse(localStorage.getItem('pc_estimates')||'[]');
+  _pcEstimates = _s;
+  if(_s.length) _pcEstNextId = Math.max(..._s.map(e=>e.id)) + 1;
+}catch(e){ _pcEstimates=[]; }
 
 function pcSearchCode(val){
   const dd = document.getElementById('pc-dd');
@@ -1843,107 +1922,308 @@ function pcSearchCode(val){
   ).slice(0,12);
   if(!matched.length){ dd.style.display='none'; return; }
   dd.innerHTML = matched.map(r=>{
-    const safeCode = (r.code||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    const safeName = (r.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    const pr = r.price!=null ? r.price : null;
-    return `<div onclick="pcSelectBd('${safeCode}','${safeName}',${pr!=null?pr:'null'})"
-      style="padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:0.5px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px;"
+    const sc=(r.code||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const sn=(r.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const pr=r.price!=null?r.price:null;
+    return `<div onclick="pcSelectBd('${sc}','${sn}',${pr!=null?pr:'null'})"
+      style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:0.5px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px;"
       onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
-      <span><b style="color:var(--tx);">${r.code||''}</b> <span style="color:var(--tx2);margin-left:6px;">${r.name||''}</span></span>
-      <span style="color:#3182F6;white-space:nowrap;flex-shrink:0;">${pr!=null?pr.toLocaleString()+'원':'단가없음'}</span>
+      <span><b style="color:var(--tx);">${r.code||''}</b><span style="color:var(--tx2);margin-left:6px;">${r.name||''}</span></span>
+      <span style="color:#3182F6;white-space:nowrap;">${pr!=null?pr.toLocaleString()+'원':'단가없음'}</span>
     </div>`;
   }).join('');
   dd.style.display='';
 }
 
-function pcSelectBd(code, name, price){
-  document.getElementById('pc-code').value = code;
-  document.getElementById('pc-name').value = name;
-  document.getElementById('pc-dd').style.display = 'none';
-  _pcRawPrice = price;
+function pcSelectBd(code,name,price){
+  document.getElementById('pc-code').value=code;
+  document.getElementById('pc-name').value=name;
+  document.getElementById('pc-dd').style.display='none';
+  _pcRawPrice=price;
   pcApplySur();
 }
 
 function pcApplySur(){
-  const sur = parseFloat(document.getElementById('pc-sur').value)||0;
-  const note = document.getElementById('pc-unit-note');
-  if(_pcRawPrice != null){
-    const applied = Math.round(_pcRawPrice * (1 + sur/100));
-    document.getElementById('pc-unit').value = applied;
-    note.textContent = sur > 0
-      ? `원래단가 ${_pcRawPrice.toLocaleString()}원 × (1+${sur}%) = ${applied.toLocaleString()}원`
-      : '';
-  } else {
-    note.textContent = '';
-  }
+  const sur=parseFloat(document.getElementById('pc-sur').value)||0;
+  const note=document.getElementById('pc-unit-note');
+  if(_pcRawPrice!=null){
+    const applied=Math.round(_pcRawPrice*(1+sur/100));
+    document.getElementById('pc-unit').value=applied;
+    note.textContent=sur>0?`원래단가 ${_pcRawPrice.toLocaleString()}원 × (1+${sur}%) = ${applied.toLocaleString()}원`:'';
+  } else { note.textContent=''; }
   pcCalc();
 }
 
 function pcCalc(){
-  const unit    = parseFloat(document.getElementById('pc-unit').value)||0;
-  const qty     = parseFloat(document.getElementById('pc-qty').value)||0;
-  const sale    = parseFloat(document.getElementById('pc-sale').value)||0;
-  const disc    = parseFloat(document.getElementById('pc-disc').value)||0;
-  const shipPr  = parseFloat(document.getElementById('pc-ship').value)||0;
-  const shipQty = parseFloat(document.getElementById('pc-ship-qty').value)||0;
-
-  const costTotal  = Math.round(unit * qty);
-  const saleAfDisc = Math.round(sale * (1 - disc/100));
-  const saleTotal  = Math.round(saleAfDisc * qty);
-  const shipTotal  = Math.round(shipPr * shipQty);
-  const margin     = saleTotal - costTotal - shipTotal;
-  const marginRate = saleTotal > 0 ? (margin / saleTotal * 100) : null;
-
-  const fmt  = n => n.toLocaleString('ko-KR')+'원';
-  const setEl = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
-
-  // 단가합계
-  setEl('pc-cost-total', unit>0&&qty>0 ? fmt(costTotal) : '—');
-  // 판매가합계
-  const saleTotalStr = sale>0&&qty>0 ? fmt(saleTotal) : '—';
-  setEl('pc-sale-total', saleTotalStr);
-  document.getElementById('pc-sale-note').textContent =
-    sale>0&&disc>0&&qty>0 ? `${fmt(sale)} × (1−${disc}%) × ${qty}개 = ${fmt(saleTotal)}` : '';
-  // 배송비합계
-  setEl('pc-ship-total', shipPr>0&&shipQty>0 ? fmt(shipTotal) : '—');
-
-  // 마진 패널 동기화
-  setEl('pc-m-cost', unit>0&&qty>0 ? fmt(costTotal) : '—');
-  setEl('pc-m-sale', sale>0&&qty>0 ? fmt(saleTotal) : '—');
-  setEl('pc-m-ship', shipPr>0&&shipQty>0 ? fmt(shipTotal) : '—');
-
-  const marginEl = document.getElementById('pc-m-margin');
-  const rateEl   = document.getElementById('pc-m-rate');
-  const hasData  = qty>0 && (unit>0 || sale>0);
-  if(hasData){
-    marginEl.textContent = fmt(margin);
-    marginEl.style.color = margin>=0 ? '#16A34A' : '#DC2626';
-    if(marginRate!=null){
-      rateEl.textContent = marginRate.toFixed(1)+'%';
-      rateEl.style.color = marginRate>=0 ? '#16A34A' : '#DC2626';
-    } else { rateEl.textContent='—'; rateEl.style.color='var(--tx)'; }
+  const unit   =parseFloat(document.getElementById('pc-unit').value)||0;
+  const qty    =parseFloat(document.getElementById('pc-qty').value)||0;
+  const sale   =parseFloat(document.getElementById('pc-sale').value)||0;
+  const disc   =parseFloat(document.getElementById('pc-disc').value)||0;
+  const shipPr =parseFloat(document.getElementById('pc-ship').value)||0;
+  const shipQty=parseFloat(document.getElementById('pc-ship-qty').value)||0;
+  const costTotal =Math.round(unit*qty);
+  const saleAfDisc=Math.round(sale*(1-disc/100));
+  const saleTotal =Math.round(saleAfDisc*qty);
+  const shipTotal =Math.round(shipPr*shipQty);
+  const margin    =saleTotal-costTotal-shipTotal;
+  const marginRate=saleTotal>0?(margin/saleTotal*100):null;
+  const fmt=n=>n.toLocaleString('ko-KR')+'원';
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  s('pc-cost-total', unit>0&&qty>0?fmt(costTotal):'—');
+  s('pc-sale-total', sale>0&&qty>0?fmt(saleTotal):'—');
+  document.getElementById('pc-sale-note').textContent=sale>0&&disc>0&&qty>0?`${fmt(sale)} × (1−${disc}%) × ${qty}개 = ${fmt(saleTotal)}`:'';
+  s('pc-ship-total', shipPr>0&&shipQty>0?fmt(shipTotal):'—');
+  s('pc-m-cost', unit>0&&qty>0?fmt(costTotal):'—');
+  s('pc-m-sale', sale>0&&qty>0?fmt(saleTotal):'—');
+  s('pc-m-ship', shipPr>0&&shipQty>0?fmt(shipTotal):'—');
+  const mEl=document.getElementById('pc-m-margin'), rEl=document.getElementById('pc-m-rate');
+  const has=qty>0&&(unit>0||sale>0);
+  if(has){
+    mEl.textContent=fmt(margin); mEl.style.color=margin>=0?'#16A34A':'#DC2626';
+    if(marginRate!=null){rEl.textContent=marginRate.toFixed(1)+'%';rEl.style.color=marginRate>=0?'#16A34A':'#DC2626';}
+    else{rEl.textContent='—';rEl.style.color='var(--tx)';}
   } else {
-    marginEl.textContent='—'; marginEl.style.color='var(--tx)';
-    rateEl.textContent='—';   rateEl.style.color='var(--tx)';
+    mEl.textContent='—';mEl.style.color='var(--tx)';rEl.textContent='—';rEl.style.color='var(--tx)';
   }
+}
+
+function pcGetData(){
+  const unit   =parseFloat(document.getElementById('pc-unit').value)||0;
+  const qty    =parseFloat(document.getElementById('pc-qty').value)||0;
+  const sale   =parseFloat(document.getElementById('pc-sale').value)||0;
+  const disc   =parseFloat(document.getElementById('pc-disc').value)||0;
+  const shipPr =parseFloat(document.getElementById('pc-ship').value)||0;
+  const shipQty=parseFloat(document.getElementById('pc-ship-qty').value)||0;
+  const name   =document.getElementById('pc-name').value.trim();
+  const code   =document.getElementById('pc-code').value.trim();
+  if(!name&&!code){alert('상품명 또는 상품코드를 입력하세요.');return null;}
+  if(qty<=0){alert('수량을 입력하세요.');return null;}
+  if(unit<=0&&sale<=0){alert('개당단가 또는 판매가를 입력하세요.');return null;}
+  const costTotal =Math.round(unit*qty);
+  const saleAfDisc=Math.round(sale*(1-disc/100));
+  const saleTotal =Math.round(saleAfDisc*qty);
+  const shipTotal =Math.round(shipPr*shipQty);
+  const margin    =saleTotal-costTotal-shipTotal;
+  const marginRate=saleTotal>0?(margin/saleTotal*100):0;
+  return{code,name,unit,qty,costTotal,sale,disc,saleAfDisc,saleTotal,shipPr,shipQty,shipTotal,margin,marginRate};
+}
+
+function pcAddOrUpdate(){
+  const data=pcGetData(); if(!data)return;
+  if(_pcEditId!==null){
+    const idx=_pcItems.findIndex(x=>x.id===_pcEditId);
+    if(idx>=0) _pcItems[idx]={..._pcItems[idx],...data};
+    _pcEditId=null;
+    document.getElementById('pc-add-btn').innerHTML='➕ 추가하기';
+  } else {
+    _pcItems.push({id:_pcItemNextId++,...data});
+  }
+  pcRenderList();
+  pcReset();
+}
+
+function pcEditItem(id){
+  const item=_pcItems.find(x=>x.id===id); if(!item)return;
+  _pcEditId=id; _pcRawPrice=null;
+  document.getElementById('pc-code').value    =item.code||'';
+  document.getElementById('pc-name').value    =item.name||'';
+  document.getElementById('pc-sur').value     ='';
+  document.getElementById('pc-unit').value    =item.unit||'';
+  document.getElementById('pc-qty').value     =item.qty||'';
+  document.getElementById('pc-sale').value    =item.sale||'';
+  document.getElementById('pc-disc').value    =item.disc||'';
+  document.getElementById('pc-ship').value    =item.shipPr||'0';
+  document.getElementById('pc-ship-qty').value=item.shipQty||'';
+  document.getElementById('pc-unit-note').textContent='';
+  document.getElementById('pc-add-btn').innerHTML='✏️ 수정하기';
+  pcCalc();
+  pcRenderList();
+  document.getElementById('pc-left-panel')?.scrollTo({top:0,behavior:'smooth'});
+}
+
+function pcDeleteItem(id){
+  if(!confirm('이 항목을 삭제하시겠습니까?'))return;
+  _pcItems=_pcItems.filter(x=>x.id!==id);
+  if(_pcEditId===id){_pcEditId=null;document.getElementById('pc-add-btn').innerHTML='➕ 추가하기';}
+  pcRenderList();
+}
+
+function pcRenderList(){
+  const emEl=document.getElementById('pc-empty');
+  const tEl =document.getElementById('pc-tbl');
+  const tbEl=document.getElementById('pc-tbody');
+  const totEl=document.getElementById('pc-totals');
+  const cntEl=document.getElementById('pc-count');
+  cntEl.textContent=`${_pcItems.length}개`;
+  if(!_pcItems.length){emEl.style.display='';tEl.style.display='none';totEl.style.display='none';return;}
+  emEl.style.display='none';tEl.style.display='';totEl.style.display='';
+  const fmt=n=>n.toLocaleString('ko-KR')+'원';
+  const mc=v=>v>=0?'#16A34A':'#DC2626';
+  tbEl.innerHTML=_pcItems.map((it,i)=>`
+    <tr style="border-bottom:0.5px solid var(--bd);${_pcEditId===it.id?'background:#FFF7ED;':''}">
+      <td style="padding:7px 10px;text-align:center;color:var(--tx2);font-size:11px;">${i+1}</td>
+      <td style="padding:7px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${it.name||it.code||''}">${it.name||it.code||'—'}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap;">${it.unit>0?fmt(it.unit):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${it.qty}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;">${it.costTotal>0?fmt(it.costTotal):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap;">${it.sale>0?fmt(it.sale):'—'}${it.disc>0?`<div style="font-size:10px;color:#D97706;">-${it.disc}%</div>`:''}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:#3182F6;">${it.saleTotal>0?fmt(it.saleTotal):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${it.shipQty>0?it.shipQty:'—'}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap;color:#D97706;">${it.shipTotal>0?fmt(it.shipTotal):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:${mc(it.margin)};">${fmt(it.margin)}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:${mc(it.marginRate)};">${it.marginRate.toFixed(1)}%</td>
+      <td style="padding:7px 10px;text-align:center;white-space:nowrap;">
+        <button onclick="pcEditItem(${it.id})" style="padding:3px 7px;border:1px solid #3182F6;border-radius:5px;background:transparent;color:#3182F6;font-size:10px;cursor:pointer;margin-right:3px;">수정</button>
+        <button onclick="pcDeleteItem(${it.id})" style="padding:3px 7px;border:1px solid #DC2626;border-radius:5px;background:transparent;color:#DC2626;font-size:10px;cursor:pointer;">삭제</button>
+      </td>
+    </tr>`).join('');
+  const tC=_pcItems.reduce((s,x)=>s+x.costTotal,0);
+  const tS=_pcItems.reduce((s,x)=>s+x.saleTotal,0);
+  const tSh=_pcItems.reduce((s,x)=>s+x.shipTotal,0);
+  const tM=tS-tC-tSh;
+  const tR=tS>0?(tM/tS*100):0;
+  document.getElementById('pc-tot-cost').textContent=fmt(tC);
+  document.getElementById('pc-tot-sale').textContent=fmt(tS);
+  document.getElementById('pc-tot-ship').textContent=fmt(tSh);
+  const tmEl=document.getElementById('pc-tot-margin');tmEl.textContent=fmt(tM);tmEl.style.color=mc(tM);
+  const trEl=document.getElementById('pc-tot-rate');trEl.textContent=tR.toFixed(1)+'%';trEl.style.color=mc(tR);
 }
 
 function pcReset(){
   ['pc-code','pc-name','pc-sur','pc-unit','pc-qty','pc-sale','pc-disc','pc-ship-qty'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value='';
+    const el=document.getElementById(id);if(el)el.value='';
   });
-  const ship=document.getElementById('pc-ship'); if(ship) ship.value='0';
+  const ship=document.getElementById('pc-ship');if(ship)ship.value='0';
   document.getElementById('pc-dd').style.display='none';
   document.getElementById('pc-unit-note').textContent='';
   document.getElementById('pc-sale-note').textContent='';
-  _pcRawPrice=null;
+  _pcRawPrice=null; _pcEditId=null;
+  document.getElementById('pc-add-btn').innerHTML='➕ 추가하기';
   pcCalc();
 }
+
+// ── 견적 저장/조회 ──
+function pcOpenSaveModal(){
+  if(!_pcItems.length){alert('추가된 항목이 없습니다.');return;}
+  document.getElementById('pc-est-name-inp').value='';
+  document.getElementById('pcSaveModal').style.display='flex';
+  setTimeout(()=>document.getElementById('pc-est-name-inp').focus(),80);
+}
+function pcCloseSaveModal(){document.getElementById('pcSaveModal').style.display='none';}
+function pcConfirmSave(){
+  const name=document.getElementById('pc-est-name-inp').value.trim();
+  if(!name){alert('견적명을 입력하세요.');return;}
+  const tC=_pcItems.reduce((s,x)=>s+x.costTotal,0);
+  const tS=_pcItems.reduce((s,x)=>s+x.saleTotal,0);
+  const tSh=_pcItems.reduce((s,x)=>s+x.shipTotal,0);
+  const tM=tS-tC-tSh;
+  const tR=tS>0?(tM/tS*100):0;
+  const now=new Date();
+  const dateStr=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
+  const est={id:_pcEstNextId++,name,date:dateStr,ts:now.getTime(),
+    items:JSON.parse(JSON.stringify(_pcItems)),
+    totals:{tC,tS,tSh,tM,tR}};
+  _pcEstimates.unshift(est);
+  try{localStorage.setItem('pc_estimates',JSON.stringify(_pcEstimates));}catch(e){}
+  pcCloseSaveModal();
+  pcRenderEstimates();
+  alert(`"${name}" 견적이 저장되었습니다.`);
+}
+
+function pcRenderEstimates(){
+  const listEl=document.getElementById('pc-est-list');if(!listEl)return;
+  if(!_pcEstimates.length){
+    listEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--tx2);font-size:12px;">저장된 견적이 없습니다</div>';
+    return;
+  }
+  const fmt=n=>n.toLocaleString('ko-KR');
+  const mc=v=>v>=0?'#16A34A':'#DC2626';
+  listEl.innerHTML=_pcEstimates.map((e,idx)=>`
+    <div onclick="pcViewEstimate(${e.id})"
+      style="padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"
+      onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+        <span style="font-size:10px;color:var(--tx2);flex-shrink:0;background:var(--bg2);padding:2px 6px;border-radius:4px;">${idx+1}</span>
+        <span style="font-size:11px;color:var(--tx2);flex-shrink:0;">${e.date}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.name}</span>
+        <span style="font-size:11px;color:var(--tx2);flex-shrink:0;">${e.items.length}개</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+        <div style="text-align:right;">
+          <div style="font-size:10px;color:var(--tx2);">마진</div>
+          <div style="font-size:12px;font-weight:600;color:${mc(e.totals.tM)};">${fmt(e.totals.tM)}원</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10px;color:var(--tx2);">마진율</div>
+          <div style="font-size:12px;font-weight:600;color:${mc(e.totals.tR)};">${e.totals.tR.toFixed(1)}%</div>
+        </div>
+        <button onclick="event.stopPropagation();pcDeleteEstimate(${e.id})" style="padding:3px 8px;border:1px solid #DC2626;border-radius:5px;background:transparent;color:#DC2626;font-size:10px;cursor:pointer;">삭제</button>
+      </div>
+    </div>`).join('');
+}
+
+function pcViewEstimate(id){
+  const e=_pcEstimates.find(x=>x.id===id);if(!e)return;
+  const fmt=n=>n.toLocaleString('ko-KR')+'원';
+  const mc=v=>v>=0?'#16A34A':'#DC2626';
+  document.getElementById('pcViewTitle').innerHTML=`📋 ${e.name} <span style="font-size:11px;color:var(--tx2);font-weight:400;margin-left:8px;">${e.date}</span>`;
+  const rows=e.items.map((it,i)=>`
+    <tr style="border-bottom:0.5px solid var(--bd);">
+      <td style="padding:7px 10px;text-align:center;color:var(--tx2);">${i+1}</td>
+      <td style="padding:7px 10px;white-space:nowrap;">${it.name||it.code||'—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${it.unit>0?fmt(it.unit):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${it.qty}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:600;">${it.costTotal>0?fmt(it.costTotal):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${it.sale>0?fmt(it.sale):'—'}${it.disc>0?`<div style="font-size:10px;color:#D97706;">-${it.disc}%</div>`:''}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:600;color:#3182F6;">${it.saleTotal>0?fmt(it.saleTotal):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;">${it.shipQty>0?it.shipQty:'—'}</td>
+      <td style="padding:7px 10px;text-align:right;color:#D97706;">${it.shipTotal>0?fmt(it.shipTotal):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:600;color:${mc(it.margin)};">${fmt(it.margin)}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:600;color:${mc(it.marginRate)};">${it.marginRate.toFixed(1)}%</td>
+    </tr>`).join('');
+  const t=e.totals;
+  document.getElementById('pcViewContent').innerHTML=`
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">
+        <thead><tr style="background:var(--bg2);">
+          <th class="pc-th" style="text-align:center;width:28px;">#</th>
+          <th class="pc-th" style="text-align:left;">상품명</th>
+          <th class="pc-th">개당단가</th><th class="pc-th">수량</th>
+          <th class="pc-th">단가합계</th><th class="pc-th">판매가(할인%)</th>
+          <th class="pc-th">판매가합계</th><th class="pc-th">배송수량</th>
+          <th class="pc-th">배송비</th><th class="pc-th">마진</th><th class="pc-th">마진율</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr style="background:var(--bg2);font-weight:700;border-top:1px solid var(--bd);">
+          <td colspan="4" style="padding:9px 10px;">합 계</td>
+          <td style="padding:9px 10px;text-align:right;">${fmt(t.tC)}</td>
+          <td></td>
+          <td style="padding:9px 10px;text-align:right;color:#3182F6;">${fmt(t.tS)}</td>
+          <td></td>
+          <td style="padding:9px 10px;text-align:right;color:#D97706;">${fmt(t.tSh)}</td>
+          <td style="padding:9px 10px;text-align:right;color:${mc(t.tM)};">${fmt(t.tM)}</td>
+          <td style="padding:9px 10px;text-align:right;color:${mc(t.tR)};">${t.tR.toFixed(1)}%</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+  document.getElementById('pcViewModal').style.display='flex';
+}
+
+function pcDeleteEstimate(id){
+  if(!confirm('이 견적을 삭제하시겠습니까?'))return;
+  _pcEstimates=_pcEstimates.filter(x=>x.id!==id);
+  try{localStorage.setItem('pc_estimates',JSON.stringify(_pcEstimates));}catch(e){}
+  pcRenderEstimates();
+}
+
 // 드롭다운 외부 클릭 시 닫기
 document.addEventListener('click',function(e){
   const dd=document.getElementById('pc-dd');
   if(dd&&!dd.contains(e.target)&&e.target.id!=='pc-code') dd.style.display='none';
 });
+
+// 초기 렌더
+pcRenderEstimates();
 
 // ══════════════════════════════════════════════
 // 재고관리
