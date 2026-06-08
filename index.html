@@ -4166,7 +4166,7 @@ function renderBdTable(){
       <td>${r.type||'—'}</td>
       <td style="font-weight:500;">${r.name||'—'}</td>
       <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</td>
-      <td style="text-align:center;"><button class="btn btn-sm" onclick="openBdEdit('${(r.code||'').replace(/'/g,"\\'")}')">수정</button></td>
+      <td style="text-align:center;"><button class="btn btn-sm" onclick="openBdEdit('${String(r.id).replace(/'/g,"\\'")}')">수정</button></td>
     </tr>`).join('');
 }
 
@@ -4200,8 +4200,8 @@ function openBdAdd(){
   openModal('bdModal');
 }
 
-function openBdEdit(code){
-  const r = _bdData.find(x=>x.code===code);
+function openBdEdit(id){
+  const r = _bdData.find(x=>String(x.id)===String(id));
   if(!r) return;
   document.getElementById('bdModalTitle').textContent='코드 수정';
   document.getElementById('bdCode').value=r.code||'';
@@ -4210,7 +4210,7 @@ function openBdEdit(code){
   fillBdTypeOptions(r.type||'');
   document.getElementById('bdName').value=r.name||'';
   document.getElementById('bdPrice').value=r.price!=null?r.price:'';
-  document.getElementById('bdEditKey').value=code;
+  document.getElementById('bdEditKey').value=String(r.id);
   openModal('bdModal');
 }
 
@@ -4290,7 +4290,7 @@ async function saveBdModal(){
   try{
     let row;
     if(editKey){
-      const idx = _bdData.findIndex(x=>x.code===editKey);
+      const idx = _bdData.findIndex(x=>String(x.id)===String(editKey));
       if(idx>=0){
         const oldPrice = _bdData[idx].price;
         row = {..._bdData[idx],supplier,type,name,price};
