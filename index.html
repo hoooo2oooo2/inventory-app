@@ -1034,16 +1034,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <span class="rev-filter-lbl" style="margin-left:8px;">판매처</span>
         <div class="rev-filter-group" id="revChBtns">
           <button class="rfbtn active" onclick="setRevCh(this,'ALL')">전체</button>
-          <button class="rfbtn" onclick="setRevCh(this,'이베이')">이베이</button>
-          <button class="rfbtn" onclick="setRevCh(this,'11번가')">11번가</button>
           <button class="rfbtn" onclick="setRevCh(this,'스마트스토어')">스마트스토어</button>
           <button class="rfbtn" onclick="setRevCh(this,'쿠팡')">쿠팡</button>
           <button class="rfbtn" onclick="setRevCh(this,'오늘의집')">오늘의집</button>
+          <button class="rfbtn" onclick="setRevCh(this,'이베이')">이베이</button>
+          <button class="rfbtn" onclick="setRevCh(this,'11번가')">11번가</button>
+          <button class="rfbtn" onclick="setRevCh(this,'올웨이즈')">올웨이즈</button>
           <button class="rfbtn" onclick="setRevCh(this,'카페24')">카페24</button>
           <button class="rfbtn" onclick="setRevCh(this,'오너클랜')">오너클랜</button>
           <button class="rfbtn" onclick="setRevCh(this,'톡스토어')">톡스토어</button>
           <button class="rfbtn" onclick="setRevCh(this,'에이블리')">에이블리</button>
-          <button class="rfbtn" onclick="setRevCh(this,'올웨이즈')">올웨이즈</button>
         </div>
       </div>
       <div class="rev-kpi" id="revMonKpiRow" style="grid-template-columns:repeat(5,1fr);">
@@ -3149,7 +3149,17 @@ async function insertRevenueRows(rows){
   }
 }
 
-const REV_CHANNELS = ['이베이','11번가','스마트스토어','쿠팡','오늘의집','카페24','오너클랜','톡스토어','에이블리','올웨이즈','전화구매건'];
+const REV_CHANNELS = ['스마트스토어','쿠팡','오늘의집','이베이','11번가','올웨이즈','카페24','오너클랜','톡스토어','에이블리','전화구매건'];
+// 판매처 고정 정렬 순서 (월별·통합·일일보고 공통)
+const CH_ORDER = ['스마트스토어','쿠팡','오늘의집','이베이','11번가','올웨이즈','카페24','오너클랜','톡스토어','에이블리'];
+function sortCh(arr){
+  return [...arr].sort((a,b)=>{
+    const ai=CH_ORDER.indexOf(a), bi=CH_ORDER.indexOf(b);
+    if(ai<0&&bi<0) return a.localeCompare(b,'ko');
+    if(ai<0) return 1; if(bi<0) return -1;
+    return ai-bi;
+  });
+}
 
 function goRevPage(p){
   _revPage = p;
@@ -3597,7 +3607,7 @@ function renderDailyReport(){
     +daysInMonth.map(d=>`<button class="rfbtn${d===_dlyFilter.day?' active':''}" onclick="setDlyFilter('day',${d===_dlyFilter.day?'null':d})">${d}일</button>`).join('');
   // 판매처 버튼: 선택된 기간 기준
   const monPfx=pad(_dlyFilter.month)+(_dlyFilter.day?('-'+pad(_dlyFilter.day)):'');
-  const chs=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(monPfx)).map(r=>r.ch).filter(Boolean))].sort();
+  const chs=sortCh([...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(monPfx)).map(r=>r.ch).filter(Boolean))]);
   const cEl=document.getElementById('revDlyChBtns');
   if(cEl) cEl.innerHTML=`<button class="rfbtn${_dlyFilter.ch==='ALL'?' active':''}" onclick="setDlyFilter('ch','ALL')">전체</button>`
     +chs.map(c=>`<button class="rfbtn${_dlyFilter.ch===c?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('');
@@ -3747,7 +3757,6 @@ function setDlyFilter(type, val){
 
 function downloadDailyExcel(){
   if(!_dlyFilter.year||!_dlyFilter.month){ alert('년도와 월을 선택하세요.'); return; }
-  const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만원`:`${Math.round(n).toLocaleString()}원`;
   const pad=v=>String(v).padStart(2,'0');
   const monStr=pad(_dlyFilter.month);
   const dayStr=_dlyFilter.day!==null?`${monStr}-${pad(_dlyFilter.day)}`:null;
@@ -3755,99 +3764,136 @@ function downloadDailyExcel(){
   const dateLabel=dayStr?`${_dlyFilter.year}-${dayStr}`:`${_dlyFilter.year}-${monStr}(월전체)`;
   const fileName=`일일보고_${dateLabel}_${chLabel}.xlsx`;
 
-  // 필터링된 원본 데이터
+  // 필터링
   let rawRows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date?.startsWith(monStr));
   if(dayStr) rawRows=rawRows.filter(r=>r.date===dayStr);
   if(_dlyFilter.ch!=='ALL') rawRows=rawRows.filter(r=>r.ch===_dlyFilter.ch);
 
+  // 정렬: 날짜 → 판매처(CH_ORDER) → 주문번호
+  const chIdx=ch=>{const i=CH_ORDER.indexOf(ch);return i>=0?i:999;};
+  rawRows=[...rawRows].sort((a,b)=>{
+    const dc=(a.date||'').localeCompare(b.date||'');
+    if(dc!==0)return dc;
+    const cc=chIdx(a.ch)-chIdx(b.ch);
+    if(cc!==0)return cc;
+    return(a.orderNo||'').localeCompare(b.orderNo||'');
+  });
+
   const wb=XLSX.utils.book_new();
+  const WON='#,##0';
+  const PCT='0.0%';
+  const MARGIN_FMT='#,##0;[Red]-#,##0'; // 마이너스는 빨간색
+  const ec=(r,c)=>XLSX.utils.encode_cell({r,c});
+
+  // 셀 포맷 + 마이너스 시 bold·red 스타일 적용
+  const applyFmt=(ws,r,c,fmt)=>{
+    const ref=ec(r,c);
+    if(!ws[ref]||ws[ref].t!=='n') return;
+    ws[ref].z=fmt;
+    if(fmt===MARGIN_FMT&&ws[ref].v<0){
+      ws[ref].s={font:{bold:true,color:{rgb:'FF0000'}}};
+    }
+  };
 
   // ── 시트1: 요약 ──
   const pkgKey=r=>`${r.date}|${r.ch}|${r.orderNo}|${r.receiver}|${r.phone1}|${r.addr}`;
   const totalSettle=rawRows.reduce((s,r)=>s+(r.settlement||0),0);
   const totalMargin=rawRows.reduce((s,r)=>s+(r.margin||0),0);
-  const totalRate=totalSettle>0?(totalMargin/totalSettle*100):0;
+  const totalRate=totalSettle>0?(totalMargin/totalSettle):0;
   const totalPkgs=new Set(rawRows.map(pkgKey)).size;
 
-  // 제품별 집계 (택배건수 = 합포장 기준 고유 배송 건수)
   const byProd={};
   rawRows.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
-    if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
+    if(!byProd[k])byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
     byProd[k].qty+=r.orderQty||0; byProd[k].pkgs.add(pkgKey(r));
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
-  Object.values(byProd).forEach(v=>{ v.cnt=v.pkgs.size; });
+  Object.values(byProd).forEach(v=>{v.cnt=v.pkgs.size;});
   const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
 
-  // 제품구분 집계
   const byType={};
   rawRows.forEach(r=>{const t=r.itemType||'기타';if(!byType[t])byType[t]=0;byType[t]+=r.settlement||0;});
   const typeList=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
 
-  const s1=[];
-  s1.push([`일일보고 - ${dateLabel} [${chLabel}]`]);
-  s1.push([]);
-  // KPI
-  s1.push(['■ 핵심 지표']);
-  s1.push(['정산금액','마진','마진율','택배건수']);
-  s1.push([totalSettle, totalMargin, parseFloat(totalRate.toFixed(2))/100, totalPkgs]);
-  s1.push([]);
-  // 제품별 현황
-  s1.push(['■ 제품별 판매 현황']);
-  s1.push(['모델명','구분','주문수량','택배건수','판매가 합','정산금액','마진','마진율']);
-  prodList.forEach(([name,v])=>{
-    const rate=v.settle>0?(v.margin/v.settle):0;
-    s1.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.settle,v.margin,parseFloat(rate.toFixed(4))]);
-  });
-  // 합계
   const tQ=prodList.reduce((s,[,v])=>s+v.qty,0);
   const tC=prodList.reduce((s,[,v])=>s+v.cnt,0);
   const tS=prodList.reduce((s,[,v])=>s+v.saleTotal,0);
   const tSt=prodList.reduce((s,[,v])=>s+v.settle,0);
   const tM=prodList.reduce((s,[,v])=>s+v.margin,0);
-  s1.push(['합계','',tQ,tC,tS,tSt,tM,tSt>0?parseFloat((tM/tSt).toFixed(4)):0]);
+
+  const s1=[];
+  s1.push([`일일보고 - ${dateLabel} [${chLabel}]`]);       // 0
+  s1.push([]);                                               // 1
+  s1.push(['■ 핵심 지표']);                                 // 2
+  s1.push(['정산금액','마진','마진율','택배건수']);          // 3
+  s1.push([totalSettle, totalMargin, totalRate, totalPkgs]); // 4 ← KPI값 (A5~D5)
+  s1.push([]);                                               // 5
+  s1.push(['■ 제품별 판매 현황']);                          // 6
+  s1.push(['모델명','구분','주문수량','택배건수','판매가합','정산금액','마진','마진율']); // 7
+  // index 8 부터 product rows
+  prodList.forEach(([name,v])=>{
+    s1.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.settle,v.margin,v.settle>0?v.margin/v.settle:0]);
+  });
+  s1.push(['합계','',tQ,tC,tS,tSt,tM,tSt>0?tM/tSt:0]); // total row
   s1.push([]);
-  // 제품구분 비중
   s1.push(['■ 제품구분별 비중']);
   s1.push(['구분','정산금액','비중']);
-  typeList.forEach(([t,v])=>{
-    s1.push([t,v,tSt>0?parseFloat((v/tSt).toFixed(4)):0]);
-  });
+  const typeStartIdx=s1.length;
+  typeList.forEach(([t,v])=>{s1.push([t,v,tSt>0?v/tSt:0]);});
 
   const ws1=XLSX.utils.aoa_to_sheet(s1);
-  // 컬럼 폭 설정
   ws1['!cols']=[{wch:35},{wch:10},{wch:10},{wch:10},{wch:14},{wch:14},{wch:12},{wch:10}];
-  // 숫자 포맷 (마진율, 비중 → 백분율)
-  const pctFmt='0.0%', wonFmt='#,##0';
-  ['E5','F5','G5'].forEach(ref=>{if(ws1[ref])ws1[ref].z=wonFmt;});
-  if(ws1['D5']) ws1['D5'].z=pctFmt;
+
+  // KPI row (index 4 = 엑셀 5행)
+  applyFmt(ws1,4,0,WON);        // 정산금액
+  applyFmt(ws1,4,1,MARGIN_FMT); // 마진
+  applyFmt(ws1,4,2,PCT);        // 마진율
+  // product rows (index 8 ~ 8+prodList.length)
+  for(let i=8;i<=8+prodList.length;i++){
+    applyFmt(ws1,i,4,WON);        // 판매가합
+    applyFmt(ws1,i,5,WON);        // 정산금액
+    applyFmt(ws1,i,6,MARGIN_FMT); // 마진
+    applyFmt(ws1,i,7,PCT);        // 마진율
+  }
+  // type rows
+  for(let i=typeStartIdx;i<s1.length;i++){
+    applyFmt(ws1,i,1,WON); // 정산금액
+    applyFmt(ws1,i,2,PCT); // 비중
+  }
   XLSX.utils.book_append_sheet(wb,ws1,'요약');
 
   // ── 시트2: 상세 데이터 ──
+  // 컬럼 인덱스(0-based): 15=배송비, 16=판매가, 17=정산금액, 18=매입액, 19=마진, 20=마진율, 21=개당단가
   const s2=[];
-  s2.push([`상세 데이터 - ${dateLabel} [${chLabel}]`]);
-  s2.push([]);
+  s2.push([`상세 데이터 - ${dateLabel} [${chLabel}]`]); // 0
+  s2.push([]);                                            // 1
   s2.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2',
     '우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수',
-    '배송비','판매가','정산금액','매입액','마진','마진율','개당단가']);
+    '배송비','판매가','정산금액','매입액','마진','마진율','개당단가']); // 2
   rawRows.forEach(r=>{
-    s2.push([
-      r.year, r.date, r.ch, r.orderNo,
-      r.buyer, r.receiver, r.phone1, r.phone2,
-      r.zip, r.addr, r.itemType, r.itemCode, r.modelName,
-      r.orderQty, r.shipQty, r.shipping,
-      r.salePrice, r.settlement, r.costPrice,
-      r.margin, r.marginRate, r.unitCost
-    ]);
+    s2.push([r.year,r.date,r.ch,r.orderNo,
+      r.buyer,r.receiver,r.phone1,r.phone2,
+      r.zip,r.addr,r.itemType,r.itemCode,r.modelName,
+      r.orderQty,r.shipQty,r.shipping,
+      r.salePrice,r.settlement,r.costPrice,
+      r.margin,r.marginRate,r.unitCost]);
   });
+
   const ws2=XLSX.utils.aoa_to_sheet(s2);
   ws2['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},
     {wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},
-    {wch:8},{wch:10},{wch:12},{wch:10},{wch:10},{wch:8},{wch:10}];
+    {wch:8},{wch:10},{wch:12},{wch:10},{wch:12},{wch:8},{wch:10}];
+
+  // 데이터 행은 index 3부터
+  for(let i=3;i<s2.length;i++){
+    [15,16,17,18,21].forEach(c=>applyFmt(ws2,i,c,WON));   // 금액 쉼표
+    applyFmt(ws2,i,19,MARGIN_FMT); // 마진 (마이너스=빨강)
+    applyFmt(ws2,i,20,PCT);        // 마진율 %
+  }
   XLSX.utils.book_append_sheet(wb,ws2,'상세데이터');
 
-  XLSX.writeFile(wb, fileName);
+  XLSX.writeFile(wb,fileName,{cellStyles:true,bookType:'xlsx'});
 }
 
 function setUniFilter(type, btn, val){
@@ -3862,7 +3908,7 @@ function buildUniFilterBtns(){
   const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort();
   // 월은 항상 1~12 전체 표시
   const allMonths=[1,2,3,4,5,6,7,8,9,10,11,12];
-  const chs=[...new Set(_revData.map(r=>r.ch).filter(Boolean))].sort();
+  const chs=sortCh([...new Set(_revData.map(r=>r.ch).filter(Boolean))]);
 
   const yEl=document.getElementById('revUniYearBtns');
   if(yEl) yEl.innerHTML=`<button class="rfbtn ${_uniFilter.year==='ALL'?'active':''}" onclick="setUniFilter('year',this,'ALL')">전체</button>`
