@@ -4040,7 +4040,17 @@ function renderUnifiedTable(){
       <td style="font-weight:500;${TC}" title="${r.modelName||''}">${r.modelName||''}</td>
       <td style="text-align:right;">${r.orderQty!=null?r.orderQty:''}</td>
       <td style="text-align:right;">${r.shipQty!=null?r.shipQty:''}</td>
-      <td style="text-align:right;">${r.shipping!=null?r.shipping.toLocaleString():''}</td>
+      <td style="text-align:right;padding:0;">
+        <input type="text" inputmode="numeric" value="${r.shipping!=null?r.shipping:''}"
+          onfocus="this.select()" onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){this.blur();}"
+          onchange="updateRowShipping(${r.id}, this.value)"
+          title="클릭하여 배송비 수정 (마진 자동 반영)"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px;border-radius:4px;cursor:text;"
+          onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
+          onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+      </td>
       <td style="text-align:right;">${r.salePrice!=null?r.salePrice.toLocaleString():''}</td>
       <td style="text-align:right;font-weight:600;">${r.settlement!=null?r.settlement.toLocaleString():''}</td>
       <td style="text-align:right;">${r.costPrice!=null?r.costPrice.toLocaleString():''}</td>
@@ -4074,6 +4084,30 @@ function renderUnifiedTable(){
 }
 
 // ── 통합 행 코드/모델명 수정 ──
+// 통합 테이블 배송비 인라인 수정 → 마진 자동 재계산
+async function updateRowShipping(id, val){
+  const r=_revData.find(x=>x.id===id);
+  if(!r) return;
+  let ship=parseFloat(String(val).replace(/[^0-9.\-]/g,''));
+  if(isNaN(ship)) ship=0;
+  ship=Math.round(ship);
+  if(ship===(r.shipping||0)){ renderUnifiedTable(); return; } // 변경 없음
+  const settle=r.settlement||0;
+  const costPrice=r.costPrice||0;
+  const margin=Math.round(settle-costPrice-ship);
+  const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
+  try{
+    const {error}=await sb.from('revenue')
+      .update({shipping_fee:ship, margin, margin_rate:marginRate}).eq('id',id);
+    if(error) throw error;
+    r.shipping=ship; r.margin=margin; r.marginRate=marginRate;
+    renderUnifiedTable();
+  }catch(e){
+    alert('배송비 저장 실패: '+e.message);
+    renderUnifiedTable();
+  }
+}
+
 function openRevRowEdit(id){
   const r=_revData.find(x=>x.id===id);
   if(!r) return;
