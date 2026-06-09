@@ -412,14 +412,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .qt-hl-val{display:flex;align-items:center;padding:2px 8px;}
 .qt-hl-val input{width:100%;border:none;outline:none;font:inherit;background:transparent;color:#000;}
 .qt-sup{display:grid;grid-template-columns:26px 88px 1fr;position:relative;}
-.qt-sup-tag{grid-row:1/6;background:#f5f6f8;border-right:1px solid #999;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-weight:700;letter-spacing:4px;font-size:13px;}
+.qt-sup-tag{grid-row:1/7;background:#f5f6f8;border-right:1px solid #999;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-weight:700;letter-spacing:4px;font-size:13px;}
 .qt-sup-lbl{background:#f5f6f8;border-right:1px solid #ddd;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;padding:4px;}
-.qt-sup-val{border-bottom:1px solid #ddd;display:flex;align-items:center;padding:3px 8px;font-size:12px;min-height:30px;}
-.qt-stamp{position:absolute;right:16px;top:50%;transform:translateY(-50%);width:64px;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;text-align:center;}
-.qt-stamp.qt-stamp-css{border:2.5px solid #c00;border-radius:50%;color:#c00;font-weight:800;opacity:.85;transform:translateY(-50%) rotate(-8deg);}
-.qt-stamp span{font-size:9px;}
-.qt-stamp b{font-size:13px;letter-spacing:1px;}
-.qt-stamp img{width:100%;height:100%;object-fit:contain;}
+.qt-sup-val{border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:center;text-align:center;padding:3px 8px;font-size:12px;min-height:30px;}
+.qt-rep-cell{position:relative;gap:8px;}
+.qt-seal{display:inline-flex;width:38px;height:38px;flex-shrink:0;opacity:.92;}
 .qt-quote-note{padding:7px 10px;border-bottom:2px solid #333;font-weight:600;font-size:12px;}
 .qt-tbl{width:100%;border-collapse:collapse;}
 .qt-tbl th{background:#f0f2f5;border:1px solid #bbb;padding:6px 4px;font-size:12px;font-weight:700;}
@@ -751,12 +748,21 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <div class="qt-sup-tag">공급자</div>
             <div class="qt-sup-lbl">사업자번호</div><div class="qt-sup-val">409-86-54328</div>
             <div class="qt-sup-lbl">상호</div><div class="qt-sup-val">(주)신성종합무역</div>
-            <div class="qt-sup-lbl">대표자</div><div class="qt-sup-val">조신성</div>
+            <div class="qt-sup-lbl">대표자</div><div class="qt-sup-val qt-rep-cell">조신성
+              <span class="qt-seal" aria-label="직인">
+                <svg viewBox="0 0 100 100" width="100%" height="100%">
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#c0150f" stroke-width="3.5"/>
+                  <circle cx="50" cy="50" r="38" fill="none" stroke="#c0150f" stroke-width="1.6"/>
+                  <text x="32" y="34" text-anchor="middle" dominant-baseline="central" font-size="24" font-weight="700" fill="#c0150f" font-family="'Batang','바탕',serif">신</text>
+                  <text x="68" y="34" text-anchor="middle" dominant-baseline="central" font-size="24" font-weight="700" fill="#c0150f" font-family="'Batang','바탕',serif">성</text>
+                  <text x="32" y="66" text-anchor="middle" dominant-baseline="central" font-size="24" font-weight="700" fill="#c0150f" font-family="'Batang','바탕',serif">무</text>
+                  <text x="68" y="66" text-anchor="middle" dominant-baseline="central" font-size="24" font-weight="700" fill="#c0150f" font-family="'Batang','바탕',serif">역</text>
+                </svg>
+              </span>
+            </div>
             <div class="qt-sup-lbl">주소</div><div class="qt-sup-val" style="font-size:11px;">부산시 사상구 새벽로113 신성종합무역</div>
-            <div class="qt-sup-lbl">업태 / 종목</div><div class="qt-sup-val">도매및소매업 / 전자상거래</div>
-            <div class="qt-stamp" id="qtStamp"></div>
-            <button class="qt-noprint" onclick="document.getElementById('qtStampFile').click()" title="도장 이미지 등록" style="position:absolute;right:6px;bottom:4px;font-size:9px;padding:1px 5px;border:1px solid var(--bd);border-radius:5px;background:rgba(255,255,255,.85);color:var(--tx2);cursor:pointer;">도장변경</button>
-            <input type="file" id="qtStampFile" accept="image/*" style="display:none;" onchange="qtStampUpload(this)">
+            <div class="qt-sup-lbl">업태</div><div class="qt-sup-val">도매및소매업</div>
+            <div class="qt-sup-lbl">종목</div><div class="qt-sup-val">전자상거래</div>
           </div>
         </div>
 
@@ -1248,9 +1254,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <button class="btn btn-pr btn-sm" onclick="openBdAdd()">+ 새 코드 추가</button>
         </div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
         <button class="btn btn-sm" onclick="downloadBackdataExcel()" style="background:#059669;color:#fff;border:none;">📥 엑셀 다운로드</button>
         <button class="btn btn-sm" onclick="openBdUpload()" style="background:#3182F6;color:#fff;border:none;">📤 엑셀 수정·업로드</button>
+        <button class="btn btn-sm" onclick="resyncRevenuePrices()" style="background:#D97706;color:#fff;border:none;" title="현재 백데이터 단가로 통합 데이터(올해 이번달~)의 단가·마진을 일괄 재계산합니다">🔄 통합 단가 일괄 반영</button>
+        <span style="font-size:11px;color:var(--tx2);">이번 달 1일부터 데이터에 현재 단가 적용</span>
       </div>
       <div class="rev-tbl-card">
         <div class="tw">
@@ -2406,32 +2414,7 @@ function qtDateChange(){
   document.getElementById('qt-date-disp').textContent=qtFmtDate(_qtDate);
 }
 
-// ── 도장 이미지 ──
-function qtRenderStamp(){
-  const el=document.getElementById('qtStamp'); if(!el) return;
-  const img=localStorage.getItem('qt_stamp');
-  if(img){
-    el.classList.remove('qt-stamp-css');
-    el.innerHTML=`<img src="${img}" alt="도장">`;
-  } else {
-    el.classList.add('qt-stamp-css');
-    el.innerHTML='<span>(주)</span><b>신성</b><span>종합무역</span>';
-  }
-}
-function qtStampUpload(input){
-  const f=input.files&&input.files[0]; if(!f) return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{ localStorage.setItem('qt_stamp', e.target.result); }
-    catch(err){ alert('도장 이미지가 너무 큽니다. 더 작은 이미지를 사용하세요.'); return; }
-    qtRenderStamp();
-  };
-  reader.readAsDataURL(f);
-  input.value='';
-}
-
 function qtInit(){
-  qtRenderStamp();
   // 빈 상태면 기본 행 5개 + 오늘 날짜
   if(_qtRows.length===0){
     for(let k=0;k<5;k++) _qtRows.push({id:_qtRowNextId++,name:'',model:'',qty:'',unit:'',note:''});
@@ -4722,6 +4705,81 @@ async function propagateBdPriceChange(bdRow, oldPrice){
     _renderRevCurrentPage();
   }
   return updates.length;
+}
+
+// 현재 백데이터 단가로 통합 데이터(올해, 이번달 1일~) 단가·마진 일괄 재계산
+async function resyncRevenuePrices(){
+  if(!_bdData || !_bdData.length){ await loadBackdata(); }
+  if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
+  const today=new Date();
+  const curYear=today.getFullYear();
+  const monthMD=`${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  if(!confirm(`현재 백데이터 단가를 통합 데이터에 일괄 반영합니다.\n대상: ${curYear}년 ${parseInt(monthMD)}월 1일 이후 전체\n\n진행할까요?`)) return;
+
+  // 백데이터 맵
+  const bdMap={}; const bdNameMap={};
+  _bdData.forEach(r=>{
+    bdMap[(r.code||'').toLowerCase()]=r;
+    if(r.name){
+      const k=normName(r.name);
+      const ck=(r.code||'').toLowerCase();
+      const special=(!r.code||SHARED_BD_CODES.has(ck));
+      if(!(k in bdNameMap)||special) bdNameMap[k]=r;
+    }
+  });
+
+  // 진행 표시
+  const btns=document.querySelectorAll('[onclick="resyncRevenuePrices()"]');
+  btns.forEach(b=>{b.disabled=true;b.dataset._t=b.textContent;b.textContent='반영 중...';});
+
+  try{
+    let from=0, updated=0, scanned=0;
+    const PAGE=1000;
+    while(true){
+      const {data,error}=await sb.from('revenue')
+        .select('id,item_code,model_name,order_qty,settlement,shipping_fee,unit_cost,cost_price,margin')
+        .eq('year',curYear).gte('sale_date',monthMD).range(from,from+PAGE-1);
+      if(error){ throw error; }
+      if(!data||!data.length) break;
+      scanned+=data.length;
+      const upd=[];
+      data.forEach(r=>{
+        const codeKey=(r.item_code||'').toLowerCase();
+        const isShared=SHARED_BD_CODES.has(codeKey)||!r.item_code;
+        const nameKey=normName(r.model_name);
+        const bd=isShared?(nameKey?bdNameMap[nameKey]:null):(bdMap[codeKey]||(nameKey?bdNameMap[nameKey]:null));
+        if(!bd||bd.price==null) return;
+        const unitCost=bd.price;
+        const costPrice=Math.round(unitCost*(r.order_qty||0));
+        const settle=r.settlement||0, shipping=r.shipping_fee||0;
+        const margin=Math.round(settle-costPrice-shipping);
+        const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
+        if(unitCost!==(r.unit_cost||0)||costPrice!==(r.cost_price||0)||margin!==(r.margin||0)){
+          upd.push({id:r.id,unit_cost:unitCost,cost_price:costPrice,margin,margin_rate:marginRate});
+        }
+      });
+      // 배치 업데이트
+      const CHUNK=80;
+      for(let i=0;i<upd.length;i+=CHUNK){
+        await Promise.all(upd.slice(i,i+CHUNK).map(u=>
+          sb.from('revenue').update({unit_cost:u.unit_cost,cost_price:u.cost_price,margin:u.margin,margin_rate:u.margin_rate}).eq('id',u.id)
+        ));
+      }
+      // 메모리 반영
+      if(_revLoaded && upd.length){
+        const m=new Map(upd.map(u=>[u.id,u]));
+        _revData.forEach(r=>{const u=m.get(r.id);if(u){r.unitCost=u.unit_cost;r.costPrice=u.cost_price;r.margin=u.margin;r.marginRate=u.margin_rate;}});
+      }
+      updated+=upd.length;
+      if(data.length<PAGE) break; from+=PAGE;
+    }
+    if(_revLoaded) _renderRevCurrentPage();
+    alert(`완료: ${scanned.toLocaleString()}건 검사, ${updated.toLocaleString()}건 단가·마진 반영했습니다.`);
+  }catch(e){
+    alert('일괄 반영 실패: '+e.message);
+  }finally{
+    btns.forEach(b=>{b.disabled=false;if(b.dataset._t)b.textContent=b.dataset._t;});
+  }
 }
 
 async function saveBdModal(){
