@@ -3365,7 +3365,7 @@ async function applyAllShipping(){
 async function recalcShippingForKey(channel,item_no,feeObj){
   let all=[],from=0;
   while(true){
-    const {data}=await sb.from('revenue').select('id,settlement,cost_price,item_type,sale_price,shipping_fee,margin,order_qty')
+    const {data}=await sb.from('revenue').select('id,settlement,cost_price,item_type,sale_price,shipping_fee,margin,margin_rate,order_qty')
       .eq('channel',channel).eq('item_no',item_no).range(from,from+999);
     if(!data||!data.length)break; all=all.concat(data); if(data.length<1000)break; from+=1000;
   }
@@ -3374,8 +3374,10 @@ async function recalcShippingForKey(channel,item_no,feeObj){
     let newFee;
     if(feeObj!=null){ newFee = feeObj.perUnit ? (feeObj.fee||0)*(r.order_qty||0) : (feeObj.fee||0); }
     else newFee = calcShippingFee(channel,r.item_type,r.sale_price||0);
-    const newMargin = Math.round((r.settlement||0)-(r.cost_price||0)-newFee);
-    if(newFee!==r.shipping_fee || newMargin!==r.margin) upd.push({id:r.id,shipping_fee:newFee,margin:newMargin});
+    const settle=r.settlement||0;
+    const newMargin = Math.round(settle-(r.cost_price||0)-newFee);
+    const newRate = settle>0 ? Math.round(newMargin/settle*10000)/10000 : 0;
+    if(newFee!==r.shipping_fee || newMargin!==r.margin || newRate!==r.margin_rate) upd.push({id:r.id,shipping_fee:newFee,margin:newMargin,margin_rate:newRate});
   }
   for(let i=0;i<upd.length;i+=500){ await sb.from('revenue').upsert(upd.slice(i,i+500)); }
   if(upd.length){ _revLoaded=false; await loadRevenueData(); }  // 메모리 갱신
