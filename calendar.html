@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>업무 캘린더</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -686,16 +687,9 @@ html, body {
 
     <div class="form-group">
       <label class="form-label">✅ 오늘 수행한 업무</label>
-      <textarea class="form-input" id="rWorkDone" rows="5"
+      <textarea class="form-input" id="rWorkDone" rows="14"
         placeholder="오늘 완료한 업무를 입력하세요&#10;예) - 거래처 견적서 발송&#10;     - 팀 미팅 참석"
-        style="resize:none;line-height:1.7"></textarea>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">📅 내일 예정 업무</label>
-      <textarea class="form-input" id="rTomorrow" rows="4"
-        placeholder="내일 예정된 업무를 입력하세요&#10;예) - 계산서 발급&#10;     - 현장 방문"
-        style="resize:none;line-height:1.7"></textarea>
+        style="resize:vertical;line-height:1.7;min-height:220px;max-height:48vh;overflow-y:auto"></textarea>
     </div>
 
     <div class="form-group" style="margin-bottom:4px">
@@ -733,6 +727,89 @@ const N = {
   notes:   {},
   reports: {},
 };
+
+// ── SUPABASE 클라우드 동기화 (담당자별 공유) ──
+const SB_URL = 'https://ywbekolvslixidpugepr.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs';
+let sbCal = null;
+try { if (window.supabase) sbCal = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) { console.warn('supabase init 실패', e); }
+let _calReady = false; // 최초 클라우드 로드 완료 전엔 클라우드 저장 보류(빈 데이터 덮어쓰기 방지)
+
+// 특정 종류 데이터를 클라우드에 저장(담당자 행 단위 upsert)
+async function cloudSave(kind, dataObj) {
+  if (!sbCal || !_calReady) return;
+  try {
+    await sbCal.from('work_calendar').upsert(
+      { person: S.person, kind, data: dataObj, updated_at: new Date().toISOString() },
+      { onConflict: 'person,kind' }
+    );
+  } catch(e) { console.warn('cloudSave 실패', kind, e); }
+}
+
+// 특정 담당자의 tasks/notes/reports를 클라우드에서 로드
+//  반환: null=오류, {_empty:true}=정상조회+데이터없음, {tasks,notes,reports}=데이터있음
+async function cloudLoad(person) {
+  if (!sbCal) return null;
+  try {
+    const { data, error } = await sbCal.from('work_calendar').select('kind,data').eq('person', person);
+    if (error) { console.warn('cloudLoad 오류', error.message); return null; }
+    if (!data || !data.length) return { _empty: true };
+    const out = { tasks: {}, notes: {}, reports: {} };
+    data.forEach(row => { if (row.kind in out) out[row.kind] = row.data || {}; });
+    return out;
+  } catch(e) { console.warn('cloudLoad 실패', e); return null; }
+}
+
+// 로컬 캐시 즉시 표시 → 클라우드 최신본으로 갱신(없으면 로컬 데이터를 클라우드로 1회 마이그레이션)
+async function loadPersonData(p) {
+  try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + p)          || '{}'); } catch { S.tasks = {}; }
+  try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + p)    || '{}'); } catch { N.notes = {}; }
+  try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports-' + p)  || '{}'); } catch { N.reports = {}; }
+  renderCalendar(); renderTasks(); updateToolButtons();
+
+  const cloud = await cloudLoad(p);
+  if (S.person !== p) { _calReady = true; return; } // 로드 중 담당자가 바뀌면 중단
+
+  if (cloud && !cloud._empty) {
+    // 클라우드에 데이터 있음 → 최신본 채택
+    S.tasks = cloud.tasks; N.notes = cloud.notes; N.reports = cloud.reports;
+    localStorage.setItem('work-cal-' + p,         JSON.stringify(S.tasks));
+    localStorage.setItem('work-cal-notes-' + p,   JSON.stringify(N.notes));
+    localStorage.setItem('work-cal-reports-' + p, JSON.stringify(N.reports));
+    renderCalendar(); renderTasks(); updateToolButtons();
+    _calReady = true;
+  } else if (cloud && cloud._empty) {
+    // 클라우드 비어있음 → 이 PC의 기존 로컬 데이터를 클라우드로 올림(최초 1회)
+    _calReady = true;
+    const hasLocal = Object.keys(S.tasks).length || Object.keys(N.notes).length || Object.keys(N.reports).length;
+    if (hasLocal) {
+      cloudSave('tasks', S.tasks);
+      cloudSave('notes', N.notes);
+      cloudSave('reports', N.reports);
+    }
+  } else {
+    // 오류(테이블 미생성/네트워크) → 로컬만 사용
+    _calReady = true;
+  }
+}
+
+// 현재 담당자 데이터를 클라우드 최신본으로 주기적 갱신 (편집 중이 아닐 때만)
+async function refreshCurrentFromCloud() {
+  if (!sbCal || !_calReady) return;
+  if (document.querySelector('.overlay.open')) return; // 모달 편집 중이면 건드리지 않음
+  const p = S.person;
+  const cloud = await cloudLoad(p);
+  if (!cloud || S.person !== p) return;
+  const changed = JSON.stringify(cloud.tasks) !== JSON.stringify(S.tasks)
+               || JSON.stringify(cloud.notes) !== JSON.stringify(N.notes)
+               || JSON.stringify(cloud.reports) !== JSON.stringify(N.reports);
+  if (!changed) return;
+  S.tasks = cloud.tasks; N.notes = cloud.notes; N.reports = cloud.reports;
+  localStorage.setItem('work-cal-' + p,         JSON.stringify(S.tasks));
+  localStorage.setItem('work-cal-notes-' + p,   JSON.stringify(N.notes));
+  localStorage.setItem('work-cal-reports-' + p, JSON.stringify(N.reports));
+  renderCalendar(); renderTasks(); updateToolButtons();
+}
 
 // ── UTILS ──
 const pad = n => String(n).padStart(2,'0');
@@ -781,11 +858,16 @@ window.__injectReports = function(data) {
 // ── 재고 시스템 연동: 발주/입고 일정 자동 주입 ──
 window.__addInventoryEvents = function(events) {
   // events: [{date:'YYYY-MM-DD', title:'...', priority:'high|medium|low'}]
-  // 기존 _inv 태그 이벤트 모두 제거
+  // 기존 _inv 태그 이벤트가 있는지 확인 후 제거
+  let hadInv = false;
   Object.keys(S.tasks).forEach(ds => {
+    const before = (S.tasks[ds] || []).length;
     S.tasks[ds] = (S.tasks[ds] || []).filter(t => !t._inv);
+    if (S.tasks[ds].length !== before) hadInv = true;
     if (!S.tasks[ds].length) delete S.tasks[ds];
   });
+  // 변경 사항이 전혀 없으면(빈 연동 호출) 저장하지 않음 → 클라우드 덮어쓰기 방지
+  if (!hadInv && !(events || []).length) { renderCalendar(); renderTasks(); return; }
   // 새 이벤트 주입
   (events || []).forEach(ev => {
     if (!S.tasks[ev.date]) S.tasks[ev.date] = [];
@@ -803,12 +885,14 @@ window.__addInventoryEvents = function(events) {
 };
 
 async function saveData() {
-  // 담당자별 분리 저장 (localStorage 단일 소스)
+  // 담당자별 분리 저장: 로컬 캐시 + 클라우드 공유
   localStorage.setItem('work-cal-' + S.person, JSON.stringify(S.tasks));
+  cloudSave('tasks', S.tasks);
 }
 
 async function saveNotesData() {
   localStorage.setItem('work-cal-notes-' + S.person, JSON.stringify(N.notes));
+  cloudSave('notes', N.notes);
 }
 
 function switchPerson(p) {
@@ -818,19 +902,12 @@ function switchPerson(p) {
     const btn = document.getElementById('pb-' + name);
     if(btn) btn.classList.toggle('active', name === p);
   });
-  try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + p)          || '{}'); } catch { S.tasks = {}; }
-  try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + p)    || '{}'); } catch { N.notes = {}; }
-  try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports-' + p)  || '{}'); } catch { N.reports = {}; }
-  renderCalendar(); renderTasks(); updateToolButtons();
+  loadPersonData(p);
 }
 
 async function saveReportsData() {
-  const key = 'work-cal-reports-' + S.person;
-  try {
-    localStorage.setItem(key, JSON.stringify(N.reports));
-  } catch {
-    localStorage.setItem(key, JSON.stringify(N.reports));
-  }
+  localStorage.setItem('work-cal-reports-' + S.person, JSON.stringify(N.reports));
+  cloudSave('reports', N.reports);
 }
 
 // ── DARK MODE ──
@@ -860,7 +937,7 @@ function updateToolButtons() {
   const ds = S.selDate || todayStr();
   const hasNote   = !!(N.notes[ds]   && N.notes[ds].trim());
   const r = N.reports[ds] || {};
-  const hasReport = !!(r.workDone || r.tomorrow || r.issues);
+  const hasReport = !!(r.workDone || r.issues);
 
   document.getElementById('btnNotepad').classList.toggle('has-data', hasNote);
   document.getElementById('btnReport').classList.toggle('has-data', hasReport);
@@ -896,7 +973,6 @@ function openReport() {
   document.getElementById('reportDateLabel').textContent = korDate(ds);
   const r = N.reports[ds] || {};
   document.getElementById('rWorkDone').value = r.workDone || '';
-  document.getElementById('rTomorrow').value = r.tomorrow || '';
   document.getElementById('rIssues').value   = r.issues   || '';
   document.getElementById('reportOverlay').classList.add('open');
 }
@@ -908,11 +984,10 @@ function closeReport() {
 function saveReport() {
   const ds       = S.selDate || todayStr();
   const workDone = document.getElementById('rWorkDone').value.trim();
-  const tomorrow = document.getElementById('rTomorrow').value.trim();
   const issues   = document.getElementById('rIssues').value.trim();
 
-  if (workDone || tomorrow || issues)
-    N.reports[ds] = { workDone, tomorrow, issues, updatedAt: new Date().toISOString() };
+  if (workDone || issues)
+    N.reports[ds] = { workDone, issues, updatedAt: new Date().toISOString() };
   else
     delete N.reports[ds];
 
@@ -926,17 +1001,13 @@ function fillReportFromTasks() {
   const ds      = S.selDate || todayStr();
   const tasks   = S.tasks[ds] || [];
   const done    = tasks.filter(t => t.done).map(t => `- ${t.title}`).join('\n');
-  const pending = tasks.filter(t => !t.done).map(t => `- ${t.title}`).join('\n');
 
   if (done) {
     const cur = document.getElementById('rWorkDone').value;
     document.getElementById('rWorkDone').value = cur ? cur + '\n' + done : done;
+  } else {
+    showToast('ℹ️ 알림', '이 날짜에 완료된 할 일이 없습니다.');
   }
-  if (pending) {
-    const cur = document.getElementById('rTomorrow').value;
-    document.getElementById('rTomorrow').value = cur ? cur + '\n' + pending : pending;
-  }
-  if (!done && !pending) showToast('ℹ️ 알림', '이 날짜에 등록된 할 일이 없습니다.');
 }
 
 // ── NOTIFICATIONS ──
@@ -1329,6 +1400,7 @@ function setupCalendar() {
   resetForm();
   setInterval(checkAlerts, 30000);
   setInterval(() => { renderTasks(); renderCalendar(); }, 30000);
+  setInterval(refreshCurrentFromCloud, 60000); // 클라우드 공유 데이터 주기적 동기화
   checkAlerts();
 }
 
@@ -1347,10 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btn) btn.classList.toggle('active', name === S.person);
   });
 
-  try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + S.person)          || '{}'); } catch {}
-  try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + S.person)    || '{}'); } catch {}
-  try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports-' + S.person)  || '{}'); } catch {}
-  renderCalendar(); renderTasks(); updateToolButtons();
+  loadPersonData(S.person);
 });
 </script>
 </body>
