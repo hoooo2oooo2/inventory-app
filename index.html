@@ -4500,8 +4500,27 @@ function renderUnifiedTable(){
       <td style="font-size:10px;${TC}" title="${_revMaskOn?'':r.addr||''}">${maskAddr(r.addr)}</td>
       <td style="font-size:10px;${TC}" title="${r.itemNo||''}">${r.itemNo||''}</td>
       <td style="${TC}">${r.itemType||''}</td>
-      <td style="font-size:10px;${TC}">${r.itemCode||''}</td>
-      <td style="font-weight:500;${TC}" title="${r.modelName||''}">${r.modelName||''}</td>
+      <td style="padding:0;">
+        <input type="text" value="${escAttr(r.itemCode||'')}"
+          onfocus="this.select()" onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){this.blur();}"
+          onchange="updateRowCode(${r.id}, this.value)"
+          title="클릭하여 코드 수정 (단가·마진 자동 반영)"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;font:inherit;font-size:10px;color:inherit;padding:6px 5px;border-radius:4px;cursor:text;"
+          onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
+          onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+      </td>
+      <td style="padding:0;">
+        <input type="text" value="${escAttr(r.modelName||'')}" title="${escAttr(r.modelName||'')}"
+          onfocus="this.select()" onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){this.blur();}"
+          onchange="updateRowModel(${r.id}, this.value)"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;font:inherit;font-weight:500;color:inherit;padding:6px 5px;border-radius:4px;cursor:text;text-overflow:ellipsis;"
+          onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
+          onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+      </td>
       <td style="text-align:right;">${r.orderQty!=null?r.orderQty:''}</td>
       <td style="text-align:right;">${r.shipQty!=null?r.shipQty:''}</td>
       <td style="text-align:right;padding:0;">
@@ -4572,6 +4591,57 @@ function renderUnifiedTable(){
 }
 
 // ── 통합 행 코드/모델명 수정 ──
+// 속성값 이스케이프(인라인 input value/title용)
+function escAttr(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// 코드/모델명 변경 → 백데이터 매칭으로 단가·매입·마진·마진율 재계산 후 저장 (공통 코어)
+async function applyRowCodeName(id, code, name){
+  code=(code||'').trim(); name=(name||'').trim();
+  const r=_revData.find(x=>x.id===id);
+  if(!r) return;
+  const codeKey=code.toLowerCase();
+  const isShared=SHARED_BD_CODES.has(codeKey)||!code;
+  const bdMap=getBdMap(), bdNameMap=getBdNameMap();
+  const bdRow=isShared?(name?bdNameMap[normName(name)]:null):(bdMap[codeKey]||(name?bdNameMap[normName(name)]:null));
+  const unitCost=bdRow&&bdRow.price!=null?bdRow.price:(r.unitCost||0);
+  const itemType=bdRow?(bdRow.type||''):(r.itemType||'');
+  const costPrice=Math.round(unitCost*(r.orderQty||0));
+  const settle=r.settlement||0, shipping=r.shipping||0;
+  const margin=Math.round(settle-costPrice-shipping);
+  const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
+  const {error}=await sb.from('revenue').update({
+    item_code:code||null, model_name:name, item_type:itemType,
+    unit_cost:unitCost, cost_price:costPrice, margin, margin_rate:marginRate
+  }).eq('id',id);
+  if(error) throw error;
+  r.itemCode=code; r.modelName=name; r.itemType=itemType;
+  r.unitCost=unitCost; r.costPrice=costPrice; r.margin=margin; r.marginRate=marginRate;
+}
+
+// 통합 테이블 코드 인라인 수정 → 단가·마진 자동 반영
+async function updateRowCode(id, val){
+  const r=_revData.find(x=>x.id===id); if(!r) return;
+  let code=(val||'').trim();
+  if(code===(r.itemCode||'')){ renderUnifiedTable(); return; } // 변경 없음
+  // 비공유(일반)코드면 백데이터 상품명 자동 채움
+  let name=r.modelName||'';
+  const codeKey=code.toLowerCase();
+  const isShared=SHARED_BD_CODES.has(codeKey)||!code;
+  if(!isShared){ const bd=getBdMap()[codeKey]; if(bd&&bd.name) name=bd.name; }
+  try{ await applyRowCodeName(id, code, name); renderUnifiedTable(); }
+  catch(e){ alert('코드 저장 실패: '+e.message); renderUnifiedTable(); }
+}
+
+// 통합 테이블 모델명 인라인 수정 → 단가·마진 자동 반영
+async function updateRowModel(id, val){
+  const r=_revData.find(x=>x.id===id); if(!r) return;
+  const name=(val||'').trim();
+  if(name===(r.modelName||'')){ renderUnifiedTable(); return; } // 변경 없음
+  if(!name){ alert('모델명은 비울 수 없습니다.'); renderUnifiedTable(); return; }
+  try{ await applyRowCodeName(id, r.itemCode||'', name); renderUnifiedTable(); }
+  catch(e){ alert('모델명 저장 실패: '+e.message); renderUnifiedTable(); }
+}
+
 // 통합 테이블 배송비 인라인 수정 → 마진 자동 재계산
 async function updateRowShipping(id, val){
   const r=_revData.find(x=>x.id===id);
@@ -4635,31 +4705,12 @@ async function saveRevRowEdit(){
   const code=document.getElementById('revRowEditCode').value.trim();
   const name=document.getElementById('revRowEditName').value.trim();
   if(!name){alert('모델명을 입력하세요.');return;}
-  const codeKey=code.toLowerCase();
-  const isShared=SHARED_BD_CODES.has(codeKey)||!code;
-  const bdMap=getBdMap(), bdNameMap=getBdNameMap();
-  const bdRow=isShared?(name?bdNameMap[normName(name)]:null):(bdMap[codeKey]||(name?bdNameMap[normName(name)]:null));
   const r=_revData.find(x=>x.id===id);
   if(!r) return;
-  const unitCost=bdRow&&bdRow.price!=null?bdRow.price:(r.unitCost||0);
-  const itemType=bdRow?(bdRow.type||''):(r.itemType||'');
-  const costPrice=Math.round(unitCost*(r.orderQty||0));
-  const settle=r.settlement||0, shipping=r.shipping||0;
-  const margin=Math.round(settle-costPrice-shipping);
-  const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
   const btn=document.querySelector('#revRowEditModal .btn-pr');
   if(btn){btn.disabled=true;btn.textContent='저장 중...';}
   try{
-    await sb.from('revenue').update({
-      item_code:code||null, model_name:name, item_type:itemType,
-      unit_cost:unitCost, cost_price:costPrice, margin, margin_rate:marginRate
-    }).eq('id',id);
-    const idx=_revData.findIndex(x=>x.id===id);
-    if(idx>=0){
-      _revData[idx].itemCode=code; _revData[idx].modelName=name; _revData[idx].itemType=itemType;
-      _revData[idx].unitCost=unitCost; _revData[idx].costPrice=costPrice;
-      _revData[idx].margin=margin; _revData[idx].marginRate=marginRate;
-    }
+    await applyRowCodeName(id, code, name);
     closeModal('revRowEditModal');
     renderUnifiedTable();
   } catch(e){ alert('저장 실패: '+e.message); }
