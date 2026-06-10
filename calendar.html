@@ -803,27 +803,12 @@ window.__addInventoryEvents = function(events) {
 };
 
 async function saveData() {
-  const key = 'work-cal-' + S.person;
-  try {
-    if (window.pywebview && window.pywebview.api)
-      await window.pywebview.api.save_tasks(JSON.stringify(S.tasks));
-    else
-      localStorage.setItem(key, JSON.stringify(S.tasks));
-  } catch {
-    localStorage.setItem(key, JSON.stringify(S.tasks));
-  }
+  // 담당자별 분리 저장 (localStorage 단일 소스)
+  localStorage.setItem('work-cal-' + S.person, JSON.stringify(S.tasks));
 }
 
 async function saveNotesData() {
-  const key = 'work-cal-notes-' + S.person;
-  try {
-    if (window.pywebview && window.pywebview.api)
-      await window.pywebview.api.save_notes(JSON.stringify(N.notes));
-    else
-      localStorage.setItem(key, JSON.stringify(N.notes));
-  } catch {
-    localStorage.setItem(key, JSON.stringify(N.notes));
-  }
+  localStorage.setItem('work-cal-notes-' + S.person, JSON.stringify(N.notes));
 }
 
 function switchPerson(p) {
@@ -833,19 +818,18 @@ function switchPerson(p) {
     const btn = document.getElementById('pb-' + name);
     if(btn) btn.classList.toggle('active', name === p);
   });
-  try { S.tasks = JSON.parse(localStorage.getItem('work-cal-' + p) || '{}'); } catch { S.tasks = {}; }
-  try { N.notes = JSON.parse(localStorage.getItem('work-cal-notes-' + p) || '{}'); } catch { N.notes = {}; }
+  try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + p)          || '{}'); } catch { S.tasks = {}; }
+  try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + p)    || '{}'); } catch { N.notes = {}; }
+  try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports-' + p)  || '{}'); } catch { N.reports = {}; }
   renderCalendar(); renderTasks(); updateToolButtons();
 }
 
 async function saveReportsData() {
+  const key = 'work-cal-reports-' + S.person;
   try {
-    if (window.pywebview && window.pywebview.api)
-      await window.pywebview.api.save_reports(JSON.stringify(N.reports));
-    else
-      localStorage.setItem('work-cal-reports', JSON.stringify(N.reports));
+    localStorage.setItem(key, JSON.stringify(N.reports));
   } catch {
-    localStorage.setItem('work-cal-reports', JSON.stringify(N.reports));
+    localStorage.setItem(key, JSON.stringify(N.reports));
   }
 }
 
@@ -1363,12 +1347,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btn) btn.classList.toggle('active', name === S.person);
   });
 
-  if (!window.pywebview) {
-    try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + S.person)       || '{}'); } catch {}
-    try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + S.person) || '{}'); } catch {}
-    try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports')            || '{}'); } catch {}
-    renderCalendar(); renderTasks(); updateToolButtons();
-  }
+  try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + S.person)          || '{}'); } catch {}
+  try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + S.person)    || '{}'); } catch {}
+  try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports-' + S.person)  || '{}'); } catch {}
+  renderCalendar(); renderTasks(); updateToolButtons();
 });
 </script>
 </body>
