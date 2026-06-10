@@ -396,6 +396,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-uni-scroll tfoot .uni-sum-item .val{font-size:14px;font-weight:700;color:#0f172a;}
 #page-revenue .rev-uni-scroll tfoot .uni-sum-pos{color:#059669!important;}
 #page-revenue .rev-uni-scroll tfoot .uni-sum-neg{color:#DC2626!important;}
+/* 헤더 클릭 정렬 */
+#page-revenue .rev-uni-scroll .uni-sort-th{user-select:none;}
+#page-revenue .rev-uni-scroll .uni-sort-th:hover{color:#2563EB;}
+#page-revenue .rev-uni-scroll .uni-sort-ar{font-size:9px;color:#2563EB;}
 #page-revenue .rev-mask{display:inline-block;background:#F1F5F9;color:#94A3B8;border-radius:4px;padding:0 5px;font-size:10px;letter-spacing:1px;}
 #page-revenue .rev-margin-pos{color:#059669;font-weight:600;}
 #page-revenue .rev-margin-neg{color:#DC2626;font-weight:600;}
@@ -1407,9 +1411,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <th>우편</th><th>주소</th><th>상품번호</th>
               <th>구분</th><th>코드</th><th>모델명</th>
               <th style="text-align:right;">수량</th><th style="text-align:right;">출고</th>
-              <th style="text-align:right;">배송비</th><th style="text-align:right;">판매가</th>
-              <th style="text-align:right;">정산</th><th style="text-align:right;">매입</th>
-              <th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
+              <th style="text-align:right;">배송비</th>
+              <th class="uni-sort-th" style="text-align:right;cursor:pointer;" onclick="setUniSort('salePrice')" title="클릭하여 정렬">판매가<span class="uni-sort-ar" data-k="salePrice"></span></th>
+              <th class="uni-sort-th" style="text-align:right;cursor:pointer;" onclick="setUniSort('settlement')" title="클릭하여 정렬">정산<span class="uni-sort-ar" data-k="settlement"></span></th>
+              <th class="uni-sort-th" style="text-align:right;cursor:pointer;" onclick="setUniSort('costPrice')" title="클릭하여 정렬">매입<span class="uni-sort-ar" data-k="costPrice"></span></th>
+              <th class="uni-sort-th" style="text-align:right;cursor:pointer;" onclick="setUniSort('margin')" title="클릭하여 정렬">마진<span class="uni-sort-ar" data-k="margin"></span></th>
+              <th class="uni-sort-th" style="text-align:right;cursor:pointer;" onclick="setUniSort('marginRate')" title="클릭하여 정렬">마진율<span class="uni-sort-ar" data-k="marginRate"></span></th>
               <th style="text-align:right;">단가</th>
               <th></th>
             </tr></thead>
@@ -3937,7 +3944,20 @@ function setRevMonthNum(btn, m){
 
 // ── 통합 탭 ──
 let _uniFilter = {year:'ALL', months: new Set(), chs: new Set()};
+let _uniSort = {key:null, dir:-1}; // 헤더 정렬: dir -1=내림차순, 1=오름차순
 let _revMaskOn = true; // 기본: 마스킹 ON
+
+// 통합 헤더 클릭 정렬 (내림차순 → 오름차순 → 해제 토글)
+function setUniSort(key){
+  if(_uniSort.key===key){
+    if(_uniSort.dir===-1) _uniSort.dir=1;
+    else { _uniSort.key=null; _uniSort.dir=-1; }
+  } else {
+    _uniSort.key=key; _uniSort.dir=-1; // 첫 클릭은 큰 값부터
+  }
+  _uniPage=0;
+  renderUnifiedTable();
+}
 
 // 개인정보 마스킹 함수
 function maskPhone(v){
@@ -4421,6 +4441,23 @@ function renderUnifiedTable(){
     if((a.date||'')!==(b.date||'')) return (a.date||'')>(b.date||'')?1:-1;
     if((a.ch||'')!==(b.ch||'')) return (a.ch||'')<(b.ch||'')?-1:1;
     return String(a.orderNo||'')<String(b.orderNo||'')?-1:1;
+  });
+
+  // ★ 헤더 클릭 정렬 (선택 시 기본정렬 대체)
+  if(_uniSort.key){
+    const k=_uniSort.key, d=_uniSort.dir;
+    rows.sort((a,b)=>{
+      const va=a[k], vb=b[k];
+      const na=(va==null||isNaN(va)), nb=(vb==null||isNaN(vb));
+      if(na&&nb) return 0;
+      if(na) return 1;   // 빈값은 항상 뒤로
+      if(nb) return -1;
+      return (va-vb)*d;
+    });
+  }
+  // 정렬 화살표 표시 갱신
+  document.querySelectorAll('.uni-sort-ar').forEach(el=>{
+    el.textContent = _uniSort.key===el.dataset.k ? (_uniSort.dir===-1?' ▼':' ▲') : '';
   });
 
   const total=rows.length;
