@@ -74,6 +74,11 @@ html, body {
 .app-title  { font-size: 16px; font-weight: 700; }
 .app-sub    { font-size: 11px; color: var(--text3); margin-top: 1px; }
 
+.person-sel { display:flex; gap:6px; padding:10px 22px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.person-btn { flex:1; padding:5px 0; border-radius:8px; border:1.5px solid var(--border); background:none; font-size:12px; font-weight:700; cursor:pointer; transition:all var(--ease); font-family:inherit; color:var(--text2); }
+.person-btn:hover { border-color:var(--blue); color:var(--blue); }
+.person-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+
 /* Month nav */
 .cal-nav {
   display: flex; align-items: center;
@@ -520,6 +525,11 @@ html, body {
         <div class="app-sub">스마트 할 일 관리</div>
       </div>
     </div>
+    <div class="person-sel">
+      <button class="person-btn" id="pb-유현" onclick="switchPerson('유현')">유현</button>
+      <button class="person-btn" id="pb-보라" onclick="switchPerson('보라')">보라</button>
+      <button class="person-btn" id="pb-연정" onclick="switchPerson('연정')">연정</button>
+    </div>
 
     <div class="cal-nav">
       <button class="cal-nav-btn" id="btnPrev">‹</button>
@@ -715,6 +725,7 @@ const S = {
   editId:    null,
   editDate:  null,
   selPri:    'medium',
+  person:    '유현',
 };
 
 // 메모장 / 보고서 상태
@@ -792,25 +803,39 @@ window.__addInventoryEvents = function(events) {
 };
 
 async function saveData() {
+  const key = 'work-cal-' + S.person;
   try {
     if (window.pywebview && window.pywebview.api)
       await window.pywebview.api.save_tasks(JSON.stringify(S.tasks));
     else
-      localStorage.setItem('work-cal', JSON.stringify(S.tasks));
+      localStorage.setItem(key, JSON.stringify(S.tasks));
   } catch {
-    localStorage.setItem('work-cal', JSON.stringify(S.tasks));
+    localStorage.setItem(key, JSON.stringify(S.tasks));
   }
 }
 
 async function saveNotesData() {
+  const key = 'work-cal-notes-' + S.person;
   try {
     if (window.pywebview && window.pywebview.api)
       await window.pywebview.api.save_notes(JSON.stringify(N.notes));
     else
-      localStorage.setItem('work-cal-notes', JSON.stringify(N.notes));
+      localStorage.setItem(key, JSON.stringify(N.notes));
   } catch {
-    localStorage.setItem('work-cal-notes', JSON.stringify(N.notes));
+    localStorage.setItem(key, JSON.stringify(N.notes));
   }
+}
+
+function switchPerson(p) {
+  S.person = p;
+  localStorage.setItem('work-cal-person', p);
+  ['유현','보라','연정'].forEach(name => {
+    const btn = document.getElementById('pb-' + name);
+    if(btn) btn.classList.toggle('active', name === p);
+  });
+  try { S.tasks = JSON.parse(localStorage.getItem('work-cal-' + p) || '{}'); } catch { S.tasks = {}; }
+  try { N.notes = JSON.parse(localStorage.getItem('work-cal-notes-' + p) || '{}'); } catch { N.notes = {}; }
+  renderCalendar(); renderTasks(); updateToolButtons();
 }
 
 async function saveReportsData() {
@@ -1331,10 +1356,17 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   setupCalendar();
 
+  // 담당자 초기화
+  S.person = localStorage.getItem('work-cal-person') || '유현';
+  ['유현','보라','연정'].forEach(name => {
+    const btn = document.getElementById('pb-' + name);
+    if(btn) btn.classList.toggle('active', name === S.person);
+  });
+
   if (!window.pywebview) {
-    try { S.tasks   = JSON.parse(localStorage.getItem('work-cal')         || '{}'); } catch {}
-    try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes')   || '{}'); } catch {}
-    try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports') || '{}'); } catch {}
+    try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + S.person)       || '{}'); } catch {}
+    try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + S.person) || '{}'); } catch {}
+    try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports')            || '{}'); } catch {}
     renderCalendar(); renderTasks(); updateToolButtons();
   }
 });
