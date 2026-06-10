@@ -388,10 +388,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-uni-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 300px);}
 #page-revenue .rev-uni-scroll thead th{position:sticky;top:0;z-index:5;background:var(--bg2);}
 /* 합계 행: 스크롤해도 하단 고정, 흰 바탕, 컬럼 정렬 */
-#page-revenue .rev-uni-scroll tfoot td{position:sticky;bottom:0;z-index:7;background:#fff;border-top:2px solid #1E293B;font-size:14px;font-weight:700;padding:10px 8px;color:#0f172a;white-space:nowrap;overflow:visible;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-lbl{font-size:13px;font-weight:600;color:#64748B;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-pos{color:#059669;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-neg{color:#DC2626;}
+#page-revenue .rev-uni-scroll tfoot td{position:sticky;bottom:0;left:0;z-index:7;background:#fff;border-top:2px solid #1E293B;padding:11px 16px;color:#0f172a;}
+#page-revenue .rev-uni-scroll tfoot .uni-sum-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;position:sticky;left:16px;}
+#page-revenue .rev-uni-scroll tfoot .uni-sum-total{font-size:13px;font-weight:700;color:#1E293B;background:#F1F5F9;border-radius:6px;padding:3px 10px;white-space:nowrap;}
+#page-revenue .rev-uni-scroll tfoot .uni-sum-item{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap;}
+#page-revenue .rev-uni-scroll tfoot .uni-sum-item .lbl{font-size:12px;font-weight:600;color:#64748B;}
+#page-revenue .rev-uni-scroll tfoot .uni-sum-item .val{font-size:14px;font-weight:700;color:#0f172a;}
+#page-revenue .rev-uni-scroll tfoot .uni-sum-pos{color:#059669!important;}
+#page-revenue .rev-uni-scroll tfoot .uni-sum-neg{color:#DC2626!important;}
 #page-revenue .rev-mask{display:inline-block;background:#F1F5F9;color:#94A3B8;border-radius:4px;padding:0 5px;font-size:10px;letter-spacing:1px;}
 #page-revenue .rev-margin-pos{color:#059669;font-weight:600;}
 #page-revenue .rev-margin-neg{color:#DC2626;font-weight:600;}
@@ -1412,15 +1416,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <tbody id="revUniTbody"></tbody>
             <tfoot id="revUniFoot" style="display:none;">
               <tr>
-                <td></td>
-                <td colspan="14" style="text-align:right;"><span class="uni-sum-lbl" id="revUniSumLbl">합계</span></td>
-                <td></td><td></td><td></td>
-                <td style="text-align:right;" id="revUniSumSale"></td>
-                <td style="text-align:right;" id="revUniSumSettle"></td>
-                <td style="text-align:right;" id="revUniSumCost"></td>
-                <td style="text-align:right;" id="revUniSumMargin"></td>
-                <td style="text-align:right;" id="revUniSumRate"></td>
-                <td></td><td></td>
+                <td colspan="25" id="revUniSumCell"></td>
               </tr>
             </tfoot>
           </table>
@@ -4513,9 +4509,10 @@ function renderUnifiedTable(){
       </div>`;
   }
 
-  // 합계 행 (테이블 하단 고정, 컬럼 정렬)
+  // 합계 행 (테이블 하단 고정, 라벨형 — 금액 잘림 없음)
   const foot = document.getElementById('revUniFoot');
-  if(foot){
+  const sumCell = document.getElementById('revUniSumCell');
+  if(foot && sumCell){
     const tSale   = rows.reduce((s,r)=>s+(r.salePrice||0),0);
     const tSettle = rows.reduce((s,r)=>s+(r.settlement||0),0);
     const tCost   = rows.reduce((s,r)=>s+(r.costPrice||0),0);
@@ -4523,17 +4520,17 @@ function renderUnifiedTable(){
     const tRate   = tSettle>0?(tMargin/tSettle*100):0;
     const f = n=>n.toLocaleString('ko-KR');
     foot.style.display = rows.length ? '' : 'none';
-    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-    set('revUniSumLbl', `합계 · ${rows.length.toLocaleString()}건`);
-    set('revUniSumSale',   f(tSale));
-    set('revUniSumSettle', f(tSettle));
-    set('revUniSumCost',   f(tCost));
-    set('revUniSumMargin', f(tMargin));
-    set('revUniSumRate',   tRate.toFixed(1)+'%');
-    const mgEl=document.getElementById('revUniSumMargin');
-    if(mgEl) mgEl.className = tMargin>=0?'uni-sum-pos':'uni-sum-neg';
-    const mrEl=document.getElementById('revUniSumRate');
-    if(mrEl) mrEl.className = tRate>=0?'uni-sum-pos':'uni-sum-neg';
+    const mgCls = tMargin>=0?'uni-sum-pos':'uni-sum-neg';
+    const mrCls = tRate>=0?'uni-sum-pos':'uni-sum-neg';
+    sumCell.innerHTML = `
+      <div class="uni-sum-wrap">
+        <span class="uni-sum-total">📊 합계 ${rows.length.toLocaleString()}건</span>
+        <span class="uni-sum-item"><span class="lbl">판매가</span><span class="val">${f(tSale)}원</span></span>
+        <span class="uni-sum-item"><span class="lbl">정산</span><span class="val" style="color:#3182F6;">${f(tSettle)}원</span></span>
+        <span class="uni-sum-item"><span class="lbl">매입</span><span class="val">${f(tCost)}원</span></span>
+        <span class="uni-sum-item"><span class="lbl">마진</span><span class="val ${mgCls}">${f(tMargin)}원</span></span>
+        <span class="uni-sum-item"><span class="lbl">마진율</span><span class="val ${mrCls}">${tRate.toFixed(1)}%</span></span>
+      </div>`;
   }
 }
 
