@@ -181,6 +181,16 @@ html, body {
 .dot-all  { background: var(--green); }
 .dot-part { background: var(--orange); }
 .dot-none { background: var(--blue); }
+.dot-report { background: var(--orange); }
+
+/* 우측 패널 업무보고서 보기 */
+.report-view { display: flex; flex-direction: column; gap: 16px; padding: 4px; }
+.report-view-block { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.report-view-label { font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 8px; }
+.report-view-text { font-size: 14px; line-height: 1.6; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.report-view-updated { font-size: 12px; color: var(--text3); text-align: right; }
+.report-view-edit { align-self: flex-start; padding: 9px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.report-view-edit:hover { background: var(--orange-light); }
 
 /* ===== SIDEBAR TOOLS ===== */
 .sidebar-tools {
@@ -625,7 +635,7 @@ html, body {
 <!-- FAB -->
 <button class="fab" id="fabBtn">
   <span style="font-size:18px;line-height:1">+</span>
-  <span>할 일 추가</span>
+  <span>업무 보고서</span>
 </button>
 
 <!-- ── 할 일 추가/수정 Modal ── -->
@@ -1044,6 +1054,8 @@ function saveReport() {
 
   saveReportsData();
   updateToolButtons();
+  renderCalendar();
+  renderTasks();
   closeReport();
   showToast('📋 저장됨', '업무 보고서가 저장되었습니다.');
 }
@@ -1255,11 +1267,9 @@ function renderCalendar() {
   const html = cells.map(({y,m,d,other}) => {
     const ds  = `${y}-${pad(m)}-${pad(d)}`;
     const dow = new Date(y,m-1,d).getDay();
-    const ts  = S.tasks[ds] || [];
-    const dotHtml = ts.length ? (() => {
-      const cls = ts.every(t=>t.done) ? 'dot-all' : ts.some(t=>t.done) ? 'dot-part' : 'dot-none';
-      return `<div class="cal-dots"><div class="dot ${cls}"></div></div>`;
-    })() : '';
+    const r   = N.reports[ds] || {};
+    const hasReport = !!(r.workDone || r.issues);
+    const dotHtml = hasReport ? `<div class="cal-dots"><div class="dot dot-report"></div></div>` : '';
     const cls = [
       'cal-cell',
       other      ? 'other' : '',
@@ -1290,75 +1300,47 @@ function updateStats() {
   document.getElementById('sPend').textContent  = total - done;
 }
 
-// ── TASK LIST ──
+// ── REPORT VIEW (우측 패널) ──
 function renderTasks() {
   const ds = S.selDate;
   if (!ds) return;
 
   document.getElementById('panelDate').textContent = korDate(ds);
 
-  const all  = S.tasks[ds] || [];
+  const r = N.reports[ds] || {};
+  const hasReport = !!(r.workDone || r.issues);
   const wrap = document.getElementById('taskWrap');
 
-  if (!all.length) {
+  // 진행률 바는 업무보고서 모드에서 사용하지 않음
+  document.getElementById('progBar').style.width = '0%';
+  document.getElementById('progText').textContent = hasReport ? '업무 보고서 작성됨' : '업무 보고서 없음';
+
+  if (!hasReport) {
     wrap.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🗒️</div>
-        <div class="empty-title">할 일이 없습니다</div>
-        <div class="empty-sub">아래 <strong>할 일 추가</strong> 버튼을 눌러<br>오늘의 계획을 세워보세요</div>
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">업무 보고서가 없습니다</div>
+        <div class="empty-sub">아래 <strong>업무 보고서</strong> 버튼을 눌러<br>오늘의 업무를 기록하세요</div>
       </div>`;
-    document.getElementById('progBar').style.width = '0%';
-    document.getElementById('progText').textContent = '할 일 없음';
     return;
   }
 
-  const done = all.filter(t=>t.done).length;
-  const pct  = Math.round(done/all.length*100);
-  document.getElementById('progBar').style.width = `${pct}%`;
-  document.getElementById('progText').textContent = `${done}/${all.length} 완료 (${pct}%)`;
-
-  const makeCard = t => {
-    const ti = !t.done && t.dueTime ? timerInfo(t.dueTime, ds) : null;
-    const isOver = ti && ti.cls.includes('over');
-    const priLbl = {high:'높음',medium:'보통',low:'낮음'}[t.priority||'medium'];
-    const priCls = `b-${t.priority||'medium'}`;
-
-    return `<div class="task-card ${t.done?'done':''} ${isOver?'overdue':''}" id="tc-${t.id}">
-      <div class="task-chk ${t.done?'checked':''}" onclick="toggleDone('${t.id}','${ds}')"></div>
-      <div class="task-body">
-        <div class="task-row1">
-          <div class="task-title">${esc(t.title)}</div>
-          ${t.done
-            ? `<span class="badge b-done">완료</span>`
-            : `<span class="badge ${priCls}">${priLbl}</span>`}
-          ${t.dueTime && !t.done ? `<span class="task-time">⏱ ${t.dueTime}</span>` : ''}
-        </div>
-        <div class="task-row2">
-          ${ti
-            ? `<div class="task-timer ${ti.cls}">
-                ${isOver?'❗':ti.cls.includes('danger')?'🔴':ti.cls.includes('warn')?'⚠️':'⏳'}
-                ${ti.text}
-               </div>`
-            : t.memo
-              ? `<div class="task-memo">${esc(t.memo)}</div>`
-              : '<div></div>'}
-          <div class="task-actions">
-            <button class="t-btn" onclick="openEdit('${t.id}','${ds}')">✎</button>
-            <button class="t-btn del" onclick="delTask('${t.id}','${ds}')">🗑</button>
-          </div>
-        </div>
-        ${ti && t.memo ? `<div class="task-memo">${esc(t.memo)}</div>` : ''}
-      </div>
+  const upd = r.updatedAt ? new Date(r.updatedAt).toLocaleString('ko-KR') : '';
+  wrap.innerHTML = `
+    <div class="report-view">
+      ${r.workDone ? `
+        <div class="report-view-block">
+          <div class="report-view-label">✅ 진행한 업무</div>
+          <div class="report-view-text">${esc(r.workDone)}</div>
+        </div>` : ''}
+      ${r.issues ? `
+        <div class="report-view-block">
+          <div class="report-view-label">⚠️ 이슈 · 특이사항</div>
+          <div class="report-view-text">${esc(r.issues)}</div>
+        </div>` : ''}
+      ${upd ? `<div class="report-view-updated">최종 수정: ${upd}</div>` : ''}
+      <button class="report-view-edit" onclick="openReport()">✎ 보고서 편집</button>
     </div>`;
-  };
-
-  const pending   = all.filter(t=>!t.done);
-  const completed = all.filter(t=> t.done);
-  let html = '';
-  if (pending.length)   html += `<div class="task-group-header">진행 중 · ${pending.length}</div>${pending.map(makeCard).join('')}`;
-  if (completed.length) html += `<div class="task-group-header">완료됨 · ${completed.length}</div>${completed.map(makeCard).join('')}`;
-
-  wrap.innerHTML = html;
 }
 
 // ── DATE SELECTION ──
@@ -1506,8 +1488,7 @@ document.getElementById('btnToday').addEventListener('click', () => {
 });
 
 document.getElementById('fabBtn').addEventListener('click', () => {
-  S.editId = null; S.editDate = null;
-  resetForm(); openOverlay();
+  openReport();
 });
 
 document.getElementById('modalClose').addEventListener('click', closeOverlay);
