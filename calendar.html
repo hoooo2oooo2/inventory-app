@@ -80,6 +80,27 @@ html, body {
 .person-btn:hover { border-color:var(--blue); color:var(--blue); }
 .person-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 
+/* 보고서 검색창 */
+.report-search { display:flex; align-items:center; gap:7px; margin:10px 22px 0; padding:7px 11px; border:1.5px solid var(--border); border-radius:9px; background:var(--bg2); transition:all var(--ease); flex-shrink:0; }
+.report-search:focus-within { border-color:var(--blue); }
+.report-search-ico { font-size:13px; opacity:.7; }
+.report-search-input { flex:1; border:none; outline:none; background:none; font-family:inherit; font-size:13px; color:var(--text1); }
+.report-search-input::placeholder { color:var(--text3); }
+
+/* 검색 결과 모달 */
+.search-modal { max-width:560px; width:92%; }
+.search-bar-row { display:flex; gap:8px; align-items:center; }
+.search-results { max-height:52vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.search-empty { padding:30px 10px; text-align:center; color:var(--text3); font-size:13px; }
+.search-result-item { padding:12px 14px; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; transition:all var(--ease); background:var(--bg2); }
+.search-result-item:hover { border-color:var(--blue); transform:translateY(-1px); }
+.sri-head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+.sri-date { font-size:13px; font-weight:700; color:var(--text1); }
+.sri-person { font-size:11px; font-weight:700; color:#fff; background:var(--blue); padding:2px 9px; border-radius:20px; flex-shrink:0; }
+.sri-snippet { font-size:12px; color:var(--text2); line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+.sri-snippet mark { background:#FEF08A; color:#854D0E; border-radius:3px; padding:0 1px; }
+[data-theme="dark"] .sri-snippet mark { background:#A16207; color:#FEF9C3; }
+
 /* Month nav */
 .cal-nav {
   display: flex; align-items: center;
@@ -532,6 +553,11 @@ html, body {
       <button class="person-btn" id="pb-연정" onclick="switchPerson('연정')">연정</button>
     </div>
 
+    <div class="report-search">
+      <span class="report-search-ico">🔍</span>
+      <input type="text" id="reportSearchInput" class="report-search-input" placeholder="업무 보고서 검색" autocomplete="off">
+    </div>
+
     <div class="cal-nav">
       <button class="cal-nav-btn" id="btnPrev">‹</button>
       <div class="cal-nav-title" id="calTitle">—</div>
@@ -637,7 +663,7 @@ html, body {
 
     <div class="form-group">
       <label class="form-label" for="iMemo">메모 <span style="color:var(--text3);font-weight:400">(선택)</span></label>
-      <textarea class="form-input" id="iMemo" rows="2"
+      <textarea class="form-input" id="iMemo" rows="2" spellcheck="false"
         placeholder="추가 내용을 입력하세요" style="resize:none;line-height:1.6"></textarea>
     </div>
 
@@ -658,7 +684,7 @@ html, body {
         <button class="modal-close" id="notepadClose">✕</button>
       </div>
     </div>
-    <textarea class="form-input" id="notepadContent" rows="14"
+    <textarea class="form-input" id="notepadContent" rows="14" spellcheck="false"
       placeholder="이 날짜의 메모를 자유롭게 입력하세요..."
       style="resize:none;line-height:1.8;font-size:14px"></textarea>
   </div>
@@ -687,16 +713,41 @@ html, body {
 
     <div class="form-group">
       <label class="form-label">✅ 오늘 수행한 업무</label>
-      <textarea class="form-input" id="rWorkDone" rows="14"
+      <textarea class="form-input" id="rWorkDone" rows="14" spellcheck="false"
         placeholder="오늘 완료한 업무를 입력하세요&#10;예) - 거래처 견적서 발송&#10;     - 팀 미팅 참석"
         style="resize:vertical;line-height:1.7;min-height:220px;max-height:48vh;overflow-y:auto"></textarea>
     </div>
 
     <div class="form-group" style="margin-bottom:4px">
       <label class="form-label">⚠️ 이슈 / 특이사항</label>
-      <textarea class="form-input" id="rIssues" rows="3"
+      <textarea class="form-input" id="rIssues" rows="3" spellcheck="false"
         placeholder="특이사항이나 이슈를 입력하세요 (없으면 비워두세요)"
         style="resize:none;line-height:1.7"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ── 업무 보고서 검색 결과 Modal ── -->
+<div class="overlay" id="searchOverlay">
+  <div class="modal search-modal">
+    <div class="modal-head">
+      <div class="modal-title">🔍 업무 보고서 검색</div>
+      <button class="modal-close" id="searchClose">✕</button>
+    </div>
+
+    <div class="form-group search-bar-row">
+      <input type="text" class="form-input" id="searchModalInput" placeholder="검색어를 입력하세요" autocomplete="off" style="flex:1">
+      <select class="form-input" id="searchPersonFilter" style="width:120px;flex:none">
+        <option value="">전체 담당자</option>
+        <option value="유현">유현</option>
+        <option value="보라">보라</option>
+        <option value="연정">연정</option>
+      </select>
+      <button class="submit-btn" id="searchRunBtn" style="width:auto;margin:0;padding:0 18px">검색</button>
+    </div>
+
+    <div class="search-results" id="searchResults">
+      <div class="search-empty">검색어를 입력하고 검색 버튼을 누르세요.</div>
     </div>
   </div>
 </div>
@@ -902,7 +953,7 @@ function switchPerson(p) {
     const btn = document.getElementById('pb-' + name);
     if(btn) btn.classList.toggle('active', name === p);
   });
-  loadPersonData(p);
+  return loadPersonData(p);
 }
 
 async function saveReportsData() {
@@ -1008,6 +1059,103 @@ function fillReportFromTasks() {
   } else {
     showToast('ℹ️ 알림', '이 날짜에 완료된 할 일이 없습니다.');
   }
+}
+
+// ── 업무 보고서 검색 ──
+const PERSONS = ['유현','보라','연정'];
+
+// 모든 담당자의 보고서 수집(현재 담당자는 메모리 최신본, 나머지는 클라우드/로컬)
+async function gatherAllReports() {
+  const all = {};
+  for (const p of PERSONS) {
+    if (p === S.person) { all[p] = N.reports || {}; continue; }
+    const cloud = await cloudLoad(p);
+    if (cloud && !cloud._empty) { all[p] = cloud.reports || {}; }
+    else {
+      try { all[p] = JSON.parse(localStorage.getItem('work-cal-reports-' + p) || '{}'); }
+      catch { all[p] = {}; }
+    }
+  }
+  return all;
+}
+
+function openSearchModal() {
+  const kw = (document.getElementById('reportSearchInput').value || '').trim();
+  document.getElementById('searchModalInput').value = kw;
+  // 담당자 미선택(전체)을 기본값으로 — 현재 담당자로 한정하려면 사용자가 직접 선택
+  document.getElementById('searchPersonFilter').value = '';
+  document.getElementById('searchOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('searchModalInput').focus(), 150);
+  if (kw) runReportSearch();
+  else document.getElementById('searchResults').innerHTML =
+    '<div class="search-empty">검색어를 입력하고 검색 버튼을 누르세요.</div>';
+}
+
+function closeSearchModal() {
+  document.getElementById('searchOverlay').classList.remove('open');
+}
+
+function makeSnippet(text, kw, span = 40) {
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(kw.toLowerCase());
+  if (idx < 0) return esc(text.slice(0, 100));
+  const start = Math.max(0, idx - span);
+  const end = Math.min(text.length, idx + kw.length + span);
+  let snip = (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '');
+  // 강조 표시(esc 후 대소문자 무시 치환)
+  const escaped = esc(snip);
+  const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  return escaped.replace(re, m => `<mark>${m}</mark>`);
+}
+
+async function runReportSearch() {
+  const kw = (document.getElementById('searchModalInput').value || '').trim();
+  const filterPerson = document.getElementById('searchPersonFilter').value;
+  const box = document.getElementById('searchResults');
+  if (!kw) {
+    box.innerHTML = '<div class="search-empty">검색어를 입력하세요.</div>';
+    return;
+  }
+  box.innerHTML = '<div class="search-empty">검색 중…</div>';
+
+  const all = await gatherAllReports();
+  const lowKw = kw.toLowerCase();
+  const results = [];
+  for (const p of PERSONS) {
+    if (filterPerson && p !== filterPerson) continue;
+    const reps = all[p] || {};
+    for (const date in reps) {
+      const r = reps[date] || {};
+      const text = `${r.workDone || ''}\n${r.issues || ''}`;
+      if (text.toLowerCase().includes(lowKw)) {
+        results.push({ person: p, date, snippet: makeSnippet(text.trim(), kw) });
+      }
+    }
+  }
+  results.sort((a, b) => b.date.localeCompare(a.date));
+
+  if (!results.length) {
+    box.innerHTML = `<div class="search-empty">"${esc(kw)}"이(가) 포함된 보고서가 없습니다.</div>`;
+    return;
+  }
+  box.innerHTML = results.map(r => `
+    <div class="search-result-item" onclick="openSearchResult('${r.person}','${r.date}')">
+      <div class="sri-head">
+        <span class="sri-date">${korDate(r.date)}</span>
+        <span class="sri-person">${r.person}</span>
+      </div>
+      <div class="sri-snippet">${r.snippet}</div>
+    </div>`).join('');
+}
+
+async function openSearchResult(person, date) {
+  closeSearchModal();
+  document.getElementById('reportSearchInput').value = '';
+  if (S.person !== person) await switchPerson(person);  // 클라우드 최신본까지 로드 후 진행
+  const [y, m] = date.split('-').map(Number);
+  S.viewYear = y; S.viewMonth = m - 1; S.selDate = date;
+  renderCalendar(); renderTasks(); updateToolButtons();
+  openReport();
 }
 
 // ── NOTIFICATIONS ──
@@ -1379,10 +1527,26 @@ document.getElementById('iTitle').addEventListener('keydown', e => {
   if (e.key==='Enter') submitTask();
 });
 
+// 보고서 검색
+document.getElementById('reportSearchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') openSearchModal();
+});
+document.getElementById('reportSearchInput').addEventListener('click', openSearchModal);
+document.getElementById('searchClose').addEventListener('click', closeSearchModal);
+document.getElementById('searchOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('searchOverlay')) closeSearchModal();
+});
+document.getElementById('searchRunBtn').addEventListener('click', runReportSearch);
+document.getElementById('searchModalInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runReportSearch();
+});
+document.getElementById('searchPersonFilter').addEventListener('change', runReportSearch);
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeOverlay();
     closeNotepad();
+    closeSearchModal();
     // 보고서는 Esc로 닫지 않음(작성 중 내용 보호) — ✕ 버튼으로만 닫힘
   }
 });
