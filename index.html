@@ -2076,7 +2076,7 @@ function goPage(p){
   if(p==='hist') renderHist();
   if(p==='report') loadDailyCache().then(()=>renderReport());
   if(p==='revenue') loadRevenuePage();
-  if(p==='price') pcRenderEstimates();
+  if(p==='price'){ pcEnsureBackdata(); pcRenderEstimates(); }
   if(p==='quote') qtInit();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
@@ -2102,6 +2102,13 @@ function pcSearchCode(val){
   const dd = document.getElementById('pc-dd');
   const kw = val.trim().toLowerCase();
   if(!kw){ dd.style.display='none'; return; }
+  // 백데이터가 아직 로드되지 않았으면 로드 후 다시 검색
+  if(!_bdData.length && !_bdLoaded){
+    dd.innerHTML='<div style="padding:8px 12px;font-size:12px;color:var(--tx2);">상품 목록 불러오는 중…</div>';
+    dd.style.display='';
+    pcEnsureBackdata().then(()=>{ if(document.getElementById('pc-code').value.trim()===val.trim()) pcSearchCode(val); });
+    return;
+  }
   const matched = (_bdData||[]).filter(r=>
     (r.code||'').toLowerCase().includes(kw)||(r.name||'').toLowerCase().includes(kw)
   ).slice(0,12);
@@ -3271,7 +3278,15 @@ let _revTrendChart = null;
 let _revDnutChart = null;
 let _revDailyChart = null;
 let _bdLoaded = false;
+let _bdLoadPromise = null;
 let _revLoaded = false;
+
+// 백데이터(상품 단가 목록)를 1회만 로드 — 단가계산기 검색 등에서 공용 사용
+function pcEnsureBackdata(){
+  if(_bdLoaded) return Promise.resolve();
+  if(!_bdLoadPromise) _bdLoadPromise = loadBackdata().finally(()=>{ _bdLoadPromise=null; });
+  return _bdLoadPromise;
+}
 
 // ── 매출관리 페이지 진입 ──
 async function loadRevenuePage(){
