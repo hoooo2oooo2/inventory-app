@@ -587,7 +587,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <input type="number" id="pc-sale" placeholder="0" min="0" class="pc-inp" oninput="pcCalc()"/>
         </div>
         <div>
-          <div class="pc-lbl">할인가 (%)</div>
+          <div class="pc-lbl">할인가 (%) <span id="pc-disc-unit" style="font-weight:400;color:#3182F6;font-size:10px;"></span></div>
           <input type="number" id="pc-disc" placeholder="0" min="0" max="100" class="pc-inp" oninput="pcCalc()"/>
         </div>
         <div style="grid-column:1/-1;">
@@ -2162,6 +2162,10 @@ function pcCalc(){
   const costTotal =Math.round(unit*qty);
   const saleAfDisc=Math.round(sale*(1-disc/100));
   const saleTotal =Math.round(saleAfDisc*qty);
+  // 할인 적용 개당 단가 — 1~999원 단위는 올림하여 1,000원 단위로 맞춤
+  const unitDisc  =Math.ceil(sale*(1-disc/100)/1000)*1000;
+  const discUnitEl=document.getElementById('pc-disc-unit');
+  if(discUnitEl) discUnitEl.textContent=(sale>0&&disc>0)?`→ 개당 ${unitDisc.toLocaleString('ko-KR')}원`:'';
   const shipTotal =Math.round(shipPr*shipQty);
   const margin    =saleTotal-costTotal-shipTotal;
   const marginRate=saleTotal>0?(margin/saleTotal*100):null;
