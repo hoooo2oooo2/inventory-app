@@ -453,6 +453,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .qt-btn{padding:9px 14px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .qt-save-card{padding:10px 11px;border:1px solid var(--bd);border-radius:9px;margin-bottom:8px;cursor:pointer;transition:all .12s;}
 .qt-save-card:hover{border-color:var(--pr);background:var(--bg2);}
+.qt-vat-sel{border:none;outline:none;background:transparent;font:inherit;font-size:12px;font-weight:700;color:#2563EB;text-align:center;cursor:pointer;width:100%;padding:4px;appearance:auto;}
 .qt-doc.qt-printing .qt-noprint{display:none !important;}
 </style>
 </head>
@@ -798,7 +799,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <tr class="qt-total">
               <td colspan="4" style="text-align:center;">합 계</td>
               <td id="qt-total" style="color:#2563EB;">0원</td>
-              <td colspan="2"></td>
+              <td colspan="2" style="text-align:center;padding:0;">
+                <select id="qt-vat" class="qt-vat-sel">
+                  <option value="별도">부가세 별도</option>
+                  <option value="포함">부가세 포함</option>
+                </select>
+              </td>
             </tr>
           </tfoot>
         </table>
@@ -2551,6 +2557,7 @@ function qtReset(){
   }
   _qtRows=[]; _qtEditId=null;
   ['qt-name','qt-company','qt-contact','qt-fax','qt-manager'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const vat=document.getElementById('qt-vat'); if(vat) vat.value='별도';
   const t=new Date();
   _qtDate=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
   document.getElementById('qt-date-input').value=_qtDate;
@@ -2582,6 +2589,7 @@ function qtConfirmSave(){
     company:document.getElementById('qt-company').value.trim(),
     contact:document.getElementById('qt-contact').value.trim(),
     fax:document.getElementById('qt-fax').value.trim(),
+    vat:document.getElementById('qt-vat')?.value||'별도',
     rows:_qtRows.map(r=>({name:r.name,model:r.model,qty:r.qty,unit:r.unit,note:r.note})),
     savedAt:`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
     ts:now.getTime()
@@ -2633,6 +2641,7 @@ function qtLoadSaved(id){
   document.getElementById('qt-contact').value=e.contact||'';
   document.getElementById('qt-fax').value=e.fax||'';
   document.getElementById('qt-manager').value=e.manager||'';
+  document.getElementById('qt-vat').value=e.vat||'별도';
   _qtDate=e.tradeDate||null;
   document.getElementById('qt-date-input').value=_qtDate||'';
   document.getElementById('qt-date-disp').textContent=qtFmtDate(_qtDate);
@@ -2651,14 +2660,49 @@ function qtDeleteSaved(id){
   qtRenderSaved();
 }
 
+// 견적서 문서를 캔버스로 캡처 (PDF 글씨 잘림 방지: 폼 필드를 세로 중앙정렬 div로 치환)
+async function qtCaptureDoc(doc){
+  // 원본 DOM은 건드리지 않고, 캡처용 클론에서만 input/select/textarea를 정적 텍스트로 교체
+  const fields=[...doc.querySelectorAll('input, select, textarea')].map(el=>{
+    const cs=getComputedStyle(el);
+    const hidden=cs.opacity==='0'||cs.visibility==='hidden'||el.offsetWidth<=2||el.offsetHeight<=2;
+    let text;
+    if(el.tagName==='SELECT') text=el.value===''?'':(el.options[el.selectedIndex]?.text||'');
+    else text=el.value||'';
+    return {text,hidden,
+      fontSize:cs.fontSize,fontFamily:cs.fontFamily,fontWeight:cs.fontWeight,fontStyle:cs.fontStyle,
+      color:cs.color,textAlign:cs.textAlign,padding:cs.padding};
+  });
+  doc.classList.add('qt-printing');
+  try{
+    return await html2canvas(doc,{scale:2,backgroundColor:'#ffffff',useCORS:true,
+      onclone:(cdoc)=>{
+        const cDoc=cdoc.getElementById('qtDoc'); if(!cDoc) return;
+        cDoc.querySelectorAll('input, select, textarea').forEach((el,i)=>{
+          const f=fields[i]; if(!f||f.hidden) return;
+          const justify=f.textAlign==='right'?'flex-end':(f.textAlign==='center'?'center':'flex-start');
+          const span=cdoc.createElement('div');
+          span.textContent=f.text;
+          span.style.cssText=`box-sizing:border-box;width:100%;height:100%;min-height:1.2em;`+
+            `display:flex;align-items:center;justify-content:${justify};`+
+            `font-size:${f.fontSize};font-family:${f.fontFamily};font-weight:${f.fontWeight};font-style:${f.fontStyle};`+
+            `color:${f.color||'#000'};padding:${f.padding};`+
+            `line-height:1.2;white-space:nowrap;overflow:visible;`;
+          el.parentNode.replaceChild(span,el);
+        });
+      }});
+  } finally {
+    doc.classList.remove('qt-printing');
+  }
+}
+
 // ── PDF 다운로드 ──
 async function qtDownloadPdf(){
   const doc=document.getElementById('qtDoc');
   if(!doc){ return; }
   const name=(document.getElementById('qt-name').value.trim()||'견적서');
-  doc.classList.add('qt-printing');
   try{
-    const canvas=await html2canvas(doc,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+    const canvas=await qtCaptureDoc(doc);
     const img=canvas.toDataURL('image/jpeg',0.95);
     const { jsPDF }=window.jspdf;
     const pdf=new jsPDF('p','mm','a4');
