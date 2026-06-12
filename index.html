@@ -486,7 +486,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-order" onclick="goPage('order')">발주관리 <span class="nbadge" id="orderBadge">0</span><span class="pulse-wrap" id="navPulse" style="display:none;"><span class="pdot"></span><span class="pring"></span><span class="pring pring2"></span></span></div>
   <div class="ni" id="nav-rg" onclick="goPage('rg')">로켓그로스</div>
   <div class="ni" id="nav-hist" onclick="goPage('hist')">변동이력</div>
-  <div class="ni" id="nav-report" onclick="goPage('report')">📋 보고</div>
+  <div class="ni" id="nav-report" onclick="goPage('report')" style="display:none;">📋 보고</div>
   <div class="ni" id="nav-revenue" onclick="goPage('revenue')">💰 매출관리</div>
   <div class="ni" id="nav-price" onclick="goPage('price')">🧮 단가계산기</div>
   <div class="ni" id="nav-quote" onclick="goPage('quote')">📄 견적서</div>
@@ -827,6 +827,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <option value="박상훈">박상훈 과장</option>
               <option value="김규리">김규리 주임</option>
               <option value="김종범">김종범 주임</option>
+              <option value="조신성">조신성 대표</option>
             </select>
           </div>
         </div>
@@ -852,6 +853,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <button class="qt-mgr-btn" data-mgr="박상훈" onclick="qtSavedMgr('박상훈')">박상훈</button>
         <button class="qt-mgr-btn" data-mgr="김규리" onclick="qtSavedMgr('김규리')">김규리</button>
         <button class="qt-mgr-btn" data-mgr="김종범" onclick="qtSavedMgr('김종범')">김종범</button>
+        <button class="qt-mgr-btn" data-mgr="조신성" onclick="qtSavedMgr('조신성')">조신성</button>
       </div>
       <div id="qt-saved-list"></div>
     </div>
@@ -869,6 +871,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <option value="박상훈">박상훈 과장</option>
       <option value="김규리">김규리 주임</option>
       <option value="김종범">김종범 주임</option>
+      <option value="조신성">조신성 대표</option>
     </select>
     <div style="display:flex;gap:8px;">
       <button onclick="document.getElementById('qtSaveModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
@@ -1142,6 +1145,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="rsni" id="rsni-upload" onclick="goRevPage('upload')">📤 데이터 업로드</div>
     <div class="rsni" id="rsni-unified" onclick="goRevPage('unified')">📋 통합</div>
     <div class="rsni" id="rsni-daily" onclick="goRevPage('daily')">📄 일일보고</div>
+    <div class="rsni" id="rsni-adcenter" onclick="goRevPage('adcenter')">📢 광고센터</div>
   </div>
   <div class="rmain">
 
@@ -1251,11 +1255,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <button class="rfbtn" onclick="setRevCh(this,'에이블리')">에이블리</button>
         </div>
       </div>
-      <div class="rev-kpi" id="revMonKpiRow" style="grid-template-columns:repeat(5,1fr);">
+      <div class="rev-kpi" id="revMonKpiRow" style="grid-template-columns:repeat(6,1fr);">
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 정산금액</div><div class="rev-kpi-val" id="revMonKpi0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi0Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revMonKpi1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi1Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revMonKpi2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi2Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">🛒 주문건수</div><div class="rev-kpi-val" id="revMonKpi3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi3Sub">데이터 없음</div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revMonKpi5" style="color:#DC2626;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi5Sub">판매처 선택 반영</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📉 손실금액</div><div class="rev-kpi-val" id="revMonKpi4" style="color:#DC2626;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi4Sub">마진 마이너스 합계</div></div>
       </div>
       <div class="rev-chart-grid">
@@ -1525,6 +1530,54 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </div>
           <div id="revDlyDnutLegend" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;"></div>
           <div class="rev-empty" id="revDlyDnutEmpty" style="padding:16px;">데이터 없음</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 광고센터 탭 ── -->
+    <div class="rpage" id="rpage-adcenter">
+      <div class="rev-chart-grid" style="grid-template-columns:380px 1fr;align-items:start;">
+        <!-- 좌: 광고비 입력/목록 -->
+        <div class="rev-tbl-card" style="padding:14px 16px;">
+          <div class="rev-card-title" style="margin-bottom:12px;"><span>📢 일별 광고비 입력</span></div>
+          <div style="display:flex;flex-direction:column;gap:9px;">
+            <div>
+              <div class="pc-lbl">판매처</div>
+              <select id="adCh" class="pc-inp"></select>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="flex:1;"><div class="pc-lbl">날짜</div><input type="date" id="adDate" class="pc-inp"></div>
+              <div style="flex:1;"><div class="pc-lbl">광고비 (원)</div><input type="number" id="adAmount" class="pc-inp" min="0" placeholder="예: 50000"></div>
+            </div>
+            <button class="btn btn-pr" onclick="adSave()" style="padding:10px;font-weight:600;">💾 저장</button>
+          </div>
+          <div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:12px;font-weight:600;color:var(--tx);">📋 등록된 광고비</span>
+            <select id="adListCh" class="sel" onchange="renderAdList()" style="font-size:11px;"><option value="ALL">전체 판매처</option></select>
+          </div>
+          <div class="tw" style="max-height:340px;overflow-y:auto;margin-top:8px;">
+            <table class="dt" id="adListTbl">
+              <thead><tr><th>날짜</th><th>판매처</th><th style="text-align:right;">광고비</th><th class="ns" style="text-align:center;width:48px;">삭제</th></tr></thead>
+              <tbody id="adListBody"></tbody>
+            </table>
+          </div>
+          <div class="rev-empty" id="adListEmpty" style="padding:16px;">등록된 광고비가 없습니다.</div>
+        </div>
+        <!-- 우: 일별 총 광고비 그래프 -->
+        <div class="rev-card">
+          <div class="rev-card-title" style="flex-wrap:wrap;gap:8px;">
+            <span>📊 일별 총 광고비 추이</span>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+              <input type="date" id="adRangeFrom" class="pc-inp" style="width:auto;padding:5px 8px;" onchange="renderAdChart()">
+              <span style="color:var(--tx2);">~</span>
+              <input type="date" id="adRangeTo" class="pc-inp" style="width:auto;padding:5px 8px;" onchange="renderAdChart()">
+              <button class="btn btn-sm" onclick="adSetRange(7)">최근 1주</button>
+              <button class="btn btn-sm" onclick="adSetRange(30)">최근 1개월</button>
+            </div>
+          </div>
+          <div class="rev-chart-wrap" style="height:300px;"><canvas id="adChart"></canvas></div>
+          <div class="rev-empty" id="adChartEmpty" style="padding:20px;display:none;">선택한 기간에 광고비 데이터가 없습니다.</div>
+          <div id="adRangeTotal" style="margin-top:10px;text-align:right;font-size:13px;font-weight:700;color:#DC2626;"></div>
         </div>
       </div>
     </div>
@@ -2533,7 +2586,7 @@ function qtInit(){
 }
 
 // ── 담당자 선택 시 연락처 자동 입력 ──
-const QT_MANAGER_PHONE={'박상훈':'010-8344-5694','김규리':'010-4604-5494','김종범':'010-8142-5335'};
+const QT_MANAGER_PHONE={'박상훈':'010-8344-5694','김규리':'010-4604-5494','김종범':'010-8142-5335','조신성':'010-4604-5694'};
 function qtManagerChange(){
   const v=document.getElementById('qt-manager').value;
   const ph=QT_MANAGER_PHONE[v];
@@ -3483,6 +3536,7 @@ function pcEnsureBackdata(){
 async function loadRevenuePage(){
   if(!_bdLoaded) await loadBackdata();
   if(!_shipLoaded) await loadShippingFees();
+  if(!_adLoaded) await loadAdSpend();
   if(!_revLoaded) await loadRevenueData();
   _renderRevCurrentPage();
 }
@@ -3492,6 +3546,7 @@ function _renderRevCurrentPage(){
   if(_revPage==='monthly')  renderRevMonthly();
   if(_revPage==='backdata'){ renderBdTable(); renderShipTable(); }
   if(_revPage==='upload')   renderRevUpSlots();
+  if(_revPage==='adcenter') renderAdCenter();
   if(_revPage==='unified')  renderUnifiedTable();
   if(_revPage==='daily')    renderDailyReport();
 }
@@ -3830,9 +3885,43 @@ function sortCh(arr){
   });
 }
 
+// ── 광고비(광고센터) 데이터 ── { 'channel|YYYY-MM-DD': 금액 }
+let _adSpend = {};
+let _adLoaded = false;
+const AD_CHANNELS = ['스마트스토어','쿠팡','오늘의집','이베이','11번가','올웨이즈','카페24','톡스토어'];
+function adKey(ch, fullDate){ return ch + '|' + fullDate; }
+function parseAdKey(k){ const i=k.indexOf('|'); return { ch:k.slice(0,i), date:k.slice(i+1) }; }
+// 기간/채널 조건에 맞는 광고비 합계
+function sumAdSpend({year=null, month=null, day=null, ch='ALL'}={}){
+  let t=0;
+  for(const k in _adSpend){
+    const {ch:c, date:d}=parseAdKey(k);
+    const parts=d.split('-'); // YYYY-MM-DD
+    if(year!=null && Number(parts[0])!==Number(year)) continue;
+    if(month!=null && Number(parts[1])!==Number(month)) continue;
+    if(day!=null && Number(parts[2])!==Number(day)) continue;
+    if(ch!=='ALL' && c!==ch) continue;
+    t += Number(_adSpend[k])||0;
+  }
+  return t;
+}
+async function loadAdSpend(){
+  try{ _adSpend=JSON.parse(localStorage.getItem('ad_spend_v1')||'{}'); }catch(e){ _adSpend={}; }
+  const cloud=await cloudKvLoad('ad_spend');
+  if(cloud && typeof cloud==='object' && !Array.isArray(cloud)){
+    _adSpend=cloud;
+    try{ localStorage.setItem('ad_spend_v1',JSON.stringify(_adSpend)); }catch(e){}
+  }
+  _adLoaded=true;
+}
+function saveAdSpend(){
+  try{ localStorage.setItem('ad_spend_v1',JSON.stringify(_adSpend)); }catch(e){}
+  cloudKvSave('ad_spend', _adSpend);
+}
+
 function goRevPage(p){
   _revPage = p;
-  ['summary','monthly','backdata','upload','unified','daily'].forEach(x=>{
+  ['summary','monthly','backdata','upload','unified','daily','adcenter'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
@@ -3872,6 +3961,9 @@ function renderRevSummary(){
     cnt:    arr.length
   });
   const cur=sum(thisMonth), prv=sum(lastMonth);
+  // 광고비 차감 반영 (마진 = 마진 - 광고비)
+  cur.margin -= sumAdSpend({year:cy, month:cm});
+  prv.margin -= sumAdSpend({year:prevY, month:prevM});
   const marginRate = cur.settle>0?(cur.margin/cur.settle*100):0;
   const prevRate   = prv.settle>0?(prv.margin/prv.settle*100):0;
 
@@ -3908,6 +4000,11 @@ function renderRevSummary(){
     byYM[key].settle += r.settlement||0;
     byYM[key].margin += r.margin||0;
     byYM[key].cnt++;
+  });
+  // 월별 마진에 광고비 차감 반영 (추이 차트·월별 요약 테이블 공통)
+  Object.keys(byYM).forEach(key=>{
+    const [yy,mm]=key.split('-');
+    byYM[key].margin -= sumAdSpend({year:Number(yy), month:Number(mm)});
   });
   const ymKeys = Object.keys(byYM).sort();
   const rangeEl = document.getElementById('revChartRange');
@@ -4105,7 +4202,10 @@ function renderRevMonthly(){
   if(_revSelCh!=='ALL') rows=rows.filter(r=>r.ch===_revSelCh);
 
   const settle=rows.reduce((s,r)=>s+(r.settlement||0),0);
-  const margin=rows.reduce((s,r)=>s+(r.margin||0),0);
+  const marginGross=rows.reduce((s,r)=>s+(r.margin||0),0);
+  // 광고비 차감 반영 (선택 판매처·해당 월)
+  const adMon=sumAdSpend({year:sy, month:sm, ch:_revSelCh});
+  const margin=marginGross-adMon;
   const rate=settle>0?(margin/settle*100):0;
   // 손실금액 = 마진이 마이너스인 건들의 손실 합계(절댓값)
   const lossRows=rows.filter(r=>(r.margin||0)<0);
@@ -4118,9 +4218,10 @@ function renderRevMonthly(){
     const s=el.parentElement.querySelector('.rev-kpi-sub'); if(s) s.textContent=sub;
   };
   setKpi('revMonKpi0',fmt(settle),`${_revSelMonth} 정산`);
-  setKpi('revMonKpi1',fmt(margin),`${_revSelMonth} 마진`);
+  setKpi('revMonKpi1',fmt(margin),adMon>0?`광고비 -${fmt(adMon)} 반영`:`${_revSelMonth} 마진`);
   setKpi('revMonKpi2',rate.toFixed(1)+'%','마진율');
   setKpi('revMonKpi3',rows.length.toLocaleString()+'건','주문건수');
+  setKpi('revMonKpi5', adMon>0?'-'+fmt(adMon):'0', _revSelCh==='ALL'?'전체 판매처':_revSelCh);
   setKpi('revMonKpi4', loss<0?'-'+fmt(Math.abs(loss)):'0', lossRows.length?`마이너스 ${lossRows.length}건`:'손실 없음');
 
   // 일별 추이 차트
@@ -4311,11 +4412,16 @@ function renderDailyReport(){
   // 택배건수 = 합포장 기준 고유 배송 건수 (날짜+판매처+주문번호+수취인+연락처1+주소)
   const pkgKey=r=>`${r.date}|${r.ch}|${r.orderNo}|${r.receiver}|${r.phone1}|${r.addr}`;
   const totalSettle=rows.reduce((s,r)=>s+(r.settlement||0),0);
-  const totalMargin=rows.reduce((s,r)=>s+(r.margin||0),0);
+  const totalMarginGross=rows.reduce((s,r)=>s+(r.margin||0),0);
+  // 광고비 차감 반영 (선택 기간·판매처)
+  const adDly=sumAdSpend({year:_dlyFilter.year, month:_dlyFilter.month, day:_dlyFilter.day, ch:_dlyFilter.ch});
+  const totalMargin=totalMarginGross-adDly;
   const totalRate=totalSettle>0?(totalMargin/totalSettle*100):0;
   const totalOrders=new Set(rows.map(pkgKey)).size;
   const prevSettle=prevRows.reduce((s,r)=>s+(r.settlement||0),0);
-  const prevMargin=prevRows.reduce((s,r)=>s+(r.margin||0),0);
+  const prevMarginGross=prevRows.reduce((s,r)=>s+(r.margin||0),0);
+  const adPrev=sumAdSpend({year:prevY, month:prevM, day:_dlyFilter.day, ch:_dlyFilter.ch});
+  const prevMargin=prevMarginGross-adPrev;
   const prevRate=prevSettle>0?(prevMargin/prevSettle*100):0;
   const prevOrders=new Set(prevRows.map(pkgKey)).size;
 
@@ -4346,7 +4452,7 @@ function renderDailyReport(){
   const tbody=document.getElementById('revDlyTbody');
   const tfoot=document.getElementById('revDlyTfoot');
   const sub=document.getElementById('revDlyTblSub');
-  if(sub) sub.textContent=`${periodLabel} ${_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch}`;
+  if(sub) sub.textContent=`${periodLabel} ${_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch}`+(adDly>0?` · 광고비 -${fmt(adDly)} (마진 반영)`:'');
 
   if(!rows.length){
     if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return;
@@ -4437,6 +4543,112 @@ function setDlyFilter(type, val){
   renderDailyReport();
 }
 
+// ══════════════════════════════════════════════
+// 광고센터 (일별 광고비 입력·그래프)
+// ══════════════════════════════════════════════
+let _adChart=null;
+function _ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+function renderAdCenter(){
+  const chSel=document.getElementById('adCh');
+  if(chSel && !chSel.options.length) chSel.innerHTML=AD_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const listChSel=document.getElementById('adListCh');
+  if(listChSel && listChSel.options.length<=1)
+    listChSel.innerHTML='<option value="ALL">전체 판매처</option>'+AD_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const dEl=document.getElementById('adDate');
+  if(dEl && !dEl.value) dEl.value=_ymd(new Date());
+  const fr=document.getElementById('adRangeFrom'), to=document.getElementById('adRangeTo');
+  if(fr && to && (!fr.value||!to.value)) adSetRange(7, true);
+  renderAdList();
+  renderAdChart();
+}
+
+function adSetRange(days, skipRender){
+  const to=new Date(), fr=new Date(); fr.setDate(fr.getDate()-(days-1));
+  const frEl=document.getElementById('adRangeFrom'), toEl=document.getElementById('adRangeTo');
+  if(frEl) frEl.value=_ymd(fr);
+  if(toEl) toEl.value=_ymd(to);
+  if(!skipRender) renderAdChart();
+}
+
+function adSave(){
+  const ch=document.getElementById('adCh').value;
+  const date=document.getElementById('adDate').value;
+  const amt=parseInt(document.getElementById('adAmount').value)||0;
+  if(!ch||!date){ alert('판매처와 날짜를 입력하세요.'); return; }
+  if(amt<=0){
+    if(!confirm('광고비가 0원입니다. 해당 날짜·판매처 광고비를 삭제할까요?')) return;
+    delete _adSpend[adKey(ch,date)];
+  } else {
+    _adSpend[adKey(ch,date)]=amt;
+  }
+  saveAdSpend();
+  document.getElementById('adAmount').value='';
+  renderAdList(); renderAdChart();
+  alert(`${ch} · ${date} 광고비 ${amt.toLocaleString()}원 저장되었습니다.`);
+}
+
+function adDelete(ch,date){
+  if(!confirm(`${ch} · ${date} 광고비를 삭제할까요?`)) return;
+  delete _adSpend[adKey(ch,date)];
+  saveAdSpend();
+  renderAdList(); renderAdChart();
+}
+
+function renderAdList(){
+  const body=document.getElementById('adListBody');
+  const empty=document.getElementById('adListEmpty');
+  const tbl=document.getElementById('adListTbl');
+  if(!body) return;
+  const filterCh=document.getElementById('adListCh')?.value||'ALL';
+  let entries=Object.keys(_adSpend).map(k=>({...parseAdKey(k), amt:_adSpend[k]}));
+  if(filterCh!=='ALL') entries=entries.filter(e=>e.ch===filterCh);
+  entries.sort((a,b)=> b.date.localeCompare(a.date) || a.ch.localeCompare(b.ch));
+  if(!entries.length){ if(empty)empty.style.display='block'; if(tbl)tbl.style.display='none'; body.innerHTML=''; return; }
+  if(empty)empty.style.display='none'; if(tbl)tbl.style.display='';
+  body.innerHTML=entries.map(e=>`<tr>
+    <td>${e.date}</td><td>${e.ch}</td>
+    <td style="text-align:right;font-weight:600;">${(e.amt||0).toLocaleString()}원</td>
+    <td style="text-align:center;"><button class="btn btn-sm" style="color:#DC2626;border-color:#DC2626;padding:2px 7px;" onclick="adDelete('${e.ch}','${e.date}')">삭제</button></td>
+  </tr>`).join('');
+}
+
+function renderAdChart(){
+  const fr=document.getElementById('adRangeFrom')?.value;
+  const to=document.getElementById('adRangeTo')?.value;
+  const ctx=document.getElementById('adChart');
+  const empty=document.getElementById('adChartEmpty');
+  const totEl=document.getElementById('adRangeTotal');
+  if(!ctx||!fr||!to) return;
+  const byDay={};
+  for(const k in _adSpend){
+    const {date}=parseAdKey(k);
+    if(date<fr||date>to) continue;
+    byDay[date]=(byDay[date]||0)+(Number(_adSpend[k])||0);
+  }
+  const labels=[], data=[]; let total=0;
+  const ed=new Date(to);
+  for(let d=new Date(fr); d<=ed; d.setDate(d.getDate()+1)){
+    const ds=_ymd(d);
+    labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+    const v=byDay[ds]||0; data.push(v); total+=v;
+  }
+  if(_adChart){ _adChart.destroy(); _adChart=null; }
+  const has=total>0;
+  if(empty) empty.style.display=has?'none':'block';
+  ctx.style.display=has?'':'none';
+  if(totEl) totEl.textContent=has?`기간 총 광고비: ${total.toLocaleString()}원`:'';
+  if(!has) return;
+  _adChart=new Chart(ctx.getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'광고비',data,backgroundColor:'rgba(220,38,38,0.4)',borderColor:'#DC2626',borderWidth:1,borderRadius:3,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y.toLocaleString()}원`}},datalabels:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:10}}},
+              y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:'var(--tx2)',font:{size:10},callback:v=>v>=10000?(v/10000)+'만':v}}}}
+  });
+}
+
 function downloadDailyExcel(){
   if(!_dlyFilter.year||!_dlyFilter.month){ alert('년도와 월을 선택하세요.'); return; }
   const pad=v=>String(v).padStart(2,'0');
@@ -4509,8 +4721,11 @@ function downloadDailyExcel(){
   s1.push([`일일보고 - ${dateLabel} [${chLabel}]`]);       // 0
   s1.push([]);                                               // 1
   s1.push(['■ 핵심 지표']);                                 // 2
-  s1.push(['판매가','마진','마진율','택배건수']);            // 3
-  s1.push([totalSale, totalMargin, totalRate, totalPkgs]);   // 4 ← KPI값 (A5~D5)
+  s1.push(['판매가','마진','마진율','택배건수','광고비']);   // 3
+  const adXls=sumAdSpend({year:_dlyFilter.year, month:_dlyFilter.month, day:_dlyFilter.day, ch:_dlyFilter.ch});
+  const marginNetXls=totalMargin-adXls;
+  const rateNetXls=totalSettle>0?(marginNetXls/totalSettle):0;
+  s1.push([totalSale, marginNetXls, rateNetXls, totalPkgs, adXls]); // 4 ← KPI값 (A5~E5)
   s1.push([]);                                               // 5
   s1.push(['■ 제품별 판매 현황']);                          // 6
   s1.push(['모델명','구분','주문수량','택배건수','판매가합','마진','마진율']); // 7
@@ -4530,8 +4745,9 @@ function downloadDailyExcel(){
 
   // KPI row (index 4 = 엑셀 5행)
   applyFmt(ws1,4,0,WON);        // 판매가
-  applyFmt(ws1,4,1,MARGIN_FMT); // 마진
+  applyFmt(ws1,4,1,MARGIN_FMT); // 마진(광고비 차감)
   applyFmt(ws1,4,2,PCT);        // 마진율
+  applyFmt(ws1,4,4,WON);        // 광고비
   // product rows (index 8 ~ 8+prodList.length)
   for(let i=8;i<=8+prodList.length;i++){
     applyFmt(ws1,i,4,WON);        // 판매가합
