@@ -101,6 +101,54 @@ html, body {
 .sri-snippet mark { background:#FEF08A; color:#854D0E; border-radius:3px; padding:0 1px; }
 [data-theme="dark"] .sri-snippet mark { background:#A16207; color:#FEF9C3; }
 
+/* ===== 진행중인 프로젝트 & 디자인 ===== */
+.proj-sec { padding:12px 22px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.proj-sec-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.proj-sec-title { font-size:12.5px; font-weight:700; color:var(--text2); display:flex; align-items:center; gap:5px; }
+.proj-sec-actions { display:flex; align-items:center; gap:6px; }
+.proj-done-list-btn { padding:3px 10px; border:1.5px solid var(--border); border-radius:7px; background:var(--bg); color:var(--text2); font-size:11px; font-weight:700; cursor:pointer; transition:all var(--ease); font-family:inherit; white-space:nowrap; }
+.proj-done-list-btn:hover { border-color:var(--blue); color:var(--blue); background:var(--blue-light); }
+.proj-add-btn { width:24px; height:24px; border:none; border-radius:7px; background:var(--blue-light); color:var(--blue); font-size:17px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; transition:all var(--ease); }
+.proj-add-btn:hover { background:var(--blue); color:#fff; }
+
+/* 세로 배치 — 3명 모두의 작업현황 */
+.proj-list { display:flex; flex-direction:column; gap:5px; max-height:184px; overflow-y:auto; padding-right:2px; }
+.proj-empty { font-size:11.5px; color:var(--text3); text-align:center; padding:12px 0; line-height:1.7; }
+.proj-row { display:flex; align-items:center; gap:7px; padding:6px 9px; border:1.5px solid var(--border); border-left-width:4px; border-radius:9px; background:var(--bg); cursor:pointer; transition:all var(--ease); }
+.proj-row:hover { box-shadow:var(--shadow-sm); transform:translateX(1px); }
+.proj-row.s-planned  { border-left-color:var(--green); }
+.proj-row.s-progress { border-left-color:var(--orange); }
+.proj-row.s-done     { border-left-color:var(--blue); opacity:.78; }
+.proj-row-person { font-size:10px; font-weight:700; color:#fff; padding:2px 8px; border-radius:20px; white-space:nowrap; flex-shrink:0; }
+.proj-row-body { flex:1; min-width:0; }
+.proj-row-title { font-size:12.5px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.proj-row.s-done .proj-row-title { text-decoration:line-through; color:var(--text3); }
+.proj-row-meta { font-size:10px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.proj-row-meta .m-planned  { color:var(--green);  font-weight:700; }
+.proj-row-meta .m-progress { color:var(--orange); font-weight:700; }
+.proj-row-meta .m-done     { color:var(--blue);   font-weight:700; }
+.proj-row-meta .m-time     { color:var(--text3); }
+.proj-row-done { width:24px; height:24px; padding:0; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text3); font-size:12px; line-height:1; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all var(--ease); }
+.proj-row-done:hover { background:var(--blue); color:#fff; border-color:var(--blue); }
+.proj-row.s-done .proj-row-done { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+/* 완료 목록 모달 */
+.done-day-group { margin-bottom:16px; }
+.done-day-label { font-size:12px; font-weight:700; color:var(--text2); margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+.done-item { display:flex; align-items:center; gap:9px; padding:9px 11px; border:1.5px solid var(--border); border-left-width:4px; border-left-color:var(--blue); border-radius:10px; background:var(--bg); cursor:pointer; margin-bottom:6px; transition:all var(--ease); }
+.done-item:hover { box-shadow:var(--shadow-sm); transform:translateX(1px); }
+.done-item-person { font-size:10px; font-weight:700; color:#fff; padding:2px 8px; border-radius:20px; white-space:nowrap; flex-shrink:0; }
+.done-item-body { flex:1; min-width:0; }
+.done-item-title { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.done-item-time { font-size:11px; color:var(--text3); margin-top:2px; }
+.done-empty { font-size:13px; color:var(--text3); text-align:center; padding:40px 10px; line-height:1.7; }
+
+/* 프로젝트 상태 선택 버튼 (모달) */
+.proj-sbtn { flex:1; padding:9px 6px; border:1.5px solid var(--border); border-radius:var(--r-md); background:none; cursor:pointer; font-size:12px; font-weight:700; color:var(--text3); transition:all var(--ease); font-family:inherit; }
+.proj-sbtn.act-planned  { border-color:var(--green);  color:var(--green);  background:var(--green-light); }
+.proj-sbtn.act-progress { border-color:var(--orange); color:var(--orange); background:var(--orange-light); }
+.proj-sbtn.act-done     { border-color:var(--blue);   color:var(--blue);   background:var(--blue-light); }
+
 /* Month nav */
 .cal-nav {
   display: flex; align-items: center;
@@ -568,6 +616,18 @@ html, body {
       <input type="text" id="reportSearchInput" class="report-search-input" placeholder="업무 보고서 검색" autocomplete="off">
     </div>
 
+    <!-- ── 진행중인 프로젝트 & 디자인 ── -->
+    <div class="proj-sec">
+      <div class="proj-sec-head">
+        <div class="proj-sec-title">📌 진행중인 프로젝트 &amp; 디자인</div>
+        <div class="proj-sec-actions">
+          <button class="proj-done-list-btn" onclick="openDoneList()" title="완료된 프로젝트 보기">✅ 완료목록</button>
+          <button class="proj-add-btn" onclick="openProjModal(null)" title="추가">+</button>
+        </div>
+      </div>
+      <div class="proj-list" id="projList"></div>
+    </div>
+
     <div class="cal-nav">
       <button class="cal-nav-btn" id="btnPrev">‹</button>
       <div class="cal-nav-title" id="calTitle">—</div>
@@ -700,6 +760,59 @@ html, body {
   </div>
 </div>
 
+<!-- ── 프로젝트 & 디자인 Modal ── -->
+<div class="overlay" id="projOverlay">
+  <div class="modal" style="width:440px">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="projModalTitle">새 프로젝트 &amp; 디자인</div>
+        <div class="modal-subtitle" id="projModalDate"></div>
+      </div>
+      <button class="modal-close" id="projClose">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="projTitle">제목 <span style="color:var(--red)">*</span></label>
+      <input class="form-input" id="projTitle" type="text" placeholder="예: OO 브랜드 상세페이지 디자인" maxlength="100" autocomplete="off">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">상태</label>
+      <div class="pri-group">
+        <button class="proj-sbtn" id="psPlanned"  data-s="planned"  onclick="setProjStatus('planned')">🟢 진행전</button>
+        <button class="proj-sbtn" id="psProgress" data-s="progress" onclick="setProjStatus('progress')">🟠 진행중</button>
+        <button class="proj-sbtn" id="psDone"     data-s="done"     onclick="setProjStatus('done')">🔵 완료</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="projMemo">상세 내용 <span style="color:var(--text3);font-weight:400">(선택)</span></label>
+      <textarea class="form-input" id="projMemo" rows="4" spellcheck="false"
+        placeholder="작업 내용, 요청사항, 참고 링크 등을 자유롭게 입력하세요"
+        style="resize:vertical;line-height:1.6;min-height:100px;max-height:40vh"></textarea>
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="submit-btn" id="projSaveBtn" style="margin-top:0; flex:1" onclick="saveProj()">저장</button>
+      <button class="submit-btn" id="projDelBtn" style="margin-top:0; width:auto; padding:0 18px; background:var(--red-light); color:var(--red); display:none" onclick="delProj()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 완료 목록 Modal ── -->
+<div class="overlay" id="doneListOverlay">
+  <div class="modal" style="width:480px; max-height:82vh; overflow-y:auto;">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">✅ 완료 목록</div>
+        <div class="modal-subtitle">완료한 다음 날부터 이곳에 보관됩니다</div>
+      </div>
+      <button class="modal-close" id="doneListClose">✕</button>
+    </div>
+    <div id="doneListBody"></div>
+  </div>
+</div>
+
 <!-- ── 일일 업무 보고서 Modal ── -->
 <div class="overlay" id="reportOverlay">
   <div class="modal report-modal">
@@ -789,6 +902,12 @@ const N = {
   reports: {},
 };
 
+// 진행중인 프로젝트 & 디자인 상태 — 3명 모두의 작업을 함께 보관
+const P = {
+  byPerson: { '유현': [], '보라': [], '연정': [] },
+  // 항목: { id, title, status:'planned'|'progress'|'done', memo, createdAt, doneAt }
+};
+
 // ── SUPABASE 클라우드 동기화 (담당자별 공유) ──
 const SB_URL = 'https://ywbekolvslixidpugepr.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs';
@@ -815,17 +934,17 @@ async function cloudLoad(person) {
     const { data, error } = await sbCal.from('work_calendar').select('kind,data').eq('person', person);
     if (error) { console.warn('cloudLoad 오류', error.message); return null; }
     if (!data || !data.length) return { _empty: true };
-    const out = { tasks: {}, notes: {}, reports: {} };
-    data.forEach(row => { if (row.kind in out) out[row.kind] = row.data || {}; });
+    const out = { tasks: {}, notes: {}, reports: {}, projects: [] };
+    data.forEach(row => { if (row.kind in out && row.data != null) out[row.kind] = row.data; });
     return out;
   } catch(e) { console.warn('cloudLoad 실패', e); return null; }
 }
 
 // 로컬 캐시 즉시 표시 → 클라우드 최신본으로 갱신(없으면 로컬 데이터를 클라우드로 1회 마이그레이션)
 async function loadPersonData(p) {
-  try { S.tasks   = JSON.parse(localStorage.getItem('work-cal-' + p)          || '{}'); } catch { S.tasks = {}; }
-  try { N.notes   = JSON.parse(localStorage.getItem('work-cal-notes-' + p)    || '{}'); } catch { N.notes = {}; }
-  try { N.reports = JSON.parse(localStorage.getItem('work-cal-reports-' + p)  || '{}'); } catch { N.reports = {}; }
+  try { S.tasks    = JSON.parse(localStorage.getItem('work-cal-' + p)          || '{}'); } catch { S.tasks = {}; }
+  try { N.notes    = JSON.parse(localStorage.getItem('work-cal-notes-' + p)    || '{}'); } catch { N.notes = {}; }
+  try { N.reports  = JSON.parse(localStorage.getItem('work-cal-reports-' + p)  || '{}'); } catch { N.reports = {}; }
   renderCalendar(); renderTasks(); updateToolButtons();
 
   const cloud = await cloudLoad(p);
@@ -834,9 +953,9 @@ async function loadPersonData(p) {
   if (cloud && !cloud._empty) {
     // 클라우드에 데이터 있음 → 최신본 채택
     S.tasks = cloud.tasks; N.notes = cloud.notes; N.reports = cloud.reports;
-    localStorage.setItem('work-cal-' + p,         JSON.stringify(S.tasks));
-    localStorage.setItem('work-cal-notes-' + p,   JSON.stringify(N.notes));
-    localStorage.setItem('work-cal-reports-' + p, JSON.stringify(N.reports));
+    localStorage.setItem('work-cal-' + p,          JSON.stringify(S.tasks));
+    localStorage.setItem('work-cal-notes-' + p,    JSON.stringify(N.notes));
+    localStorage.setItem('work-cal-reports-' + p,  JSON.stringify(N.reports));
     renderCalendar(); renderTasks(); updateToolButtons();
     _calReady = true;
   } else if (cloud && cloud._empty) {
@@ -866,9 +985,9 @@ async function refreshCurrentFromCloud() {
                || JSON.stringify(cloud.reports) !== JSON.stringify(N.reports);
   if (!changed) return;
   S.tasks = cloud.tasks; N.notes = cloud.notes; N.reports = cloud.reports;
-  localStorage.setItem('work-cal-' + p,         JSON.stringify(S.tasks));
-  localStorage.setItem('work-cal-notes-' + p,   JSON.stringify(N.notes));
-  localStorage.setItem('work-cal-reports-' + p, JSON.stringify(N.reports));
+  localStorage.setItem('work-cal-' + p,          JSON.stringify(S.tasks));
+  localStorage.setItem('work-cal-notes-' + p,    JSON.stringify(N.notes));
+  localStorage.setItem('work-cal-reports-' + p,  JSON.stringify(N.reports));
   renderCalendar(); renderTasks(); updateToolButtons();
 }
 
@@ -969,6 +1088,279 @@ function switchPerson(p) {
 async function saveReportsData() {
   localStorage.setItem('work-cal-reports-' + S.person, JSON.stringify(N.reports));
   cloudSave('reports', N.reports);
+}
+
+// ── 진행중인 프로젝트 & 디자인 (3명 공유) ──
+const PROJ_PERSONS    = ['유현', '보라', '연정'];
+const PROJ_STAT_LABEL = { planned:'진행전', progress:'진행중', done:'완료' };
+const PERSON_COLOR    = { '유현':'#3182F6', '보라':'#8B5CF6', '연정':'#0AB68B' };
+
+// 특정 담당자의 프로젝트 배열을 로컬+클라우드에 저장
+async function saveProjectsFor(person) {
+  const arr = P.byPerson[person] || [];
+  localStorage.setItem('work-cal-projects-' + person, JSON.stringify(arr));
+  if (!sbCal || !_calReady) return;
+  try {
+    await sbCal.from('work_calendar').upsert(
+      { person, kind:'projects', data: arr, updated_at: new Date().toISOString() },
+      { onConflict: 'person,kind' }
+    );
+  } catch(e) { console.warn('saveProjectsFor 실패', e); }
+}
+
+// 3명 모두의 프로젝트 로드 (로컬 즉시 표시 → 클라우드 최신본 갱신)
+async function loadAllProjects(initial) {
+  if (initial) {
+    PROJ_PERSONS.forEach(p => {
+      try { P.byPerson[p] = JSON.parse(localStorage.getItem('work-cal-projects-' + p) || '[]'); }
+      catch { P.byPerson[p] = []; }
+      if (!Array.isArray(P.byPerson[p])) P.byPerson[p] = [];
+    });
+    renderProjects();
+  }
+  for (const p of PROJ_PERSONS) {
+    const cloud = await cloudLoad(p);
+    if (cloud && !cloud._empty) {
+      P.byPerson[p] = Array.isArray(cloud.projects) ? cloud.projects : [];
+      localStorage.setItem('work-cal-projects-' + p, JSON.stringify(P.byPerson[p]));
+    } else if (cloud && cloud._empty) {
+      if ((P.byPerson[p] || []).length) saveProjectsFor(p); // 최초 1회 마이그레이션
+    }
+  }
+  renderProjects();
+}
+
+// 편집 중이 아닐 때만 주기적으로 3명 프로젝트 갱신
+async function refreshAllProjects() {
+  if (!sbCal || !_calReady) return;
+  if (document.querySelector('.overlay.open')) return;
+  let changed = false;
+  for (const p of PROJ_PERSONS) {
+    const cloud = await cloudLoad(p);
+    if (!cloud) continue;
+    const arr = (cloud && !cloud._empty && Array.isArray(cloud.projects)) ? cloud.projects : [];
+    if (JSON.stringify(arr) !== JSON.stringify(P.byPerson[p] || [])) {
+      P.byPerson[p] = arr;
+      localStorage.setItem('work-cal-projects-' + p, JSON.stringify(arr));
+      changed = true;
+    }
+  }
+  if (changed) renderProjects();
+}
+
+// 프로젝트 소유자(담당자) 찾기
+function findProjOwner(id) {
+  for (const p of PROJ_PERSONS) {
+    if ((P.byPerson[p] || []).some(x => x.id === id)) return p;
+  }
+  return null;
+}
+function getProj(person, id) {
+  return (P.byPerson[person] || []).find(x => x.id === id) || null;
+}
+
+function isTodayIso(iso) {
+  if (!iso) return false;
+  const d = new Date(iso);
+  if (isNaN(d)) return false;
+  const t = new Date();
+  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+}
+
+function fmtMD(iso, suffix) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}${suffix ? ' ' + suffix : ''}`;
+}
+
+function fmtFull(iso, suffix) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const days = ['일','월','화','수','목','금','토'];
+  return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일(${days[d.getDay()]}) ${pad(d.getHours())}:${pad(d.getMinutes())}${suffix ? ' ' + suffix : ''}`;
+}
+
+// 메인 목록: 진행전/진행중 + (오늘 완료한 것). 완료 후 다음날부터는 완료목록으로 이동
+function renderProjects() {
+  const list = document.getElementById('projList');
+  if (!list) return;
+
+  const all = [];
+  PROJ_PERSONS.forEach(person => {
+    (P.byPerson[person] || []).forEach(p => {
+      if (p.status === 'done' && !isTodayIso(p.doneAt)) return; // 완료 후 다음날 → 완료목록으로
+      all.push({ ...p, _person: person });
+    });
+  });
+
+  if (!all.length) {
+    list.innerHTML = '<div class="proj-empty">진행중인 프로젝트 / 디자인이 없습니다.<br>오른쪽 <strong>+</strong> 버튼으로 추가하세요.</div>';
+    return;
+  }
+
+  const order = { progress:0, planned:1, done:2 };
+  all.sort((a,b) => (order[a.status] - order[b.status]) || (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+  list.innerHTML = all.map(p => {
+    const metaTime = p.status === 'done'
+      ? `<span class="m-time">${fmtMD(p.doneAt, '완료')}</span>`
+      : `<span class="m-time">${fmtMD(p.createdAt, '등록')}</span>`;
+    return `
+    <div class="proj-row s-${p.status}" onclick="openProjModal('${p._person}','${p.id}')" title="클릭하면 자세히 보기">
+      <span class="proj-row-person" style="background:${PERSON_COLOR[p._person] || '#888'}">${p._person}</span>
+      <div class="proj-row-body">
+        <div class="proj-row-title">${esc(p.title)}</div>
+        <div class="proj-row-meta"><span class="m-${p.status}">${PROJ_STAT_LABEL[p.status] || ''}</span> · ${metaTime}</div>
+      </div>
+      <button class="proj-row-done" title="완료 처리" onclick="event.stopPropagation();toggleProjDone('${p._person}','${p.id}')">✓</button>
+    </div>`;
+  }).join('');
+}
+
+function setProjStatus(s) {
+  S.projStatus = s;
+  [['planned','psPlanned'],['progress','psProgress'],['done','psDone']].forEach(([k,id]) => {
+    const b = document.getElementById(id);
+    if (b) b.className = 'proj-sbtn' + (k === s ? ` act-${k}` : '');
+  });
+}
+
+function openProjModal(person, id) {
+  // 추가: openProjModal(null) / 상세: openProjModal(person, id)
+  S.editProjPerson = id ? person : (S.person || '유현');
+  S.editProjId     = id || null;
+  const titleEl = document.getElementById('projModalTitle');
+  const dateEl  = document.getElementById('projModalDate');
+  const delBtn  = document.getElementById('projDelBtn');
+
+  if (id) {
+    const p = getProj(person, id);
+    if (!p) return;
+    titleEl.textContent = `${person} · 프로젝트 & 디자인`;
+    let sub = fmtFull(p.createdAt, '등록');
+    if (p.status === 'done' && p.doneAt) sub += `  ·  ${fmtFull(p.doneAt, '완료')}`;
+    dateEl.textContent = sub;
+    document.getElementById('projTitle').value = p.title || '';
+    document.getElementById('projMemo').value  = p.memo  || '';
+    setProjStatus(p.status || 'planned');
+    delBtn.style.display = '';
+  } else {
+    titleEl.textContent = `새 프로젝트 & 디자인 (${S.editProjPerson})`;
+    dateEl.textContent  = '';
+    document.getElementById('projTitle').value = '';
+    document.getElementById('projMemo').value  = '';
+    setProjStatus('planned');
+    delBtn.style.display = 'none';
+  }
+  document.getElementById('projOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('projTitle').focus(), 200);
+}
+
+function closeProjModal() {
+  document.getElementById('projOverlay').classList.remove('open');
+  S.editProjId = null; S.editProjPerson = null;
+}
+
+function saveProj() {
+  const title = document.getElementById('projTitle').value.trim();
+  if (!title) {
+    const el = document.getElementById('projTitle');
+    el.classList.add('error'); el.focus();
+    setTimeout(() => el.classList.remove('error'), 1600);
+    return;
+  }
+  const memo   = document.getElementById('projMemo').value.trim();
+  const status = S.projStatus || 'planned';
+  const nowIso = new Date().toISOString();
+  const person = S.editProjPerson || S.person || '유현';
+  if (!Array.isArray(P.byPerson[person])) P.byPerson[person] = [];
+
+  if (S.editProjId) {
+    const p = getProj(person, S.editProjId);
+    if (p) {
+      const wasDone = p.status === 'done';
+      p.title = title; p.memo = memo; p.status = status;
+      if (status === 'done' && !wasDone) p.doneAt = nowIso;
+      if (status !== 'done') p.doneAt = null;
+    }
+  } else {
+    P.byPerson[person].push({
+      id: genId(), title, memo, status,
+      createdAt: nowIso,
+      doneAt: status === 'done' ? nowIso : null,
+    });
+  }
+  saveProjectsFor(person); renderProjects(); closeProjModal();
+  showToast('💾 저장됨', '프로젝트 / 디자인이 저장되었습니다.');
+}
+
+function toggleProjDone(person, id) {
+  const p = getProj(person, id);
+  if (!p) return;
+  if (p.status === 'done') { p.status = 'progress'; p.doneAt = null; }
+  else                     { p.status = 'done';     p.doneAt = new Date().toISOString(); }
+  saveProjectsFor(person); renderProjects(); renderDoneList();
+  if (p.status === 'done') showToast('✅ 완료!', `"${p.title}" ${fmtMD(p.doneAt, '완료')} 처리했습니다.`);
+}
+
+function delProj() {
+  if (!S.editProjId) return;
+  if (!confirm('이 프로젝트 / 디자인을 삭제할까요?')) return;
+  const person = S.editProjPerson || findProjOwner(S.editProjId);
+  if (person) {
+    P.byPerson[person] = (P.byPerson[person] || []).filter(x => x.id !== S.editProjId);
+    saveProjectsFor(person);
+  }
+  renderProjects(); renderDoneList(); closeProjModal();
+}
+
+// ── 완료 목록 (완료 후 다음 날부터 보관) ──
+function openDoneList() {
+  renderDoneList();
+  document.getElementById('doneListOverlay').classList.add('open');
+}
+function closeDoneList() {
+  document.getElementById('doneListOverlay').classList.remove('open');
+}
+function renderDoneList() {
+  const box = document.getElementById('doneListBody');
+  if (!box) return;
+
+  const items = [];
+  PROJ_PERSONS.forEach(person => {
+    (P.byPerson[person] || []).forEach(p => {
+      if (p.status === 'done' && p.doneAt && !isTodayIso(p.doneAt)) {
+        items.push({ ...p, _person: person });
+      }
+    });
+  });
+
+  if (!items.length) {
+    box.innerHTML = '<div class="done-empty">완료 목록이 비어 있습니다.<br>완료한 항목은 <strong>다음 날부터</strong> 이곳에 모입니다.</div>';
+    return;
+  }
+
+  items.sort((a,b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+
+  // 완료 날짜별 그룹
+  const groups = {};
+  items.forEach(p => {
+    const d = new Date(p.doneAt);
+    const key = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    (groups[key] = groups[key] || []).push(p);
+  });
+
+  box.innerHTML = Object.keys(groups).sort((a,b) => b.localeCompare(a)).map(key => {
+    const rows = groups[key].map(p => `
+      <div class="done-item" onclick="openProjModal('${p._person}','${p.id}')" title="클릭하면 자세히 보기">
+        <span class="done-item-person" style="background:${PERSON_COLOR[p._person] || '#888'}">${p._person}</span>
+        <div class="done-item-body">
+          <div class="done-item-title">${esc(p.title)}</div>
+          <div class="done-item-time">🕒 ${fmtFull(p.doneAt, '완료')}</div>
+        </div>
+      </div>`).join('');
+    return `<div class="done-day-group"><div class="done-day-label">${korDate(key)}</div>${rows}</div>`;
+  }).join('');
 }
 
 // ── DARK MODE ──
@@ -1501,6 +1893,19 @@ document.getElementById('notepadOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('notepadOverlay')) closeNotepad();
 });
 
+document.getElementById('projClose').addEventListener('click', closeProjModal);
+document.getElementById('projOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('projOverlay')) closeProjModal();
+});
+document.getElementById('projTitle').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveProj();
+});
+
+document.getElementById('doneListClose').addEventListener('click', closeDoneList);
+document.getElementById('doneListOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('doneListOverlay')) closeDoneList();
+});
+
 document.getElementById('reportClose').addEventListener('click', closeReport);
 // 바깥 클릭으로는 닫지 않음(작성 중 내용 보호) — ✕ 버튼으로만 닫힘
 
@@ -1527,6 +1932,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeOverlay();
     closeNotepad();
+    closeProjModal();
+    closeDoneList();
     closeSearchModal();
     // 보고서는 Esc로 닫지 않음(작성 중 내용 보호) — ✕ 버튼으로만 닫힘
   }
@@ -1540,10 +1947,12 @@ function setupCalendar() {
   S.selDate   = todayStr();
   renderCalendar();
   renderTasks();
+  renderProjects();
   resetForm();
   setInterval(checkAlerts, 30000);
-  setInterval(() => { renderTasks(); renderCalendar(); }, 30000);
+  setInterval(() => { renderTasks(); renderCalendar(); renderProjects(); }, 30000); // 날짜 바뀌면 완료 항목 자동 이동
   setInterval(refreshCurrentFromCloud, 60000); // 클라우드 공유 데이터 주기적 동기화
+  setInterval(refreshAllProjects, 60000);       // 3명 프로젝트 클라우드 동기화
   checkAlerts();
 }
 
@@ -1563,6 +1972,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   loadPersonData(S.person);
+  loadAllProjects(true); // 3명 모두의 프로젝트 로드
 });
 </script>
 </body>
