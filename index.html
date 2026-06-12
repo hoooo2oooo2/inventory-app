@@ -5338,6 +5338,9 @@ async function submitRevUpload(){
   if(!_bdLoaded) await loadBackdata();
   if(_bdData.length===0){ alert('백데이터를 먼저 확인해주세요.'); return; }
 
+  // 택배비(판매처·상품번호별) 최신본을 다시 로드 → 새 통합 데이터에 자동 반영되도록
+  await loadShippingFees();
+
   const btn = document.querySelector('.rev-submit');
   if(btn){ btn.disabled=true; btn.textContent='처리 중...'; }
 
@@ -5375,6 +5378,7 @@ async function submitRevUpload(){
 
     // ── 2단계: 전부 정상 → 저장 ──
     let skipped=[];
+    const insertedChannels=new Set();
     for(const {ch, rows} of parsedList){
       // 파일에 포함된 (년도, 날짜) 조합 전체
       const ymSet=[...new Set(rows.map(r=>`${r.year}|${r.sale_date}`))];
@@ -5396,9 +5400,22 @@ async function submitRevUpload(){
       }
       await insertRevenueRows(rows);
       totalRows += rows.length;
+      insertedChannels.add(ch);
       console.log(`${ch}: ${rows.length}건 업로드 완료`);
     }
     if(skipped.length) errors.push('건너뜀: '+skipped.join(', '));
+
+    // ★ 새로 등록된 통합 데이터에 설정된 택배비(판매처·상품번호별) 자동 반영 — 누락 방지
+    //   업로드 시 이미 적용되지만, 혹시 모를 누락까지 보정(변경 없으면 DB 미접근)
+    if(insertedChannels.size && _shipData.length){
+      let shipFixed=0;
+      for(const r of _shipData){
+        if(insertedChannels.has(r.channel)){
+          shipFixed += await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:!!r.perUnit});
+        }
+      }
+      if(shipFixed) console.log(`택배비 자동 반영: ${shipFixed}건 보정`);
+    }
 
     _revUpFiles = {};
     renderRevUpSlots();
@@ -6746,7 +6763,7 @@ function openCalPanel() {
   const iframe = document.getElementById('calIframe');
   // 첫 오픈 시 iframe src 설정
   if (!_calLoaded) {
-    iframe.src = 'calendar.html';
+    iframe.src = 'calendar.html?v=20260611b';
     _calLoaded = true;
     // 기존에 주입됐던 재고 이벤트 제거 (연동 해제)
     iframe.onload = () => {

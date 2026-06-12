@@ -1082,6 +1082,8 @@ function switchPerson(p) {
     const btn = document.getElementById('pb-' + name);
     if(btn) btn.classList.toggle('active', name === p);
   });
+  renderProjects();   // 선택한 담당자의 프로젝트만 표시
+  renderDoneList();
   return loadPersonData(p);
 }
 
@@ -1180,21 +1182,20 @@ function fmtFull(iso, suffix) {
   return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일(${days[d.getDay()]}) ${pad(d.getHours())}:${pad(d.getMinutes())}${suffix ? ' ' + suffix : ''}`;
 }
 
-// 메인 목록: 진행전/진행중 + (오늘 완료한 것). 완료 후 다음날부터는 완료목록으로 이동
+// 메인 목록: 선택된 담당자의 진행전/진행중 + (오늘 완료한 것). 완료 후 다음날부터는 완료목록으로 이동
 function renderProjects() {
   const list = document.getElementById('projList');
   if (!list) return;
 
+  const person = S.person || '유현';
   const all = [];
-  PROJ_PERSONS.forEach(person => {
-    (P.byPerson[person] || []).forEach(p => {
-      if (p.status === 'done' && !isTodayIso(p.doneAt)) return; // 완료 후 다음날 → 완료목록으로
-      all.push({ ...p, _person: person });
-    });
+  (P.byPerson[person] || []).forEach(p => {
+    if (p.status === 'done' && !isTodayIso(p.doneAt)) return; // 완료 후 다음날 → 완료목록으로
+    all.push({ ...p, _person: person });
   });
 
   if (!all.length) {
-    list.innerHTML = '<div class="proj-empty">진행중인 프로젝트 / 디자인이 없습니다.<br>오른쪽 <strong>+</strong> 버튼으로 추가하세요.</div>';
+    list.innerHTML = `<div class="proj-empty"><strong>${person}</strong> 담당의 진행중인 프로젝트 / 디자인이 없습니다.<br>오른쪽 <strong>+</strong> 버튼으로 추가하세요.</div>`;
     return;
   }
 
@@ -1326,17 +1327,16 @@ function renderDoneList() {
   const box = document.getElementById('doneListBody');
   if (!box) return;
 
+  const person = S.person || '유현';
   const items = [];
-  PROJ_PERSONS.forEach(person => {
-    (P.byPerson[person] || []).forEach(p => {
-      if (p.status === 'done' && p.doneAt && !isTodayIso(p.doneAt)) {
-        items.push({ ...p, _person: person });
-      }
-    });
+  (P.byPerson[person] || []).forEach(p => {
+    if (p.status === 'done' && p.doneAt && !isTodayIso(p.doneAt)) {
+      items.push({ ...p, _person: person });
+    }
   });
 
   if (!items.length) {
-    box.innerHTML = '<div class="done-empty">완료 목록이 비어 있습니다.<br>완료한 항목은 <strong>다음 날부터</strong> 이곳에 모입니다.</div>';
+    box.innerHTML = `<div class="done-empty"><strong>${person}</strong> 담당의 완료 목록이 비어 있습니다.<br>완료한 항목은 <strong>다음 날부터</strong> 이곳에 모입니다.</div>`;
     return;
   }
 
