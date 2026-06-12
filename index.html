@@ -264,13 +264,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* ── 오늘 주문 체크 박스 ── */
 #ocb-section{display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:10px;}
 #orderCheckBox{margin-bottom:0;}
-.ocb-outer{display:flex;gap:14px;align-items:flex-start;width:100%;}
+.ocb-outer{display:flex;gap:14px;align-items:stretch;width:100%;}
 /* 왼쪽: 체크리스트 */
-.ocb-wrap{flex:1.5 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-wrap{flex:1.5 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
 .ocb-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:0.5px solid var(--bd);cursor:pointer;user-select:none;}
 .ocb-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
 .ocb-toggle{font-size:11px;color:var(--tx2);}
-.ocb-body{padding:4px 0;max-height:340px;overflow-y:auto;}
+.ocb-body{padding:4px 0;flex:1 1 0;min-height:0;overflow-y:auto;}
 .ocb-row{display:grid;grid-template-columns:auto 42px 42px 84px 38px;align-items:center;gap:3px;padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:11px;}
 .ocb-row:last-child{border:none;}
 .ocb-hrow{font-size:9px;color:var(--tx2);font-weight:600;letter-spacing:.4px;padding:5px 10px 3px;display:grid;grid-template-columns:auto 42px 42px 84px 38px;gap:3px;position:sticky;top:0;background:var(--bg2);z-index:1;}
@@ -293,9 +293,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .ocb-t6val{font-weight:700;color:var(--pr);white-space:nowrap;font-size:11px;text-align:center;}
 .ocb-rg-val{font-weight:700;color:#7C3AED;white-space:nowrap;font-size:11px;text-align:center;}
 /* 오른쪽: 진행중 발주 */
-.ocb-right{flex:1.1 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.ocb-right{flex:1.1 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
 .ocb-right-head{font-size:12px;font-weight:600;padding:9px 14px;border-bottom:0.5px solid var(--bd);color:var(--tx);display:flex;align-items:center;gap:6px;}
-.ocb-pend-body{max-height:340px;overflow-y:auto;}
+.ocb-pend-body{flex:1 1 0;min-height:0;overflow-y:auto;}
 .ocb-pend-row{display:grid;grid-template-columns:1fr auto;gap:16px;padding:6px 14px;border-bottom:0.5px solid var(--bd);font-size:11px;align-items:center;}
 .ocb-pend-row>div:first-child{min-width:0;}
 .ocb-pend-row:last-child{border:none;}
@@ -806,8 +806,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <td id="qt-total" style="color:#2563EB;">0원</td>
               <td colspan="2" style="text-align:center;padding:0;">
                 <select id="qt-vat" class="qt-vat-sel">
-                  <option value="별도">부가세 별도</option>
                   <option value="포함">부가세 포함</option>
+                  <option value="별도">부가세 별도</option>
                 </select>
               </td>
             </tr>
@@ -2619,7 +2619,7 @@ function qtReset(){
   }
   _qtRows=[]; _qtEditId=null;
   ['qt-name','qt-company','qt-contact','qt-fax','qt-manager'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  const vat=document.getElementById('qt-vat'); if(vat) vat.value='별도';
+  const vat=document.getElementById('qt-vat'); if(vat) vat.value='포함';
   const t=new Date();
   _qtDate=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
   document.getElementById('qt-date-input').value=_qtDate;
@@ -2651,7 +2651,7 @@ function qtConfirmSave(){
     company:document.getElementById('qt-company').value.trim(),
     contact:document.getElementById('qt-contact').value.trim(),
     fax:document.getElementById('qt-fax').value.trim(),
-    vat:document.getElementById('qt-vat')?.value||'별도',
+    vat:document.getElementById('qt-vat')?.value||'포함',
     rows:_qtRows.map(r=>({name:r.name,model:r.model,qty:r.qty,unit:r.unit,note:r.note})),
     savedAt:`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
     ts:now.getTime()
@@ -2724,7 +2724,7 @@ function qtLoadSaved(id){
   document.getElementById('qt-contact').value=e.contact||'';
   document.getElementById('qt-fax').value=e.fax||'';
   document.getElementById('qt-manager').value=e.manager||'';
-  document.getElementById('qt-vat').value=e.vat||'별도';
+  document.getElementById('qt-vat').value=e.vat||'포함';
   _qtDate=e.tradeDate||null;
   document.getElementById('qt-date-input').value=_qtDate||'';
   document.getElementById('qt-date-disp').textContent=qtFmtDate(_qtDate);
