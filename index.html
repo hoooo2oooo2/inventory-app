@@ -1320,6 +1320,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <button class="btn btn-sm" onclick="openBdUpload()" style="background:#3182F6;color:#fff;border:none;">📤 엑셀 수정·업로드</button>
         <button class="btn btn-sm" onclick="resyncRevenuePrices()" style="background:#D97706;color:#fff;border:none;" title="현재 백데이터 단가로 통합 데이터(올해 이번달~)의 단가·마진을 일괄 재계산합니다">🔄 통합 단가 일괄 반영</button>
         <span style="font-size:11px;color:var(--tx2);">이번 달 1일부터 데이터에 현재 단가 적용</span>
+        <button class="btn btn-sm" onclick="resyncRevenueTypes()" style="background:#7C3AED;color:#fff;border:none;" title="현재 백데이터 '구분'을 통합 데이터 전체(날짜 제한 없음)에 일괄 반영합니다. 단가·마진은 변경하지 않습니다">🏷️ 구분 수정</button>
+        <span style="font-size:11px;color:var(--tx2);">구분만 전체 기간에 적용 (날짜 제한 없음)</span>
       </div>
       <div class="rev-tbl-card">
         <div class="tw">
@@ -5551,6 +5553,71 @@ async function resyncRevenuePrices(){
     alert(`완료: ${scanned.toLocaleString()}건 검사, ${updated.toLocaleString()}건 단가·마진 반영했습니다.`);
   }catch(e){
     alert('일괄 반영 실패: '+e.message);
+  }finally{
+    btns.forEach(b=>{b.disabled=false;if(b.dataset._t)b.textContent=b.dataset._t;});
+  }
+}
+
+// 백데이터 '구분'만 통합 데이터 전체(날짜 제한 없음)에 일괄 반영 — 단가·마진은 변경 없음
+async function resyncRevenueTypes(){
+  if(!_bdData || !_bdData.length){ await loadBackdata(); }
+  if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
+  if(!confirm(`현재 백데이터의 '구분'을 통합 데이터 전체(전체 기간·날짜 제한 없음)에 일괄 반영합니다.\n구분만 변경되며 단가·마진은 그대로 유지됩니다.\n\n진행할까요?`)) return;
+
+  // 백데이터 맵 (단가 반영과 동일한 매칭 규칙)
+  const bdMap={}; const bdNameMap={};
+  _bdData.forEach(r=>{
+    bdMap[(r.code||'').toLowerCase()]=r;
+    if(r.name){
+      const k=normName(r.name);
+      const ck=(r.code||'').toLowerCase();
+      const special=(!r.code||SHARED_BD_CODES.has(ck));
+      if(!(k in bdNameMap)||special) bdNameMap[k]=r;
+    }
+  });
+
+  const btns=document.querySelectorAll('[onclick="resyncRevenueTypes()"]');
+  btns.forEach(b=>{b.disabled=true;b.dataset._t=b.textContent;b.textContent='반영 중...';});
+
+  try{
+    let from=0, updated=0, scanned=0;
+    const PAGE=1000;
+    while(true){
+      const {data,error}=await sb.from('revenue')
+        .select('id,item_code,model_name,item_type')
+        .range(from,from+PAGE-1);   // 날짜·연도 필터 없음 → 전체 기간
+      if(error){ throw error; }
+      if(!data||!data.length) break;
+      scanned+=data.length;
+      const upd=[];
+      data.forEach(r=>{
+        const codeKey=(r.item_code||'').toLowerCase();
+        const isShared=SHARED_BD_CODES.has(codeKey)||!r.item_code;
+        const nameKey=normName(r.model_name);
+        const bd=isShared?(nameKey?bdNameMap[nameKey]:null):(bdMap[codeKey]||(nameKey?bdNameMap[nameKey]:null));
+        if(!bd) return;
+        const newType=bd.type||'';
+        if(newType && newType!==(r.item_type||'')){
+          upd.push({id:r.id,item_type:newType});
+        }
+      });
+      const CHUNK=80;
+      for(let i=0;i<upd.length;i+=CHUNK){
+        await Promise.all(upd.slice(i,i+CHUNK).map(u=>
+          sb.from('revenue').update({item_type:u.item_type}).eq('id',u.id)
+        ));
+      }
+      if(_revLoaded && upd.length){
+        const m=new Map(upd.map(u=>[u.id,u]));
+        _revData.forEach(r=>{const u=m.get(r.id);if(u){r.itemType=u.item_type;}});
+      }
+      updated+=upd.length;
+      if(data.length<PAGE) break; from+=PAGE;
+    }
+    if(_revLoaded) _renderRevCurrentPage();
+    alert(`완료: ${scanned.toLocaleString()}건 검사, ${updated.toLocaleString()}건 구분 반영했습니다.`);
+  }catch(e){
+    alert('구분 일괄 반영 실패: '+e.message);
   }finally{
     btns.forEach(b=>{b.disabled=false;if(b.dataset._t)b.textContent=b.dataset._t;});
   }
