@@ -4719,19 +4719,29 @@ function _buildDailyChartXml(sheetName, serials, saleVals, adVals, firstR, lastR
     +`<c:spPr>${fillXml}<a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>`
     +catRef
     +`<c:val><c:numRef><c:f>${sn}!$${valCol}$${firstR}:$${valCol}$${lastR}</c:f><c:numCache><c:formatCode>#,##0</c:formatCode><c:ptCount val="${n}"/>${pts(vals)}</c:numCache></c:numRef></c:val></c:ser>`;
+  // 투명 placeholder 시리즈(값 0·테두리/채움 없음) — 같은 축에 빈 슬롯을 만들어
+  // 판매가는 왼쪽, 광고비는 오른쪽으로 어긋나게 배치(겹침 방지)
+  const zeroLit=`<c:formatCode>General</c:formatCode><c:ptCount val="${n}"/>`+serials.map((_,i)=>`<c:pt idx="${i}"><c:v>0</c:v></c:pt>`).join('');
+  const phSer=(idx,order)=>
+    `<c:ser><c:idx val="${idx}"/><c:order val="${order}"/>`
+    +`<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>`
+    +catRef
+    +`<c:val><c:numLit>${zeroLit}</c:numLit></c:val></c:ser>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="1400"/><a:t>일자별 판매가 · 광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>`
     +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
     +ser(0,0,'B','판매가','B',saleVals,'<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>')
-    +`<c:gapWidth val="80"/><c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>`
+    +phSer(1,1)
+    +`<c:gapWidth val="60"/><c:overlap val="-20"/><c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>`
     +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
-    +ser(1,1,'F','광고비','F',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
-    +`<c:gapWidth val="140"/><c:axId val="333333333"/><c:axId val="444444444"/></c:barChart>`
+    +phSer(2,2)
+    +ser(3,3,'F','광고비','F',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
+    +`<c:gapWidth val="60"/><c:overlap val="-20"/><c:axId val="333333333"/><c:axId val="444444444"/></c:barChart>`
     +`<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="mm-dd" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="222222222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
     +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>판매가</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
     +`<c:valAx><c:axId val="444444444"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="333333333"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`
     +`<c:catAx><c:axId val="333333333"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="1"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="444444444"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
-    +`</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
+    +`</c:plotArea><c:legend><c:legendPos val="b"/><c:legendEntry><c:idx val="1"/><c:delete val="1"/></c:legendEntry><c:legendEntry><c:idx val="2"/><c:delete val="1"/></c:legendEntry><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
 }
 
 const _DAILY_DRAWING_XML=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
