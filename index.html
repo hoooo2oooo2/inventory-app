@@ -1308,6 +1308,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <span style="font-size:11px;color:var(--tx2);margin-left:8px;">공급가 기준 마진 계산 테이블</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
+          <select id="bdTypeFilter" onchange="renderBdTable()" title="구분으로 조회" style="font-size:12px;padding:6px 8px;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);cursor:pointer;"><option value="ALL">전체 구분</option></select>
           <div class="search-box">
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <input type="text" id="bdSrch" placeholder="코드, 상품명 검색..." oninput="renderBdTable()">
@@ -5354,8 +5355,18 @@ async function saveRevRowEdit(){
 // ── 백데이터 ──
 function renderBdTable(){
   const srch = (document.getElementById('bdSrch')?.value||'').toLowerCase();
+  // 구분 조회 드롭다운 옵션 채우기 (선택값 유지)
+  const typeSel=document.getElementById('bdTypeFilter');
+  if(typeSel){
+    const curType=typeSel.value||'ALL';
+    const types=[...new Set(_bdData.map(r=>r.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+    typeSel.innerHTML='<option value="ALL">전체 구분</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');
+    typeSel.value=(curType!=='ALL'&&types.includes(curType))?curType:'ALL';
+  }
+  const typeFilter=typeSel?typeSel.value:'ALL';
   const filtered = _bdData.filter(r=>
-    !srch || (r.code||'').toLowerCase().includes(srch) || (r.name||'').toLowerCase().includes(srch)
+    (!srch || (r.code||'').toLowerCase().includes(srch) || (r.name||'').toLowerCase().includes(srch))
+    && (typeFilter==='ALL' || (r.type||'')===typeFilter)
   );
   const tbody = document.getElementById('bdTbody');
   const empty = document.getElementById('bdEmpty');
