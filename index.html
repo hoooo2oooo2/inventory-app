@@ -840,6 +840,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <button class="qt-btn" onclick="qtOpenLoadCalc()" style="background:#EEF4FF;color:#3182F6;border:1px solid #3182F6;">🧮 계산 불러오기</button>
         <div style="flex:1;"></div>
         <button class="qt-btn" onclick="qtDownloadPdf()" style="background:#DC2626;color:#fff;">📄 PDF 다운로드</button>
+        <button class="qt-btn" id="qtCopyImgBtn" onclick="qtCopyImage()" style="background:#7C3AED;color:#fff;">🖼 이미지 복사</button>
         <button class="qt-btn" onclick="qtOpenSaveModal()" style="background:#059669;color:#fff;">💾 저장하기</button>
       </div>
     </div>
@@ -1260,7 +1261,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revMonKpi1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi1Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revMonKpi2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi2Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">🛒 주문건수</div><div class="rev-kpi-val" id="revMonKpi3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi3Sub">데이터 없음</div></div>
-        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revMonKpi5" style="color:#DC2626;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi5Sub">판매처 선택 반영</div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revMonKpi5">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi5Sub">판매처 선택 반영</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📉 손실금액</div><div class="rev-kpi-val" id="revMonKpi4" style="color:#DC2626;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi4Sub">마진 마이너스 합계</div></div>
       </div>
       <div class="rev-chart-grid">
@@ -1494,11 +1495,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rev-filter-group" id="revDlyChBtns"></div>
       </div>
       <!-- KPI -->
-      <div class="rev-kpi" id="revDlyKpi">
+      <div class="rev-kpi" id="revDlyKpi" style="grid-template-columns:repeat(5,1fr);">
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 정산금액</div><div class="rev-kpi-val" id="revDlyK0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK0s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revDlyK1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK1s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revDlyK2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK2s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 택배건수</div><div class="rev-kpi-val" id="revDlyK3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK3s"></div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revDlyK4">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK4s">해당 기간·판매처</div></div>
       </div>
       <!-- 상품 테이블 + 도넛 -->
       <div class="rev-chart-grid">
@@ -2896,6 +2898,36 @@ async function qtCaptureDoc(doc){
   }
 }
 
+// ── 이미지 복사 (클립보드) ──
+async function qtCopyImage(){
+  const doc=document.getElementById('qtDoc');
+  if(!doc) return;
+  const btn=document.getElementById('qtCopyImgBtn');
+  const orig=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='복사 중...'; }
+  try{
+    const canvas=await qtCaptureDoc(doc);
+    const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
+    if(!blob) throw new Error('이미지 변환 실패');
+    if(navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      if(btn){ btn.textContent='✅ 복사됨'; setTimeout(()=>{btn.textContent=orig;},1500); }
+    } else {
+      // 클립보드 미지원 → 다운로드로 대체
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=`${(document.getElementById('qt-name').value.trim()||'견적서')}.png`;
+      a.click(); URL.revokeObjectURL(url);
+      alert('이 브라우저는 클립보드 복사를 지원하지 않아 이미지로 저장했습니다.');
+    }
+  }catch(e){
+    alert('이미지 복사 실패: '+e.message);
+  }finally{
+    doc.classList.remove('qt-printing');
+    if(btn){ btn.disabled=false; if(btn.textContent==='복사 중...') btn.textContent=orig; }
+  }
+}
+
 // ── PDF 다운로드 ──
 async function qtDownloadPdf(){
   const doc=document.getElementById('qtDoc');
@@ -4221,7 +4253,7 @@ function renderRevMonthly(){
   setKpi('revMonKpi1',fmt(margin),adMon>0?`광고비 -${fmt(adMon)} 반영`:`${_revSelMonth} 마진`);
   setKpi('revMonKpi2',rate.toFixed(1)+'%','마진율');
   setKpi('revMonKpi3',rows.length.toLocaleString()+'건','주문건수');
-  setKpi('revMonKpi5', adMon>0?'-'+fmt(adMon):'0', _revSelCh==='ALL'?'전체 판매처':_revSelCh);
+  setKpi('revMonKpi5', fmt(adMon), _revSelCh==='ALL'?'전체 판매처':_revSelCh);
   setKpi('revMonKpi4', loss<0?'-'+fmt(Math.abs(loss)):'0', lossRows.length?`마이너스 ${lossRows.length}건`:'손실 없음');
 
   // 일별 추이 차트
@@ -4441,6 +4473,9 @@ function renderDailyReport(){
   document.getElementById('revDlyK2s').innerHTML=prevSettle?`<span style="color:${totalRate>=prevRate?'#DC2626':'#059669'};font-weight:600;">${totalRate>=prevRate?'▲':'▼'} ${Math.abs(totalRate-prevRate).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">전월 ${prevRate.toFixed(1)}%</span>`:'<span style="color:var(--tx2);">전월 데이터 없음</span>';
   document.getElementById('revDlyK3').textContent=totalOrders.toLocaleString()+'건';
   document.getElementById('revDlyK3s').innerHTML=diffHtml(totalOrders,prevOrders,'건');
+  // 광고비: 마이너스 없이 검은 글씨로 금액만 표시
+  document.getElementById('revDlyK4').textContent=fmt(adDly);
+  document.getElementById('revDlyK4s').innerHTML=adPrev?diffHtml(adDly,adPrev):'<span style="color:var(--tx2);">해당 기간·판매처</span>';
 
   // 기간 라벨
   const periodLabel=_dlyFilter.day!==null
