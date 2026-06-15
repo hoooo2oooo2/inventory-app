@@ -173,6 +173,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .ord-kpi-box{font-size:12px;font-weight:700;color:var(--pr);white-space:nowrap;}
 .ord-kpi-sub{font-size:10px;color:var(--tx2);margin-top:3px;min-height:13px;}
 .ord-kpi-sub.urg{color:#DC2626;font-weight:600;}
+/* 재고관리 한 줄 인사이트 */
+.inv-insight{margin:2px 0 12px;padding:12px 15px;border-radius:10px;background:var(--prl);border:0.5px solid rgba(49,130,246,0.25);font-size:13px;line-height:1.55;color:var(--tx);display:flex;align-items:flex-start;gap:9px;}
+.inv-insight .ii-ico{font-size:17px;flex-shrink:0;line-height:1.4;}
+.inv-insight .ii-body{display:flex;flex-direction:column;gap:7px;min-width:0;}
+.inv-insight .ii-badges{display:flex;gap:6px;flex-wrap:wrap;}
+.inv-insight .ii-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:14px;white-space:nowrap;cursor:default;}
+.inv-insight .ii-badge.crit{background:#FEE2E2;color:#B91C1C;}
+.inv-insight .ii-badge.new{background:#E0EDFF;color:#1D4ED8;}
+.inv-insight.ok{background:#ECFDF5;border-color:rgba(5,150,105,0.25);align-items:center;}
 
 /* FLOAT */
 .float-btn-wrap{position:fixed;bottom:78px;right:18px;z-index:200;}
@@ -518,7 +527,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div class="page active" id="page-inv">
 <div class="main">
   <div id="ocb-section">
-    <div class="sum-row" id="invSum" style="padding:0;"></div>
+    <div id="invInsight"></div>
+    <div class="ord-kpi" id="invKpi"></div>
     <!-- 오늘 주문 체크 -->
     <div id="orderCheckBox"></div>
   </div>
@@ -3199,6 +3209,66 @@ function _hasEnoughDailyData(p){
   return entries.length>=3 && entries.some(([,q])=>q>0);
 }
 
+// 재고 상태별 KPI 카드 — 클릭 시 상태 필터
+function renderInvKpi(total,cnt){
+  const el=document.getElementById('invKpi'); if(!el) return;
+  const cur=document.getElementById('invStF')?.value||'';
+  const card=(key,label,val,color,sub)=>`<div class="ord-kpi-card ${cur===key?'active':''}" onclick="setInvStatus('${key}')">
+    <div class="ord-kpi-cat" style="color:${color||'var(--tx)'};">${label}</div>
+    <div class="ord-kpi-row"><span class="ord-kpi-cnt" style="${color?`color:${color};`:''}">${val}<small>개</small></span></div>
+    <div class="ord-kpi-sub">${sub||' '}</div></div>`;
+  el.innerHTML =
+    card('','📦 전체',total,'','전체 제품')+
+    card('정상','정상',cnt.정상,'#059669','재고 충분')+
+    card('임박','임박',cnt.임박,'#D97706','발주 검토')+
+    card('긴급','긴급',cnt.긴급,'#EA580C','곧 소진')+
+    card('부족','부족',cnt.부족,'#DC2626','즉시발주');
+}
+function setInvStatus(s){ const sel=document.getElementById('invStF'); if(sel) sel.value=s; renderInv(); }
+// 이번주(월요일 기준) 키 — '신규 진입' 비교 기준
+function invWeekKey(){ const d=new Date(); const day=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-day); mon.setHours(0,0,0,0); return fmtDate(mon); }
+// 이번주 위험권 베이스라인과 비교 → 신규 진입 코드 (베이스라인은 주 1회만 갱신, localStorage)
+function getInvRiskDiff(riskCodes){
+  const wk=invWeekKey();
+  let snap=null; try{ snap=JSON.parse(localStorage.getItem('inv_risk_snapshot')||'null'); }catch{}
+  if(!snap || snap.week!==wk){
+    localStorage.setItem('inv_risk_snapshot', JSON.stringify({week:wk, codes:riskCodes}));
+    return []; // 이번주 첫 조회 → 베이스라인 설정, 신규 없음
+  }
+  const base=new Set(snap.codes||[]);
+  return riskCodes.filter(c=>!base.has(c));
+}
+// 재고관리 한 줄 인사이트 — 이미 계산된 값으로 자연어 요약
+function renderInvInsight(act,cnt){
+  const el=document.getElementById('invInsight'); if(!el) return;
+  if(!act.length){ el.innerHTML=''; return; }
+  const need=cnt.부족+cnt.긴급+cnt.임박;
+  // 위험권 제품 + 도착 전 소진 위험(재고일수 < 리드타임) 판정
+  let stockout=0;
+  const risky=act.filter(p=>['부족','긴급','임박'].includes(getStatus(p)))
+    .map(p=>{const er=getEffectiveReorder(p); const c=calcNeeded(p);
+      const days=(!c.noData&&c.expM>0)?p.stock/(c.expM/30):null;
+      const leadDays=(p.leadTime||0)*30;
+      const willStockout=days!=null && days<leadDays;
+      if(willStockout) stockout++;
+      return {p,ratio:er>0?p.stock/er:99,days,willStockout};})
+    .sort((a,b)=>a.ratio-b.ratio);
+  const newCodes=getInvRiskDiff(risky.map(x=>x.p.code));
+  if(need===0){
+    el.innerHTML=`<div class="inv-insight ok"><span class="ii-ico">✅</span><span>현재 발주가 시급한 제품은 없습니다. 전체 <strong>${act.length}개</strong> 모두 안정권입니다.</span></div>`;
+    return;
+  }
+  const top=risky[0];
+  const topTxt=top?`가장 급한 건 <strong>${top.p.name}</strong>(현재고 ${top.p.stock.toLocaleString()}개${top.days!=null?` · 약 ${Math.max(0,Math.round(top.days))}일분`:''})`:'';
+  const parts=[];
+  if(cnt.부족) parts.push(`<span style="color:#DC2626;font-weight:700;">즉시발주 ${cnt.부족}개</span>`);
+  if(cnt.긴급) parts.push(`<span style="color:#EA580C;font-weight:700;">긴급 ${cnt.긴급}개</span>`);
+  if(cnt.임박) parts.push(`<span style="color:#D97706;font-weight:700;">임박 ${cnt.임박}개</span>`);
+  const badges=[];
+  if(stockout>0) badges.push(`<span class="ii-badge crit" title="지금 발주해도 도착(리드타임) 전에 재고가 바닥나는 제품 — 가장 시급">🚨 도착 전 소진 위험 ${stockout}개</span>`);
+  if(newCodes.length>0) badges.push(`<span class="ii-badge new" title="이번주(월요일 기준) 들어 새로 위험권에 진입한 제품">🆕 이번주 신규 진입 ${newCodes.length}개</span>`);
+  el.innerHTML=`<div class="inv-insight"><span class="ii-ico">📊</span><div class="ii-body"><div>전체 ${act.length}개 중 <strong>${need}개</strong>가 발주 검토 필요 — ${parts.join(', ')}.${topTxt?' '+topTxt:''}</div>${badges.length?`<div class="ii-badges">${badges.join('')}</div>`:''}</div></div>`;
+}
 function renderInv(){
   const srch=document.getElementById('invSrch').value.toLowerCase();
   const sf=document.getElementById('invStF').value;
@@ -3214,10 +3284,11 @@ function renderInv(){
     let av=invSort==='status'?getStatus(a):a[invSort], bv=invSort==='status'?getStatus(b):b[invSort];
     return (typeof av==='string'?av.localeCompare(bv):(av-bv))*invDir;
   });
-  const ok=products.filter(p=>!p.hidden&&getStatus(p)==='정상').length;
-  const wn=products.filter(p=>!p.hidden&&['임박','긴급'].includes(getStatus(p))).length;
-  const cr=products.filter(p=>!p.hidden&&getStatus(p)==='부족').length;
-  document.getElementById('invSum').innerHTML=`<div class="sc"><div class="sl">전체</div><div class="sv">${products.length}</div></div><div class="sc"><div class="sl" style="color:#059669;">정상</div><div class="sv" style="color:#059669;">${ok}</div></div><div class="sc"><div class="sl" style="color:#D97706;">임박/긴급</div><div class="sv" style="color:#D97706;">${wn}</div></div><div class="sc"><div class="sl" style="color:#DC2626;">부족</div><div class="sv" style="color:#DC2626;">${cr}</div></div>`;
+  const act=products.filter(p=>!p.hidden&&!p.disc);
+  const cnt={정상:0,임박:0,긴급:0,부족:0};
+  act.forEach(p=>{const s=getStatus(p); if(cnt[s]!==undefined) cnt[s]++;});
+  renderInvKpi(act.length,cnt);
+  renderInvInsight(act,cnt);
   renderOrderCheck();
   if(!data.length){document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--tx2);">상품이 없습니다.</td></tr>`;return;}
   // 코드별 진행중 주문 합산 (재고목록 필요발주 셀용)
