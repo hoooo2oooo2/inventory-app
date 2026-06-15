@@ -8,6 +8,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>window._XLSX_PLAIN = window.XLSX;</script>
+<!-- 셀 스타일 지원 빌드(xlsx-js-style) + JSZip(차트 주입용) — 일일보고 엑셀 전용 -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script>window.XLSXStyle = window.XLSX; window.XLSX = window._XLSX_PLAIN;</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -4684,56 +4689,113 @@ function renderAdChart(){
   });
 }
 
-function downloadDailyExcel(){
+// 엑셀 날짜 직렬값 (1899-12-30 기준)
+function _excelSerial(y,m,d){ return Math.round((Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000); }
+
+// 일일보고 요약시트 차트(일자별 정산금액·광고비, 둘 다 묶은 세로막대) XML 생성
+function _buildDailyChartXml(serials, saleVals, adVals, firstR, lastR){
+  const n=serials.length;
+  const pts=arr=>arr.map((v,i)=>`<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`).join('');
+  const catRef=`<c:cat><c:numRef><c:f>요약!$A$${firstR}:$A$${lastR}</c:f><c:numCache><c:formatCode>m/d/yyyy</c:formatCode><c:ptCount val="${n}"/>${pts(serials)}</c:numCache></c:numRef></c:cat>`;
+  const ser=(idx,order,nameCell,nameVal,valCol,vals,fillXml,axA,axB)=>
+    `<c:ser><c:idx val="${idx}"/><c:order val="${order}"/>`
+    +`<c:tx><c:strRef><c:f>요약!$${nameCell}$${firstR-1}</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${nameVal}</c:v></c:pt></c:strCache></c:strRef></c:tx>`
+    +`<c:spPr>${fillXml}<a:ln><a:noFill/></a:ln></c:spPr><c:invertIfNegative val="0"/>`
+    +catRef
+    +`<c:val><c:numRef><c:f>요약!$${valCol}$${firstR}:$${valCol}$${lastR}</c:f><c:numCache><c:formatCode>#,##0</c:formatCode><c:ptCount val="${n}"/>${pts(vals)}</c:numCache></c:numRef></c:val></c:ser>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="1400"/><a:t>일자별 정산금액 · 광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>`
+    +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
+    +ser(0,0,'B','판매가','B',saleVals,'<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>')
+    +`<c:gapWidth val="150"/><c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>`
+    +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
+    +ser(1,1,'F','광고비','F',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
+    +`<c:gapWidth val="150"/><c:axId val="333333333"/><c:axId val="444444444"/></c:barChart>`
+    +`<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="m/d" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="222222222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
+    +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:valAx><c:axId val="444444444"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="333333333"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:catAx><c:axId val="333333333"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="1"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="444444444"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
+    +`</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
+}
+
+const _DAILY_DRAWING_XML=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>209550</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>157162</xdr:rowOff></xdr:from><xdr:to><xdr:col>6</xdr:col><xdr:colOff>1000125</xdr:colOff><xdr:row>14</xdr:row><xdr:rowOff>52387</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="4" name="차트 3"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+
+async function downloadDailyExcel(){
   if(!_dlyFilter.year||!_dlyFilter.month){ alert('년도와 월을 선택하세요.'); return; }
+  if(!window.XLSXStyle||!window.JSZip){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  const XS=window.XLSXStyle, U=XS.utils;
   const pad=v=>String(v).padStart(2,'0');
-  const monStr=pad(_dlyFilter.month);
-  const dayStr=_dlyFilter.day!==null?`${monStr}-${pad(_dlyFilter.day)}`:null;
+  const y=_dlyFilter.year, mon=_dlyFilter.month, monStr=pad(mon);
   const chLabel=_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch;
-  const dateLabel=dayStr?`${_dlyFilter.year}-${dayStr}`:`${_dlyFilter.year}-${monStr}(월전체)`;
+  // 다운로드 기준일: 일 선택 시 그 날, 아니면 해당 월 데이터 마지막 날
+  const monRowsAll=_revData.filter(r=>r.year===y&&r.date?.startsWith(monStr)&&(_dlyFilter.ch==='ALL'||r.ch===_dlyFilter.ch));
+  const daysWithData=[...new Set(monRowsAll.map(r=>parseInt(r.date.split('-')[1])))].sort((a,b)=>a-b);
+  const endDay=_dlyFilter.day!==null?_dlyFilter.day:(daysWithData.length?daysWithData[daysWithData.length-1]:1);
+  const dateLabel=`${y}-${monStr}-${pad(endDay)}`;
   const fileName=`일일보고_${dateLabel}_${chLabel}.xlsx`;
 
-  // 필터링
-  let rawRows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date?.startsWith(monStr));
-  if(dayStr) rawRows=rawRows.filter(r=>r.date===dayStr);
-  if(_dlyFilter.ch!=='ALL') rawRows=rawRows.filter(r=>r.ch===_dlyFilter.ch);
+  const WON='#,##0', PCT='0.0%', MARGIN_FMT='#,##0;[Red]-#,##0', DATEFMT='m/d/yyyy';
+  const HEAD={font:{bold:true}}, SECT={font:{bold:true,sz:12}};
+  const RED5={font:{bold:true,color:{rgb:'C00000'}},fill:{patternType:'solid',fgColor:{rgb:'FFE0E0'}}};
+  const sc=(ws,r,c,style)=>{ const ref=U.encode_cell({r,c}); if(ws[ref]) ws[ref].s=Object.assign({},ws[ref].s||{},style); };
+  const fmt=(ws,r,c,f)=>{ const ref=U.encode_cell({r,c}); if(ws[ref]) ws[ref].s=Object.assign({},ws[ref].s||{},{numFmt:f}); };
+  const pkgKey=r=>`${r.date}|${r.ch}|${r.orderNo}|${r.receiver}|${r.phone1}|${r.addr}`;
 
-  // 정렬: 날짜 → 판매처(CH_ORDER) → 주문번호
-  const chIdx=ch=>{const i=CH_ORDER.indexOf(ch);return i>=0?i:999;};
-  rawRows=[...rawRows].sort((a,b)=>{
-    const dc=(a.date||'').localeCompare(b.date||'');
-    if(dc!==0)return dc;
-    const cc=chIdx(a.ch)-chIdx(b.ch);
-    if(cc!==0)return cc;
-    return(a.orderNo||'').localeCompare(b.orderNo||'');
+  // ── 해당 월 누적(1일~기준일) 행 ──
+  const cumRows=monRowsAll.filter(r=>parseInt(r.date.split('-')[1])<=endDay);
+  // 다운로드 기준일(제품별·제품구분 비중용): 일 선택 시 그 날, 아니면 누적 전체
+  const dayRowsForBreakdown=_dlyFilter.day!==null
+    ? cumRows.filter(r=>r.date===`${monStr}-${pad(endDay)}`)
+    : cumRows;
+
+  // ── 시트1: 요약 (핵심지표 일자누적 + 제품구분 비중) ──
+  // 일자별 집계 (데이터 있는 날만)
+  const dayList=[...new Set(cumRows.map(r=>r.date))].sort();
+  const dayAgg=dayList.map(ds=>{
+    const rs=cumRows.filter(r=>r.date===ds);
+    const dd=parseInt(ds.split('-')[1]);
+    const sale=rs.reduce((s,r)=>s+(r.salePrice||0),0);
+    const gross=rs.reduce((s,r)=>s+(r.margin||0),0);
+    const ad=sumAdSpend({year:y,month:mon,day:dd,ch:_dlyFilter.ch});
+    const net=gross-ad;
+    const pkgs=new Set(rs.map(pkgKey)).size;
+    return {serial:_excelSerial(y,mon,dd), sale, net, rate:sale>0?net/sale:0, pkgs, ad};
   });
 
-  const wb=XLSX.utils.book_new();
-  const WON='#,##0';
-  const PCT='0.0%';
-  const MARGIN_FMT='#,##0;[Red]-#,##0'; // 마이너스는 빨간색
-  const ec=(r,c)=>XLSX.utils.encode_cell({r,c});
+  const s1=[];
+  s1.push([`일일보고 - ${dateLabel} [${chLabel}]`]); // 0
+  for(let i=0;i<15;i++) s1.push([]);                 // 1~15 (차트 영역)
+  s1.push(['■ 핵심 지표']);                          // 16
+  s1.push(['날짜','판매가','마진','마진율','택배건수','광고비','비고']); // 17 (엑셀 18행)
+  const firstR=19, lastR=18+dayAgg.length;           // 데이터 엑셀행
+  dayAgg.forEach(d=>s1.push([d.serial,d.sale,d.net,d.rate,d.pkgs,d.ad,'']));
+  s1.push([]);
+  const typeStart=s1.length;
+  s1.push(['■ 제품구분별 비중']);
+  s1.push(['구분','정산금액','비중']);
+  const byType={};
+  dayRowsForBreakdown.forEach(r=>{const t=r.itemType||'기타';byType[t]=(byType[t]||0)+(r.settlement||0);});
+  const typeList=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+  const typeTot=typeList.reduce((s,[,v])=>s+v,0);
+  const typeRowStart=s1.length;
+  typeList.forEach(([t,v])=>s1.push([t,v,typeTot>0?v/typeTot:0]));
 
-  // 셀 포맷 + 마이너스 시 bold·red 스타일 적용
-  const applyFmt=(ws,r,c,fmt)=>{
-    const ref=ec(r,c);
-    if(!ws[ref]||ws[ref].t!=='n') return;
-    ws[ref].z=fmt;
-    if(fmt===MARGIN_FMT&&ws[ref].v<0){
-      ws[ref].s={font:{bold:true,color:{rgb:'FF0000'}}};
-    }
-  };
+  const ws1=U.aoa_to_sheet(s1);
+  ws1['!cols']=[{wch:12},{wch:14},{wch:13},{wch:9},{wch:10},{wch:12},{wch:18}];
+  sc(ws1,0,0,SECT); sc(ws1,16,0,SECT); sc(ws1,typeStart,0,SECT);
+  for(let c=0;c<7;c++) sc(ws1,17,c,HEAD);
+  sc(ws1,typeStart+1,0,HEAD); sc(ws1,typeStart+1,1,HEAD); sc(ws1,typeStart+1,2,HEAD);
+  dayAgg.forEach((d,i)=>{
+    const r=18+i;
+    fmt(ws1,r,0,DATEFMT); fmt(ws1,r,1,WON); fmt(ws1,r,2,MARGIN_FMT); fmt(ws1,r,3,PCT); fmt(ws1,r,4,'#,##0'); fmt(ws1,r,5,WON);
+  });
+  for(let i=0;i<typeList.length;i++){ fmt(ws1,typeRowStart+i,1,WON); fmt(ws1,typeRowStart+i,2,PCT); }
+  ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
 
-  // ── 시트1: 요약 ──
-  const pkgKey=r=>`${r.date}|${r.ch}|${r.orderNo}|${r.receiver}|${r.phone1}|${r.addr}`;
-  const totalSettle=rawRows.reduce((s,r)=>s+(r.settlement||0),0);
-  const totalSale=rawRows.reduce((s,r)=>s+(r.salePrice||0),0);
-  const totalMargin=rawRows.reduce((s,r)=>s+(r.margin||0),0);
-  const totalRate=totalSettle>0?(totalMargin/totalSettle):0;
-  const totalPkgs=new Set(rawRows.map(pkgKey)).size;
-
+  // ── 시트2: 제품별_판매현황 (마진율 5%미만 빨강 강조) ──
   const byProd={};
-  rawRows.forEach(r=>{
+  dayRowsForBreakdown.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
     if(!byProd[k])byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
     byProd[k].qty+=r.orderQty||0; byProd[k].pkgs.add(pkgKey(r));
@@ -4741,92 +4803,99 @@ function downloadDailyExcel(){
   });
   Object.values(byProd).forEach(v=>{v.cnt=v.pkgs.size;});
   const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
-
-  const byType={};
-  rawRows.forEach(r=>{const t=r.itemType||'기타';if(!byType[t])byType[t]=0;byType[t]+=r.salePrice||0;});
-  const typeList=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
-
-  const tQ=prodList.reduce((s,[,v])=>s+v.qty,0);
-  const tC=prodList.reduce((s,[,v])=>s+v.cnt,0);
-  const tS=prodList.reduce((s,[,v])=>s+v.saleTotal,0);
-  const tSt=prodList.reduce((s,[,v])=>s+v.settle,0);
-  const tM=prodList.reduce((s,[,v])=>s+v.margin,0);
-
-  const s1=[];
-  s1.push([`일일보고 - ${dateLabel} [${chLabel}]`]);       // 0
-  s1.push([]);                                               // 1
-  s1.push(['■ 핵심 지표']);                                 // 2
-  s1.push(['판매가','마진','마진율','택배건수','광고비']);   // 3
-  const adXls=sumAdSpend({year:_dlyFilter.year, month:_dlyFilter.month, day:_dlyFilter.day, ch:_dlyFilter.ch});
-  const marginNetXls=totalMargin-adXls;
-  const rateNetXls=totalSettle>0?(marginNetXls/totalSettle):0;
-  s1.push([totalSale, marginNetXls, rateNetXls, totalPkgs, adXls]); // 4 ← KPI값 (A5~E5)
-  s1.push([]);                                               // 5
-  s1.push(['■ 제품별 판매 현황']);                          // 6
-  s1.push(['모델명','구분','주문수량','택배건수','판매가합','마진','마진율']); // 7
-  // index 8 부터 product rows
-  prodList.forEach(([name,v])=>{
-    s1.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.margin,v.settle>0?v.margin/v.settle:0]);
-  });
-  s1.push(['합계','',tQ,tC,tS,tM,tSt>0?tM/tSt:0]); // total row
-  s1.push([]);
-  s1.push(['■ 제품구분별 비중']);
-  s1.push(['구분','판매가','비중']);
-  const typeStartIdx=s1.length;
-  typeList.forEach(([t,v])=>{s1.push([t,v,tS>0?v/tS:0]);});
-
-  const ws1=XLSX.utils.aoa_to_sheet(s1);
-  ws1['!cols']=[{wch:35},{wch:10},{wch:10},{wch:10},{wch:14},{wch:12},{wch:10}];
-
-  // KPI row (index 4 = 엑셀 5행)
-  applyFmt(ws1,4,0,WON);        // 판매가
-  applyFmt(ws1,4,1,MARGIN_FMT); // 마진(광고비 차감)
-  applyFmt(ws1,4,2,PCT);        // 마진율
-  applyFmt(ws1,4,4,WON);        // 광고비
-  // product rows (index 8 ~ 8+prodList.length)
-  for(let i=8;i<=8+prodList.length;i++){
-    applyFmt(ws1,i,4,WON);        // 판매가합
-    applyFmt(ws1,i,5,MARGIN_FMT); // 마진
-    applyFmt(ws1,i,6,PCT);        // 마진율
-  }
-  // type rows
-  for(let i=typeStartIdx;i<s1.length;i++){
-    applyFmt(ws1,i,1,WON); // 판매가
-    applyFmt(ws1,i,2,PCT); // 비중
-  }
-  XLSX.utils.book_append_sheet(wb,ws1,'요약');
-
-  // ── 시트2: 상세 데이터 ──
-  // 컬럼 인덱스(0-based): 15=배송비, 16=판매가, 17=매입액, 18=마진, 19=마진율, 20=개당단가
   const s2=[];
-  s2.push([`상세 데이터 - ${dateLabel} [${chLabel}]`]); // 0
-  s2.push([]);                                            // 1
-  s2.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2',
-    '우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수',
-    '배송비','판매가','매입액','마진','마진율','개당단가']); // 2
-  rawRows.forEach(r=>{
-    s2.push([r.year,r.date,r.ch,r.orderNo,
-      r.buyer,r.receiver,r.phone1,r.phone2,
-      r.zip,r.addr,r.itemType,r.itemCode,r.modelName,
-      r.orderQty,r.shipQty,r.shipping,
-      r.salePrice,r.costPrice,
-      r.margin,r.marginRate,r.unitCost]);
+  s2.push(['■ 제품별 판매 현황']);
+  s2.push(['모델명','구분','주문수량','택배건수','판매가합','마진','마진율','비고']);
+  prodList.forEach(([name,v])=>s2.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.margin,v.settle>0?v.margin/v.settle:0,'']));
+  const tQ=prodList.reduce((s,[,v])=>s+v.qty,0), tC=prodList.reduce((s,[,v])=>s+v.cnt,0),
+        tS=prodList.reduce((s,[,v])=>s+v.saleTotal,0), tSt=prodList.reduce((s,[,v])=>s+v.settle,0),
+        tM=prodList.reduce((s,[,v])=>s+v.margin,0);
+  s2.push(['합계','',tQ,tC,tS,tM,tSt>0?tM/tSt:0,'']);
+  const ws2=U.aoa_to_sheet(s2);
+  ws2['!cols']=[{wch:40},{wch:11},{wch:9},{wch:9},{wch:13},{wch:12},{wch:9},{wch:14}];
+  sc(ws2,0,0,SECT); for(let c=0;c<8;c++) sc(ws2,1,c,HEAD);
+  prodList.forEach(([,v],i)=>{
+    const r=2+i;
+    fmt(ws2,r,4,WON); fmt(ws2,r,5,MARGIN_FMT); fmt(ws2,r,6,PCT);
+    const rate=v.settle>0?v.margin/v.settle:0;
+    if(rate<0.05){ sc(ws2,r,5,RED5); sc(ws2,r,6,RED5); fmt(ws2,r,5,WON); fmt(ws2,r,6,PCT); } // 5%미만 강조
   });
+  const totR=2+prodList.length;
+  for(let c=0;c<8;c++) sc(ws2,totR,c,HEAD);
+  fmt(ws2,totR,4,WON); fmt(ws2,totR,5,MARGIN_FMT); fmt(ws2,totR,6,PCT);
 
-  const ws2=XLSX.utils.aoa_to_sheet(s2);
-  ws2['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},
-    {wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},
-    {wch:8},{wch:10},{wch:10},{wch:12},{wch:8},{wch:10}];
+  // ── 시트3: 상세데이터 (해당 월 1일~기준일 누적) ──
+  const chIdx=ch=>{const i=CH_ORDER.indexOf(ch);return i>=0?i:999;};
+  const detail=[...cumRows].sort((a,b)=>{
+    const dc=(a.date||'').localeCompare(b.date||''); if(dc)return dc;
+    const cc=chIdx(a.ch)-chIdx(b.ch); if(cc)return cc;
+    return(a.orderNo||'').localeCompare(b.orderNo||'');
+  });
+  const s3=[];
+  s3.push([`상세 데이터 - ${y}-${monStr} (1일~${pad(endDay)}일 누적) [${chLabel}]`]);
+  s3.push([]);
+  s3.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2','우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수','배송비','판매가','매입액','마진','마진율','개당단가']);
+  detail.forEach(r=>s3.push([r.year,r.date,r.ch,r.orderNo,r.buyer,r.receiver,r.phone1,r.phone2,r.zip,r.addr,r.itemType,r.itemCode,r.modelName,r.orderQty,r.shipQty,r.shipping,r.salePrice,r.costPrice,r.margin,r.marginRate,r.unitCost]));
+  const ws3=U.aoa_to_sheet(s3);
+  ws3['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},{wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},{wch:8},{wch:10},{wch:10},{wch:12},{wch:8},{wch:10}];
+  sc(ws3,0,0,SECT); for(let c=0;c<21;c++) sc(ws3,2,c,HEAD);
+  for(let i=3;i<s3.length;i++){ [15,16,17,20].forEach(c=>fmt(ws3,i,c,WON)); fmt(ws3,i,18,MARGIN_FMT); fmt(ws3,i,19,PCT); }
 
-  // 데이터 행은 index 3부터
-  for(let i=3;i<s2.length;i++){
-    [15,16,17,20].forEach(c=>applyFmt(ws2,i,c,WON));   // 금액 쉼표
-    applyFmt(ws2,i,18,MARGIN_FMT); // 마진 (마이너스=빨강)
-    applyFmt(ws2,i,19,PCT);        // 마진율 %
+  // ── 시트4: 광고비 (해당 월 1일~기준일) ──
+  const s4=[['날짜','판매처','광고비']];
+  const adRows=[];
+  for(const k in _adSpend){
+    const {ch,date}=parseAdKey(k); const p=date.split('-');
+    if(Number(p[0])!==y||Number(p[1])!==mon) continue;
+    if(Number(p[2])>endDay) continue;
+    if(_dlyFilter.ch!=='ALL'&&ch!==_dlyFilter.ch) continue;
+    adRows.push({date,ch,amt:_adSpend[k]});
   }
-  XLSX.utils.book_append_sheet(wb,ws2,'상세데이터');
+  adRows.sort((a,b)=>a.date.localeCompare(b.date)||a.ch.localeCompare(b.ch));
+  adRows.forEach(a=>s4.push([a.date,a.ch,a.amt]));
+  const ws4=U.aoa_to_sheet(s4);
+  ws4['!cols']=[{wch:14},{wch:14},{wch:12}];
+  for(let c=0;c<3;c++) sc(ws4,0,c,HEAD);
+  for(let i=1;i<s4.length;i++) fmt(ws4,i,2,WON);
 
-  XLSX.writeFile(wb,fileName,{cellStyles:true,bookType:'xlsx'});
+  // ── 워크북 조립 (요약이 sheet1.xml 이 되도록 첫번째) ──
+  const wb=U.book_new();
+  U.book_append_sheet(wb,ws1,'요약');
+  U.book_append_sheet(wb,ws2,'제품별_판매현황');
+  U.book_append_sheet(wb,ws3,'상세데이터');
+  U.book_append_sheet(wb,ws4,'광고비');
+  const wbout=XS.write(wb,{bookType:'xlsx',type:'array'});
+
+  // ── 차트 주입 (요약 sheet1) ──
+  try{
+    if(dayAgg.length){
+      const zip=await JSZip.loadAsync(wbout);
+      const chartXml=_buildDailyChartXml(dayAgg.map(d=>d.serial),dayAgg.map(d=>d.sale),dayAgg.map(d=>d.ad),firstR,lastR);
+      zip.file('xl/charts/chart1.xml',chartXml);
+      zip.file('xl/drawings/drawing1.xml',_DAILY_DRAWING_XML);
+      zip.file('xl/drawings/_rels/drawing1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/></Relationships>');
+      zip.file('xl/worksheets/_rels/sheet1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+      let s1xml=await zip.file('xl/worksheets/sheet1.xml').async('string');
+      if(!/xmlns:r=/.test(s1xml)) s1xml=s1xml.replace('<worksheet ','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+      if(!/<drawing /.test(s1xml)) s1xml=s1xml.replace('</worksheet>','<drawing r:id="rId1"/></worksheet>');
+      zip.file('xl/worksheets/sheet1.xml',s1xml);
+      let ct=await zip.file('[Content_Types].xml').async('string');
+      ct=ct.replace('</Types>','<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/><Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/></Types>');
+      zip.file('[Content_Types].xml',ct);
+      const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      _saveBlob(blob,fileName);
+      return;
+    }
+  }catch(e){ console.warn('차트 주입 실패, 차트 없이 저장', e); }
+  // 차트 없이 저장 (폴백)
+  _saveBlob(new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),fileName);
+}
+
+function _saveBlob(blob,fileName){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=fileName; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },1000);
 }
 
 function setUniFilter(type, btn, val){
