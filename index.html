@@ -196,6 +196,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .brief-box.warn{background:#FFFBEB;border-color:rgba(217,119,6,.35);color:#92400E;}
 .brief-body strong{color:#4F46E5;}
 .inv-insight.ok{background:#ECFDF5;border-color:rgba(5,150,105,0.25);align-items:center;}
+#invListCard{scroll-margin-top:104px;}
 
 /* FLOAT */
 .float-btn-wrap{position:fixed;bottom:78px;right:18px;z-index:200;}
@@ -546,7 +547,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <!-- 오늘 주문 체크 -->
     <div id="orderCheckBox"></div>
   </div>
-  <div class="card">
+  <div class="card" id="invListCard">
     <div class="ch">
       <span class="ct">재고 목록</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -3241,7 +3242,12 @@ function renderInvKpi(total,cnt){
     card('긴급','긴급',cnt.긴급,'#EA580C','곧 소진')+
     card('부족','부족',cnt.부족,'#DC2626','즉시발주');
 }
-function setInvStatus(s){ const sel=document.getElementById('invStF'); if(sel) sel.value=s; renderInv(); }
+function setInvStatus(s){
+  const sel=document.getElementById('invStF'); if(sel) sel.value=s; renderInv();
+  // 특정 상태 선택 시 재고 목록으로 스크롤 (오늘 주문체크 등에 가려 안 보이는 문제 해소)
+  if(s){ const card=document.getElementById('invListCard'); if(card) card.scrollIntoView({behavior:'smooth',block:'start'}); }
+  else window.scrollTo({top:0,behavior:'smooth'});
+}
 // 이번주(월요일 기준) 키 — '신규 진입' 비교 기준
 function invWeekKey(){ const d=new Date(); const day=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-day); mon.setHours(0,0,0,0); return fmtDate(mon); }
 // 이번주 위험권 베이스라인과 비교 → 신규 진입 코드 (베이스라인은 주 1회만 갱신, localStorage)
@@ -6187,8 +6193,18 @@ async function applyIO(id){
   if(p){const b=p.stock;p.stock=Math.max(0,p.stock+inn-out);await sb.from('products').update({stock:p.stock}).eq('id',id);await addHistory({menu:'재고관리',type:'io',code:p.code,name:p.name,desc:`입고+${inn}/출고-${out}`,before:String(b),after:String(p.stock),user:'수동'});}
   ioTarget=null;renderInv();updateFloat();
 }
-function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='1';document.getElementById('pm_disc').value='0';openModal('prodModal');}
-function openEditProd(id){editProdId=id;const p=products.find(x=>x.id===id);if(!p)return;document.getElementById('prodModalTitle').textContent='상품 수정';document.getElementById('pm_code').value=p.code;document.getElementById('pm_name').value=p.name;document.getElementById('pm_type').value=p.type;document.getElementById('pm_stock').value=p.stock;document.getElementById('pm_boxqty').value=p.boxQty;document.getElementById('pm_lead').value=p.leadTime;document.getElementById('pm_reorder').value=p.reorderPoint;document.getElementById('pm_disc').value=p.disc?'1':'0';openModal('prodModal');}
+function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='1';document.getElementById('pm_disc').value='0';_fillTypeOptions('기타');openModal('prodModal');}
+// 제품구분 드롭다운을 실제 존재하는 구분들로 채움 (커스텀 구분 보존)
+function _fillTypeOptions(selected){
+  const sel=document.getElementById('pm_type'); if(!sel) return;
+  const base=['의류','잡화','식품','전자','기타'];
+  const cats=[...new Set(products.map(p=>p.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const all=[...new Set([...cats,...base])];
+  if(selected && !all.includes(selected)) all.unshift(selected);
+  sel.innerHTML=all.map(t=>`<option${t===selected?' selected':''}>${t}</option>`).join('');
+  if(selected!=null) sel.value=selected;
+}
+function openEditProd(id){editProdId=id;const p=products.find(x=>x.id===id);if(!p)return;document.getElementById('prodModalTitle').textContent='상품 수정';document.getElementById('pm_code').value=p.code;document.getElementById('pm_name').value=p.name;_fillTypeOptions(p.type);document.getElementById('pm_stock').value=p.stock;document.getElementById('pm_boxqty').value=p.boxQty;document.getElementById('pm_lead').value=p.leadTime;document.getElementById('pm_reorder').value=p.reorderPoint;document.getElementById('pm_disc').value=p.disc?'1':'0';openModal('prodModal');}
 async function saveProd(){
   const code=document.getElementById('pm_code').value.trim();
   const name=document.getElementById('pm_name').value.trim();
@@ -6366,19 +6382,30 @@ function getDateRange(yr,per){
 function getLastWeekDays(){const days=[];const d=new Date(now);d.setDate(d.getDate()-7);while(d.getDay()!==1)d.setDate(d.getDate()-1);for(let i=0;i<5;i++){const dd=new Date(d);dd.setDate(d.getDate()+i);days.push(`${dd.getMonth()+1}/${dd.getDate()}(${DNAMES[dd.getDay()]})`);}return days;}
 function getThisWeekDays(){const days=[];let d=new Date(now),c=0;while(c<5){if(d.getDay()>=1&&d.getDay()<=5){days.unshift(`${d.getMonth()+1}/${d.getDate()}(${DNAMES[d.getDay()]})`);c++;}d.setDate(d.getDate()-1);}return days;}
 
+// 월 진행률 (이번달이 며칠 지났나) — 월중 비교 왜곡 보정용
+function salesMonthProgress(){
+  const now=new Date();
+  const dim=new Date(CUR_YEAR,MONTH+1,0).getDate();
+  const dom=(now.getFullYear()===CUR_YEAR&&now.getMonth()===MONTH)?now.getDate():dim;
+  return Math.max(0.1,Math.min(1,dom/dim));
+}
 // 판매분석 통계 1회 계산 (KPI·인사이트·표 공용)
 function computeSalesStats(){
+  const prog=salesMonthProgress();
   return products.filter(p=>!p.hidden).map(p=>{
     const m=getYearData(p,CUR_YEAR).data;
-    const cm=m[MONTH]||0;
+    const cm=m[MONTH]||0;            // 이번달 누적(실제)
     const pm=m[Math.max(0,MONTH-1)]||0;
-    const g=pm>0?Math.round(((cm-pm)/pm)*100):(cm>0?100:0);
+    const cmProj=Math.round(cm/prog); // 이 추세 지속 시 월말 예상치
+    // 전월대비: 월말 예상치 기준 + 과도값 cap(-99~999%)으로 소량 노이즈 완화
+    const g=pm>0?Math.max(-99,Math.min(999,Math.round(((cmProj-pm)/pm)*100))):(cm>0?100:0);
     const l6=m.slice(Math.max(0,MONTH-5),MONTH+1);
     const a6=l6.length?Math.round(l6.reduce((a,b)=>a+b,0)/l6.length):0;
     const dl=a6>0?Math.round(p.stock/(a6/30)):999;
     const s=detectSeason(getYearData(p,getBestYear(p)).data);
-    const meaningful=(cm+pm)>=4; // 소량 제품의 % 노이즈 방지
-    return {p,cm,pm,g,a6,dl,s,meaningful};
+    // 소량 제품의 % 노이즈 방지: 최소 물량 기준 상향
+    const meaningful=(cm+pm)>=6 && Math.max(cmProj,pm)>=5;
+    return {p,cm,pm,cmProj,g,a6,dl,s,meaningful,prog};
   });
 }
 let salesView=''; // 판매현황 표 필터: '' | up | down | soon
@@ -6391,15 +6418,17 @@ function salesStatMatch(st){
 }
 function renderSalesKpi(stats){
   const el=document.getElementById('salesKpi'); if(!el) return;
+  const prog=salesMonthProgress(), progPct=Math.round(prog*100);
   const cm=stats.reduce((a,s)=>a+s.cm,0), pm=stats.reduce((a,s)=>a+s.pm,0);
-  const g=pm>0?Math.round((cm-pm)/pm*100):(cm>0?100:0);
+  const cmProj=Math.round(cm/prog);
+  const g=pm>0?Math.round((cmProj-pm)/pm*100):(cm>0?100:0);
   const up=stats.filter(s=>s.meaningful&&s.g>=30).length;
   const down=stats.filter(s=>s.meaningful&&s.g<=-30).length;
   const soon=stats.filter(s=>s.a6>0&&s.dl<14).length;
   const gcol=g>0?'#059669':g<0?'#DC2626':'var(--tx2)';
   el.innerHTML=
-    `<div class="ord-kpi-card ${salesView===''?'active':''}" onclick="setSalesView('')"><div class="ord-kpi-cat">📦 이번달 출고</div><div class="ord-kpi-row"><span class="ord-kpi-cnt">${cm.toLocaleString()}<small>개</small></span></div><div class="ord-kpi-sub">전체 보기</div></div>`+
-    `<div class="ord-kpi-card" onclick="setSalesView('')"><div class="ord-kpi-cat">📈 전월대비</div><div class="ord-kpi-row"><span class="ord-kpi-cnt" style="color:${gcol};">${g>0?'+':''}${g}<small>%</small></span></div><div class="ord-kpi-sub">저번달 ${pm.toLocaleString()}개</div></div>`+
+    `<div class="ord-kpi-card ${salesView===''?'active':''}" onclick="setSalesView('')"><div class="ord-kpi-cat">📦 이번달 출고</div><div class="ord-kpi-row"><span class="ord-kpi-cnt">${cm.toLocaleString()}<small>개</small></span></div><div class="ord-kpi-sub">누적 · 진행률 ${progPct}%</div></div>`+
+    `<div class="ord-kpi-card" onclick="setSalesView('')"><div class="ord-kpi-cat">📈 전월대비</div><div class="ord-kpi-row"><span class="ord-kpi-cnt" style="color:${gcol};">${g>0?'+':''}${g}<small>%</small></span></div><div class="ord-kpi-sub">추세 예상 · 저번달 ${pm.toLocaleString()}개</div></div>`+
     `<div class="ord-kpi-card ${salesView==='up'?'active':''}" onclick="setSalesView('up')"><div class="ord-kpi-cat" style="color:#15803D;">🚀 급상승</div><div class="ord-kpi-row"><span class="ord-kpi-cnt" style="color:#15803D;">${up}<small>개</small></span></div><div class="ord-kpi-sub">전월비 +30%↑</div></div>`+
     `<div class="ord-kpi-card ${salesView==='down'?'active':''}" onclick="setSalesView('down')"><div class="ord-kpi-cat" style="color:#DC2626;">📉 급하락</div><div class="ord-kpi-row"><span class="ord-kpi-cnt" style="color:#DC2626;">${down}<small>개</small></span></div><div class="ord-kpi-sub">전월비 -30%↓</div></div>`+
     `<div class="ord-kpi-card ${salesView==='soon'?'active':''}" onclick="setSalesView('soon')"><div class="ord-kpi-cat" style="color:#D97706;">⏳ 소진임박</div><div class="ord-kpi-row"><span class="ord-kpi-cnt" style="color:#D97706;">${soon}<small>개</small></span></div><div class="ord-kpi-sub">재고 14일분 미만</div></div>`;
@@ -6407,14 +6436,16 @@ function renderSalesKpi(stats){
 function renderSalesInsight(stats){
   const el=document.getElementById('salesInsight'); if(!el) return;
   if(!stats.length){ el.innerHTML=''; return; }
+  const prog=salesMonthProgress(), progPct=Math.round(prog*100);
   const cm=stats.reduce((a,s)=>a+s.cm,0), pm=stats.reduce((a,s)=>a+s.pm,0);
-  const g=pm>0?Math.round((cm-pm)/pm*100):(cm>0?100:0);
+  const cmProj=Math.round(cm/prog);
+  const g=pm>0?Math.round((cmProj-pm)/pm*100):(cm>0?100:0);
   const ups=stats.filter(s=>s.meaningful&&s.g>=30).sort((a,b)=>b.g-a.g);
   const downs=stats.filter(s=>s.meaningful&&s.g<=-30).sort((a,b)=>a.g-b.g);
   const soons=stats.filter(s=>s.a6>0&&s.dl<14).sort((a,b)=>a.dl-b.dl);
   const topUp=ups[0], topDown=downs[0], topSoon=soons[0];
   const gtxt=`<strong style="color:${g>=0?'#059669':'#DC2626'};">${g>0?'+':''}${g}%</strong>`;
-  let lead=`이번달 총출고 <strong>${cm.toLocaleString()}개</strong> · 전월대비 ${gtxt}.`;
+  let lead=`이번달 누적 출고 <strong>${cm.toLocaleString()}개</strong>(진행률 ${progPct}%) · 이 추세 지속 시 전월대비 ${gtxt}.`;
   if(topUp) lead+=` 가장 많이 뛴 건 <strong>${topUp.p.name}</strong>(+${topUp.g}%)`;
   else if(topSoon) lead+=` 재고가 가장 급한 건 <strong>${topSoon.p.name}</strong>(${topSoon.dl}일분)`;
   if(topUp||topSoon) lead+='.';
@@ -6431,13 +6462,14 @@ function renderSalesTbody(){
   renderSalesKpi(stats);
   renderSalesInsight(stats);
   const list=stats.filter(salesStatMatch);
-  tb.innerHTML=list.length?list.map(({p,cm,pm,g,a6,dl,s})=>`<tr onclick="focusSalesProd(${p.id})" style="cursor:pointer;">
+  const progPct=Math.round(salesMonthProgress()*100);
+  tb.innerHTML=list.length?list.map(({p,cm,pm,cmProj,g,a6,dl,s})=>`<tr onclick="focusSalesProd(${p.id})" style="cursor:pointer;">
       <td><span class="code-chip">${p.code}</span></td>
       <td style="font-weight:500;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${p.name}</td>
       <td><span class="badge b-gy">${p.type}</span></td>
       <td style="text-align:right;">${pm.toLocaleString()}개</td>
-      <td style="text-align:right;">${cm.toLocaleString()}개</td>
-      <td style="text-align:right;"><span style="color:${g>0?'#059669':g<0?'#DC2626':'var(--tx2)'};">${g>0?'+':''}${g}%</span></td>
+      <td style="text-align:right;" title="이번달 누적 ${cm.toLocaleString()}개 (월 진행률 ${progPct}%)">${cm.toLocaleString()}개</td>
+      <td style="text-align:right;" title="월 진행률 ${progPct}% 반영 예상치 ${cmProj.toLocaleString()}개 기준 전월대비"><span style="color:${g>0?'#059669':g<0?'#DC2626':'var(--tx2)'};">${g>0?'+':''}${g}%</span></td>
       <td style="text-align:right;">${a6.toLocaleString()}개</td>
       <td style="text-align:right;">${Math.round(a6*1.05).toLocaleString()}개</td>
       <td><span class="badge ${s.badge}">${s.label}</span></td>
