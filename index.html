@@ -157,6 +157,22 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .sbar.summer{background:#FFF7ED;border-left:3px solid #EA580C;color:#C2410C;}
 .sbar.winter{background:#EEF4FF;border-left:3px solid #3182F6;color:#1e40af;}
 .sbar.normal{background:#ECFDF5;border-left:3px solid #059669;color:#065f46;}
+.sbar{flex-wrap:wrap;}
+.sbar-toggle{margin-left:6px;cursor:pointer;color:var(--pr);font-size:11px;font-weight:600;user-select:none;}
+.sbar-names{display:none;flex-basis:100%;margin-top:5px;padding-top:5px;border-top:0.5px solid rgba(0,0,0,0.08);font-size:11px;line-height:1.6;}
+.sbar-names.open{display:block;}
+/* 발주 구분별 KPI */
+.ord-kpi{display:flex;gap:8px;flex-wrap:wrap;padding:4px 14px 10px;}
+.ord-kpi-card{flex:1 1 130px;min-width:130px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:10px 13px;cursor:pointer;transition:all .15s;}
+.ord-kpi-card:hover{border-color:var(--pr);}
+.ord-kpi-card.active{background:var(--prl);border-color:var(--pr);box-shadow:0 2px 8px rgba(49,130,246,.22);}
+.ord-kpi-cat{font-size:12px;font-weight:600;color:var(--tx);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ord-kpi-row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+.ord-kpi-cnt{font-size:22px;font-weight:800;letter-spacing:-0.5px;color:var(--tx);}
+.ord-kpi-cnt small{font-size:12px;font-weight:600;color:var(--tx2);margin-left:1px;}
+.ord-kpi-box{font-size:12px;font-weight:700;color:var(--pr);white-space:nowrap;}
+.ord-kpi-sub{font-size:10px;color:var(--tx2);margin-top:3px;min-height:13px;}
+.ord-kpi-sub.urg{color:#DC2626;font-weight:600;}
 
 /* FLOAT */
 .float-btn-wrap{position:fixed;bottom:78px;right:18px;z-index:200;}
@@ -1004,6 +1020,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="alertWrap"></div>
     <div class="fbox" id="formulaBox"></div>
     <div class="sum-row" id="orderSum"></div>
+    <div class="ord-kpi" id="orderKpi"></div>
     <div class="tw-scroll"><table>
       <thead><tr><th>상품명</th><th>코드</th><th>구분</th><th style="text-align:right;">현재고</th><th style="text-align:right;">발주시점</th><th style="text-align:right;">예상월소진</th><th style="text-align:right;">필요수량(박스)</th><th>제품시즌</th><th>시즌보정</th><th>리드타임</th><th>긴급도</th><th class="ns" style="text-align:center;">입고등록</th></tr></thead>
       <tbody id="orderBody"></tbody>
@@ -1995,6 +2012,7 @@ function _initOrderCycleSel(){
 let products=[], receiveList=[], doneList=[], rgProducts=[], historyLog=[];
 let invSort='code', invDir=1, ioTarget=null, _showHidden=false, editProdId=null;
 let recvSort='orderDate', recvDir=-1; // 발주관리 정렬 (기본: 주문날짜 최신순)
+let orderTypeFilter=''; // 발주 필요 목록 구분 KPI 필터 ('' = 전체)
 let salesPeriod='monthly', salesYear=CUR_YEAR, salesSel=new Set(), salesChart=null;
 let rgPeriod='monthly',    rgYear=CUR_YEAR,    rgSel=new Set(),    rgChart=null;
 let orderList=[], inTarget=null, floatOpen=false;
@@ -6350,7 +6368,7 @@ function recalcOrders(){
   document.getElementById('orderBadge').textContent=orderList.length;
   const actives=products.filter(p=>isInSeason(detectSeason(getYearData(p,getBestYear(p)).data).type));
   const sb_el=document.getElementById('seasonBar');
-  if(actives.length){const hasSu=actives.some(p=>detectSeason(getYearData(p,getBestYear(p)).data).type==='summer');sb_el.innerHTML=`<div class="sbar ${hasSu?'summer':'winter'}"><span>${hasSu?'☀':'❄'}</span><strong>현재 성수기:</strong> ${actives.map(p=>p.name).join(', ')}</div>`;}
+  if(actives.length){const hasSu=actives.some(p=>detectSeason(getYearData(p,getBestYear(p)).data).type==='summer');sb_el.innerHTML=`<div class="sbar ${hasSu?'summer':'winter'}"><span>${hasSu?'☀':'❄'}</span><strong>현재 성수기 ${actives.length}개</strong><span class="sbar-toggle" onclick="const n=this.nextElementSibling;n.classList.toggle('open');this.textContent=n.classList.contains('open')?'접기 ▴':'제품 보기 ▾';">제품 보기 ▾</span><span class="sbar-names">${actives.map(p=>p.name).join(', ')}</span></div>`;}
   else sb_el.innerHTML=`<div class="sbar normal"><span>✓</span><span>${MNAMES[MONTH]} 기준 평시</span></div>`;
 
   document.getElementById('formulaBox').innerHTML=`<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | 최신 데이터 기준 최근7일→최근30일 일평균 월환산 (없으면 월별 데이터 폴백) | 리드타임+0.5개월 재고 확보 | 진행중 주문 자동 반영`;
@@ -6363,7 +6381,39 @@ function recalcOrders(){
   const addCnt=orderList.filter(x=>x.isAdditional).length;
   document.getElementById('orderSum').innerHTML=`<div class="sc"><div class="sl">발주필요</div><div class="sv" style="color:#DC2626;">${orderList.length}개</div></div><div class="sc"><div class="sl">즉시발주</div><div class="sv" style="color:#EA580C;">${urg}개</div></div><div class="sc"><div class="sl">추가발주요청</div><div class="sv" style="color:#534AB7;">${addCnt}개</div></div><div class="sc"><div class="sl">총박스수</div><div class="sv">${orderList.reduce((a,b)=>a+b.boxes,0)}박스</div></div>`;
 
-  document.getElementById('orderBody').innerHTML=orderList.length?orderList.map(p=>{
+  // 선택된 구분이 더 이상 목록에 없으면 전체로 초기화
+  if(orderTypeFilter && !orderList.some(p=>(p.type||'기타')===orderTypeFilter)) orderTypeFilter='';
+  renderOrderKpi();
+  renderOrderTable();
+  renderRecv(); updateFloat();
+}
+// 구분별 KPI 카드 — 클릭 시 해당 구분으로 발주 목록 필터
+function renderOrderKpi(){
+  const el=document.getElementById('orderKpi'); if(!el) return;
+  const byCat={};
+  orderList.forEach(p=>{
+    const t=p.type||'기타';
+    if(!byCat[t]) byCat[t]={cnt:0,boxes:0,urg:0};
+    byCat[t].cnt++; byCat[t].boxes+=(p.boxes||0);
+    if(!p.isAdditional && p.stock<=p.reorderPoint*0.3) byCat[t].urg++;
+  });
+  const cats=Object.keys(byCat).sort((a,b)=>byCat[b].boxes-byCat[a].boxes);
+  const totalBoxes=orderList.reduce((a,b)=>a+(b.boxes||0),0);
+  const esc=s=>String(s).replace(/'/g,"\\'");
+  let html=`<div class="ord-kpi-card ${orderTypeFilter===''?'active':''}" onclick="setOrderType('')">
+    <div class="ord-kpi-cat">📦 전체</div>
+    <div class="ord-kpi-row"><span class="ord-kpi-cnt">${orderList.length}<small>개</small></span><span class="ord-kpi-box">${totalBoxes}박스</span></div>
+    <div class="ord-kpi-sub">전체 발주 필요</div></div>`;
+  html+=cats.map(t=>`<div class="ord-kpi-card ${orderTypeFilter===t?'active':''}" onclick="setOrderType('${esc(t)}')">
+    <div class="ord-kpi-cat" title="${t}">${t}</div>
+    <div class="ord-kpi-row"><span class="ord-kpi-cnt">${byCat[t].cnt}<small>개</small></span><span class="ord-kpi-box">${byCat[t].boxes}박스</span></div>
+    <div class="ord-kpi-sub${byCat[t].urg>0?' urg':''}">${byCat[t].urg>0?`🚨 즉시발주 ${byCat[t].urg}개`:' '}</div></div>`).join('');
+  el.innerHTML=html;
+}
+function setOrderType(t){ orderTypeFilter=t; renderOrderKpi(); renderOrderTable(); }
+function renderOrderTable(){
+  const list=orderTypeFilter?orderList.filter(p=>(p.type||'기타')===orderTypeFilter):orderList;
+  document.getElementById('orderBody').innerHTML=list.length?list.map(p=>{
     const r=p.stock/p.reorderPoint;
     const ug=p.isAdditional
       ? {l:'추가발주요청',c:'b-pu'}
@@ -6385,8 +6435,7 @@ function recalcOrders(){
       <td><span class="badge ${ug.c}">${ug.l}</span></td>
       <td style="text-align:center;"><button class="btn btn-su btn-sm" onclick="openInReg(${p.id})">입고등록</button></td>
     </tr>`;
-  }).join(''):`<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--tx2);">발주 필요 상품이 없습니다</td></tr>`;
-  renderRecv(); updateFloat();
+  }).join(''):`<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--tx2);">${orderTypeFilter?`'${orderTypeFilter}' 구분에 발주 필요 상품이 없습니다`:'발주 필요 상품이 없습니다'}</td></tr>`;
 }
 function openInReg(pid){inTarget=pid;const p=products.find(x=>x.id===pid);document.getElementById('inTitle').textContent=`입고등록 — ${p?.name||''}`;openModal('inModal');}
 async function saveIn(){
