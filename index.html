@@ -422,6 +422,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-quote .qt-side{width:300px;flex-shrink:0;border-left:1px solid var(--bd);overflow-y:auto;padding:12px;}
 .qt-doc{background:#fff;border:1.5px solid #333;max-width:780px;margin:0 auto;font-size:13px;color:#000;}
 .qt-title{text-align:center;font-size:28px;font-weight:800;letter-spacing:18px;padding:14px 0 10px;border-bottom:2px solid #333;}
+[contenteditable="true"]:focus{outline:1px dashed #93C5FD;outline-offset:2px;border-radius:3px;}
 .qt-head{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid #333;}
 .qt-head-l{border-right:1px solid #999;padding:0;}
 .qt-hl-row{display:grid;grid-template-columns:78px 1fr;border-bottom:1px solid #ddd;min-height:34px;align-items:stretch;}
@@ -760,7 +761,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <!-- 좌: 견적서 문서 -->
     <div class="qt-main">
       <div class="qt-doc" id="qtDoc">
-        <div class="qt-title">견적서</div>
+        <div class="qt-title" id="qt-title" contenteditable="true" spellcheck="false" title="클릭하여 제목 수정">견적서</div>
 
         <!-- 상단: 좌(견적정보) / 우(공급자) -->
         <div class="qt-head">
@@ -771,7 +772,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <span id="qt-date-disp" onclick="qtOpenDate()" style="cursor:pointer;color:#2563EB;">날짜 선택 ▾</span>
             </div></div>
             <div class="qt-hl-row"><div class="qt-hl-lbl">업체명</div><div class="qt-hl-val"><input id="qt-company" placeholder="업체명 입력"></div></div>
-            <div class="qt-hl-row" style="min-height:40px;"><div class="qt-hl-lbl" style="background:#fff;border-right:none;"></div><div class="qt-hl-val" style="font-weight:700;">아래와 같이 견적합니다.</div></div>
+            <div class="qt-hl-row" style="min-height:40px;"><div class="qt-hl-lbl" style="background:#fff;border-right:none;"></div><div class="qt-hl-val" id="qt-phrase" contenteditable="true" spellcheck="false" title="클릭하여 문구 수정" style="font-weight:700;">아래와 같이 거래합니다.</div></div>
           </div>
           <div class="qt-sup">
             <div class="qt-sup-tag">공급자</div>
@@ -2684,6 +2685,8 @@ function qtReset(){
     if(!confirm('현재 작성 중인 견적서를 초기화할까요?')) return;
   }
   _qtRows=[]; _qtEditId=null;
+  const titleEl=document.getElementById('qt-title'); if(titleEl) titleEl.innerText='견적서';
+  const phraseEl=document.getElementById('qt-phrase'); if(phraseEl) phraseEl.innerText='아래와 같이 거래합니다.';
   ['qt-name','qt-company','qt-contact','qt-fax','qt-manager'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const vat=document.getElementById('qt-vat'); if(vat) vat.value='포함';
   const t=new Date();
@@ -2714,6 +2717,8 @@ function qtConfirmSave(){
   const data={
     name, manager,
     tradeDate:_qtDate,
+    docTitle:(document.getElementById('qt-title')?.innerText||'견적서').trim()||'견적서',
+    docPhrase:(document.getElementById('qt-phrase')?.innerText||'아래와 같이 거래합니다.').trim(),
     company:document.getElementById('qt-company').value.trim(),
     contact:document.getElementById('qt-contact').value.trim(),
     fax:document.getElementById('qt-fax').value.trim(),
@@ -2785,6 +2790,8 @@ function qtRenderSaved(){
 function qtLoadSaved(id){
   const e=_qtSaved.find(x=>x.id===id); if(!e) return;
   _qtEditId=id;
+  const titleEl=document.getElementById('qt-title'); if(titleEl) titleEl.innerText=e.docTitle||'견적서';
+  const phraseEl=document.getElementById('qt-phrase'); if(phraseEl) phraseEl.innerText=e.docPhrase||'아래와 같이 거래합니다.';
   document.getElementById('qt-name').value=e.name||'';
   document.getElementById('qt-company').value=e.company||'';
   document.getElementById('qt-contact').value=e.contact||'';
