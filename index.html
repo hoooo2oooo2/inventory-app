@@ -1519,7 +1519,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-empty" id="revDlyEmpty">날짜와 판매처를 선택하세요</div>
           <div class="tw"><table class="dt" id="revDlyTbl" style="display:none;">
             <thead><tr>
-              <th>모델명</th><th>구분</th>
+              <th>모델명</th>
+              <th style="white-space:nowrap;">구분 <select id="dlyTypeFilter" onchange="setDlyTypeFilter(this.value)" style="font-size:10px;padding:1px 4px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);cursor:pointer;max-width:90px;"><option value="ALL">전체</option></select></th>
               <th style="text-align:right;">주문수량</th>
               <th style="text-align:right;">택배건수</th>
               <th style="text-align:right;">판매가 합</th>
@@ -4402,6 +4403,7 @@ function toggleRevMask(){
 
 // ── 일일 보고 ──
 let _dlyFilter={year:null,month:null,day:null,ch:'ALL'};
+let _dlyTypeFilter='ALL';   // 제품별 판매현황 '구분' 헤더 필터
 let _revDlyDnut=null;
 const CH_COLORS_DLY=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
 
@@ -4513,7 +4515,17 @@ function renderDailyReport(){
   Object.values(byProd).forEach(v=>{ v.cnt=v.pkgs.size; });
   const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
 
-  if(tbody) tbody.innerHTML=prodList.map(([name,v])=>{
+  // '구분' 헤더 필터 옵션 채우기 (선택값 유지, 없으면 전체로)
+  const typeSel=document.getElementById('dlyTypeFilter');
+  if(typeSel){
+    const types=[...new Set(prodList.map(([,v])=>v.type).filter(Boolean))].sort();
+    if(_dlyTypeFilter!=='ALL'&&!types.includes(_dlyTypeFilter)) _dlyTypeFilter='ALL';
+    typeSel.innerHTML='<option value="ALL">전체</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');
+    typeSel.value=_dlyTypeFilter;
+  }
+  const viewList=_dlyTypeFilter==='ALL'?prodList:prodList.filter(([,v])=>v.type===_dlyTypeFilter);
+
+  if(tbody) tbody.innerHTML=viewList.map(([name,v])=>{
     const rate=v.settle>0?(v.margin/v.settle*100):0;
     const rCls=rate<0?'rev-margin-neg':rate>0?'rev-margin-pos':'';
     return `<tr>
@@ -4528,12 +4540,12 @@ function renderDailyReport(){
     </tr>`;
   }).join('');
 
-  // 합계 행
-  const totSettle=prodList.reduce((s,[,v])=>s+v.settle,0);
-  const totMargin=prodList.reduce((s,[,v])=>s+v.margin,0);
-  const totQty=prodList.reduce((s,[,v])=>s+v.qty,0);
-  const totCnt=prodList.reduce((s,[,v])=>s+v.cnt,0);
-  const totSale=prodList.reduce((s,[,v])=>s+v.saleTotal,0);
+  // 합계 행 (필터 적용된 목록 기준)
+  const totSettle=viewList.reduce((s,[,v])=>s+v.settle,0);
+  const totMargin=viewList.reduce((s,[,v])=>s+v.margin,0);
+  const totQty=viewList.reduce((s,[,v])=>s+v.qty,0);
+  const totCnt=viewList.reduce((s,[,v])=>s+v.cnt,0);
+  const totSale=viewList.reduce((s,[,v])=>s+v.saleTotal,0);
   const totRate=totSettle>0?(totMargin/totSettle*100):0;
   if(tfoot) tfoot.innerHTML=`<tr>
     <td colspan="2">합계</td>
@@ -4555,6 +4567,7 @@ function renderDailyReport(){
     if(_revDlyDnut){_revDlyDnut.destroy();_revDlyDnut=null;}
     if(typeEntries.length){
       if(dnutEmpty) dnutEmpty.style.display='none'; dnutCtx.style.display='';
+      const typeTot=typeEntries.reduce((s,[,v])=>s+v,0);
       _revDlyDnut=new Chart(dnutCtx.getContext('2d'),{
         type:'doughnut',
         data:{labels:typeEntries.map(([k])=>k),datasets:[{
@@ -4562,7 +4575,10 @@ function renderDailyReport(){
           backgroundColor:CH_COLORS_DLY.slice(0,typeEntries.length),borderWidth:2,borderColor:'#fff'
         }]},
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtMan(c.parsed)}원`}},datalabels:{display:false}}}
+          plugins:{legend:{display:false},
+            tooltip:{callbacks:{label:c=>{const t=c.dataset.data.reduce((a,b)=>a+b,0);const p=t>0?(c.parsed/t*100).toFixed(1):0;return `${c.label}: ${fmtMan(c.parsed)}원 (${p}%)`;}}},
+            datalabels:{display:true,color:'#fff',font:{weight:'700',size:11},
+              formatter:(v,ctx)=>{const t=ctx.dataset.data.reduce((a,b)=>a+b,0);const p=t>0?v/t*100:0;return p>=5?Math.round(p)+'%':'';}}}}
       });
       const leg=document.getElementById('revDlyDnutLegend');
       if(leg) leg.innerHTML=typeEntries.map(([k,v],i)=>`
@@ -4571,7 +4587,7 @@ function renderDailyReport(){
             <span style="width:10px;height:10px;border-radius:50%;background:${CH_COLORS_DLY[i]};display:inline-block;flex-shrink:0;"></span>${k}
           </div>
           <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v/typeEntries[0][1]*100)}%;background:${CH_COLORS_DLY[i]};"></div></div>
-          <div class="rev-ch-val">${fmt(v)}</div>
+          <div class="rev-ch-val">${fmt(v)} <span style="color:var(--tx2);font-weight:500;">(${typeTot>0?(v/typeTot*100).toFixed(1):0}%)</span></div>
         </div>`).join('');
     } else { if(dnutEmpty) dnutEmpty.style.display='block'; dnutCtx.style.display='none'; }
   }
@@ -4582,6 +4598,12 @@ function setDlyFilter(type, val){
   else if(type==='month'){_dlyFilter.month=val;_dlyFilter.day=null;}
   else if(type==='day') _dlyFilter.day=(val===null||val==='null')?null:Number(val);
   else _dlyFilter.ch=val;
+  _dlyTypeFilter='ALL';   // 기간·판매처 변경 시 구분 필터 초기화
+  renderDailyReport();
+}
+
+function setDlyTypeFilter(val){
+  _dlyTypeFilter=val||'ALL';
   renderDailyReport();
 }
 
@@ -4738,8 +4760,8 @@ function _buildDailyChartXml(sheetName, serials, saleVals, adVals, firstR, lastR
     +ser(3,3,'F','광고비','F',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
     +`<c:gapWidth val="60"/><c:overlap val="-20"/><c:axId val="333333333"/><c:axId val="444444444"/></c:barChart>`
     +`<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="mm-dd" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="222222222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
-    +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>판매가</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
-    +`<c:valAx><c:axId val="444444444"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="333333333"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:title><c:tx><c:rich><a:bodyPr rot="0" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>판매가</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:valAx><c:axId val="444444444"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:title><c:tx><c:rich><a:bodyPr rot="0" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="333333333"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`
     +`<c:catAx><c:axId val="333333333"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="1"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="444444444"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
     +`</c:plotArea><c:legend><c:legendPos val="b"/><c:legendEntry><c:idx val="1"/><c:delete val="1"/></c:legendEntry><c:legendEntry><c:idx val="2"/><c:delete val="1"/></c:legendEntry><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
 }
