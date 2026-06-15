@@ -1513,7 +1513,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-tbl-head">
             <span class="rev-tbl-title">📦 제품별 판매 현황</span>
             <span style="font-size:11px;color:var(--tx2);" id="revDlyTblSub"></span>
-            <button class="btn btn-sm" onclick="downloadDailyExcel()" style="background:#059669;color:#fff;border:none;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;">📥 엑셀 다운로드</button>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="dlyCumChk" style="cursor:pointer;">월별 누적 포함</label>
+            <button class="btn btn-sm" onclick="downloadDailyExcel()" style="background:#059669;color:#fff;border:none;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;margin-left:8px;">📥 엑셀 다운로드</button>
           </div>
           <div class="rev-empty" id="revDlyEmpty">날짜와 판매처를 선택하세요</div>
           <div class="tw"><table class="dt" id="revDlyTbl" style="display:none;">
@@ -4719,13 +4720,17 @@ function _buildDailyChartXml(sheetName, serials, saleVals, adVals, firstR, lastR
     +catRef
     +`<c:val><c:numRef><c:f>${sn}!$${valCol}$${firstR}:$${valCol}$${lastR}</c:f><c:numCache><c:formatCode>#,##0</c:formatCode><c:ptCount val="${n}"/>${pts(vals)}</c:numCache></c:numRef></c:val></c:ser>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="1400"/><a:t>일자별 정산금액 · 광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>`
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="1400"/><a:t>일자별 판매가 · 광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>`
     +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
     +ser(0,0,'B','판매가','B',saleVals,'<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>')
+    +`<c:gapWidth val="80"/><c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>`
+    +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
     +ser(1,1,'F','광고비','F',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
-    +`<c:gapWidth val="150"/><c:overlap val="-27"/><c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>`
+    +`<c:gapWidth val="140"/><c:axId val="333333333"/><c:axId val="444444444"/></c:barChart>`
     +`<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="mm-dd" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="222222222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
-    +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>판매가</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:valAx><c:axId val="444444444"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="333333333"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:catAx><c:axId val="333333333"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="1"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="444444444"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
     +`</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
 }
 
@@ -4754,10 +4759,17 @@ async function downloadDailyExcel(){
   const wb=U.book_new();
   const monthCharts=[]; // {name, serials, sales, ads, firstR, lastR, sheetIdx}
 
-  // ── 월별 핵심지표 시트 (데이터 있는 모든 년-월, 최신순으로 계속 누적) ──
-  const ymSet=new Set();
-  _revData.forEach(r=>{ if(chFilter!=='ALL'&&r.ch!==chFilter) return; if(r.year&&r.date) ymSet.add(`${r.year}-${r.date.slice(0,2)}`); });
-  const ymList=[...ymSet].sort().reverse();
+  // ── 월별 핵심지표 시트 ──
+  //    '월별 누적 포함' 체크 시: 데이터 있는 모든 년-월(최신순) / 미체크 시: 선택한 월만
+  const cumChk=document.getElementById('dlyCumChk')?.checked;
+  let ymList;
+  if(cumChk){
+    const ymSet=new Set();
+    _revData.forEach(r=>{ if(chFilter!=='ALL'&&r.ch!==chFilter) return; if(r.year&&r.date) ymSet.add(`${r.year}-${r.date.slice(0,2)}`); });
+    ymList=[...ymSet].sort().reverse();
+  } else {
+    ymList=[`${selY}-${selMonStr}`];
+  }
   ymList.forEach(name=>{
     const [yy,mm]=name.split('-').map(Number);
     const rows=_revData.filter(r=>r.year===yy&&r.date?.startsWith(pad(mm))&&(chFilter==='ALL'||r.ch===chFilter));
