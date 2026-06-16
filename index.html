@@ -587,19 +587,19 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
     <button class="btn btn-da btn-sm" id="clearAllBtn" onclick="confirmClearAll()" title="예시 데이터 초기화">🗑 초기화</button>
     <span id="viewBadge" style="display:none;font-size:10px;color:#F59E0B;border:1px solid #F59E0B66;border-radius:5px;padding:2px 6px;white-space:nowrap;">열람전용</span>
-    <button class="btn btn-sm" id="userMgrBtn" onclick="openUserMgr()" title="직원 계정·권한 관리" style="display:none;">👥 직원관리</button>
-    <span id="whoami" style="font-size:11px;color:var(--tx2);padding:0 4px;white-space:nowrap;"></span>
+    <span id="whoami" onclick="openMyPage()" title="마이페이지" style="font-size:11px;color:var(--tx2);padding:3px 8px;white-space:nowrap;cursor:pointer;border-radius:6px;border:1px solid var(--bd);"></span>
     <button class="btn btn-sm" onclick="logout()" title="로그아웃">로그아웃</button>
   </div>
 </div>
 
-<!-- ═══ 직원 계정·권한 관리 (마스터 전용) ═══ -->
-<div class="modal-overlay" id="userMgrModal">
+<!-- ═══ 마이페이지 (계정/권한) ═══ -->
+<div class="modal-overlay" id="myPageModal">
   <div class="modal um-modal">
-    <h3>👥 직원 계정 · 팀 권한 현황</h3>
-    <div class="um-hint">계정은 <b>코드에 저장</b>되어 모든 PC에서 동일하게 로그인됩니다. 계정 추가·비밀번호 변경·권한 조정은 관리자에게 요청하세요. &nbsp;|&nbsp; <b style="color:#05C072;">수정</b>=추가·수정·삭제 가능 · <b style="color:#3182F6;">열람</b>=보기만 · <b>—</b>=메뉴 숨김</div>
-    <div id="umBody" style="overflow-x:auto;"></div>
-    <div class="ma"><button class="btn btn-pr" onclick="closeUserMgr()">닫기</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin:0;">👤 마이페이지</h3>
+      <button class="btn btn-sm" onclick="closeMyPage()">✕ 닫기</button>
+    </div>
+    <div id="mpBody"></div>
   </div>
 </div>
 
@@ -2038,45 +2038,31 @@ let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인
 const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', name:'관리자' };
 
 // ══════════════════════════════════════════════
-//  팀(부서)별 메뉴 권한 정의
-//   각 메뉴 값: 'edit'(추가·수정·삭제 가능) / 'view'(보기만)
-//   목록에 없는 메뉴는 자동으로 '없음'(메뉴 숨김)
-//   ※ 특정 메뉴만 보기 전용으로 바꾸려면 'edit' → 'view' 로 변경
+//  팀 프리셋 — 마이페이지에서 계정 만들 때 권한을 한 번에 채워주는 용도
+//   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
-const TEAMS = {
-  cx:     { name:'CX팀',    menus:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit' } },
-  design: { name:'디자인팀', menus:{ /* 메뉴 추후 생성 예정 */ } },
-  ops:    { name:'운영관리',  menus:{ revenue:'edit', hist:'edit', sales:'edit' } },
+const TEAM_PRESETS = {
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit' } },
+  design: { name:'디자인팀', perms:{} },
+  ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit' } },
 };
 
 // ══════════════════════════════════════════════
-//  직원 계정 (코드에 저장 → 모든 PC에서 동일 로그인)
-//   계정 추가: 아래 배열에 한 줄 추가
-//   { username:'아이디', password:'비밀번호', name:'표시이름', team:'cx'|'design'|'ops' }
+//  직원 계정 — Supabase(work_calendar KV, kind='app_users')에 저장 → 모든 PC 동기화
+//   계정 객체: { username, password, name, perms:{ 메뉴키: 'none'|'view'|'edit' } }
 // ══════════════════════════════════════════════
-const ACCOUNTS = [
-  { username:'cx',     password:'cx1234',     name:'CX팀',    team:'cx' },
-  { username:'design', password:'design1234', name:'디자인팀', team:'design' },
-  { username:'ops',    password:'ops1234',    name:'운영관리', team:'ops' },
-];
+let APP_USERS = [];
+async function loadAppUsers(){ try{ APP_USERS = (await cloudKvLoad('app_users')) || []; }catch{ APP_USERS = []; } return APP_USERS; }
+async function saveAppUsers(){ await cloudKvSave('app_users', APP_USERS); }
+const _appUsersLoaded = loadAppUsers();   // 페이지 로드 즉시 계정목록 가져오기 시작
 
-// 팀 → 메뉴별 권한 객체로 변환
-function _permsForTeam(teamId){
-  const t = TEAMS[teamId]; const perms = {};
-  MENUS.forEach(m => { perms[m.id] = (t && t.menus[m.id]) ? t.menus[m.id] : 'none'; });
-  return perms;
-}
-
-function _getUsers(){ try{ return JSON.parse(localStorage.getItem('inv_users')||'[]'); }catch{ return []; } }
 function _findUser(id,pw){
   if(id===MASTER_ACCOUNT.username && pw===MASTER_ACCOUNT.password) return { ...MASTER_ACCOUNT };
-  const a = ACCOUNTS.find(u=>u.username===id && u.password===pw);
-  if(a) return { username:a.username, name:a.name||a.username, role:'staff', team:a.team, perms:_permsForTeam(a.team) };
-  // 레거시: localStorage 개별 계정(예전에 만든 경우만)
-  const ext = _getUsers().find(u=>u.username===id && u.password===pw);
-  if(ext) return { username:ext.username, name:ext.name||ext.username, role:'staff', perms:ext.perms||{} };
+  const a = APP_USERS.find(u=>u.username===id && u.password===pw);
+  if(a) return { username:a.username, name:a.name||a.username, role:'staff', perms:a.perms||{} };
   return null;
 }
+function _getSession_legacyNoop(){}
 function _getSession(){
   try{ return JSON.parse(localStorage.getItem('inv_session')||sessionStorage.getItem('inv_session')||'null'); }
   catch{ return null; }
@@ -2084,38 +2070,30 @@ function _getSession(){
 window.__CURRENT_USER = null;
 
 function _revealApp(sess){
-  // 마스터가 아니면, 최신 권한을 코드(팀 설정)에서 다시 계산해 반영
-  if(sess.role !== 'master'){
-    if(sess.team && TEAMS[sess.team]){
-      sess.perms = _permsForTeam(sess.team);
-      sess.teamName = TEAMS[sess.team].name;
-    } else {
-      const u = _getUsers().find(x=>x.username===sess.username);
-      if(u){ sess.perms=u.perms||{}; sess.name=u.name||sess.username; }
-    }
-  }
   window.__CURRENT_USER = sess;
+  window.__ACTOR = sess.name || sess.username;   // 변동이력 작업자
   const ov = document.getElementById('loginOverlay');
   if(ov) ov.style.display = 'none';
   const who = document.getElementById('whoami');
-  if(who) who.textContent = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · ' + (sess.teamName || '직원'));
+  if(who) who.innerHTML = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원') + ' <span style="opacity:.5;">▾</span>';
   applyPermissions();
 }
 
-function doLogin(e){
+async function doLogin(e){
   if(e) e.preventDefault();
   const id = document.getElementById('lgId').value.trim();
   const pw = document.getElementById('lgPw').value;
   const remember = document.getElementById('lgRemember').checked;
   const err = document.getElementById('lgErr');
-  const u = _findUser(id, pw);
+  let u = _findUser(id, pw);
+  if(!u && id!=='admin'){ try{ await _appUsersLoaded; }catch{} u = _findUser(id, pw); }  // 계정목록 로드 보장 후 재시도
   if(!u){
     err.style.display = 'block';
     err.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
     return;
   }
   err.style.display = 'none';
-  const sess = { username:u.username, role:u.role, name:u.name||u.username, team:u.team, ts:Date.now() };
+  const sess = { username:u.username, role:u.role, name:u.name||u.username, perms:u.perms||{}, ts:Date.now() };
   if(remember){
     localStorage.setItem('inv_session', JSON.stringify(sess));
     localStorage.setItem('inv_remember', JSON.stringify({ id, pw }));
@@ -2142,19 +2120,49 @@ const MENUS = [
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}
 ];
+// 매출관리 하위탭 — 각각 개별 권한 부여 가능
+const REV_SUBS = [
+  {id:'summary',label:'요약'}, {id:'monthly',label:'월별'}, {id:'backdata',label:'백데이터'},
+  {id:'upload',label:'데이터업로드'}, {id:'unified',label:'통합'}, {id:'daily',label:'일일보고'}, {id:'adcenter',label:'광고센터'}
+];
 const PERM_LEVELS = [['none','없음'],['view','열람'],['edit','수정']];
+const _PERM_RANK = { none:0, view:1, edit:2 };
 
-function _saveUsers(arr){ localStorage.setItem('inv_users', JSON.stringify(arr)); }
+// 권한 키 목록(계정 권한표용): 일반 메뉴 + 매출관리 하위탭
+function permKeyRows(){
+  const rows = [];
+  MENUS.forEach(m=>{
+    if(m.id==='revenue'){
+      rows.push({ header:'매출관리' });
+      REV_SUBS.forEach(s=> rows.push({ key:'revenue.'+s.id, label:'└ '+s.label }));
+    } else {
+      rows.push({ key:m.id, label:m.label });
+    }
+  });
+  return rows;
+}
 
-// 현재 사용자의 특정 메뉴 권한
-function _menuPerm(menuId){
+// 특정 권한키의 사용자 레벨
+function _permOf(key){
   const u = window.__CURRENT_USER;
   if(!u) return 'none';
   if(u.role==='master') return 'edit';
-  return (u.perms && u.perms[menuId]) || 'none';
+  return (u.perms && u.perms[key]) || 'none';
 }
-// 현재 보고 있는 페이지의 권한
-function _pagePerm(){ return _menuPerm(currentPage); }
+// 상단 메뉴(네비) 권한 — 매출관리는 하위탭 중 최댓값
+function _menuPerm(menuId){
+  if(menuId==='revenue'){
+    let best='none';
+    REV_SUBS.forEach(s=>{ const v=_permOf('revenue.'+s.id); if(_PERM_RANK[v]>_PERM_RANK[best]) best=v; });
+    return best;
+  }
+  return _permOf(menuId);
+}
+// 현재 보고 있는 화면의 권한 (매출관리는 현재 하위탭 기준)
+function _pagePerm(){
+  if(currentPage==='revenue') return _permOf('revenue.'+(typeof _revPage!=='undefined'?_revPage:'summary'));
+  return _permOf(currentPage);
+}
 
 // 쓰기(수정/삭제/저장/입고/발주 등) 핸들러 함수명 — 열람 권한일 때 차단
 const WRITE_FNS = /^(openAddProd|openUpload|confirmClearAll|executeClear|saveProd|saveIn|saveRgProd|saveBdModal|saveShipModal|saveRevRowEdit|saveTelegramSettings|openEditProd|deleteProd|hideProd|discProd|setInvStatus|deleteShip|openShipAdd|openShipEdit|applyAllShipping|deleteSelectedUni|openBdAdd|openBdEdit|openBdUpload|applyBdUpload|submitRevUpload|confirmUpload|resyncRevenuePrices|resyncRevenueTypes|applyIO|startIO|openInReg|confirmRecv|addMemo|runDataDiagFix|deleteHistUpload|adSave|adDelete|pcAddOrUpdate|pcEditItem|pcDeleteItem|pcConfirmSave|pcOpenSaveModal|qtAddRow|qtDelRow|qtReset|qtConfirmSave|qtOpenSaveModal|qtApplyCalc|qtRemoveSeal)\b/;
@@ -2168,13 +2176,15 @@ function toast(msg){
 // 로그인 후 권한에 따라 메뉴 노출 / 버튼 잠금
 function applyPermissions(){
   const u = window.__CURRENT_USER; if(!u) return;
-  const master = u.role==='master';
-  const mgrBtn = document.getElementById('userMgrBtn');
-  if(mgrBtn) mgrBtn.style.display = master ? '' : 'none';
   // '없음' 메뉴는 네비에서 숨김
   MENUS.forEach(m=>{
     const nav = document.getElementById('nav-'+m.id);
     if(nav) nav.style.display = (_menuPerm(m.id)==='none') ? 'none' : '';
+  });
+  // 매출관리 하위탭도 권한별로 숨김
+  REV_SUBS.forEach(s=>{
+    const sn = document.getElementById('rsni-'+s.id);
+    if(sn) sn.style.display = (_permOf('revenue.'+s.id)==='none') ? 'none' : '';
   });
   // 접근 가능 메뉴 유무
   const first = MENUS.find(m=>_menuPerm(m.id)!=='none');
@@ -2219,33 +2229,132 @@ document.addEventListener('click', function(e){
   }
 }, true);
 
-// ── 직원 계정 관리 (마스터 전용) ──
-function openUserMgr(){
-  if(window.__CURRENT_USER?.role!=='master') return;
-  document.getElementById('userMgrModal').classList.add('open');
-  renderUserMgr();
+// ══════════════════════════════════════════════
+// 마이페이지 — 직원: 내 권한 보기 / 마스터: 계정 생성·관리
+// ══════════════════════════════════════════════
+let _mpEditing = null;
+const _lvlTag = v => v==='edit' ? '<span style="color:#05C072;font-weight:700;">수정</span>'
+                   : v==='view' ? '<span style="color:#3182F6;font-weight:600;">열람</span>'
+                   : '<span style="color:#cbd2dc;">—</span>';
+
+async function openMyPage(){
+  if(!window.__CURRENT_USER) return;
+  document.getElementById('myPageModal').classList.add('open');
+  if(window.__CURRENT_USER.role==='master'){ try{ await loadAppUsers(); }catch{} }
+  renderMyPage();
 }
-function closeUserMgr(){ document.getElementById('userMgrModal').classList.remove('open'); }
+function closeMyPage(){ document.getElementById('myPageModal').classList.remove('open'); _mpEditing=null; }
 
-function renderUserMgr(){
-  const lvlLbl = v => v==='edit' ? '<span style="color:#05C072;font-weight:700;">수정</span>'
-                    : v==='view' ? '<span style="color:#3182F6;font-weight:600;">열람</span>'
-                    : '<span style="color:#cbd2dc;">—</span>';
-  const rows = [];
-  rows.push({ username:MASTER_ACCOUNT.username, name:MASTER_ACCOUNT.name, team:'마스터', master:true });
-  ACCOUNTS.forEach(a => rows.push({ username:a.username, name:a.name||a.username, team:(TEAMS[a.team]?.name || a.team), perms:_permsForTeam(a.team) }));
-  _getUsers().forEach(u => rows.push({ username:u.username, name:u.name||u.username, team:'개별(레거시)', perms:u.perms||{} }));
+function renderMyPage(){
+  const u = window.__CURRENT_USER; if(!u) return;
+  const body = document.getElementById('mpBody');
+  if(u.role==='master'){
+    body.innerHTML =
+      `<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">계정은 서버(Supabase)에 저장되어 <b>모든 PC에서 동일하게 로그인</b>됩니다.<br><span style="color:#05C072;">수정</span>=추가·수정·삭제 가능 · <span style="color:#3182F6;">열람</span>=보기만 · —=메뉴 숨김</div>
+       <div style="margin-bottom:8px;"><button class="btn btn-pr btn-sm" onclick="mpOpenForm()">+ 새 계정 만들기</button></div>
+       <div id="mpList" style="overflow-x:auto;"></div>
+       <div id="mpForm" style="display:none;margin-top:10px;"></div>`;
+    renderMpList();
+  } else {
+    let rows = permKeyRows().map(r => r.header
+      ? `<tr><td colspan="2" style="background:var(--bg2);font-weight:700;color:var(--tx);text-align:left;">${r.header}</td></tr>`
+      : `<tr><td style="text-align:left;">${r.label}</td><td>${_lvlTag((u.perms&&u.perms[r.key])||'none')}</td></tr>`).join('');
+    body.innerHTML =
+      `<div style="font-size:14px;margin-bottom:4px;"><b>${u.name||u.username}</b> <span style="color:var(--tx2);">(${u.username}) · 직원</span></div>
+       <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">내 메뉴 권한입니다. 변경이 필요하면 관리자에게 요청하세요.</div>
+       <table class="um-table" style="max-width:360px;"><tbody>${rows}</tbody></table>`;
+  }
+}
 
-  let html = '<table class="um-table"><thead><tr><th>아이디</th><th>이름</th><th>팀</th>'
-    + MENUS.map(m=>`<th>${m.label}</th>`).join('') + '</tr></thead><tbody>';
-  html += rows.map(r=>{
-    const cells = MENUS.map(m => r.master
-      ? '<td><span style="color:#05C072;font-weight:700;">수정</span></td>'
-      : `<td>${lvlLbl((r.perms && r.perms[m.id]) || 'none')}</td>`).join('');
-    return `<tr><td><b>${r.username}</b></td><td>${r.name}</td><td>${r.team}</td>${cells}</tr>`;
-  }).join('');
-  html += '</tbody></table>';
-  document.getElementById('umBody').innerHTML = html;
+function renderMpList(){
+  const keys = permKeyRows().filter(r=>r.key);
+  let h = '<table class="um-table"><thead><tr><th>아이디</th><th>이름</th>'
+    + keys.map(r=>`<th>${r.label.replace('└ ','')}</th>`).join('') + '<th>관리</th></tr></thead><tbody>';
+  if(!APP_USERS.length){
+    h += `<tr><td colspan="${keys.length+3}" style="text-align:center;color:var(--tx2);padding:18px;">아직 만든 계정이 없습니다. ‘+ 새 계정 만들기’로 추가하세요.</td></tr>`;
+  } else {
+    h += APP_USERS.map(u=>{
+      const cells = keys.map(r=>`<td>${_lvlTag((u.perms&&u.perms[r.key])||'none')}</td>`).join('');
+      return `<tr><td><b>${u.username}</b></td><td>${u.name||'-'}</td>${cells}`
+        + `<td style="white-space:nowrap;"><button class="btn btn-sm" onclick="mpOpenForm('${u.username}')">수정</button> `
+        + `<button class="btn btn-da btn-sm" onclick="mpDeleteAccount('${u.username}')">삭제</button></td></tr>`;
+    }).join('');
+  }
+  h += '</tbody></table>';
+  document.getElementById('mpList').innerHTML = h;
+}
+
+function _mpPermGrid(perms){
+  perms = perms || {};
+  let h = '<table class="um-table" style="margin-top:8px;max-width:420px;"><tbody>';
+  permKeyRows().forEach(r=>{
+    if(r.header){ h += `<tr><td colspan="2" style="background:var(--bg2);font-weight:700;color:var(--tx);text-align:left;">${r.header}</td></tr>`; return; }
+    const v = perms[r.key] || 'none';
+    h += `<tr><td style="text-align:left;">${r.label}</td><td><select class="um-sel" data-permkey="${r.key}">`
+      + PERM_LEVELS.map(([val,lbl])=>`<option value="${val}" ${v===val?'selected':''}>${lbl}</option>`).join('')
+      + '</select></td></tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
+
+function mpOpenForm(username){
+  const editing = username ? APP_USERS.find(u=>u.username===username) : null;
+  _mpEditing = editing ? editing.username : null;
+  const f = document.getElementById('mpForm');
+  document.getElementById('mpList').style.display = 'none';
+  f.style.display = '';
+  f.innerHTML =
+    `<h4 style="margin:0 0 8px;">${editing ? '계정 수정 — '+editing.username : '새 계정 만들기'}</h4>
+     <div class="um-add">
+       <input id="mpId" placeholder="아이디" value="${editing?editing.username:''}" ${editing?'disabled':''}/>
+       <input id="mpName" placeholder="이름" value="${editing?(editing.name||''):''}"/>
+       <input id="mpPw" type="text" placeholder="비밀번호" value="${editing?editing.password:''}"/>
+     </div>
+     <div style="margin:8px 0;font-size:12px;color:var(--tx2);display:flex;gap:4px;flex-wrap:wrap;align-items:center;">빠른 채움:
+       <button class="btn btn-sm" onclick="mpApplyPreset('cx')">CX팀</button>
+       <button class="btn btn-sm" onclick="mpApplyPreset('ops')">운영관리</button>
+       <button class="btn btn-sm" onclick="mpApplyPreset('design')">디자인팀</button>
+       <button class="btn btn-sm" onclick="mpApplyPreset('all')">전체 수정</button>
+       <button class="btn btn-sm" onclick="mpApplyPreset('none')">전체 없음</button>
+     </div>
+     <div id="mpGrid">${_mpPermGrid(editing?editing.perms:{})}</div>
+     <div class="ma"><button class="btn" onclick="mpCancelForm()">취소</button>
+       <button class="btn btn-pr" onclick="mpSaveAccount()">${editing?'저장':'계정 생성'}</button></div>`;
+}
+function mpCancelForm(){
+  _mpEditing = null;
+  const f=document.getElementById('mpForm'); if(f){ f.style.display='none'; f.innerHTML=''; }
+  const l=document.getElementById('mpList'); if(l) l.style.display='';
+}
+function mpApplyPreset(id){
+  let perms = {};
+  if(id==='all'){ permKeyRows().forEach(r=>{ if(r.key) perms[r.key]='edit'; }); }
+  else if(id==='none'){ perms = {}; }
+  else { perms = { ...(TEAM_PRESETS[id]?.perms || {}) }; }
+  document.querySelectorAll('#mpGrid select[data-permkey]').forEach(sel=>{ sel.value = perms[sel.dataset.permkey] || 'none'; });
+}
+async function mpSaveAccount(){
+  const editing = _mpEditing;
+  const id = editing || document.getElementById('mpId').value.trim();
+  const name = document.getElementById('mpName').value.trim();
+  const pw = document.getElementById('mpPw').value;
+  if(!id || !pw){ toast('아이디와 비밀번호를 입력하세요.'); return; }
+  if(id==='admin'){ toast('admin은 마스터 예약 아이디입니다.'); return; }
+  if(!editing && APP_USERS.some(u=>u.username===id)){ toast('이미 존재하는 아이디입니다.'); return; }
+  const perms = {};
+  document.querySelectorAll('#mpGrid select[data-permkey]').forEach(sel=>{ if(sel.value!=='none') perms[sel.dataset.permkey]=sel.value; });
+  if(editing){ const u=APP_USERS.find(x=>x.username===editing); u.name=name; u.password=pw; u.perms=perms; }
+  else { APP_USERS.push({ username:id, name, password:pw, perms }); }
+  try{ await saveAppUsers(); }catch(e){ toast('저장 실패: '+(e.message||e)); return; }
+  toast(editing ? '계정이 수정되었습니다.' : '계정이 생성되었습니다.');
+  mpCancelForm(); renderMpList();
+}
+async function mpDeleteAccount(username){
+  if(!confirm(username+' 계정을 삭제할까요?')) return;
+  APP_USERS = APP_USERS.filter(u=>u.username!==username);
+  try{ await saveAppUsers(); }catch(e){ toast('삭제 실패: '+(e.message||e)); return; }
+  toast('삭제되었습니다.'); renderMpList();
 }
 
 // 페이지 로드 즉시 인증 게이트 실행
@@ -2269,6 +2378,15 @@ function renderUserMgr(){
   if(sess) _revealApp(sess);
   else { const f=document.getElementById('lgId'); if(f) f.focus(); }
 })();
+
+// 계정목록 로드 완료 후, 자동 로그인된 직원의 권한을 최신으로 갱신
+_appUsersLoaded.then(()=>{
+  const cu = window.__CURRENT_USER;
+  if(cu && cu.role!=='master'){
+    const fresh = APP_USERS.find(u=>u.username===cu.username);
+    if(fresh){ cu.perms = fresh.perms || {}; cu.name = fresh.name || cu.name; window.__ACTOR = cu.name; applyPermissions(); }
+  }
+}).catch(()=>{});
 
 // ── 단가계산기 견적 / 견적서 클라우드 공유 (work_calendar 테이블 재사용, person='__app__') ──
 //    캘린더처럼 다른 컴퓨터에서도 동일하게 보이도록 저장
@@ -2463,8 +2581,11 @@ async function loadHist(){
   if(data) historyLog=data.map(r=>({id:r.id,time:r.time,menu:r.menu,type:r.type,code:r.code,name:r.name,desc:r.description,before:r.before_val,after:r.after_val,user:r.user_type}));
 }
 async function addHistory(item){
-  historyLog.unshift({id:Date.now(),time:fmtFull(new Date()),...item});
-  await sb.from('history_log').insert({time:fmtFull(new Date()),menu:item.menu,type:item.type,code:item.code,name:item.name,description:item.desc,before_val:item.before,after_val:item.after,user_type:item.user});
+  const actor = window.__ACTOR || '-';                       // 로그인 작업자
+  const t = fmtFull(new Date());
+  const userField = actor + (item.user ? ' / '+item.user : '');  // "홍길동 / 수동"
+  historyLog.unshift({id:Date.now(),time:t,actor,...item,user:userField});
+  await sb.from('history_log').insert({time:t,menu:item.menu,type:item.type,code:item.code,name:item.name,description:item.desc,before_val:item.before,after_val:item.after,user_type:userField});
 }
 let _dCache={};
 async function loadDailyCache(){
@@ -2557,7 +2678,7 @@ function goPage(p){
   if(p==='rg'){ loadRgDailyCache().then(()=>{ renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
   if(p==='hist') renderHist();
   if(p==='report') loadDailyCache().then(()=>renderReport());
-  if(p==='revenue') loadRevenuePage();
+  if(p==='revenue') loadRevenuePage().then(()=>goRevPage(_revPage));
   if(p==='price'){ pcEnsureBackdata(); pcRenderEstimates(); pcLoadEstimatesCloud(); }
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
@@ -4404,12 +4525,19 @@ function saveAdSpend(){
 }
 
 function goRevPage(p){
+  // 하위탭 접근 권한 확인 → 없으면 첫 허용 탭으로
+  if(window.__CURRENT_USER && _permOf('revenue.'+p)==='none'){
+    const f = REV_SUBS.find(s=>_permOf('revenue.'+s.id)!=='none');
+    if(!f){ toast('매출관리 접근 권한이 없습니다.'); return; }
+    p = f.id;
+  }
   _revPage = p;
   ['summary','monthly','backdata','upload','unified','daily','adcenter'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
   _renderRevCurrentPage();
+  _applyWriteLockUI();
 }
 
 function setRevCh(btn, ch){
