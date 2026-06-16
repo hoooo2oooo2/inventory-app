@@ -571,6 +571,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .um-table th{background:var(--bg2);color:var(--tx2);font-weight:600;font-size:11px;}
 .um-table td:first-child,.um-table th:first-child{text-align:left;}
 .um-sel{border:1px solid var(--bd);border-radius:6px;font-size:12px;padding:3px 4px;background:var(--bg);cursor:pointer;}
+/* 통합 수정모드 잠금 시 행 수정버튼 흐리게 */
+#revUniTable.uni-locked td:last-child button{opacity:.35;}
+/* 네비 즐겨찾기 별 */
+.navstar{font-size:11px;color:#cbd2dc;cursor:pointer;margin-left:2px;vertical-align:middle;transition:transform .1s;}
+.navstar:hover{transform:scale(1.3);}
+#deptNav .ni{font-weight:700;font-size:14px;}
 </style>
 
 <div class="app" id="appRoot">
@@ -592,6 +598,19 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- ═══ 통합 선택삭제 비밀번호 모달 ═══ -->
+<div class="modal-overlay" id="delPwModal">
+  <div class="modal" style="max-width:340px;">
+    <h3>🔒 삭제 비밀번호 확인</h3>
+    <div id="delPwCount" style="font-size:12px;color:var(--tx2);margin-bottom:10px;"></div>
+    <input type="password" id="delPwInput" placeholder="비밀번호" onkeydown="if(event.key==='Enter')confirmDelPw()"
+      style="width:100%;height:42px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;" />
+    <div id="delPwMsg" style="color:#DC2626;font-size:12px;min-height:16px;margin-top:6px;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('delPwModal')">취소</button>
+      <button class="btn btn-da" onclick="confirmDelPw()">삭제</button></div>
+  </div>
+</div>
+
 <!-- ═══ 마이페이지 (계정/권한) ═══ -->
 <div class="modal-overlay" id="myPageModal">
   <div class="modal um-modal">
@@ -604,16 +623,21 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 </div>
 
 <!-- NAV -->
-<nav class="nav">
-  <div class="ni active" id="nav-inv" onclick="goPage('inv')">재고관리</div>
-  <div class="ni" id="nav-sales" onclick="goPage('sales')">판매분석</div>
-  <div class="ni" id="nav-order" onclick="goPage('order')">발주관리 <span class="nbadge" id="orderBadge">0</span><span class="pulse-wrap" id="navPulse" style="display:none;"><span class="pdot"></span><span class="pring"></span><span class="pring pring2"></span></span></div>
-  <div class="ni" id="nav-rg" onclick="goPage('rg')">로켓그로스</div>
-  <div class="ni" id="nav-hist" onclick="goPage('hist')">변동이력</div>
+<!-- 부서 탭 -->
+<div class="nav" id="deptNav" style="border-bottom:none;padding-bottom:0;"></div>
+<!-- 즐겨찾기 바 -->
+<div class="nav" id="favNav" style="display:none;background:var(--bg2);border-bottom:0.5px solid var(--bd);"></div>
+<!-- 부서별 메뉴 -->
+<nav class="nav" id="mainMenuNav">
+  <div class="ni active" id="nav-inv" onclick="goMenu('inv')">재고관리 <span class="navstar" onclick="toggleFav('inv',event)">★</span></div>
+  <div class="ni" id="nav-sales" onclick="goMenu('sales')">판매분석 <span class="navstar" onclick="toggleFav('sales',event)">★</span></div>
+  <div class="ni" id="nav-order" onclick="goMenu('order')">발주관리 <span class="nbadge" id="orderBadge">0</span><span class="pulse-wrap" id="navPulse" style="display:none;"><span class="pdot"></span><span class="pring"></span><span class="pring pring2"></span></span> <span class="navstar" onclick="toggleFav('order',event)">★</span></div>
+  <div class="ni" id="nav-rg" onclick="goMenu('rg')">로켓그로스 <span class="navstar" onclick="toggleFav('rg',event)">★</span></div>
+  <div class="ni" id="nav-hist" onclick="goMenu('hist')">변동이력 <span class="navstar" onclick="toggleFav('hist',event)">★</span></div>
   <div class="ni" id="nav-report" onclick="goPage('report')" style="display:none;">📋 보고</div>
-  <div class="ni" id="nav-revenue" onclick="goPage('revenue')">💰 매출관리</div>
-  <div class="ni" id="nav-price" onclick="goPage('price')">🧮 단가계산기</div>
-  <div class="ni" id="nav-quote" onclick="goPage('quote')">📄 견적서</div>
+  <div class="ni" id="nav-revenue" onclick="goMenu('revenue')">💰 매출관리 <span class="navstar" onclick="toggleFav('revenue',event)">★</span></div>
+  <div class="ni" id="nav-price" onclick="goMenu('price')">🧮 단가계산기 <span class="navstar" onclick="toggleFav('price',event)">★</span></div>
+  <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서 <span class="navstar" onclick="toggleFav('quote',event)">★</span></div>
 </nav>
 
 <!-- ═══ 재고관리 ═══ -->
@@ -1539,9 +1563,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <button class="rfbtn active" onclick="setUniFilter('ch',this,'ALL')">전체</button>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;padding:8px 14px;font-size:12px;white-space:nowrap;flex-shrink:0;">
-          <span id="revMaskStatus">🔒 개인정보 마스킹 중</span>
-          <button class="btn btn-sm" id="revMaskBtn" onclick="toggleRevMask()">🔑 관리자 해제</button>
+        <div style="display:flex;flex-direction:column;gap:6px;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;padding:8px 14px;font-size:12px;white-space:nowrap;flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="revMaskStatus">🔒 개인정보 마스킹 중</span>
+            <button class="btn btn-sm" id="revMaskBtn" onclick="toggleRevMask()">🔑 관리자 해제</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;border-top:0.5px solid var(--bd);padding-top:6px;">
+            <span id="uniEditStatus">🔒 수정 잠금</span>
+            <button class="btn btn-sm" id="uniEditBtn" onclick="toggleUniEdit()">✏️ 수정모드</button>
+          </div>
         </div>
       </div>
       <!-- 검색 + 건수 -->
@@ -2128,6 +2158,79 @@ const REV_SUBS = [
 const PERM_LEVELS = [['none','없음'],['view','열람'],['edit','수정']];
 const _PERM_RANK = { none:0, view:1, edit:2 };
 
+// 부서(상단 탭) → 하위 메뉴
+const DEPTS = [
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote'] },
+  { id:'design', label:'디자인팀',  menus:[] },
+  { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales'] },
+];
+let _activeDept = null;
+function _menuLabel(id){ const m=MENUS.find(x=>x.id===id); return m?m.label:id; }
+function _deptVisibleMenus(deptId){
+  const d=DEPTS.find(x=>x.id===deptId); if(!d) return [];
+  return d.menus.filter(m=>_menuPerm(m)!=='none');
+}
+function _deptOfPage(page){
+  for(const d of DEPTS){ if(_deptVisibleMenus(d.id).includes(page)) return d.id; }
+  return null;
+}
+
+// ── 즐겨찾기 (직원별, localStorage) ──
+function _favKey(){ const u=window.__CURRENT_USER; return 'favs_'+(u?u.username:'anon'); }
+function getFavs(){ try{ return JSON.parse(localStorage.getItem(_favKey())||'[]'); }catch{ return []; } }
+function toggleFav(menuId, ev){
+  if(ev){ ev.stopPropagation(); }
+  let f=getFavs();
+  if(f.includes(menuId)){ f=f.filter(x=>x!==menuId); } else { f.push(menuId); }
+  localStorage.setItem(_favKey(), JSON.stringify(f));
+  updateNavVisibility();
+}
+
+// ── 부서/메뉴 네비 렌더 ──
+function selectDept(deptId){
+  const menus=_deptVisibleMenus(deptId);
+  if(!menus.length){ toast((DEPTS.find(d=>d.id===deptId)||{}).label+' 메뉴는 준비 중입니다.'); return; }
+  _activeDept = deptId;
+  if(!menus.includes(currentPage)){ goMenu(menus[0]); return; }
+  updateNavVisibility();
+}
+function goMenu(menuId){
+  if(window.__CURRENT_USER && _menuPerm(menuId)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
+  // 현재 활성 부서에 없는 메뉴면, 그 메뉴가 속한 부서로 전환
+  const cur=DEPTS.find(d=>d.id===_activeDept);
+  if(!cur || !cur.menus.includes(menuId)){ const dd=_deptOfPage(menuId); if(dd) _activeDept=dd; }
+  goPage(menuId);
+}
+function renderFavBar(){
+  const bar=document.getElementById('favNav'); if(!bar) return;
+  const favs=getFavs().filter(m=>_menuPerm(m)!=='none');
+  if(!favs.length){ bar.style.display='none'; bar.innerHTML=''; return; }
+  bar.style.display='';
+  bar.innerHTML = '<span style="font-size:11px;color:var(--tx2);align-self:center;margin-right:2px;">⭐ 즐겨찾기</span>'
+    + favs.map(m=>`<div class="ni ${currentPage===m?'active':''}" style="padding:5px 12px;" onclick="goMenu('${m}')">${_menuLabel(m)}</div>`).join('');
+}
+function updateNavVisibility(){
+  const u=window.__CURRENT_USER; if(!u) return;
+  // 마스터는 빈 부서(디자인팀)도 플레이스홀더로 노출
+  const visDepts = DEPTS.filter(d=> u.role==='master' || _deptVisibleMenus(d.id).length>0);
+  if(!_activeDept || !visDepts.find(d=>d.id===_activeDept)){
+    _activeDept = _deptOfPage(currentPage) || (visDepts[0] && visDepts[0].id) || null;
+  }
+  // 부서 탭
+  const deptNav=document.getElementById('deptNav');
+  if(deptNav) deptNav.innerHTML = visDepts.map(d=>`<div class="ni ${d.id===_activeDept?'active':''}" onclick="selectDept('${d.id}')">${d.label}</div>`).join('');
+  // 메뉴 항목: 권한 있고 + 활성 부서에 속한 것만 표시
+  const deptMenus = _activeDept ? (DEPTS.find(d=>d.id===_activeDept).menus) : [];
+  MENUS.forEach(m=>{
+    const el=document.getElementById('nav-'+m.id); if(!el) return;
+    el.style.display = (_menuPerm(m.id)!=='none' && deptMenus.includes(m.id)) ? '' : 'none';
+    el.classList.toggle('active', currentPage===m.id);
+    const star=el.querySelector('.navstar');
+    if(star) star.style.color = getFavs().includes(m.id) ? '#F59E0B' : '#cbd2dc';
+  });
+  renderFavBar();
+}
+
 // 권한 키 목록(계정 권한표용): 일반 메뉴 + 매출관리 하위탭
 function permKeyRows(){
   const rows = [];
@@ -2176,12 +2279,7 @@ function toast(msg){
 // 로그인 후 권한에 따라 메뉴 노출 / 버튼 잠금
 function applyPermissions(){
   const u = window.__CURRENT_USER; if(!u) return;
-  // '없음' 메뉴는 네비에서 숨김
-  MENUS.forEach(m=>{
-    const nav = document.getElementById('nav-'+m.id);
-    if(nav) nav.style.display = (_menuPerm(m.id)==='none') ? 'none' : '';
-  });
-  // 매출관리 하위탭도 권한별로 숨김
+  // 매출관리 하위탭 권한별 숨김
   REV_SUBS.forEach(s=>{
     const sn = document.getElementById('rsni-'+s.id);
     if(sn) sn.style.display = (_permOf('revenue.'+s.id)==='none') ? 'none' : '';
@@ -2190,18 +2288,19 @@ function applyPermissions(){
   const first = MENUS.find(m=>_menuPerm(m.id)!=='none');
   const blank = document.getElementById('noAccessMsg');
   if(!first){
-    // 접근 가능한 메뉴가 하나도 없음 → 모든 페이지 숨기고 안내
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     let b = blank;
     if(!b){ b=document.createElement('div'); b.id='noAccessMsg'; b.style.cssText='padding:80px 24px;text-align:center;color:var(--tx2);font-size:14px;line-height:1.7;'; document.getElementById('appRoot')?.appendChild(b); }
     b.innerHTML='🔒 접근 가능한 메뉴가 없습니다.<br>관리자에게 권한을 요청하세요.';
     b.style.display='';
+    ['deptNav','favNav','mainMenuNav'].forEach(id=>{ const e=document.getElementById(id); if(e)e.style.display='none'; });
     return;
   }
   if(blank) blank.style.display='none';
-  // 현재 페이지 접근 불가 → 첫 허용 메뉴로 이동
-  if(_pagePerm()==='none') goPage(first.id);
-  else _applyWriteLockUI();
+  ['deptNav','mainMenuNav'].forEach(id=>{ const e=document.getElementById(id); if(e)e.style.display=''; });
+  // 현재 페이지 접근 불가 → 첫 허용 메뉴로 이동, 가능하면 현재 페이지 열기
+  if(_pagePerm()==='none') goMenu(first.id);
+  else goPage(currentPage);
 }
 
 // 열람 권한 페이지에서 쓰기 버튼/상단 버튼 숨김 + 배지 표시
@@ -2684,6 +2783,7 @@ function goPage(p){
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
   if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote') ? 'hidden' : '';
+  if(window.__CURRENT_USER) updateNavVisibility();
   _applyWriteLockUI();
 }
 
@@ -4122,6 +4222,7 @@ function renderReport(){
 // ══════════════════════════════════════════════
 // 매출관리
 let _revPage = 'summary';
+let _uniEditMode = false;   // 통합 탭 수정모드(잠금 토글) — 기본 잠금
 let _revSelMonth = null;
 let _revSelCh = 'ALL';
 let _revData = [];
@@ -5606,17 +5707,44 @@ function updateUniSelUI(){
   const cnt=document.getElementById('revUniSelCount');
   const btn=document.getElementById('revUniDelBtn');
   if(cnt) cnt.textContent = n?`${n}건 선택됨`:'';
-  if(btn) btn.style.display = n?'':'none';
+  if(btn) btn.style.display = (n && _uniEditMode)?'':'none';   // 수정모드일 때만 삭제 노출
+}
+// 통합 수정모드 잠금 토글
+function toggleUniEdit(){
+  _uniEditMode = !_uniEditMode;
+  const b=document.getElementById('uniEditBtn');
+  if(b){
+    b.innerHTML = _uniEditMode ? '🔓 수정 중 (잠그기)' : '✏️ 수정모드';
+    b.style.background = _uniEditMode ? '#16A34A' : '';
+    b.style.color = _uniEditMode ? '#fff' : '';
+    b.style.borderColor = _uniEditMode ? '#16A34A' : '';
+  }
+  const st=document.getElementById('uniEditStatus');
+  if(st){ st.textContent = _uniEditMode ? '✏️ 수정 가능' : '🔒 수정 잠금'; st.style.color = _uniEditMode ? '#16A34A' : ''; }
+  document.getElementById('revUniTable')?.classList.toggle('uni-locked', !_uniEditMode);
+  updateUniSelUI();
 }
 async function deleteSelectedUni(){
+  if(!_uniEditMode){ toast('먼저 ✏️ 수정모드를 켜주세요 (마스킹 버튼 아래).'); return; }
   const ids=[..._uniSel];
   if(!ids.length){ alert('선택된 행이 없습니다.'); return; }
-  // 관리자 비밀번호 확인
-  const pw=prompt(`선택한 ${ids.length}건을 삭제합니다.\n관리자 비밀번호를 입력하세요:`);
-  if(pw===null) return;
+  // 비밀번호 입력 모달 열기
+  const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
+  const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
+  const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=`선택한 ${ids.length}건을 영구 삭제합니다. 되돌릴 수 없습니다.`;
+  openModal('delPwModal');
+  setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
+}
+function confirmDelPw(){
+  const pw=(document.getElementById('delPwInput')||{}).value||'';
   const savedPw=localStorage.getItem('rev_admin_pw')||'1234';
-  if(pw!==savedPw){ alert('비밀번호가 올바르지 않습니다.'); return; }
-  if(!confirm(`정말 ${ids.length}건을 삭제할까요? (되돌릴 수 없습니다)`)) return;
+  if(pw!==savedPw){ const m=document.getElementById('delPwMsg'); if(m) m.textContent='비밀번호가 올바르지 않습니다.'; return; }
+  closeModal('delPwModal');
+  _doDeleteSelectedUni();
+}
+async function _doDeleteSelectedUni(){
+  const ids=[..._uniSel];
+  if(!ids.length) return;
   const btn=document.getElementById('revUniDelBtn');
   if(btn){ btn.disabled=true; btn.textContent='삭제 중...'; }
   try{
@@ -5635,6 +5763,7 @@ async function deleteSelectedUni(){
 
 function renderUnifiedTable(){
   buildUniFilterBtns();
+  document.getElementById('revUniTable')?.classList.toggle('uni-locked', !_uniEditMode);
   const srch=(document.getElementById('revUniSrch')?.value||'').toLowerCase();
   const empty=document.getElementById('revUniEmpty');
   const scroll=document.getElementById('revUniScroll');
@@ -5884,6 +6013,7 @@ async function updateRowShipping(id, val){
 }
 
 function openRevRowEdit(id){
+  if(!_uniEditMode){ toast('먼저 ✏️ 수정모드를 켜주세요 (마스킹 버튼 아래).'); return; }
   const r=_revData.find(x=>x.id===id);
   if(!r) return;
   document.getElementById('revRowEditId').value=id;
