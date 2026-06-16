@@ -509,6 +509,82 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 </style>
 </head>
 <body>
+
+<!-- ═══════════════════════════════════════════════
+     로그인 화면 (로그인 전에는 앱 전체를 가림)
+═══════════════════════════════════════════════ -->
+<div id="loginOverlay">
+  <div class="lg-card">
+
+    <!-- 로고 (신성종합무역 가로형) -->
+    <div class="lg-logo">
+      <svg width="58" height="58" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="신성종합무역">
+        <defs>
+          <linearGradient id="ssLogoGrad" x1="30" y1="8" x2="70" y2="92" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#16263f"/>
+            <stop offset="0.5" stop-color="#1f4f86"/>
+            <stop offset="1" stop-color="#3b9ae8"/>
+          </linearGradient>
+        </defs>
+        <path d="M74 26
+                 C74 15 58 12 44 16
+                 C28 20 22 32 30 42
+                 C36 50 56 50 62 56
+                 C70 64 60 76 44 74
+                 C34 73 28 68 26 60"
+              stroke="url(#ssLogoGrad)" stroke-width="15"
+              stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <div class="lg-divider"></div>
+      <div class="lg-name">
+        <div class="lg-kr">신성종합무역</div>
+        <div class="lg-en">SHINSUNG TRADING CO., LTD.</div>
+      </div>
+    </div>
+
+    <div class="lg-sub">재고관리 시스템 로그인</div>
+
+    <form id="loginForm" class="lg-form" autocomplete="on">
+      <input type="text" id="lgId" class="lg-inp" placeholder="아이디" autocomplete="username" />
+      <input type="password" id="lgPw" class="lg-inp" placeholder="비밀번호" autocomplete="current-password" />
+      <div id="lgErr" class="lg-err"></div>
+      <div class="lg-row">
+        <label class="lg-remember">
+          <input type="checkbox" id="lgRemember" />
+          <span>아이디와 비밀번호 기억</span>
+        </label>
+        <button type="submit" class="lg-btn">로그인</button>
+      </div>
+    </form>
+
+  </div>
+  <div class="lg-foot">© SHINSUNG TRADING CO., LTD.</div>
+</div>
+
+<style>
+#loginOverlay{position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#f4f7fb 0%,#e9eef6 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+#loginOverlay .lg-card{width:380px;max-width:92vw;background:#fff;border-radius:18px;padding:38px 34px 32px;
+  box-shadow:0 12px 40px rgba(22,38,63,.12);border:1px solid rgba(22,38,63,.06);}
+.lg-logo{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:6px;}
+.lg-divider{width:1px;height:42px;background:rgba(22,38,63,.18);}
+.lg-name .lg-kr{font-size:21px;font-weight:800;letter-spacing:2px;color:#16263f;line-height:1.15;}
+.lg-name .lg-en{font-size:8.5px;font-weight:600;letter-spacing:1.5px;color:#7c8aa0;margin-top:3px;}
+.lg-sub{text-align:center;font-size:12px;color:#8a96a8;margin:14px 0 22px;letter-spacing:.5px;}
+.lg-form{display:flex;flex-direction:column;gap:10px;}
+.lg-inp{height:46px;border:1.5px solid #e3e8f0;border-radius:10px;padding:0 14px;font-size:14px;color:#16263f;outline:none;transition:border-color .15s,box-shadow .15s;background:#fafbfd;}
+.lg-inp:focus{border-color:#3182F6;box-shadow:0 0 0 3px rgba(49,130,246,.12);background:#fff;}
+.lg-inp::placeholder{color:#aab4c4;}
+.lg-err{display:none;color:#EF4444;font-size:12px;padding:2px 2px 0;}
+.lg-row{display:flex;align-items:center;justify-content:space-between;margin-top:6px;gap:12px;}
+.lg-remember{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#5a6577;cursor:pointer;user-select:none;white-space:nowrap;}
+.lg-remember input{width:16px;height:16px;accent-color:#3182F6;cursor:pointer;}
+.lg-btn{flex:1;max-width:130px;height:44px;border:none;border-radius:10px;background:#3182F6;color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s,transform .05s;letter-spacing:1px;}
+.lg-btn:hover{background:#1f6fe0;}
+.lg-btn:active{transform:scale(.98);}
+.lg-foot{font-size:10px;color:#aab4c4;letter-spacing:1px;}
+</style>
+
 <div class="app" id="appRoot">
 
 <!-- TOPBAR -->
@@ -522,6 +598,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <button class="btn btn-pr" id="addTopBtn" style="display:none;">+ 추가</button>
     <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
     <button class="btn btn-da btn-sm" onclick="confirmClearAll()" title="예시 데이터 초기화">🗑 초기화</button>
+    <span id="whoami" style="font-size:11px;color:var(--tx2);padding:0 4px;white-space:nowrap;"></span>
+    <button class="btn btn-sm" onclick="logout()" title="로그아웃">로그아웃</button>
   </div>
 </div>
 
@@ -1950,6 +2028,86 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 const SUPABASE_URL = 'https://ywbekolvslixidpugepr.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ══════════════════════════════════════════════
+// 로그인 / 인증  (1단계: 클라이언트 측 검증)
+//  · 마스터 계정은 코드에 내장 → 어느 PC에서도 즉시 로그인 가능
+//  · 추가 직원 계정은 localStorage('inv_users')에 저장(2단계에서 확장)
+// ══════════════════════════════════════════════
+const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', name:'마스터' };
+
+function _getUsers(){ try{ return JSON.parse(localStorage.getItem('inv_users')||'[]'); }catch{ return []; } }
+function _findUser(id,pw){
+  if(id===MASTER_ACCOUNT.username && pw===MASTER_ACCOUNT.password) return { ...MASTER_ACCOUNT };
+  return _getUsers().find(u=>u.username===id && u.password===pw) || null;
+}
+function _getSession(){
+  try{ return JSON.parse(localStorage.getItem('inv_session')||sessionStorage.getItem('inv_session')||'null'); }
+  catch{ return null; }
+}
+window.__CURRENT_USER = null;
+
+function _revealApp(sess){
+  window.__CURRENT_USER = sess;
+  const ov = document.getElementById('loginOverlay');
+  if(ov) ov.style.display = 'none';
+  const who = document.getElementById('whoami');
+  if(who) who.textContent = '👤 ' + (sess.name || sess.username);
+}
+
+function doLogin(e){
+  if(e) e.preventDefault();
+  const id = document.getElementById('lgId').value.trim();
+  const pw = document.getElementById('lgPw').value;
+  const remember = document.getElementById('lgRemember').checked;
+  const err = document.getElementById('lgErr');
+  const u = _findUser(id, pw);
+  if(!u){
+    err.style.display = 'block';
+    err.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
+    return;
+  }
+  err.style.display = 'none';
+  const sess = { username:u.username, role:u.role, name:u.name||u.username, ts:Date.now() };
+  if(remember){
+    localStorage.setItem('inv_session', JSON.stringify(sess));
+    localStorage.setItem('inv_remember', JSON.stringify({ id, pw }));
+    sessionStorage.removeItem('inv_session');
+  }else{
+    sessionStorage.setItem('inv_session', JSON.stringify(sess));
+    localStorage.removeItem('inv_session');
+    localStorage.removeItem('inv_remember');
+  }
+  _revealApp(sess);
+}
+
+function logout(){
+  localStorage.removeItem('inv_session');
+  sessionStorage.removeItem('inv_session');
+  location.reload();
+}
+
+// 페이지 로드 즉시 인증 게이트 실행
+(function _initAuthGate(){
+  // 폼 핸들러 연결
+  const form = document.getElementById('loginForm');
+  if(form) form.addEventListener('submit', doLogin);
+
+  // '기억하기'로 저장된 아이디/비밀번호 자동 채움
+  try{
+    const rem = JSON.parse(localStorage.getItem('inv_remember')||'null');
+    if(rem){
+      document.getElementById('lgId').value = rem.id || '';
+      document.getElementById('lgPw').value = rem.pw || '';
+      document.getElementById('lgRemember').checked = true;
+    }
+  }catch{}
+
+  // 기존 세션이 있으면 앱 바로 표시, 없으면 로그인 화면 유지
+  const sess = _getSession();
+  if(sess) _revealApp(sess);
+  else { const f=document.getElementById('lgId'); if(f) f.focus(); }
+})();
 
 // ── 단가계산기 견적 / 견적서 클라우드 공유 (work_calendar 테이블 재사용, person='__app__') ──
 //    캘린더처럼 다른 컴퓨터에서도 동일하게 보이도록 저장
