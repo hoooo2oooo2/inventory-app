@@ -635,7 +635,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-revenue" onclick="goMenu('revenue')">💰 매출관리</div>
   <div class="ni" id="nav-price" onclick="goMenu('price')">🧮 단가계산기</div>
   <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서</div>
-  <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📅 캘린더</div>
+  <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
 </nav>
 
 <!-- ═══ 캘린더 (디자인팀) ═══ -->
@@ -2066,7 +2066,7 @@ const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', 
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
   cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit' } },
-  design: { name:'디자인팀', perms:{} },
+  design: { name:'디자인팀', perms:{ calendar:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit' } },
 };
 
@@ -2145,7 +2145,7 @@ function logout(){
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'calendar',label:'📅 캘린더'}
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'calendar',label:'📋 업무보고'}
 ];
 // 매출관리 하위탭 — 각각 개별 권한 부여 가능
 const REV_SUBS = [
@@ -2222,8 +2222,10 @@ function updateNavVisibility(){
 function permKeyRows(){
   const rows = [];
   MENUS.forEach(m=>{
-    if(m.id==='calendar') return;   // 캘린더는 공용 메뉴 — 권한표에서 제외
-    if(m.id==='revenue'){
+    if(m.id==='calendar'){
+      rows.push({ header:'디자인팀' });
+      rows.push({ key:'calendar', label:'업무보고' });
+    } else if(m.id==='revenue'){
       rows.push({ header:'매출관리' });
       REV_SUBS.forEach(s=> rows.push({ key:'revenue.'+s.id, label:'└ '+s.label }));
     } else {
@@ -2237,7 +2239,6 @@ function permKeyRows(){
 function _permOf(key){
   const u = window.__CURRENT_USER;
   if(!u) return 'none';
-  if(key==='calendar') return 'edit';   // 캘린더는 공용 메뉴 — 전 직원 접근 가능
   if(u.role==='master') return 'edit';
   return (u.perms && u.perms[key]) || 'none';
 }
