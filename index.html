@@ -596,14 +596,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 직원 계정·권한 관리 (마스터 전용) ═══ -->
 <div class="modal-overlay" id="userMgrModal">
   <div class="modal um-modal">
-    <h3>👥 직원 계정 · 메뉴 권한 관리</h3>
-    <div class="um-add">
-      <input id="umNewId" placeholder="아이디" />
-      <input id="umNewName" placeholder="이름(선택)" />
-      <input id="umNewPw" type="text" placeholder="비밀번호" />
-      <button class="btn btn-pr btn-sm" onclick="addStaffUser()">+ 직원 추가</button>
-    </div>
-    <div class="um-hint">메뉴별 권한 — <b>없음</b>(메뉴 숨김) · <b>열람</b>(보기만) · <b>수정</b>(추가·수정·삭제 가능). 변경 즉시 저장됩니다.</div>
+    <h3>👥 직원 계정 · 팀 권한 현황</h3>
+    <div class="um-hint">계정은 <b>코드에 저장</b>되어 모든 PC에서 동일하게 로그인됩니다. 계정 추가·비밀번호 변경·권한 조정은 관리자에게 요청하세요. &nbsp;|&nbsp; <b style="color:#05C072;">수정</b>=추가·수정·삭제 가능 · <b style="color:#3182F6;">열람</b>=보기만 · <b>—</b>=메뉴 숨김</div>
     <div id="umBody" style="overflow-x:auto;"></div>
     <div class="ma"><button class="btn btn-pr" onclick="closeUserMgr()">닫기</button></div>
   </div>
@@ -2043,10 +2037,45 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인증부보다 먼저 선언)
 const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', name:'관리자' };
 
+// ══════════════════════════════════════════════
+//  팀(부서)별 메뉴 권한 정의
+//   각 메뉴 값: 'edit'(추가·수정·삭제 가능) / 'view'(보기만)
+//   목록에 없는 메뉴는 자동으로 '없음'(메뉴 숨김)
+//   ※ 특정 메뉴만 보기 전용으로 바꾸려면 'edit' → 'view' 로 변경
+// ══════════════════════════════════════════════
+const TEAMS = {
+  cx:     { name:'CX팀',    menus:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit' } },
+  design: { name:'디자인팀', menus:{ /* 메뉴 추후 생성 예정 */ } },
+  ops:    { name:'운영관리',  menus:{ revenue:'edit', hist:'edit', sales:'edit' } },
+};
+
+// ══════════════════════════════════════════════
+//  직원 계정 (코드에 저장 → 모든 PC에서 동일 로그인)
+//   계정 추가: 아래 배열에 한 줄 추가
+//   { username:'아이디', password:'비밀번호', name:'표시이름', team:'cx'|'design'|'ops' }
+// ══════════════════════════════════════════════
+const ACCOUNTS = [
+  { username:'cx',     password:'cx1234',     name:'CX팀',    team:'cx' },
+  { username:'design', password:'design1234', name:'디자인팀', team:'design' },
+  { username:'ops',    password:'ops1234',    name:'운영관리', team:'ops' },
+];
+
+// 팀 → 메뉴별 권한 객체로 변환
+function _permsForTeam(teamId){
+  const t = TEAMS[teamId]; const perms = {};
+  MENUS.forEach(m => { perms[m.id] = (t && t.menus[m.id]) ? t.menus[m.id] : 'none'; });
+  return perms;
+}
+
 function _getUsers(){ try{ return JSON.parse(localStorage.getItem('inv_users')||'[]'); }catch{ return []; } }
 function _findUser(id,pw){
   if(id===MASTER_ACCOUNT.username && pw===MASTER_ACCOUNT.password) return { ...MASTER_ACCOUNT };
-  return _getUsers().find(u=>u.username===id && u.password===pw) || null;
+  const a = ACCOUNTS.find(u=>u.username===id && u.password===pw);
+  if(a) return { username:a.username, name:a.name||a.username, role:'staff', team:a.team, perms:_permsForTeam(a.team) };
+  // 레거시: localStorage 개별 계정(예전에 만든 경우만)
+  const ext = _getUsers().find(u=>u.username===id && u.password===pw);
+  if(ext) return { username:ext.username, name:ext.name||ext.username, role:'staff', perms:ext.perms||{} };
+  return null;
 }
 function _getSession(){
   try{ return JSON.parse(localStorage.getItem('inv_session')||sessionStorage.getItem('inv_session')||'null'); }
@@ -2055,16 +2084,21 @@ function _getSession(){
 window.__CURRENT_USER = null;
 
 function _revealApp(sess){
-  // 마스터가 아니면, 저장된 최신 권한을 반영(마스터가 권한을 바꿨을 수 있음)
+  // 마스터가 아니면, 최신 권한을 코드(팀 설정)에서 다시 계산해 반영
   if(sess.role !== 'master'){
-    const u = _getUsers().find(x=>x.username===sess.username);
-    if(u){ sess.role=u.role; sess.name=u.name||sess.username; sess.perms=u.perms||{}; }
+    if(sess.team && TEAMS[sess.team]){
+      sess.perms = _permsForTeam(sess.team);
+      sess.teamName = TEAMS[sess.team].name;
+    } else {
+      const u = _getUsers().find(x=>x.username===sess.username);
+      if(u){ sess.perms=u.perms||{}; sess.name=u.name||sess.username; }
+    }
   }
   window.__CURRENT_USER = sess;
   const ov = document.getElementById('loginOverlay');
   if(ov) ov.style.display = 'none';
   const who = document.getElementById('whoami');
-  if(who) who.textContent = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원');
+  if(who) who.textContent = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · ' + (sess.teamName || '직원'));
   applyPermissions();
 }
 
@@ -2081,7 +2115,7 @@ function doLogin(e){
     return;
   }
   err.style.display = 'none';
-  const sess = { username:u.username, role:u.role, name:u.name||u.username, ts:Date.now() };
+  const sess = { username:u.username, role:u.role, name:u.name||u.username, team:u.team, ts:Date.now() };
   if(remember){
     localStorage.setItem('inv_session', JSON.stringify(sess));
     localStorage.setItem('inv_remember', JSON.stringify({ id, pw }));
@@ -2142,14 +2176,22 @@ function applyPermissions(){
     const nav = document.getElementById('nav-'+m.id);
     if(nav) nav.style.display = (_menuPerm(m.id)==='none') ? 'none' : '';
   });
-  // 현재 페이지 접근 불가 → 첫 허용 메뉴로 이동
-  if(_pagePerm()==='none'){
-    const first = MENUS.find(m=>_menuPerm(m.id)!=='none');
-    if(first) goPage(first.id);
-    else { document.querySelector('.main')?.insertAdjacentHTML('afterbegin','<div style="padding:24px;color:var(--tx2);">접근 가능한 메뉴가 없습니다. 마스터에게 권한을 요청하세요.</div>'); }
-  } else {
-    _applyWriteLockUI();
+  // 접근 가능 메뉴 유무
+  const first = MENUS.find(m=>_menuPerm(m.id)!=='none');
+  const blank = document.getElementById('noAccessMsg');
+  if(!first){
+    // 접근 가능한 메뉴가 하나도 없음 → 모든 페이지 숨기고 안내
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    let b = blank;
+    if(!b){ b=document.createElement('div'); b.id='noAccessMsg'; b.style.cssText='padding:80px 24px;text-align:center;color:var(--tx2);font-size:14px;line-height:1.7;'; document.getElementById('appRoot')?.appendChild(b); }
+    b.innerHTML='🔒 접근 가능한 메뉴가 없습니다.<br>관리자에게 권한을 요청하세요.';
+    b.style.display='';
+    return;
   }
+  if(blank) blank.style.display='none';
+  // 현재 페이지 접근 불가 → 첫 허용 메뉴로 이동
+  if(_pagePerm()==='none') goPage(first.id);
+  else _applyWriteLockUI();
 }
 
 // 열람 권한 페이지에서 쓰기 버튼/상단 버튼 숨김 + 배지 표시
@@ -2186,58 +2228,24 @@ function openUserMgr(){
 function closeUserMgr(){ document.getElementById('userMgrModal').classList.remove('open'); }
 
 function renderUserMgr(){
-  const users = _getUsers();
-  let html = '<table class="um-table"><thead><tr><th>아이디</th><th>이름</th>'
-    + MENUS.map(m=>`<th>${m.label}</th>`).join('')
-    + '<th>비번</th><th>삭제</th></tr></thead><tbody>';
-  if(!users.length){
-    html += `<tr><td colspan="${MENUS.length+4}" style="text-align:center;color:var(--tx2);padding:18px;">등록된 직원 계정이 없습니다. 아래에서 추가하세요.</td></tr>`;
-  } else {
-    html += users.map(u=>{
-      const cells = MENUS.map(m=>{
-        const v=(u.perms&&u.perms[m.id])||'none';
-        return `<td><select class="um-sel" onchange="_setPerm('${u.username}','${m.id}',this.value)">`
-          + PERM_LEVELS.map(([val,lbl])=>`<option value="${val}" ${v===val?'selected':''}>${lbl}</option>`).join('')
-          + '</select></td>';
-      }).join('');
-      return `<tr><td><b>${u.username}</b></td><td>${u.name||'-'}</td>${cells}`
-        + `<td><button class="btn btn-sm" onclick="_chgPw('${u.username}')">변경</button></td>`
-        + `<td><button class="btn btn-da btn-sm" onclick="_delUser('${u.username}')">삭제</button></td></tr>`;
-    }).join('');
-  }
+  const lvlLbl = v => v==='edit' ? '<span style="color:#05C072;font-weight:700;">수정</span>'
+                    : v==='view' ? '<span style="color:#3182F6;font-weight:600;">열람</span>'
+                    : '<span style="color:#cbd2dc;">—</span>';
+  const rows = [];
+  rows.push({ username:MASTER_ACCOUNT.username, name:MASTER_ACCOUNT.name, team:'마스터', master:true });
+  ACCOUNTS.forEach(a => rows.push({ username:a.username, name:a.name||a.username, team:(TEAMS[a.team]?.name || a.team), perms:_permsForTeam(a.team) }));
+  _getUsers().forEach(u => rows.push({ username:u.username, name:u.name||u.username, team:'개별(레거시)', perms:u.perms||{} }));
+
+  let html = '<table class="um-table"><thead><tr><th>아이디</th><th>이름</th><th>팀</th>'
+    + MENUS.map(m=>`<th>${m.label}</th>`).join('') + '</tr></thead><tbody>';
+  html += rows.map(r=>{
+    const cells = MENUS.map(m => r.master
+      ? '<td><span style="color:#05C072;font-weight:700;">수정</span></td>'
+      : `<td>${lvlLbl((r.perms && r.perms[m.id]) || 'none')}</td>`).join('');
+    return `<tr><td><b>${r.username}</b></td><td>${r.name}</td><td>${r.team}</td>${cells}</tr>`;
+  }).join('');
   html += '</tbody></table>';
   document.getElementById('umBody').innerHTML = html;
-}
-
-function addStaffUser(){
-  const id = document.getElementById('umNewId').value.trim();
-  const nm = document.getElementById('umNewName').value.trim();
-  const pw = document.getElementById('umNewPw').value;
-  if(!id || !pw){ toast('아이디와 비밀번호를 입력하세요.'); return; }
-  if(id==='admin' || _getUsers().some(u=>u.username===id)){ toast('이미 존재하는 아이디입니다.'); return; }
-  const perms = {}; MENUS.forEach(m=>perms[m.id]='view');   // 신규 직원 기본값: 전체 열람
-  const users = _getUsers();
-  users.push({ username:id, name:nm, password:pw, role:'staff', perms });
-  _saveUsers(users);
-  document.getElementById('umNewId').value='';
-  document.getElementById('umNewName').value='';
-  document.getElementById('umNewPw').value='';
-  renderUserMgr();
-  toast('직원 계정이 추가되었습니다.');
-}
-function _setPerm(id,menu,val){
-  const us=_getUsers(); const u=us.find(x=>x.username===id);
-  if(!u) return; u.perms=u.perms||{}; u.perms[menu]=val; _saveUsers(us);
-}
-function _delUser(id){
-  if(!confirm(id+' 계정을 삭제할까요?')) return;
-  _saveUsers(_getUsers().filter(u=>u.username!==id));
-  renderUserMgr();
-}
-function _chgPw(id){
-  const pw=prompt(id+' 의 새 비밀번호:'); if(pw==null||pw==='') return;
-  const us=_getUsers(); const u=us.find(x=>x.username===id);
-  if(u){ u.password=pw; _saveUsers(us); toast('비밀번호가 변경되었습니다.'); }
 }
 
 // 페이지 로드 즉시 인증 게이트 실행
