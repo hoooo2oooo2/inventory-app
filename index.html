@@ -560,6 +560,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lg-btn:hover{background:#1f6fe0;}
 .lg-btn:active{transform:scale(.98);}
 .lg-foot{font-size:10px;color:#aab4c4;letter-spacing:1px;}
+
+/* 직원 관리 모달 */
+.um-modal{max-width:860px;}
+.um-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+.um-add input{height:34px;border:1px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;flex:1;min-width:110px;}
+.um-hint{font-size:11px;color:var(--tx2);margin-bottom:10px;line-height:1.5;}
+.um-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;}
+.um-table th,.um-table td{border:0.5px solid var(--bd);padding:6px 8px;text-align:center;}
+.um-table th{background:var(--bg2);color:var(--tx2);font-weight:600;font-size:11px;}
+.um-table td:first-child,.um-table th:first-child{text-align:left;}
+.um-sel{border:1px solid var(--bd);border-radius:6px;font-size:12px;padding:3px 4px;background:var(--bg);cursor:pointer;}
 </style>
 
 <div class="app" id="appRoot">
@@ -574,9 +585,27 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
     <button class="btn btn-pr" id="addTopBtn" style="display:none;">+ 추가</button>
     <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
-    <button class="btn btn-da btn-sm" onclick="confirmClearAll()" title="예시 데이터 초기화">🗑 초기화</button>
+    <button class="btn btn-da btn-sm" id="clearAllBtn" onclick="confirmClearAll()" title="예시 데이터 초기화">🗑 초기화</button>
+    <span id="viewBadge" style="display:none;font-size:10px;color:#F59E0B;border:1px solid #F59E0B66;border-radius:5px;padding:2px 6px;white-space:nowrap;">열람전용</span>
+    <button class="btn btn-sm" id="userMgrBtn" onclick="openUserMgr()" title="직원 계정·권한 관리" style="display:none;">👥 직원관리</button>
     <span id="whoami" style="font-size:11px;color:var(--tx2);padding:0 4px;white-space:nowrap;"></span>
     <button class="btn btn-sm" onclick="logout()" title="로그아웃">로그아웃</button>
+  </div>
+</div>
+
+<!-- ═══ 직원 계정·권한 관리 (마스터 전용) ═══ -->
+<div class="modal-overlay" id="userMgrModal">
+  <div class="modal um-modal">
+    <h3>👥 직원 계정 · 메뉴 권한 관리</h3>
+    <div class="um-add">
+      <input id="umNewId" placeholder="아이디" />
+      <input id="umNewName" placeholder="이름(선택)" />
+      <input id="umNewPw" type="text" placeholder="비밀번호" />
+      <button class="btn btn-pr btn-sm" onclick="addStaffUser()">+ 직원 추가</button>
+    </div>
+    <div class="um-hint">메뉴별 권한 — <b>없음</b>(메뉴 숨김) · <b>열람</b>(보기만) · <b>수정</b>(추가·수정·삭제 가능). 변경 즉시 저장됩니다.</div>
+    <div id="umBody" style="overflow-x:auto;"></div>
+    <div class="ma"><button class="btn btn-pr" onclick="closeUserMgr()">닫기</button></div>
   </div>
 </div>
 
@@ -2011,7 +2040,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  · 마스터 계정은 코드에 내장 → 어느 PC에서도 즉시 로그인 가능
 //  · 추가 직원 계정은 localStorage('inv_users')에 저장(2단계에서 확장)
 // ══════════════════════════════════════════════
-const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', name:'마스터' };
+let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인증부보다 먼저 선언)
+const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', name:'관리자' };
 
 function _getUsers(){ try{ return JSON.parse(localStorage.getItem('inv_users')||'[]'); }catch{ return []; } }
 function _findUser(id,pw){
@@ -2025,11 +2055,17 @@ function _getSession(){
 window.__CURRENT_USER = null;
 
 function _revealApp(sess){
+  // 마스터가 아니면, 저장된 최신 권한을 반영(마스터가 권한을 바꿨을 수 있음)
+  if(sess.role !== 'master'){
+    const u = _getUsers().find(x=>x.username===sess.username);
+    if(u){ sess.role=u.role; sess.name=u.name||sess.username; sess.perms=u.perms||{}; }
+  }
   window.__CURRENT_USER = sess;
   const ov = document.getElementById('loginOverlay');
   if(ov) ov.style.display = 'none';
   const who = document.getElementById('whoami');
-  if(who) who.textContent = '👤 ' + (sess.name || sess.username);
+  if(who) who.textContent = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원');
+  applyPermissions();
 }
 
 function doLogin(e){
@@ -2062,6 +2098,146 @@ function logout(){
   localStorage.removeItem('inv_session');
   sessionStorage.removeItem('inv_session');
   location.reload();
+}
+
+// ══════════════════════════════════════════════
+// 메뉴별 권한 (열람 / 수정)  + 직원 계정 관리 (마스터 전용)
+// ══════════════════════════════════════════════
+const MENUS = [
+  {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
+  {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}
+];
+const PERM_LEVELS = [['none','없음'],['view','열람'],['edit','수정']];
+
+function _saveUsers(arr){ localStorage.setItem('inv_users', JSON.stringify(arr)); }
+
+// 현재 사용자의 특정 메뉴 권한
+function _menuPerm(menuId){
+  const u = window.__CURRENT_USER;
+  if(!u) return 'none';
+  if(u.role==='master') return 'edit';
+  return (u.perms && u.perms[menuId]) || 'none';
+}
+// 현재 보고 있는 페이지의 권한
+function _pagePerm(){ return _menuPerm(currentPage); }
+
+// 쓰기(수정/삭제/저장/입고/발주 등) 핸들러 함수명 — 열람 권한일 때 차단
+const WRITE_FNS = /^(openAddProd|openUpload|confirmClearAll|executeClear|saveProd|saveIn|saveRgProd|saveBdModal|saveShipModal|saveRevRowEdit|saveTelegramSettings|openEditProd|deleteProd|hideProd|discProd|setInvStatus|deleteShip|openShipAdd|openShipEdit|applyAllShipping|deleteSelectedUni|openBdAdd|openBdEdit|openBdUpload|applyBdUpload|submitRevUpload|confirmUpload|resyncRevenuePrices|resyncRevenueTypes|applyIO|startIO|openInReg|confirmRecv|addMemo|runDataDiagFix|deleteHistUpload|adSave|adDelete|pcAddOrUpdate|pcEditItem|pcDeleteItem|pcConfirmSave|pcOpenSaveModal|qtAddRow|qtDelRow|qtReset|qtConfirmSave|qtOpenSaveModal|qtApplyCalc|qtRemoveSeal)\b/;
+
+function toast(msg){
+  const n=document.createElement('div');
+  n.style.cssText='position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:100001;background:#191919;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.22);';
+  n.textContent=msg; document.body.appendChild(n); setTimeout(()=>n.remove(),2200);
+}
+
+// 로그인 후 권한에 따라 메뉴 노출 / 버튼 잠금
+function applyPermissions(){
+  const u = window.__CURRENT_USER; if(!u) return;
+  const master = u.role==='master';
+  const mgrBtn = document.getElementById('userMgrBtn');
+  if(mgrBtn) mgrBtn.style.display = master ? '' : 'none';
+  // '없음' 메뉴는 네비에서 숨김
+  MENUS.forEach(m=>{
+    const nav = document.getElementById('nav-'+m.id);
+    if(nav) nav.style.display = (_menuPerm(m.id)==='none') ? 'none' : '';
+  });
+  // 현재 페이지 접근 불가 → 첫 허용 메뉴로 이동
+  if(_pagePerm()==='none'){
+    const first = MENUS.find(m=>_menuPerm(m.id)!=='none');
+    if(first) goPage(first.id);
+    else { document.querySelector('.main')?.insertAdjacentHTML('afterbegin','<div style="padding:24px;color:var(--tx2);">접근 가능한 메뉴가 없습니다. 마스터에게 권한을 요청하세요.</div>'); }
+  } else {
+    _applyWriteLockUI();
+  }
+}
+
+// 열람 권한 페이지에서 쓰기 버튼/상단 버튼 숨김 + 배지 표시
+function _applyWriteLockUI(){
+  const view = _pagePerm()==='view';
+  const badge = document.getElementById('viewBadge');
+  if(badge) badge.style.display = view ? '' : 'none';
+  // 항상 표시되던 상단 쓰기 버튼: 열람이면 숨기고, 수정이면 복원
+  const up=document.getElementById('uploadTopBtn'); if(up) up.style.display = view ? 'none' : '';
+  const cl=document.getElementById('clearAllBtn'); if(cl) cl.style.display = view ? 'none' : '';
+  // 추가 버튼은 goPage가 페이지별로 제어 → 열람일 때만 강제로 숨김
+  const add=document.getElementById('addTopBtn'); if(add && view) add.style.display='none';
+}
+
+// 문서 레벨에서 쓰기 버튼 클릭 가로채기 (동적 생성 버튼까지 포함)
+document.addEventListener('click', function(e){
+  if(_pagePerm()!=='view') return;            // 수정 권한 또는 마스터면 통과
+  const el = e.target.closest('button,[onclick]');
+  if(!el || el.classList.contains('ni')) return;
+  const oc = el.getAttribute('onclick') || '';
+  const fn = (oc.match(/^\s*(\w+)\s*\(/)||[])[1] || '';
+  if(WRITE_FNS.test(fn)){
+    e.preventDefault(); e.stopPropagation();
+    toast('열람 권한만 있어 수정할 수 없습니다.');
+  }
+}, true);
+
+// ── 직원 계정 관리 (마스터 전용) ──
+function openUserMgr(){
+  if(window.__CURRENT_USER?.role!=='master') return;
+  document.getElementById('userMgrModal').classList.add('open');
+  renderUserMgr();
+}
+function closeUserMgr(){ document.getElementById('userMgrModal').classList.remove('open'); }
+
+function renderUserMgr(){
+  const users = _getUsers();
+  let html = '<table class="um-table"><thead><tr><th>아이디</th><th>이름</th>'
+    + MENUS.map(m=>`<th>${m.label}</th>`).join('')
+    + '<th>비번</th><th>삭제</th></tr></thead><tbody>';
+  if(!users.length){
+    html += `<tr><td colspan="${MENUS.length+4}" style="text-align:center;color:var(--tx2);padding:18px;">등록된 직원 계정이 없습니다. 아래에서 추가하세요.</td></tr>`;
+  } else {
+    html += users.map(u=>{
+      const cells = MENUS.map(m=>{
+        const v=(u.perms&&u.perms[m.id])||'none';
+        return `<td><select class="um-sel" onchange="_setPerm('${u.username}','${m.id}',this.value)">`
+          + PERM_LEVELS.map(([val,lbl])=>`<option value="${val}" ${v===val?'selected':''}>${lbl}</option>`).join('')
+          + '</select></td>';
+      }).join('');
+      return `<tr><td><b>${u.username}</b></td><td>${u.name||'-'}</td>${cells}`
+        + `<td><button class="btn btn-sm" onclick="_chgPw('${u.username}')">변경</button></td>`
+        + `<td><button class="btn btn-da btn-sm" onclick="_delUser('${u.username}')">삭제</button></td></tr>`;
+    }).join('');
+  }
+  html += '</tbody></table>';
+  document.getElementById('umBody').innerHTML = html;
+}
+
+function addStaffUser(){
+  const id = document.getElementById('umNewId').value.trim();
+  const nm = document.getElementById('umNewName').value.trim();
+  const pw = document.getElementById('umNewPw').value;
+  if(!id || !pw){ toast('아이디와 비밀번호를 입력하세요.'); return; }
+  if(id==='admin' || _getUsers().some(u=>u.username===id)){ toast('이미 존재하는 아이디입니다.'); return; }
+  const perms = {}; MENUS.forEach(m=>perms[m.id]='view');   // 신규 직원 기본값: 전체 열람
+  const users = _getUsers();
+  users.push({ username:id, name:nm, password:pw, role:'staff', perms });
+  _saveUsers(users);
+  document.getElementById('umNewId').value='';
+  document.getElementById('umNewName').value='';
+  document.getElementById('umNewPw').value='';
+  renderUserMgr();
+  toast('직원 계정이 추가되었습니다.');
+}
+function _setPerm(id,menu,val){
+  const us=_getUsers(); const u=us.find(x=>x.username===id);
+  if(!u) return; u.perms=u.perms||{}; u.perms[menu]=val; _saveUsers(us);
+}
+function _delUser(id){
+  if(!confirm(id+' 계정을 삭제할까요?')) return;
+  _saveUsers(_getUsers().filter(u=>u.username!==id));
+  renderUserMgr();
+}
+function _chgPw(id){
+  const pw=prompt(id+' 의 새 비밀번호:'); if(pw==null||pw==='') return;
+  const us=_getUsers(); const u=us.find(x=>x.username===id);
+  if(u){ u.password=pw; _saveUsers(us); toast('비밀번호가 변경되었습니다.'); }
 }
 
 // 페이지 로드 즉시 인증 게이트 실행
@@ -2180,7 +2356,7 @@ let salesPeriod='monthly', salesYear=CUR_YEAR, salesSel=new Set(), salesChart=nu
 let rgPeriod='monthly',    rgYear=CUR_YEAR,    rgSel=new Set(),    rgChart=null;
 let orderList=[], inTarget=null, floatOpen=false;
 let histPage=0; const HIST_PER=10;
-let currentPage='inv';
+// currentPage 선언은 상단 인증부로 이동됨 (TDZ 방지)
 let _pendingRows=[], _pendingType='';
 
 // ══════════════════════════════════════════════
@@ -2351,6 +2527,8 @@ function rgYrChange(){ rgYear=parseInt(document.getElementById('rgYrSel').value)
 // 페이지 라우팅
 // ══════════════════════════════════════════════
 function goPage(p){
+  // 권한 없는 메뉴 접근 차단
+  if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   currentPage=p;
   ['inv','sales','order','rg','hist','report','revenue','price','quote'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
@@ -2377,6 +2555,7 @@ function goPage(p){
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
   if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote') ? 'hidden' : '';
+  _applyWriteLockUI();
 }
 
 // ══════════════════════════════════════════════
