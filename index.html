@@ -1198,7 +1198,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="histSrch" placeholder="상품명, 코드..." oninput="renderHist()"></div>
         <select class="sel" id="histTypeF" onchange="renderHist()"><option value="">전체유형</option><option value="upload">엑셀업로드</option><option value="edit">수동수정</option><option value="io">입출고</option><option value="order">발주입고</option><option value="rg">로켓그로스</option></select>
-        <select class="sel" id="histMenuF" onchange="renderHist()"><option value="">전체메뉴</option><option value="재고관리">재고관리</option><option value="발주관리">발주관리</option><option value="로켓그로스">로켓그로스</option></select>
+        <select class="sel" id="histMenuF" onchange="renderHist()"><option value="">전체메뉴</option><option value="재고관리">재고관리</option><option value="판매분석">판매분석</option><option value="발주관리">발주관리</option><option value="로켓그로스">로켓그로스</option><option value="매출관리">매출관리</option><option value="단가계산기">단가계산기</option><option value="견적서">견적서</option></select>
       </div>
     </div>
     <div class="tw"><table>
@@ -2165,7 +2165,7 @@ function _pagePerm(){
 }
 
 // 쓰기(수정/삭제/저장/입고/발주 등) 핸들러 함수명 — 열람 권한일 때 차단
-const WRITE_FNS = /^(openAddProd|openUpload|confirmClearAll|executeClear|saveProd|saveIn|saveRgProd|saveBdModal|saveShipModal|saveRevRowEdit|saveTelegramSettings|openEditProd|deleteProd|hideProd|discProd|setInvStatus|deleteShip|openShipAdd|openShipEdit|applyAllShipping|deleteSelectedUni|openBdAdd|openBdEdit|openBdUpload|applyBdUpload|submitRevUpload|confirmUpload|resyncRevenuePrices|resyncRevenueTypes|applyIO|startIO|openInReg|confirmRecv|addMemo|runDataDiagFix|deleteHistUpload|adSave|adDelete|pcAddOrUpdate|pcEditItem|pcDeleteItem|pcConfirmSave|pcOpenSaveModal|qtAddRow|qtDelRow|qtReset|qtConfirmSave|qtOpenSaveModal|qtApplyCalc|qtRemoveSeal)\b/;
+const WRITE_FNS = /^(openAddProd|openUpload|confirmClearAll|executeClear|saveProd|saveIn|saveRgProd|saveBdModal|saveShipModal|saveRevRowEdit|saveTelegramSettings|openEditProd|deleteProd|hideProd|discProd|setInvStatus|deleteShip|openShipAdd|openShipEdit|applyAllShipping|deleteSelectedUni|openBdAdd|openBdEdit|openBdUpload|applyBdUpload|submitRevUpload|confirmUpload|resyncRevenuePrices|resyncRevenueTypes|applyIO|startIO|openInReg|confirmRecv|addMemo|runDataDiagFix|deleteHistUpload|adSave|adDelete|pcAddOrUpdate|pcEditItem|pcDeleteItem|pcDeleteEstimate|pcConfirmSave|pcOpenSaveModal|qtAddRow|qtDelRow|qtReset|qtConfirmSave|qtDeleteSaved|qtOpenSaveModal|qtApplyCalc|qtRemoveSeal)\b/;
 
 function toast(msg){
   const n=document.createElement('div');
@@ -2929,6 +2929,7 @@ function pcConfirmSave(){
   _pcEstimates.unshift(est);
   try{localStorage.setItem('pc_estimates',JSON.stringify(_pcEstimates));}catch(e){}
   cloudKvSave('pc_estimates', _pcEstimates);   // 클라우드 공유 저장
+  addHistory({menu:'단가계산기',type:'edit',code:'-',name,desc:'견적 저장',before:'-',after:`${_pcItems.length}개 품목`,user:'수동'});
   pcCloseSaveModal();
   pcRenderEstimates();
   alert(`"${name}" 견적이 저장되었습니다.`);
@@ -3015,9 +3016,11 @@ function pcViewEstimate(id){
 
 function pcDeleteEstimate(id){
   if(!confirm('이 견적을 삭제하시겠습니까?'))return;
+  const _est=_pcEstimates.find(x=>x.id===id);
   _pcEstimates=_pcEstimates.filter(x=>x.id!==id);
   try{localStorage.setItem('pc_estimates',JSON.stringify(_pcEstimates));}catch(e){}
   cloudKvSave('pc_estimates', _pcEstimates);   // 클라우드 공유 갱신
+  addHistory({menu:'단가계산기',type:'edit',code:'-',name:_est?_est.name:'-',desc:'견적 삭제',before:'존재',after:'삭제',user:'수동'});
   pcRenderEstimates();
 }
 
@@ -3216,6 +3219,7 @@ function qtConfirmSave(){
     savedAt:`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
     ts:now.getTime()
   };
+  const _qtWasEdit = _qtEditId!==null;
   if(_qtEditId!==null){
     const idx=_qtSaved.findIndex(e=>e.id===_qtEditId);
     if(idx>=0) _qtSaved[idx]={..._qtSaved[idx],...data};
@@ -3226,6 +3230,7 @@ function qtConfirmSave(){
   }
   try{ localStorage.setItem('qt_saved',JSON.stringify(_qtSaved)); }catch(e){}
   cloudKvSave('qt_saved', _qtSaved);   // 클라우드 공유 저장
+  addHistory({menu:'견적서',type:'edit',code:'-',name,desc:_qtWasEdit?'견적서 수정':'견적서 저장',before:'-',after:`${_qtRows.length}개 품목`,user:'수동'});
   document.getElementById('qtSaveModal').style.display='none';
   qtRenderSaved();
   alert(`"${name}" 견적서가 저장되었습니다.`);
@@ -3299,10 +3304,12 @@ function qtLoadSaved(id){
 
 function qtDeleteSaved(id){
   if(!confirm('이 견적서를 삭제할까요?')) return;
+  const _q=_qtSaved.find(x=>x.id===id);
   _qtSaved=_qtSaved.filter(x=>x.id!==id);
   if(_qtEditId===id) _qtEditId=null;
   try{ localStorage.setItem('qt_saved',JSON.stringify(_qtSaved)); }catch(e){}
   cloudKvSave('qt_saved', _qtSaved);   // 클라우드 공유 갱신
+  addHistory({menu:'견적서',type:'edit',code:'-',name:_q?_q.name:'-',desc:'견적서 삭제',before:'존재',after:'삭제',user:'수동'});
   qtRenderSaved();
 }
 
@@ -4246,6 +4253,7 @@ async function saveShipModal(){
     closeModal('shipModal');
     // 해당 판매처·상품번호의 통합 데이터 배송비·마진 즉시 재계산
     const n=await recalcShippingForKey(channel,item_no,{fee,perUnit});
+    addHistory({menu:'매출관리',type:'edit',code:item_no,name:item_name||channel,desc:`배송비 ${id?'수정':'등록'} (${channel})`,before:'-',after:`${fee}원`,user:'수동'});
     alert(`저장 완료. 통합 데이터 ${n}건의 배송비·마진을 재계산했습니다.`);
   }catch(e){ alert('저장 실패: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='저장'; } }
@@ -4258,6 +4266,7 @@ async function deleteShip(id){
   await loadShippingFees(); renderShipTable();
   // 기본 규칙(공식)으로 재계산
   const n=await recalcShippingForKey(r.channel,r.item_no,null);
+  addHistory({menu:'매출관리',type:'edit',code:r.item_no,name:r.item_name||r.channel,desc:`배송비 삭제 (${r.channel})`,before:`${r.fee}원`,after:'삭제',user:'수동'});
   alert(`삭제 완료. 통합 데이터 ${n}건을 기본 배송비 규칙으로 재계산했습니다.`);
 }
 
@@ -4269,6 +4278,7 @@ async function applyAllShipping(){
   for(const r of _shipData){
     total += await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:!!r.perUnit});
   }
+  addHistory({menu:'매출관리',type:'edit',code:'MULTI',name:`택배비 ${_shipData.length}건`,desc:'택배비 전체 재적용',before:'-',after:`${total}건 재계산`,user:'수동'});
   alert(`완료. 통합 데이터 ${total}건의 배송비·마진을 재계산했습니다.`);
 }
 
@@ -5231,6 +5241,7 @@ function adSave(){
     _adSpend[adKey(ch,date)]=amt;
   }
   saveAdSpend();
+  addHistory({menu:'매출관리',type:'edit',code:ch,name:`광고비 ${date}`,desc:amt>0?'광고비 저장':'광고비 삭제',before:'-',after:amt>0?`${amt.toLocaleString()}원`:'삭제',user:'수동'});
   document.getElementById('adAmount').value='';
   renderAdList(); renderAdChart();
   alert(`${ch} · ${date} 광고비 ${amt.toLocaleString()}원 저장되었습니다.`);
@@ -5240,6 +5251,7 @@ function adDelete(ch,date){
   if(!confirm(`${ch} · ${date} 광고비를 삭제할까요?`)) return;
   delete _adSpend[adKey(ch,date)];
   saveAdSpend();
+  addHistory({menu:'매출관리',type:'edit',code:ch,name:`광고비 ${date}`,desc:'광고비 삭제',before:'-',after:'삭제',user:'수동'});
   renderAdList(); renderAdChart();
 }
 
@@ -5614,6 +5626,7 @@ async function deleteSelectedUni(){
     }
     _uniSel.clear();
     _revLoaded=false; await loadRevenueData();
+    addHistory({menu:'매출관리',type:'edit',code:'MULTI',name:`통합 ${ids.length}건`,desc:'통합 데이터 선택 삭제',before:`${ids.length}건`,after:'삭제',user:'수동'});
     goRevPage('unified');
     alert(`${ids.length}건 삭제 완료`);
   }catch(e){ alert('삭제 실패: '+e.message); }
@@ -5915,6 +5928,7 @@ async function saveRevRowEdit(){
   if(btn){btn.disabled=true;btn.textContent='저장 중...';}
   try{
     await applyRowCodeName(id, code, name);
+    addHistory({menu:'매출관리',type:'edit',code,name,desc:'통합 행 코드·모델명 수정',before:'-',after:'수정',user:'수동'});
     closeModal('revRowEditModal');
     renderUnifiedTable();
   } catch(e){ alert('저장 실패: '+e.message); }
@@ -6242,6 +6256,7 @@ async function saveBdModal(){
       await saveBdToSupabase(row, false);
       _bdData.push(row);
     }
+    addHistory({menu:'매출관리',type:'edit',code,name,desc:editKey?'백데이터 수정':'백데이터 등록',before:'-',after:editKey?'수정':'등록',user:'수동'});
     closeModal('bdModal');
     renderBdTable();
   } catch(e){
