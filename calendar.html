@@ -1975,10 +1975,33 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAllProjects(true); // 3명 모두의 프로젝트 로드
 });
 
-// iframe 내에서 로드될 때 "+ 업무 보고서" FAB 버튼 숨김 (부모 페이지에 네이티브 보고서 패널이 있음)
+// iframe 모드: 캘린더 그리드만 표시, 나머지 UI 모두 숨김
 if(window.self !== window.top){
   const fab = document.getElementById('fabBtn');
   if(fab) fab.style.display = 'none';
+  // 사이드바에서 캘린더 그리드 외 모두 숨김
+  ['.sidebar-header','.person-sel','.report-search','.proj-sec','.sidebar-tools','.sidebar-stats']
+    .forEach(sel => { const el = document.querySelector(sel); if(el) el.style.display='none'; });
+  // 우측 패널 숨김
+  const panel = document.querySelector('.main-panel');
+  if(panel) panel.style.display = 'none';
+  // 사이드바 전체 너비로
+  const aside = document.querySelector('.sidebar');
+  if(aside){ aside.style.width='100%'; aside.style.maxWidth='100%'; aside.style.flex='1'; }
+  // app 컨테이너 단일 컬럼
+  const app = document.getElementById('app');
+  if(app){ app.style.display='block'; app.style.padding='0'; }
+  // 캘린더 섹션 여백 최소화
+  const style = document.createElement('style');
+  style.textContent = `
+    body { overflow:hidden; }
+    .sidebar { padding: 0 8px 8px !important; }
+    .cal-nav { padding: 8px 4px 4px !important; }
+    .cal-nav-title { font-size: 14px !important; }
+    .cal-wd { font-size: 11px !important; }
+    .cal-cell { min-height: 32px !important; font-size: 11px !important; }
+  `;
+  document.head.appendChild(style);
 }
 </script>
 </body>
