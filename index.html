@@ -50,13 +50,22 @@ body{background:var(--bg2);min-height:100vh;}
 #page-collab.active{display:block;}
 /* ── 협업업무 레이아웃: 좌=보드(전체높이) / 우=달력(위)+보고서(아래) ── */
 .collab-wrap{display:flex;flex-direction:row;gap:10px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
-.collab-board{flex:1.1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-.collab-right{flex:0.9;min-width:0;display:flex;flex-direction:column;gap:10px;}
-.collab-cal-top{flex:0 0 230px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;}
+.collab-cal-top{flex:0 0 205px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-top iframe{width:100%;height:100%;border:none;display:block;}
 /* 업무보고서 native panel */
-.report-panel{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:visible;position:relative;}
-.rp-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;}
+.report-panel{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;position:relative;z-index:1;}
+/* 카테고리 필터 바 */
+.rp-cat-bar{display:flex;gap:5px;padding:5px 10px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);flex-wrap:wrap;}
+.rp-cat-btn{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:10px;border:1.5px solid;cursor:pointer;background:transparent;transition:background .12s,color .12s;white-space:nowrap;}
+.rp-cat-btn.on{color:#fff!important;border-color:transparent!important;}
+.rp-block-cat{font-size:9px;font-weight:800;padding:0px 5px;border-radius:7px;color:#fff;flex-shrink:0;line-height:1.7;}
+.rp-bp-cat{font-size:11px;border:1px solid var(--bd);border-radius:5px;padding:2px 5px;background:var(--bg);color:var(--tx);cursor:pointer;flex-shrink:0;}
+.rp-filter-date{font-size:10px;font-weight:700;color:var(--tx2);padding:4px 2px 2px;margin-top:6px;border-top:0.5px solid var(--bd);}
+.rp-filter-date:first-child{margin-top:0;border-top:none;}
+.rp-empty-msg{text-align:center;color:var(--tx2);font-size:12px;padding:40px 20px;line-height:1.9;}
+.rp-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;position:relative;z-index:2;}
 .rp-head-left{display:flex;align-items:center;gap:8px;}
 .rp-head-title{font-size:13px;font-weight:800;color:var(--tx);}
 .rp-pin-add-btn{font-size:11px;background:#FFFBEB;border:0.5px solid #FCD34D;border-radius:5px;padding:2px 7px;cursor:pointer;color:#B45309;font-weight:700;}
@@ -827,6 +836,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </div>
         </div>
         <div class="rp-person-tabs" id="rpPersonTabs"></div>
+        <div class="rp-cat-bar" id="rpCatBar"></div>
         <div class="rp-pinned" id="rpPinned" style="display:none;"></div>
         <div class="rp-body">
           <div class="rp-editor" id="rpEditor"></div>
@@ -8812,6 +8822,12 @@ let _reportSaveTimer = null;
 let _reportKbSetup   = false;
 let _rpLinkDropId    = null;
 let _rpInsertAfterId = null;  // Alt+Enter: 이 라인 id 다음에 블럭 삽입
+let _reportCategoryFilter = null;
+
+const REPORT_CATS = ['디자인','광고관리','품절관리','매출관리','기타'];
+const REPORT_CAT_COLOR = {
+  '디자인':'#3B82F6','광고관리':'#F59E0B','품절관리':'#EF4444','매출관리':'#10B981','기타':'#8B5CF6'
+};
 
 function _reportTodayStr(){ return new Date().toISOString().slice(0,10); }
 function _reportKey(p,d){ return `${p||_reportPerson}|${d||_reportDate}`; }
@@ -8856,7 +8872,11 @@ function _reportSyncLine(id, text){
   if(item) item.text = text;
 }
 
-function reportSetPerson(p){ _reportPerson=p; renderReportPanel(); }
+function reportSetPerson(p){ _reportPerson=p; _reportCategoryFilter=null; renderReportPanel(); }
+function reportSetCategory(cat){
+  _reportCategoryFilter = (_reportCategoryFilter===cat) ? null : cat;
+  renderReportPanel();
+}
 function reportPrevDay(){
   const base=_reportDate||_reportTodayStr();
   const d=new Date(base+'T00:00:00');
@@ -8899,6 +8919,16 @@ function renderReportPanel(){
         onclick="reportSetPerson('${p}')">${p}</button>`;
     }).join('');
   }
+  // 카테고리 필터 바
+  const catBar=document.getElementById('rpCatBar');
+  if(catBar){
+    catBar.innerHTML=REPORT_CATS.map(cat=>{
+      const c=REPORT_CAT_COLOR[cat], on=cat===_reportCategoryFilter;
+      return `<button class="rp-cat-btn ${on?'on':''}"
+        style="color:${c};border-color:${c};${on?`background:${c};`:''};"
+        onclick="reportSetCategory('${cat}')">${cat}</button>`;
+    }).join('');
+  }
   _rpRenderPinned();
   _rpBuildEditor();
 }
@@ -8928,8 +8958,26 @@ function _rpRenderPinned(){
 function _rpBuildEditor(){
   const editor=document.getElementById('rpEditor');
   if(!editor) return;
+  if(_reportCategoryFilter){ _rpBuildEditorFiltered(); return; }
   const content=_reportGetEntry().content||[];
-  if(!content.length) content.push({id:'l_e0',type:'line',text:''});
+  const hasReal=content.some(i=>i.type==='block'||(i.type==='line'&&(i.text||'').replace(/^•\s*/,'').trim()));
+  if(!hasReal){
+    editor.innerHTML=`<div class="rp-empty-msg">✏️ 이날의 업무보고서가 비어있습니다.<br><span style="font-size:11px;">Alt+Enter 로 블럭 추가, Enter 로 줄 추가</span></div>
+      <div class="rp-line" data-id="${content[0]?.id||'l_e0'}" contenteditable="true" style="display:none;"></div>`;
+    editor.onclick=e=>{ if(e.target===editor||e.target.classList.contains('rp-empty-msg')||e.target.closest('.rp-empty-msg')){
+      editor.onclick=null;
+      const entry=_reportEnsureEntry();
+      if(!entry.content.length) entry.content.push({id:'l_c'+Date.now(),type:'line',text:''});
+      editor.innerHTML=entry.content.map(item=>{
+        if(item.type==='line') return `<div class="rp-line" data-id="${item.id}" contenteditable="true">${_esc(item.text||'')}</div>`;
+        if(item.type==='block') return _rpBlockHTML(item);
+        return '';
+      }).join('');
+      editor.querySelector('.rp-line')?.focus();
+    }};
+    return;
+  }
+  editor.onclick=null;
   editor.innerHTML=content.map(item=>{
     if(item.type==='line')
       return `<div class="rp-line" data-id="${item.id}" contenteditable="true">${_esc(item.text||'')}</div>`;
@@ -8939,11 +8987,39 @@ function _rpBuildEditor(){
   }).join('');
 }
 
+// 카테고리 필터 뷰 — 전체 날짜 통합 출력
+function _rpBuildEditorFiltered(){
+  const editor=document.getElementById('rpEditor');
+  if(!editor) return;
+  const cat=_reportCategoryFilter;
+  const days=['일','월','화','수','목','금','토'];
+  const groups=[];
+  Object.keys(_reportAllData).sort((a,b)=>b.localeCompare(a)).forEach(key=>{
+    const [p,d]=key.split('|');
+    if(p!==_reportPerson) return;
+    const blocks=((_reportAllData[key].content)||[]).filter(i=>i.type==='block'&&i.category===cat);
+    if(blocks.length) groups.push({date:d,blocks});
+  });
+  if(!groups.length){
+    const c=REPORT_CAT_COLOR[cat]||'#888';
+    editor.innerHTML=`<div class="rp-empty-msg">
+      <span style="display:inline-block;background:${c};color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:9px;margin-bottom:8px;">${cat}</span><br>
+      아직 이 카테고리의 블럭이 없습니다.<br><span style="font-size:11px;">블럭 생성 시 카테고리를 선택하면 여기에 표시됩니다.</span></div>`;
+    return;
+  }
+  editor.innerHTML=groups.map(({date,blocks})=>{
+    const dObj=new Date(date+'T00:00:00');
+    return `<div class="rp-filter-date">📅 ${date} (${days[dObj.getDay()]})</div>`+blocks.map(b=>_rpBlockHTML(b)).join('');
+  }).join('');
+}
+
 function _rpBlockHTML(item){
   const sub=[item.time, item.linked_title?`🔗${item.linked_title}`:''].filter(Boolean).join(' ');
+  const catColor=item.category?REPORT_CAT_COLOR[item.category]||'#888':'';
+  const catBadge=item.category?`<span class="rp-block-cat" style="background:${catColor};">${_esc(item.category)}</span>`:'';
   return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" contenteditable="false">
     <div class="rp-block-text">
-      <span class="rp-block-main">⏱ ${_esc(item.task)}</span>${sub?`<span class="rp-block-sub"> — ${_esc(sub)}</span>`:''}
+      ${catBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${sub?`<span class="rp-block-sub"> — ${_esc(sub)}</span>`:''}
     </div>
     <div class="rp-block-btns">
       <button class="rp-block-btn" title="${item.pinned?'고정 해제':'상단 고정'}" onclick="reportTogglePin('${item.id}')">${item.pinned?'📌':'📍'}</button>
@@ -8995,7 +9071,9 @@ function rpShowInlinePopup(afterLineId){
   if(!line) return;
   const form=document.createElement('div');
   form.className='rp-bp-form';
-  form.innerHTML=`<input id="rpBpTask" class="rp-bp-input" placeholder="업무명">
+  const catOpts=REPORT_CATS.map(c=>`<option value="${c}"${_reportCategoryFilter===c?` selected`:''}">${c}</option>`).join('');
+  form.innerHTML=`<select id="rpBpCat" class="rp-bp-cat"><option value="">카테고리</option>${catOpts}</select>
+    <input id="rpBpTask" class="rp-bp-input" placeholder="업무명">
     <input id="rpBpTime" class="rp-bp-input" placeholder="소요시간 (예: 30분)">
     <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
     <button class="rp-bp-cancel" onclick="rpHideInlinePopup()">✕</button>`;
@@ -9018,11 +9096,12 @@ function rpBlockPopupClose(){ rpHideInlinePopup(); }
 function rpBlockSave(){
   const task=(document.getElementById('rpBpTask')?.value||'').trim();
   const time=(document.getElementById('rpBpTime')?.value||'').trim();
+  const category=(document.getElementById('rpBpCat')?.value||'').trim()||null;
   if(!task){ toast('업무명을 입력하세요.'); return; }
   const afterId=_rpInsertAfterId;
   rpHideInlinePopup();
   const newBlock={id:'b'+Date.now()+Math.random().toString(36).slice(2,4),type:'block',
-    task,time,pinned:false,linked_task_id:null,linked_title:null};
+    task,time,category,pinned:false,linked_task_id:null,linked_title:null};
   const entry=_reportEnsureEntry();
   const idx=afterId ? entry.content.findIndex(i=>i.id===afterId) : entry.content.length-1;
   entry.content.splice(idx<0?entry.content.length:idx+1,0,newBlock);
