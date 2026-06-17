@@ -50,11 +50,11 @@ body{background:var(--bg2);min-height:100vh;}
 #page-collab.active{display:block;}
 .collab-wrap{display:flex;gap:12px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
 .collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-.collab-cal{flex:1.5;min-width:500px;display:flex;flex-direction:row;gap:8px;background:transparent;border:none;padding:0;}
-.cal-iframe-col{flex:0 0 275px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-cal{flex:1.7;min-width:460px;display:flex;flex-direction:row;gap:8px;background:transparent;border:none;padding:0;}
+.cal-iframe-col{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .cal-iframe-col iframe{width:100%;height:100%;border:none;display:block;}
 /* 업무보고서 native panel */
-.report-panel{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:visible;position:relative;}
+.report-panel{flex:0 0 340px;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:visible;position:relative;}
 .rp-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;}
 .rp-head-left{display:flex;align-items:center;gap:8px;}
 .rp-head-title{font-size:13px;font-weight:800;color:var(--tx);}
@@ -71,28 +71,27 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-pinned-title{font-size:10px;font-weight:800;color:#B45309;margin-bottom:4px;}
 .rp-pinned-item{font-size:11.5px;color:var(--tx);background:#FEF3C7;border:0.5px solid #FCD34D;border-radius:6px;padding:4px 8px;margin-bottom:3px;display:flex;align-items:center;gap:6px;line-height:1.4;}
 .rp-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);border-radius:0 0 12px 12px;}
-.rp-textarea{flex:1;width:100%;border:none;outline:none;resize:none;font-family:inherit;font-size:13px;line-height:1.8;color:var(--tx);background:transparent;padding:10px 12px;box-sizing:border-box;}
-.rp-textarea::placeholder{color:var(--tx2);opacity:.6;font-size:12px;}
-/* 블럭 목록 — 텍스트창과 연속되는 느낌 */
-.rp-blocks{flex-shrink:0;padding:4px 10px 6px;border-top:0.5px dashed var(--bd);display:flex;flex-direction:column;gap:3px;}
-/* 블럭 = 텍스트 라인처럼 + 테두리 */
-.rp-block{border:1px solid #DBEAFE;border-left:3px solid #3182F6;border-radius:5px;padding:4px 10px;font-size:13px;line-height:1.7;color:var(--tx);background:transparent;display:flex;align-items:center;gap:8px;}
-.rp-block.pinned{border-color:#FDE68A;border-left-color:#F59E0B;background:#FFFBEB;}
-.rp-block-text{flex:1;min-width:0;}
-.rp-block-main{font-weight:600;}
-.rp-block-sub{font-size:11.5px;color:var(--tx2);}
-.rp-block-btns{display:flex;gap:2px;flex-shrink:0;align-items:center;opacity:0;transition:opacity .1s;}
+/* contenteditable 에디터 — 텍스트 라인 + 블럭 혼합 */
+.rp-editor{flex:1;overflow-y:auto;padding:8px 10px;outline:none;}
+.rp-line{outline:none;min-height:22px;font-size:12.5px;line-height:1.75;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
+.rp-line:empty::before{content:'•';color:var(--bd);pointer-events:none;}
+/* 블럭 = 텍스트 라인 안에 인라인으로 들어가는 컴팩트 카드 */
+.rp-block{border:1px solid #D1E9FF;border-left:2.5px solid #3182F6;border-radius:4px;padding:1px 7px;font-size:12px;line-height:1.55;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:6px;margin:1px 0;user-select:none;-webkit-user-select:none;}
+.rp-block.pinned{border-color:#FDE68A;border-left-color:#F59E0B;background:#FFFEF5;}
+.rp-block-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rp-block-main{font-weight:700;font-size:11.5px;}
+.rp-block-sub{font-size:10.5px;color:var(--tx2);margin-left:3px;}
+.rp-block-btns{display:flex;gap:1px;flex-shrink:0;align-items:center;opacity:0;transition:opacity .1s;}
 .rp-block:hover .rp-block-btns{opacity:1;}
-.rp-block-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--tx2);padding:2px 4px;border-radius:4px;line-height:1;}
+.rp-block-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--tx2);padding:1px 3px;border-radius:3px;line-height:1;}
 .rp-block-btn:hover{background:var(--bd);}
-/* Alt+Enter 인라인 팝업 — 텍스트 영역 바로 아래 */
-.rp-block-popup{flex-shrink:0;background:var(--bg);border-top:1.5px solid var(--pr);padding:8px 12px 10px;}
-.rp-bp-title{font-size:11px;font-weight:800;color:var(--pr);margin-bottom:6px;}
-.rp-bp-row{display:flex;gap:6px;align-items:center;}
-.rp-bp-input{flex:1;border:1px solid var(--bd);border-radius:6px;padding:6px 9px;font-size:12px;outline:none;font-family:inherit;min-width:0;background:var(--bg2);}
-.rp-bp-input:focus{border-color:var(--pr);}
-.rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
-.rp-bp-cancel{background:none;border:0.5px solid var(--bd);border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer;color:var(--tx2);}
+/* Alt+Enter 인라인 팝업 — 라인 사이에 삽입 */
+.rp-bp-form{display:flex;align-items:center;gap:4px;padding:4px 7px;background:var(--bg);border:1.5px solid var(--pr);border-radius:6px;margin:2px 0;}
+.rp-bp-input{flex:1;min-width:0;border:none;outline:none;font-size:11.5px;font-family:inherit;padding:2px 3px;background:transparent;color:var(--tx);}
+.rp-bp-input::placeholder{color:var(--tx2);font-size:11px;}
+.rp-bp-input+.rp-bp-input{border-left:0.5px solid var(--bd);padding-left:6px;flex:0.7;}
+.rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.rp-bp-cancel{background:none;border:none;font-size:11px;cursor:pointer;color:var(--tx2);padding:1px 3px;}
 /* Link dropdown — 패널 바깥으로 넘칠 수 있게 fixed */
 .rp-link-drop{position:fixed;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:9999;min-width:210px;max-height:220px;overflow-y:auto;}
 .rp-link-drop-head{padding:5px 10px;font-size:10px;font-weight:800;color:var(--tx2);background:var(--bg2);border-bottom:0.5px solid var(--bd);position:sticky;top:0;}
@@ -831,19 +830,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rp-person-tabs" id="rpPersonTabs"></div>
         <div class="rp-pinned" id="rpPinned" style="display:none;"></div>
         <div class="rp-body">
-          <textarea id="rpTextarea" class="rp-textarea"
-            placeholder="업무 내용을 입력하세요.&#10;Enter → 새 줄 (• 자동)&#10;Alt+Enter → 소요시간 블럭 추가"></textarea>
-          <!-- Alt+Enter 인라인 팝업 — 텍스트 바로 아래 -->
-          <div class="rp-block-popup" id="rpBlockPopup" style="display:none;">
-            <div class="rp-bp-title">⏱ 업무 소요시간 등록</div>
-            <div class="rp-bp-row">
-              <input id="rpBpTask" class="rp-bp-input" placeholder="업무명">
-              <input id="rpBpTime" class="rp-bp-input" placeholder="소요시간 (예: 30분)">
-              <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
-              <button class="rp-bp-cancel" onclick="rpBlockPopupClose()">✕</button>
-            </div>
-          </div>
-          <div class="rp-blocks" id="rpBlocks" style="display:none;"></div>
+          <!-- contenteditable 에디터: .rp-line(텍스트)과 .rp-block이 자연스럽게 섞임 -->
+          <div class="rp-editor" id="rpEditor"></div>
         </div>
       </div>
     </div>
@@ -8810,21 +8798,43 @@ function collabModalFolderClick(ev, idx){
 }
 
 // ══════════════════════════════════════════════
-// 업무보고서 (Report Panel) — 네이티브 에디터
+// 업무보고서 (Report Panel) — contenteditable 인라인 에디터
+// 텍스트 라인(.rp-line)과 블럭(.rp-block)이 에디터 안에서 자연스럽게 혼합
 // ══════════════════════════════════════════════
 const REPORT_KIND = 'work_report_v1';
-let _reportAllData = {};   // { 'person|YYYY-MM-DD': { text, blocks } }
-let _reportPerson  = '유현';
-let _reportDate    = '';
-let _reportLoaded  = false;
+let _reportAllData   = {};  // { 'person|YYYY-MM-DD': { content:[{id,type,text?,task?,...}], notes:[] } }
+let _reportPerson    = '유현';
+let _reportDate      = '';
+let _reportLoaded    = false;
 let _reportSaveTimer = null;
 let _reportKbSetup   = false;
 let _rpLinkDropId    = null;
+let _rpInsertAfterId = null;  // Alt+Enter: 이 라인 id 다음에 블럭 삽입
 
 function _reportTodayStr(){ return new Date().toISOString().slice(0,10); }
-function _reportKey(p, d){ return `${p||_reportPerson}|${d||_reportDate}`; }
-function _reportCurrent(){
-  return _reportAllData[_reportKey()] || { text:'', blocks:[] };
+function _reportKey(p,d){ return `${p||_reportPerson}|${d||_reportDate}`; }
+
+// 구 포맷(text+blocks) → 신 포맷(content[]) 마이그레이션
+function _reportGetEntry(){
+  const raw = _reportAllData[_reportKey()] || {};
+  if(raw.content) return raw;
+  const content = [];
+  (raw.text||'').split('\n').forEach((line,i)=>{
+    content.push({id:'ml'+i, type:'line', text:line});
+  });
+  (raw.blocks||[]).filter(b=>!b.pinned).forEach(b=>{
+    content.push({id:b.id, type:'block', task:b.task||'', time:b.time||'',
+      pinned:false, linked_task_id:b.linked_task_id||null, linked_title:b.linked_title||null});
+  });
+  if(!content.length) content.push({id:'l_init', type:'line', text:''});
+  const migrated = { content, notes: raw.notes||[] };
+  _reportAllData[_reportKey()] = migrated;
+  return migrated;
+}
+function _reportEnsureEntry(){
+  const k = _reportKey();
+  if(!_reportAllData[k]) _reportAllData[k] = { content:[{id:'l0',type:'line',text:''}], notes:[] };
+  return _reportAllData[k];
 }
 
 async function loadReport(){
@@ -8832,266 +8842,360 @@ async function loadReport(){
   _reportAllData = (d && typeof d==='object' && !Array.isArray(d)) ? d : {};
   _reportLoaded = true;
 }
-async function _reportFlushSave(){
-  await cloudKvSave(REPORT_KIND, _reportAllData);
-}
+async function _reportFlushSave(){ await cloudKvSave(REPORT_KIND, _reportAllData); }
 function _reportAutoSave(){
   if(_reportSaveTimer) clearTimeout(_reportSaveTimer);
   _reportSaveTimer = setTimeout(_reportFlushSave, 1500);
 }
-function _reportCommitText(){
-  const ta = document.getElementById('rpTextarea');
-  if(!ta) return;
-  const k = _reportKey();
-  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[] };
-  _reportAllData[k].text = ta.value;
+function _reportSyncLine(id, text){
+  const entry = _reportAllData[_reportKey()];
+  if(!entry) return;
+  const item = (entry.content||[]).find(i=>i.id===id);
+  if(item) item.text = text;
 }
 
-function reportSetPerson(p){
-  _reportCommitText();
-  _reportPerson = p;
-  renderReportPanel();
-}
+function reportSetPerson(p){ _reportPerson=p; renderReportPanel(); }
 function reportPrevDay(){
-  _reportCommitText();
-  const d = new Date(_reportDate + 'T00:00:00');
-  d.setDate(d.getDate() - 1);
-  _reportDate = d.toISOString().slice(0,10);
-  renderReportPanel();
+  const d=new Date(_reportDate+'T00:00:00'); d.setDate(d.getDate()-1);
+  _reportDate=d.toISOString().slice(0,10); renderReportPanel();
 }
 function reportNextDay(){
-  _reportCommitText();
-  const d = new Date(_reportDate + 'T00:00:00');
-  d.setDate(d.getDate() + 1);
-  _reportDate = d.toISOString().slice(0,10);
-  renderReportPanel();
+  const d=new Date(_reportDate+'T00:00:00'); d.setDate(d.getDate()+1);
+  _reportDate=d.toISOString().slice(0,10); renderReportPanel();
 }
-function reportTodayBtn(){
-  _reportCommitText();
-  _reportDate = _reportTodayStr();
-  renderReportPanel();
-}
+function reportTodayBtn(){ _reportDate=_reportTodayStr(); renderReportPanel(); }
 
 function renderReportPanel(){
   if(!document.getElementById('reportPanel')) return;
   // 날짜 레이블
-  const lbl = document.getElementById('rpDateLabel');
+  const lbl=document.getElementById('rpDateLabel');
   if(lbl){
-    const d = new Date(_reportDate + 'T00:00:00');
-    const days = ['일','월','화','수','목','금','토'];
-    lbl.textContent = `${_reportDate} (${days[d.getDay()]})`;
+    const d=new Date(_reportDate+'T00:00:00');
+    const days=['일','월','화','수','목','금','토'];
+    lbl.textContent=`${_reportDate} (${days[d.getDay()]})`;
   }
-  // 담당자 탭 — 각자 색상
-  const tabs = document.getElementById('rpPersonTabs');
+  // 담당자 탭
+  const tabs=document.getElementById('rpPersonTabs');
   if(tabs){
-    tabs.innerHTML = COLLAB_PEOPLE.map(p=>{
-      const c = COLLAB_PERSON_COLOR[p];
-      const on = p === _reportPerson;
+    tabs.innerHTML=COLLAB_PEOPLE.map(p=>{
+      const c=COLLAB_PERSON_COLOR[p], on=p===_reportPerson;
       return `<button class="rp-ptab ${on?'on':''}"
-        style="color:${c};border-bottom-color:${on?c:'transparent'};${on?`background:${c}18;`:''}font-weight:${on?'800':'600'};"
+        style="color:${c};border-bottom-color:${on?c:'transparent'};${on?`background:${c}18;`:''}font-weight:${on?800:600};"
         onclick="reportSetPerson('${p}')">${p}</button>`;
     }).join('');
   }
-  const entry = _reportCurrent();
-  // 텍스트 (포커스 중엔 덮어쓰지 않음)
-  const ta = document.getElementById('rpTextarea');
-  if(ta && ta !== document.activeElement) ta.value = entry.text || '';
-  // 고정 섹션 (고정 메모 + 고정 블럭)
-  const pinnedNotes = (entry.notes||[]);
-  const pinnedBlocks = (entry.blocks||[]).filter(b=>b.pinned);
-  const pinnedDiv = document.getElementById('rpPinned');
-  if(pinnedDiv){
-    if(pinnedNotes.length || pinnedBlocks.length){
-      pinnedDiv.style.display = '';
-      let html = `<div class="rp-pinned-title">📌 고정됨</div>`;
-      pinnedNotes.forEach(n=>{
-        html += `<div class="rp-pinned-item"><span style="flex:1;">${_esc(n.text)}</span>
-          <button class="rp-block-btn" title="고정 해제" onclick="reportDelPin('${n.id}')">✕</button></div>`;
-      });
-      pinnedBlocks.forEach(b=>{
-        html += `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b>${_esc(b.task)}</b>${b.time?' — '+_esc(b.time):''}${b.linked_title?` <span style="color:#7C3AED;">[🔗${_esc(b.linked_title)}]</span>`:''}</span>
-          <button class="rp-block-btn" title="고정 해제" onclick="reportTogglePin('${b.id}')">📌</button></div>`;
-      });
-      pinnedDiv.innerHTML = html;
-    } else { pinnedDiv.style.display = 'none'; }
-  }
-  // 블럭 목록 (비고정) — 텍스트 라인 스타일
-  const nonPinned = (entry.blocks||[]).filter(b=>!b.pinned);
-  const blocksDiv = document.getElementById('rpBlocks');
-  if(blocksDiv){
-    if(nonPinned.length){
-      blocksDiv.style.display = '';
-      blocksDiv.innerHTML = nonPinned.map(b=>`
-        <div class="rp-block" id="rpb-${b.id}">
-          <div class="rp-block-text">
-            <span class="rp-block-main">⏱ ${_esc(b.task)}</span>
-            ${b.time||b.linked_title ? `<span class="rp-block-sub"> — ${b.time?_esc(b.time):''}${b.linked_title?` <span style="color:#7C3AED;">🔗${_esc(b.linked_title)}</span>`:''}</span>`:''}
-          </div>
-          <div class="rp-block-btns">
-            <button class="rp-block-btn" title="상단 고정" onclick="reportTogglePin('${b.id}')">📍</button>
-            <button class="rp-block-btn" title="협업업무 연동 / 이전 블럭 가져오기" onclick="reportLinkBlock(event,'${b.id}')">▼</button>
-            <button class="rp-block-btn" title="삭제" onclick="reportDelBlock('${b.id}')" style="color:#DC2626;">✕</button>
-          </div>
-        </div>`).join('');
-    } else { blocksDiv.style.display = 'none'; }
-  }
+  _rpRenderPinned();
+  _rpBuildEditor();
 }
 
-// 📌 고정 메모 추가/삭제
+function _rpRenderPinned(){
+  const entry=_reportGetEntry();
+  const notes=entry.notes||[];
+  const pinnedBlocks=(entry.content||[]).filter(i=>i.type==='block'&&i.pinned);
+  const div=document.getElementById('rpPinned');
+  if(!div) return;
+  if(notes.length||pinnedBlocks.length){
+    div.style.display='';
+    let html=`<div class="rp-pinned-title">📌 고정됨</div>`;
+    notes.forEach(n=>{
+      html+=`<div class="rp-pinned-item"><span style="flex:1;">${_esc(n.text)}</span>
+        <button class="rp-block-btn" onclick="reportDelPin('${n.id}')">✕</button></div>`;
+    });
+    pinnedBlocks.forEach(b=>{
+      html+=`<div class="rp-pinned-item"><span style="flex:1;">⏱ <b>${_esc(b.task)}</b>${b.time?' — '+_esc(b.time):''}${b.linked_title?` <span style="color:#7C3AED;">🔗${_esc(b.linked_title)}</span>`:''}</span>
+        <button class="rp-block-btn" onclick="reportTogglePin('${b.id}')">📌</button></div>`;
+    });
+    div.innerHTML=html;
+  } else { div.style.display='none'; }
+}
+
+// 에디터 전체 재빌드 (담당자/날짜 전환 시)
+function _rpBuildEditor(){
+  const editor=document.getElementById('rpEditor');
+  if(!editor) return;
+  const content=_reportGetEntry().content||[];
+  if(!content.length) content.push({id:'l_e0',type:'line',text:''});
+  editor.innerHTML=content.map(item=>{
+    if(item.type==='line')
+      return `<div class="rp-line" data-id="${item.id}" contenteditable="true">${_esc(item.text||'')}</div>`;
+    if(item.type==='block')
+      return _rpBlockHTML(item);
+    return '';
+  }).join('');
+}
+
+function _rpBlockHTML(item){
+  const sub=[item.time, item.linked_title?`🔗${item.linked_title}`:''].filter(Boolean).join(' ');
+  return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" contenteditable="false">
+    <div class="rp-block-text">
+      <span class="rp-block-main">⏱ ${_esc(item.task)}</span>${sub?`<span class="rp-block-sub"> — ${_esc(sub)}</span>`:''}
+    </div>
+    <div class="rp-block-btns">
+      <button class="rp-block-btn" title="${item.pinned?'고정 해제':'상단 고정'}" onclick="reportTogglePin('${item.id}')">${item.pinned?'📌':'📍'}</button>
+      <button class="rp-block-btn" title="협업업무 연동 / 이전 블럭" onclick="reportLinkBlock(event,'${item.id}')">▼</button>
+      <button class="rp-block-btn" title="삭제" onclick="reportDelBlock('${item.id}')" style="color:#DC2626;">✕</button>
+    </div>
+  </div>`;
+}
+
+// 📌 고정 메모
 function reportAddPin(){
-  const text = (prompt('고정할 내용을 입력하세요')||'').trim();
+  const text=(prompt('고정할 내용을 입력하세요')||'').trim();
   if(!text) return;
-  const k = _reportKey();
-  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[], notes:[] };
-  if(!_reportAllData[k].notes) _reportAllData[k].notes = [];
-  _reportAllData[k].notes.push({ id:'n'+Date.now()+Math.random().toString(36).slice(2,4), text });
-  renderReportPanel(); _reportAutoSave();
+  const entry=_reportEnsureEntry();
+  if(!entry.notes) entry.notes=[];
+  entry.notes.push({id:'n'+Date.now()+Math.random().toString(36).slice(2,4),text});
+  _rpRenderPinned(); _reportAutoSave();
 }
 function reportDelPin(id){
-  const k = _reportKey();
-  if(!_reportAllData[k]) return;
-  _reportAllData[k].notes = (_reportAllData[k].notes||[]).filter(n=>n.id!==id);
-  renderReportPanel(); _reportAutoSave();
+  const k=_reportKey(); if(!_reportAllData[k]) return;
+  _reportAllData[k].notes=(_reportAllData[k].notes||[]).filter(n=>n.id!==id);
+  _rpRenderPinned(); _reportAutoSave();
 }
 function reportTogglePin(id){
-  const k = _reportKey();
-  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[], notes:[] };
-  const b = (_reportAllData[k].blocks||[]).find(x=>x.id===id);
-  if(b){ b.pinned = !b.pinned; renderReportPanel(); _reportAutoSave(); }
+  const entry=_reportAllData[_reportKey()]; if(!entry) return;
+  const item=(entry.content||[]).find(i=>i.id===id); if(!item) return;
+  item.pinned=!item.pinned;
+  const el=document.getElementById('rpEditor')?.querySelector(`[data-id="${id}"]`);
+  if(el){
+    el.classList.toggle('pinned',item.pinned);
+    const btn=el.querySelector('.rp-block-btn');
+    if(btn){ btn.textContent=item.pinned?'📌':'📍'; btn.title=item.pinned?'고정 해제':'상단 고정'; }
+  }
+  _rpRenderPinned(); _reportAutoSave();
 }
 function reportDelBlock(id){
-  const k = _reportKey();
-  if(!_reportAllData[k]) return;
-  _reportAllData[k].blocks = (_reportAllData[k].blocks||[]).filter(x=>x.id!==id);
-  renderReportPanel(); _reportAutoSave();
+  const k=_reportKey(); if(!_reportAllData[k]) return;
+  _reportAllData[k].content=(_reportAllData[k].content||[]).filter(i=>i.id!==id);
+  document.getElementById('rpEditor')?.querySelector(`[data-id="${id}"]`)?.remove();
+  _rpRenderPinned(); _reportAutoSave();
 }
 
-// Alt+Enter 팝업 열기/닫기/저장
-function rpBlockPopupOpen(){
-  const p = document.getElementById('rpBlockPopup');
-  if(!p) return;
-  p.style.display = '';
-  document.getElementById('rpBpTask').value = '';
-  document.getElementById('rpBpTime').value = '';
-  setTimeout(()=>document.getElementById('rpBpTask').focus(), 50);
+// Alt+Enter 인라인 팝업 — 해당 라인 바로 아래 삽입
+function rpShowInlinePopup(afterLineId){
+  _rpInsertAfterId=afterLineId;
+  document.querySelectorAll('.rp-bp-form').forEach(f=>f.remove());
+  const editor=document.getElementById('rpEditor');
+  const line=editor?.querySelector(`.rp-line[data-id="${afterLineId}"]`);
+  if(!line) return;
+  const form=document.createElement('div');
+  form.className='rp-bp-form';
+  form.innerHTML=`<input id="rpBpTask" class="rp-bp-input" placeholder="업무명">
+    <input id="rpBpTime" class="rp-bp-input" placeholder="소요시간 (예: 30분)">
+    <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
+    <button class="rp-bp-cancel" onclick="rpHideInlinePopup()">✕</button>`;
+  line.after(form);
+  setTimeout(()=>{
+    const t=document.getElementById('rpBpTask');
+    const tm=document.getElementById('rpBpTime');
+    t?.focus();
+    t?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tm?.focus();} });
+    tm?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();rpBlockSave();} });
+  },30);
 }
-function rpBlockPopupClose(){
-  const p = document.getElementById('rpBlockPopup');
-  if(p) p.style.display = 'none';
+function rpHideInlinePopup(){
+  document.querySelectorAll('.rp-bp-form').forEach(f=>f.remove());
+  _rpInsertAfterId=null;
 }
+function rpBlockPopupOpen(){ /* compat — no-op, replaced by rpShowInlinePopup */ }
+function rpBlockPopupClose(){ rpHideInlinePopup(); }
+
 function rpBlockSave(){
-  const task = (document.getElementById('rpBpTask').value||'').trim();
-  const time = (document.getElementById('rpBpTime').value||'').trim();
+  const task=(document.getElementById('rpBpTask')?.value||'').trim();
+  const time=(document.getElementById('rpBpTime')?.value||'').trim();
   if(!task){ toast('업무명을 입력하세요.'); return; }
-  _reportCommitText();
-  const k = _reportKey();
-  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[], notes:[] };
-  (_reportAllData[k].blocks = _reportAllData[k].blocks||[]).push({
-    id: 'b'+Date.now()+Math.random().toString(36).slice(2,5),
-    task, time, pinned:false, linked_task_id:null, linked_title:null
-  });
-  rpBlockPopupClose();
-  renderReportPanel();
+  const afterId=_rpInsertAfterId;
+  rpHideInlinePopup();
+  const newBlock={id:'b'+Date.now()+Math.random().toString(36).slice(2,4),type:'block',
+    task,time,pinned:false,linked_task_id:null,linked_title:null};
+  const entry=_reportEnsureEntry();
+  const idx=afterId ? entry.content.findIndex(i=>i.id===afterId) : entry.content.length-1;
+  entry.content.splice(idx<0?entry.content.length:idx+1,0,newBlock);
+  // DOM: 블럭 삽입
+  const editor=document.getElementById('rpEditor');
+  const anchor=afterId?editor?.querySelector(`.rp-line[data-id="${afterId}"]`):null;
+  const tpl=document.createElement('template');
+  tpl.innerHTML=_rpBlockHTML(newBlock);
+  const blockEl=tpl.content.firstElementChild;
+  anchor?anchor.after(blockEl):editor?.appendChild(blockEl);
+  // 블럭 뒤에 빈 라인 추가 & 포커스
+  const newLineId='l'+Date.now()+Math.random().toString(36).slice(2,4);
+  const newLine=document.createElement('div');
+  newLine.className='rp-line'; newLine.dataset.id=newLineId;
+  newLine.contentEditable='true'; newLine.textContent='• ';
+  blockEl.after(newLine);
+  entry.content.splice(entry.content.indexOf(newBlock)+1,0,{id:newLineId,type:'line',text:'• '});
+  newLine.focus();
+  const r=document.createRange(); r.selectNodeContents(newLine); r.collapse(false);
+  window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
   _reportAutoSave();
 }
 
-// ▼ 화살표 → 드롭다운 (fixed 포지션으로 overflow 문제 해결)
-function reportLinkBlock(ev, id){
+// ▼ 드롭다운 (fixed 포지션)
+function reportLinkBlock(ev,id){
   ev.stopPropagation();
-  _rpLinkDropId = id;
+  _rpLinkDropId=id;
   document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
-
-  const btnRect = ev.currentTarget.getBoundingClientRect();
-  const drop = document.createElement('div');
-  drop.className = 'rp-link-drop';
-  drop.style.cssText = `left:${btnRect.left}px;top:${btnRect.bottom+4}px;`;
-
-  // 협업업무 목록
-  const personTasks = (_collabTasks||[]).filter(t=>!t.weekly && t.assignee===_reportPerson && !_collabArchived(t));
-  let html = `<div class="rp-link-drop-head">🤝 협업업무 연동 (${_reportPerson})</div>`;
+  const rect=ev.currentTarget.getBoundingClientRect();
+  const drop=document.createElement('div');
+  drop.className='rp-link-drop';
+  // 화면 오른쪽 넘침 방지
+  const left=Math.min(rect.left, window.innerWidth-220);
+  drop.style.cssText=`left:${left}px;top:${rect.bottom+4}px;`;
+  const personTasks=(_collabTasks||[]).filter(t=>!t.weekly&&t.assignee===_reportPerson&&!_collabArchived(t));
+  let html=`<div class="rp-link-drop-head">🤝 협업업무 (${_reportPerson})</div>`;
   if(personTasks.length){
-    html += personTasks.map(t=>{
-      const lbl = COLLAB_STATUS[t.status]?.label||'';
-      const clr = COLLAB_STATUS[t.status]?.color||'#888';
-      const safe = t.title.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html+=personTasks.map(t=>{
+      const lbl=COLLAB_STATUS[t.status]?.label||'', clr=COLLAB_STATUS[t.status]?.color||'#888';
+      const safe=t.title.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       return `<div class="rp-link-drop-item" onclick="reportLinkApply('${t.id}','${safe}')">
         <span style="color:${clr};font-size:10px;font-weight:700;margin-right:4px;">${lbl}</span>${_esc(t.title)}
       </div>`;
     }).join('');
-  } else {
-    html += `<div class="rp-link-drop-item" style="color:var(--tx2);">연동할 협업업무 없음</div>`;
-  }
-  // 이전 블럭 (최근 5개)
-  const allPrev = [];
+  } else html+=`<div class="rp-link-drop-item" style="color:var(--tx2);">연동할 협업업무 없음</div>`;
+  // 이전 블럭 (신/구 포맷 모두)
+  const allPrev=[];
   for(const [k,v] of Object.entries(_reportAllData)){
-    if(k.startsWith(_reportPerson+'|') && k!==_reportKey() && v.blocks){
-      const date = k.split('|')[1];
-      v.blocks.forEach(b=>{ if(b.task) allPrev.push({...b, date}); });
-    }
+    if(!k.startsWith(_reportPerson+'|')||k===_reportKey()) continue;
+    const date=k.split('|')[1];
+    if(v.content) v.content.filter(i=>i.type==='block'&&i.task).forEach(b=>allPrev.push({...b,date}));
+    else if(v.blocks) v.blocks.forEach(b=>{ if(b.task) allPrev.push({...b,date}); });
   }
   allPrev.sort((a,b)=>b.date.localeCompare(a.date));
-  html += `<div class="rp-link-drop-head">📋 이전 블럭 가져오기</div>`;
+  html+=`<div class="rp-link-drop-head">📋 이전 블럭</div>`;
   if(allPrev.length){
-    html += allPrev.slice(0,5).map(b=>{
-      const st = b.task.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      const sm = (b.time||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html+=allPrev.slice(0,5).map(b=>{
+      const st=b.task.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const sm=(b.time||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       return `<div class="rp-link-drop-item" onclick="reportBlockCopy('${st}','${sm}')">
         <span style="color:var(--tx2);font-size:10px;margin-right:4px;">${b.date}</span>${_esc(b.task)}${b.time?' — '+_esc(b.time):''}
       </div>`;
     }).join('');
-  } else {
-    html += `<div class="rp-link-drop-item" style="color:var(--tx2);">이전 블럭 없음</div>`;
-  }
-  drop.innerHTML = html;
+  } else html+=`<div class="rp-link-drop-item" style="color:var(--tx2);">이전 블럭 없음</div>`;
+  drop.innerHTML=html;
   document.body.appendChild(drop);
-  setTimeout(()=>{ document.addEventListener('click', ()=>{ drop.remove(); _rpLinkDropId=null; }, {once:true}); }, 50);
+  setTimeout(()=>document.addEventListener('click',()=>{ drop.remove(); _rpLinkDropId=null; },{once:true}),50);
 }
-function reportLinkApply(taskId, title){
-  const k = _reportKey();
-  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[], notes:[] };
-  const b = (_reportAllData[k].blocks||[]).find(x=>x.id===_rpLinkDropId);
-  if(b){ b.linked_task_id=taskId; b.linked_title=title; renderReportPanel(); _reportAutoSave(); }
+function reportLinkApply(taskId,title){
+  const entry=_reportAllData[_reportKey()]; if(!entry) return;
+  const item=(entry.content||[]).find(i=>i.id===_rpLinkDropId); if(!item) return;
+  item.linked_task_id=taskId; item.linked_title=title;
+  const el=document.getElementById('rpEditor')?.querySelector(`[data-id="${_rpLinkDropId}"]`);
+  if(el){
+    let sub=el.querySelector('.rp-block-sub');
+    const newSub=` — ${[item.time,title?'🔗'+title:''].filter(Boolean).join(' ')}`;
+    if(sub) sub.textContent=newSub;
+    else{
+      sub=document.createElement('span'); sub.className='rp-block-sub'; sub.textContent=newSub;
+      el.querySelector('.rp-block-main')?.after(sub);
+    }
+  }
   document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
+  _reportAutoSave();
 }
-function reportBlockCopy(task, time){
-  _reportCommitText();
-  const k = _reportKey();
-  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[], notes:[] };
-  (_reportAllData[k].blocks = _reportAllData[k].blocks||[]).push({
-    id:'b'+Date.now()+Math.random().toString(36).slice(2,5),
-    task, time, pinned:false, linked_task_id:null, linked_title:null
-  });
-  renderReportPanel(); _reportAutoSave();
+function reportBlockCopy(task,time){
+  const newBlock={id:'b'+Date.now()+Math.random().toString(36).slice(2,4),type:'block',
+    task,time,pinned:false,linked_task_id:null,linked_title:null};
+  const entry=_reportEnsureEntry();
+  entry.content.push(newBlock);
+  const editor=document.getElementById('rpEditor');
+  const tpl=document.createElement('template');
+  tpl.innerHTML=_rpBlockHTML(newBlock);
+  editor?.appendChild(tpl.content.firstElementChild);
   document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
+  _reportAutoSave();
 }
 
-// 키보드 이벤트 & textarea 자동저장 — 한번만 등록
+// 이벤트 델리게이션 — 한 번만 등록
 function _reportSetupKeyboard(){
   if(_reportKbSetup) return;
-  _reportKbSetup = true;
-  const ta = document.getElementById('rpTextarea');
-  if(!ta) return;
-  // 첫 포커스시 • 자동 삽입
-  ta.addEventListener('focus', ()=>{
-    if(!ta.value){ ta.value = '• '; ta.selectionStart = ta.selectionEnd = 2; }
+  _reportKbSetup=true;
+  const editor=document.getElementById('rpEditor');
+  if(!editor) return;
+
+  // input: 라인 텍스트 실시간 동기화
+  editor.addEventListener('input',e=>{
+    const line=e.target.closest?.('.rp-line');
+    if(!line) return;
+    _reportSyncLine(line.dataset.id, line.textContent);
+    _reportAutoSave();
   });
-  ta.addEventListener('keydown', e=>{
-    if(e.altKey && e.key==='Enter'){ e.preventDefault(); rpBlockPopupOpen(); return; }
-    // Enter → 새 줄 + • 자동
-    if(e.key==='Enter' && !e.altKey && !e.ctrlKey && !e.shiftKey){
+
+  editor.addEventListener('keydown',e=>{
+    const line=e.target.closest?.('.rp-line');
+    if(!line) return;
+
+    // Alt+Enter → 인라인 블럭 팝업
+    if(e.altKey && e.key==='Enter'){
       e.preventDefault();
-      const s = ta.selectionStart, end = ta.selectionEnd;
-      ta.value = ta.value.slice(0,s) + '\n• ' + ta.value.slice(end);
-      ta.selectionStart = ta.selectionEnd = s + 3;
-      _reportCommitText(); _reportAutoSave();
+      rpShowInlinePopup(line.dataset.id);
+      return;
+    }
+
+    // Enter → 새 줄 + • 자동
+    if(e.key==='Enter' && !e.altKey && !e.ctrlKey){
+      e.preventDefault();
+      const sel=window.getSelection();
+      if(!sel.rangeCount) return;
+      const range=sel.getRangeAt(0);
+      // 커서 이후 텍스트 추출
+      const afterRange=range.cloneRange();
+      afterRange.selectNodeContents(line);
+      afterRange.setStart(range.endContainer,range.endOffset);
+      const afterText=afterRange.toString();
+      afterRange.deleteContents();
+      _reportSyncLine(line.dataset.id, line.textContent);
+      // 새 라인
+      const newId='l'+Date.now()+Math.random().toString(36).slice(2,4);
+      const newLine=document.createElement('div');
+      newLine.className='rp-line'; newLine.dataset.id=newId;
+      newLine.contentEditable='true'; newLine.textContent='• '+afterText;
+      // 폼이 있으면 그 뒤에 삽입
+      const form=line.nextSibling?.classList?.contains('rp-bp-form')?line.nextSibling:null;
+      (form||line).after(newLine);
+      // 커서를 • 다음으로
+      const r=document.createRange();
+      const tn=newLine.firstChild;
+      if(tn){ r.setStart(tn,2); r.collapse(true); }
+      else{ r.selectNodeContents(newLine); r.collapse(false); }
+      sel.removeAllRanges(); sel.addRange(r);
+      // 데이터 업데이트
+      const entry=_reportEnsureEntry();
+      const idx=entry.content.findIndex(i=>i.id===line.dataset.id);
+      entry.content.splice(idx<0?entry.content.length:idx+1,0,{id:newId,type:'line',text:'• '+afterText});
+      _reportAutoSave();
+      return;
+    }
+
+    // Backspace on empty line → 제거
+    if(e.key==='Backspace'&&(line.textContent===''||line.textContent==='• ')){
+      const k=_reportKey(); if(!_reportAllData[k]) return;
+      const content=_reportAllData[k].content||[];
+      if(content.filter(i=>i.type==='line').length<=1) return;
+      e.preventDefault();
+      const prev=line.previousSibling;
+      _reportAllData[k].content=content.filter(i=>i.id!==line.dataset.id);
+      line.remove();
+      if(prev?.classList?.contains('rp-line')){
+        prev.focus();
+        const r=document.createRange(); r.selectNodeContents(prev); r.collapse(false);
+        window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+      }
+      _reportAutoSave();
     }
   });
-  ta.addEventListener('input', ()=>{ _reportCommitText(); _reportAutoSave(); });
-  // 팝업 내 Enter 키
-  const bpTask = document.getElementById('rpBpTask');
-  if(bpTask) bpTask.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('rpBpTime').focus(); }});
-  const bpTime = document.getElementById('rpBpTime');
-  if(bpTime) bpTime.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); rpBlockSave(); }});
+
+  // 에디터 빈 상태 클릭시 첫 줄 생성
+  editor.addEventListener('click',e=>{
+    if(e.target===editor && !editor.querySelector('.rp-line')){
+      const newId='l_c'+Date.now();
+      _reportEnsureEntry().content=[{id:newId,type:'line',text:'• '}];
+      editor.innerHTML=`<div class="rp-line" data-id="${newId}" contenteditable="true">• </div>`;
+      const line=editor.firstElementChild; line.focus();
+      const r=document.createRange(); r.selectNodeContents(line); r.collapse(false);
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+    }
+  });
 }
 
 // ── 등록/수정 모달 ──
