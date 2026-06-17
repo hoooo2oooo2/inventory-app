@@ -48,13 +48,14 @@ body{background:var(--bg2);min-height:100vh;}
 
 /* ── 협업업무(collab) ── */
 #page-collab.active{display:block;}
-.collab-wrap{display:flex;gap:12px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
-.collab-board{flex:2;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-.collab-cal{flex:3;min-width:0;display:flex;flex-direction:row;gap:8px;background:transparent;border:none;padding:0;}
-.cal-iframe-col{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-.cal-iframe-col iframe{width:100%;height:100%;border:none;display:block;}
+/* ── 협업업무 레이아웃: 상단 캘린더 + 하단 보드/보고서 ── */
+.collab-wrap{display:flex;flex-direction:column;gap:10px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
+.collab-cal-top{flex:0 0 260px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-cal-top iframe{width:100%;height:100%;border:none;display:block;}
+.collab-bottom{flex:1;min-height:0;display:flex;flex-direction:row;gap:10px;}
+.collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 /* 업무보고서 native panel */
-.report-panel{flex:2;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:visible;position:relative;}
+.report-panel{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:visible;position:relative;}
 .rp-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;}
 .rp-head-left{display:flex;align-items:center;gap:8px;}
 .rp-head-title{font-size:13px;font-weight:800;color:var(--tx);}
@@ -794,26 +795,25 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 협업업무 (디자인팀) ═══ -->
 <div class="page" id="page-collab">
   <div class="collab-wrap">
-    <!-- 좌측: 3인 협업 보드 -->
-    <div class="collab-board">
-      <div class="collab-board-head">
-        <span style="font-size:15px;font-weight:800;color:var(--tx);">🤝 협업업무 보드</span>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
-          <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 폴더가 클릭으로 안 열릴 때, PC당 1회 실행하면 바로 열립니다">📂 폴더열기 설정</button>
-          <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
-        </div>
-      </div>
-      <div class="collab-manager" id="collabManager"></div>
-      <div class="collab-cols" id="collabCols"></div>
+    <!-- 상단: 업무 캘린더 (전체 너비) -->
+    <div class="collab-cal-top">
+      <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
     </div>
-    <!-- 우측: 캘린더 iframe + 업무보고서 패널 -->
-    <div class="collab-cal">
-      <!-- 캘린더 iframe (좁게) -->
-      <div class="cal-iframe-col">
-        <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
+    <!-- 하단: 협업업무 보드(좌) + 업무보고서(우) -->
+    <div class="collab-bottom">
+      <div class="collab-board">
+        <div class="collab-board-head">
+          <span style="font-size:15px;font-weight:800;color:var(--tx);">🤝 협업업무 보드</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
+            <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 폴더가 클릭으로 안 열릴 때, PC당 1회 실행하면 바로 열립니다">📂 폴더열기 설정</button>
+            <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
+          </div>
+        </div>
+        <div class="collab-manager" id="collabManager"></div>
+        <div class="collab-cols" id="collabCols"></div>
       </div>
-      <!-- 업무보고서 네이티브 패널 -->
+      <!-- 업무보고서 패널 -->
       <div class="report-panel" id="reportPanel">
         <div class="rp-head">
           <div class="rp-head-left">
@@ -830,7 +830,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rp-person-tabs" id="rpPersonTabs"></div>
         <div class="rp-pinned" id="rpPinned" style="display:none;"></div>
         <div class="rp-body">
-          <!-- contenteditable 에디터: .rp-line(텍스트)과 .rp-block이 자연스럽게 섞임 -->
           <div class="rp-editor" id="rpEditor"></div>
         </div>
       </div>
@@ -8425,7 +8424,7 @@ let _calLoaded = false;
 function loadCalPage() {
   const iframe = document.getElementById('calPageFrame');
   if (!iframe || _calLoaded) return;
-  iframe.src = 'calendar.html?v=20260611b';
+  iframe.src = 'calendar.html?v=20260617b&mode=full';
   _calLoaded = true;
   // 기존에 주입됐던 재고 이벤트 제거 (연동 해제)
   iframe.onload = () => {
@@ -8860,14 +8859,27 @@ function _reportSyncLine(id, text){
 
 function reportSetPerson(p){ _reportPerson=p; renderReportPanel(); }
 function reportPrevDay(){
-  const d=new Date(_reportDate+'T00:00:00'); d.setDate(d.getDate()-1);
+  const base=_reportDate||_reportTodayStr();
+  const d=new Date(base+'T00:00:00');
+  if(isNaN(d)){ _reportDate=_reportTodayStr(); renderReportPanel(); return; }
+  d.setDate(d.getDate()-1);
   _reportDate=d.toISOString().slice(0,10); renderReportPanel();
 }
 function reportNextDay(){
-  const d=new Date(_reportDate+'T00:00:00'); d.setDate(d.getDate()+1);
+  const base=_reportDate||_reportTodayStr();
+  const d=new Date(base+'T00:00:00');
+  if(isNaN(d)){ _reportDate=_reportTodayStr(); renderReportPanel(); return; }
+  d.setDate(d.getDate()+1);
   _reportDate=d.toISOString().slice(0,10); renderReportPanel();
 }
 function reportTodayBtn(){ _reportDate=_reportTodayStr(); renderReportPanel(); }
+// 캘린더 iframe에서 날짜 클릭 시 업무보고서 날짜 연동
+window.addEventListener('message', e=>{
+  if(e.data?.type==='calDateSelect' && e.data.date){
+    _reportDate = e.data.date;
+    renderReportPanel();
+  }
+});
 
 function renderReportPanel(){
   if(!document.getElementById('reportPanel')) return;

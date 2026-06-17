@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>업무 캘린더</title>
-<!-- iframe 모드: <head>에서 즉시 클래스 적용 → CSS로 그리드만 표시 -->
-<script>if(window.self!==window.top)document.documentElement.classList.add('iframe-mode');</script>
+<!-- iframe 모드: mode=full 파라미터 없을 때만 그리드 전용 모드 적용 -->
+<script>if(window.self!==window.top && new URLSearchParams(location.search).get('mode')!=='full')document.documentElement.classList.add('iframe-mode');</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -705,9 +705,6 @@ html, body {
     <div class="task-list-wrap" id="taskWrap"></div>
   </main>
 </div>
-
-<!-- Dark mode toggle -->
-<button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="다크모드 전환">🌙</button>
 
 <!-- FAB -->
 <button class="fab" id="fabBtn">
@@ -1758,6 +1755,8 @@ function pickDate(ds) {
   renderCalendar();
   renderTasks();
   updateToolButtons();
+  // 부모 페이지(index.html)에 날짜 선택 알림 → 업무보고서 연동
+  if(window.parent !== window) window.parent.postMessage({ type:'calDateSelect', date:ds }, '*');
 }
 
 // ── TASK OPERATIONS ──
