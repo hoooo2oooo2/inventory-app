@@ -8464,13 +8464,17 @@ function _collabCanEdit(){ return _menuPerm('collab')==='edit'; }
 function loadCollabPage(){
   // 캘린더 iframe 1회 로드
   const f = document.getElementById('collabCalFrame');
-  if(f && !_collabCalLoaded){ f.src = 'calendar.html?v=20260611b'; _collabCalLoaded = true; }
+  if(f && !_collabCalLoaded){ f.src = 'calendar.html?v=20260617b'; _collabCalLoaded = true; }
   // 협업업무 데이터 로드 + 실시간 구독 + 폴링
   collabReload().then(renderCollab);
   collabStartRealtime();
-  // 업무보고서 패널 초기화
+  // 업무보고서 패널 초기화 + 구 calendar.html 데이터 1회 마이그레이션
   if(!_reportDate) _reportDate = _reportTodayStr();
-  loadReport().then(()=>{ renderReportPanel(); _reportSetupKeyboard(); });
+  loadReport().then(async ()=>{
+    await _reportMigrateFromCalendar();
+    renderReportPanel();
+    _reportSetupKeyboard();
+  });
 }
 
 async function collabReload(){
@@ -9104,6 +9108,38 @@ function reportBlockCopy(task,time){
   editor?.appendChild(tpl.content.firstElementChild);
   document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
   _reportAutoSave();
+}
+
+// calendar.html 구 업무보고서 데이터 → work_report_v1 1회 마이그레이션
+async function _reportMigrateFromCalendar(){
+  if(localStorage.getItem('report_cal_migrated_v1')) return;
+  const PEOPLE = ['유현','보라','연정'];
+  let count = 0;
+  for(const person of PEOPLE){
+    try{
+      const { data, error } = await sb.from('work_calendar')
+        .select('data').eq('person', person).eq('kind','reports').maybeSingle();
+      if(error || !data?.data) continue;
+      const reports = data.data; // { 'YYYY-MM-DD': { workDone, issues } }
+      for(const [date, report] of Object.entries(reports)){
+        const key = `${person}|${date}`;
+        // 이미 새 포맷 데이터가 있으면 건너뜀
+        if(_reportAllData[key]?.content?.length) continue;
+        const combined = [report.workDone, report.issues].filter(Boolean).join('\n');
+        if(!combined.trim()) continue;
+        const content = combined.split('\n').map((line, i) => ({
+          id: `cal_${date}_${i}`, type: 'line', text: line
+        }));
+        _reportAllData[key] = { content, notes: [] };
+        count++;
+      }
+    }catch(e){ console.warn('calendar migration error', person, e); }
+  }
+  if(count > 0){
+    await _reportFlushSave();
+    toast(`📋 이전 업무보고서 ${count}일치 데이터를 가져왔습니다.`);
+  }
+  localStorage.setItem('report_cal_migrated_v1', '1');
 }
 
 // 이벤트 델리게이션 — 한 번만 등록
