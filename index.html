@@ -48,14 +48,14 @@ body{background:var(--bg2);min-height:100vh;}
 
 /* ── 협업업무(collab) ── */
 #page-collab.active{display:block;}
-/* ── 협업업무 레이아웃: 상단 캘린더 + 하단 보드/보고서 ── */
-.collab-wrap{display:flex;flex-direction:column;gap:10px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
-.collab-cal-top{flex:0 0 260px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+/* ── 협업업무 레이아웃: 좌=보드(전체높이) / 우=달력(위)+보고서(아래) ── */
+.collab-wrap{display:flex;flex-direction:row;gap:10px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
+.collab-board{flex:1.1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-right{flex:0.9;min-width:0;display:flex;flex-direction:column;gap:10px;}
+.collab-cal-top{flex:0 0 230px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-top iframe{width:100%;height:100%;border:none;display:block;}
-.collab-bottom{flex:1;min-height:0;display:flex;flex-direction:row;gap:10px;}
-.collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 /* 업무보고서 native panel */
-.report-panel{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:visible;position:relative;}
+.report-panel{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:visible;position:relative;}
 .rp-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;}
 .rp-head-left{display:flex;align-items:center;gap:8px;}
 .rp-head-title{font-size:13px;font-weight:800;color:var(--tx);}
@@ -795,25 +795,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 협업업무 (디자인팀) ═══ -->
 <div class="page" id="page-collab">
   <div class="collab-wrap">
-    <!-- 상단: 업무 캘린더 (전체 너비) -->
-    <div class="collab-cal-top">
-      <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
-    </div>
-    <!-- 하단: 협업업무 보드(좌) + 업무보고서(우) -->
-    <div class="collab-bottom">
-      <div class="collab-board">
-        <div class="collab-board-head">
-          <span style="font-size:15px;font-weight:800;color:var(--tx);">🤝 협업업무 보드</span>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
-            <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 폴더가 클릭으로 안 열릴 때, PC당 1회 실행하면 바로 열립니다">📂 폴더열기 설정</button>
-            <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
-          </div>
+    <!-- 좌: 협업업무 보드 (전체 높이) -->
+    <div class="collab-board">
+      <div class="collab-board-head">
+        <span style="font-size:15px;font-weight:800;color:var(--tx);">🤝 협업업무 보드</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
+          <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 폴더가 클릭으로 안 열릴 때, PC당 1회 실행하면 바로 열립니다">📂 폴더열기 설정</button>
+          <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
         </div>
-        <div class="collab-manager" id="collabManager"></div>
-        <div class="collab-cols" id="collabCols"></div>
       </div>
-      <!-- 업무보고서 패널 -->
+      <div class="collab-manager" id="collabManager"></div>
+      <div class="collab-cols" id="collabCols"></div>
+    </div>
+    <!-- 우: 달력(위 컴팩트) + 업무보고서(아래 넓게) -->
+    <div class="collab-right">
+      <div class="collab-cal-top">
+        <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
+      </div>
       <div class="report-panel" id="reportPanel">
         <div class="rp-head">
           <div class="rp-head-left">
