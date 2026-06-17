@@ -103,7 +103,7 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .rp-bp-cancel{background:none;border:none;font-size:11px;cursor:pointer;color:var(--tx2);padding:1px 3px;}
 /* Link dropdown — 패널 바깥으로 넘칠 수 있게 fixed */
-.rp-link-drop{position:fixed;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:9999;min-width:210px;max-height:220px;overflow-y:auto;}
+.rp-link-drop{position:fixed;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:9999;max-height:240px;overflow-y:auto;}
 .rp-link-drop-head{padding:5px 10px;font-size:10px;font-weight:800;color:var(--tx2);background:var(--bg2);border-bottom:0.5px solid var(--bd);position:sticky;top:0;}
 .rp-link-drop-item{padding:7px 10px;cursor:pointer;font-size:12px;color:var(--tx);border-bottom:0.5px solid var(--bd);}
 .rp-link-drop-item:last-child{border-bottom:none;}
@@ -8872,7 +8872,7 @@ function _reportSyncLine(id, text){
   if(item) item.text = text;
 }
 
-function reportSetPerson(p){ _reportPerson=p; _reportCategoryFilter=null; renderReportPanel(); }
+function reportSetPerson(p){ _reportPerson=p; renderReportPanel(); }
 function reportSetCategory(cat){
   _reportCategoryFilter = (_reportCategoryFilter===cat) ? null : cat;
   renderReportPanel();
@@ -9022,11 +9022,58 @@ function _rpBlockHTML(item){
       ${catBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${sub?`<span class="rp-block-sub"> — ${_esc(sub)}</span>`:''}
     </div>
     <div class="rp-block-btns">
+      <button class="rp-block-btn" title="수정" onclick="reportEditBlock('${item.id}')">✏️</button>
       <button class="rp-block-btn" title="${item.pinned?'고정 해제':'상단 고정'}" onclick="reportTogglePin('${item.id}')">${item.pinned?'📌':'📍'}</button>
       <button class="rp-block-btn" title="협업업무 연동 / 이전 블럭" onclick="reportLinkBlock(event,'${item.id}')">▼</button>
       <button class="rp-block-btn" title="삭제" onclick="reportDelBlock('${item.id}')" style="color:#DC2626;">✕</button>
     </div>
   </div>`;
+}
+
+// 블럭 ID로 어느 날짜 키에 속하는지 탐색 (카테고리 필터 뷰에서도 동작)
+function _reportFindBlockKey(id){
+  const curKey=_reportKey();
+  if(_reportAllData[curKey]?.content?.find(i=>i.id===id)) return curKey;
+  for(const key of Object.keys(_reportAllData)){
+    if(!key.startsWith(_reportPerson+'|')) continue;
+    if(_reportAllData[key]?.content?.find(i=>i.id===id)) return key;
+  }
+  return null;
+}
+
+// 블럭 인라인 수정
+function reportEditBlock(id){
+  const key=_reportFindBlockKey(id); if(!key) return;
+  const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
+  const el=document.getElementById('rpEditor')?.querySelector(`[data-id="${id}"]`); if(!el) return;
+  const catOpts=REPORT_CATS.map(c=>`<option value="${c}"${item.category===c?' selected':''}>${c}</option>`).join('');
+  const form=document.createElement('div');
+  form.className='rp-bp-form'; form.dataset.editId=id;
+  form.innerHTML=`<select class="rp-bp-cat" id="rpBpECat"><option value="">카테고리</option>${catOpts}</select>
+    <input id="rpBpETask" class="rp-bp-input" value="${(item.task||'').replace(/"/g,'&quot;')}">
+    <input id="rpBpETime" class="rp-bp-input" placeholder="소요시간" value="${(item.time||'').replace(/"/g,'&quot;')}">
+    <button class="rp-bp-save" onclick="reportEditBlockSave('${id}')">저장</button>
+    <button class="rp-bp-cancel" onclick="reportEditBlockCancel('${id}')">✕</button>`;
+  el.replaceWith(form);
+  setTimeout(()=>{ document.getElementById('rpBpETask')?.focus(); document.getElementById('rpBpETask')?.select(); },20);
+}
+function reportEditBlockSave(id){
+  const task=(document.getElementById('rpBpETask')?.value||'').trim();
+  const time=(document.getElementById('rpBpETime')?.value||'').trim();
+  const category=document.getElementById('rpBpECat')?.value||null;
+  if(!task){ toast('업무명을 입력하세요.'); return; }
+  const key=_reportFindBlockKey(id); if(!key) return;
+  const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
+  item.task=task; item.time=time; item.category=category||null;
+  const form=document.getElementById('rpEditor')?.querySelector(`[data-edit-id="${id}"]`);
+  if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item); form.replaceWith(tpl.content.firstElementChild); }
+  _rpRenderPinned(); _reportAutoSave();
+}
+function reportEditBlockCancel(id){
+  const key=_reportFindBlockKey(id); if(!key) return;
+  const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
+  const form=document.getElementById('rpEditor')?.querySelector(`[data-edit-id="${id}"]`);
+  if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item); form.replaceWith(tpl.content.firstElementChild); }
 }
 
 // 📌 고정 메모
@@ -9056,7 +9103,7 @@ function reportTogglePin(id){
   _rpRenderPinned(); _reportAutoSave();
 }
 function reportDelBlock(id){
-  const k=_reportKey(); if(!_reportAllData[k]) return;
+  const k=_reportFindBlockKey(id)||_reportKey(); if(!_reportAllData[k]) return;
   _reportAllData[k].content=(_reportAllData[k].content||[]).filter(i=>i.id!==id);
   document.getElementById('rpEditor')?.querySelector(`[data-id="${id}"]`)?.remove();
   _rpRenderPinned(); _reportAutoSave();
@@ -9105,8 +9152,11 @@ function rpBlockSave(){
   const entry=_reportEnsureEntry();
   const idx=afterId ? entry.content.findIndex(i=>i.id===afterId) : entry.content.length-1;
   entry.content.splice(idx<0?entry.content.length:idx+1,0,newBlock);
-  // DOM: 블럭 삽입
+  // DOM: empty state 정리 후 블럭 삽입
   const editor=document.getElementById('rpEditor');
+  editor.onclick=null;
+  editor.querySelector('.rp-empty-msg')?.remove();
+  editor.querySelectorAll('.rp-line[style*="display:none"]').forEach(l=>l.style.display='');
   const anchor=afterId?editor?.querySelector(`.rp-line[data-id="${afterId}"]`):null;
   const tpl=document.createElement('template');
   tpl.innerHTML=_rpBlockHTML(newBlock);
@@ -9133,9 +9183,10 @@ function reportLinkBlock(ev,id){
   const rect=ev.currentTarget.getBoundingClientRect();
   const drop=document.createElement('div');
   drop.className='rp-link-drop';
-  // 화면 오른쪽 넘침 방지
-  const left=Math.min(rect.left, window.innerWidth-220);
-  drop.style.cssText=`left:${left}px;top:${rect.bottom+4}px;`;
+  // 화면 오른쪽 넘침 방지: 버튼 오른쪽 끝 기준으로 왼쪽 정렬
+  const dropW=230;
+  const left=Math.max(4, rect.right+dropW>window.innerWidth ? rect.right-dropW : rect.left);
+  drop.style.cssText=`left:${left}px;top:${rect.bottom+4}px;min-width:${dropW}px;`;
   const personTasks=(_collabTasks||[]).filter(t=>!t.weekly&&t.assignee===_reportPerson&&!_collabArchived(t));
   let html=`<div class="rp-link-drop-head">🤝 협업업무 (${_reportPerson})</div>`;
   if(personTasks.length){
