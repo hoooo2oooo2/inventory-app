@@ -52,7 +52,16 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-board{flex:1.55;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal{flex:1;min-width:300px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;padding:8px;}
 .collab-board-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--bd);}
-.collab-cols{flex:1;display:flex;gap:10px;padding:12px;overflow:hidden;}
+.collab-done-btn{font-size:11px;font-weight:700;color:#3182F6;background:var(--prl);border:none;border-radius:7px;padding:5px 11px;cursor:pointer;}
+.collab-done-btn:hover{background:#DCE8FF;}
+/* 실장님 존 (상단 가운데) */
+.collab-manager{margin:8px 12px 0;padding:12px 14px;background:var(--bg);border:1.5px dashed var(--bd);border-radius:11px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:outline .12s,background .12s;}
+.collab-manager.drop-on{outline:2px dashed #0D9488;outline-offset:-3px;background:#ECFDF5;}
+.collab-manager-head{display:flex;align-items:center;justify-content:center;gap:10px;}
+.collab-manager-items{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;width:100%;}
+.collab-manager-items .postit{width:230px;}
+.collab-manager-empty{color:var(--tx2);font-size:12px;text-align:center;padding:4px 0;}
+.collab-cols{flex:1;display:flex;gap:10px;padding:14px 12px 12px;overflow:hidden;}
 .collab-col{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;transition:box-shadow .12s,outline .12s;}
 .collab-col.drop-on{outline:2px dashed var(--pr);outline-offset:-3px;background:var(--prl);}
 .collab-col-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:0.5px solid var(--bd);}
@@ -71,6 +80,8 @@ body{background:var(--bg2);min-height:100vh;}
 .postit-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px;padding-top:7px;border-top:0.5px dashed var(--bd);font-size:10.5px;color:var(--tx2);}
 .postit-del{font-size:14px;color:#bbb;background:none;border:none;cursor:pointer;padding:0 2px;line-height:1;}
 .postit-del:hover{color:#DC2626;}
+.postit-done{margin-top:6px;padding:6px 8px;background:#EFF6FF;border-radius:7px;font-size:10.5px;color:#2563EB;line-height:1.5;}
+.postit-done b{color:#1D4ED8;}
 .cl-lbl{font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:6px;}
 .cl-person-pick,.cl-status-pick{display:flex;gap:8px;}
 .cl-chip{flex:1;text-align:center;font-size:13px;font-weight:700;border:1.5px solid var(--bd);border-radius:8px;padding:9px 0;cursor:pointer;background:var(--bg);color:var(--tx2);transition:all .1s;}
@@ -671,6 +682,18 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- ═══ 협업업무 완료목록 ═══ -->
+<div class="modal-overlay" id="collabDoneModal">
+  <div class="modal" style="max-width:560px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">✅ 완료목록</h3>
+      <button class="btn btn-sm" onclick="closeModal('collabDoneModal')">✕ 닫기</button>
+    </div>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">완료된 업무는 완료 당일엔 보드에 남고, <b>다음날 자동으로 이 목록으로 이동</b>됩니다.</div>
+    <div id="collabDoneBody" style="max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+
 <!-- ═══ 마이페이지 (계정/권한) ═══ -->
 <div class="modal-overlay" id="myPageModal">
   <div class="modal um-modal">
@@ -707,8 +730,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="collab-board">
       <div class="collab-board-head">
         <span style="font-size:15px;font-weight:800;color:var(--tx);">🤝 협업업무 보드</span>
-        <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
+          <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
+        </div>
       </div>
+      <div class="collab-manager" id="collabManager"></div>
       <div class="collab-cols" id="collabCols"></div>
     </div>
     <!-- 우측: 업무 캘린더 -->
@@ -8317,8 +8344,10 @@ function loadCalPage() {
 // ══════════════════════════════════════════════
 // 협업업무 보드 (실시간 공유: Supabase realtime + 폴링 폴백)
 // ══════════════════════════════════════════════
+const COLLAB_MANAGER = '실장님';
 const COLLAB_PEOPLE = ['유현','보라','연정'];
-const COLLAB_PERSON_COLOR = { '유현':'#3182F6', '보라':'#8B5CF6', '연정':'#EC4899' };
+const COLLAB_ALL = [COLLAB_MANAGER, ...COLLAB_PEOPLE];
+const COLLAB_PERSON_COLOR = { '실장님':'#0D9488', '유현':'#3182F6', '보라':'#8B5CF6', '연정':'#EC4899' };
 const COLLAB_STATUS = {
   plan:  { label:'진행예정', color:'#05C072' },
   doing: { label:'진행중',   color:'#F59E0B' },
@@ -8392,33 +8421,81 @@ function _collabFmtTime(iso){
   const Y=d.getFullYear(), M=pad(d.getMonth()+1), D=pad(d.getDate());
   return `${Y}.${M}.${D} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+// 로컬 날짜(YYYY-MM-DD)
+function _collabDayStr(iso){ const d=new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+// 소요시간 (생성→완료) 일/시간/분
+function _collabDur(a,b){
+  let ms = new Date(b)-new Date(a); if(isNaN(ms)||ms<0) ms=0;
+  const tot = Math.floor(ms/60000);
+  const days=Math.floor(tot/1440), hrs=Math.floor((tot%1440)/60), mins=tot%60;
+  let s=''; if(days)s+=days+'일 '; if(hrs)s+=hrs+'시간 '; s+=mins+'분';
+  return s.trim();
+}
+// 완료 후 다음날부터는 보드에서 숨기고 완료목록으로 이동
+function _collabArchived(t){
+  return t.status==='done' && t.completed_at && _collabDayStr(t.completed_at) < _collabDayStr(new Date().toISOString());
+}
+// 상태 변경 시 완료시각 기록/해제
+function _collabSetStatus(t, status){
+  t.status = status;
+  if(status==='done'){ if(!t.completed_at) t.completed_at = new Date().toISOString(); }
+  else { t.completed_at = null; }
+}
+// 포스트잇 카드 HTML
+function _collabCardHTML(t, canEdit){
+  const st = COLLAB_STATUS[t.status] || COLLAB_STATUS.plan;
+  const pcolor = COLLAB_PERSON_COLOR[t.assignee] || '#888';
+  const doneBox = (t.status==='done' && t.completed_at)
+    ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabDur(t.created_at, t.completed_at)}</b></div>`
+    : '';
+  return `<div class="postit" style="border-left-color:${st.color};" draggable="${canEdit}"
+      ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
+      ondblclick="${canEdit?`collabOpenEdit('${t.id}')`:''}">
+    <div class="postit-top">
+      <span class="postit-badge" style="background:${st.color};">${st.label}</span>
+      ${canEdit?`<button class="postit-del" title="삭제" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
+    </div>
+    <div class="postit-title">${_esc(t.title)}</div>
+    ${t.detail?`<div class="postit-detail">${_esc(t.detail)}</div>`:''}
+    ${doneBox}
+    <div class="postit-foot">
+      <span>🕒 ${_collabFmtTime(t.created_at)}</span>
+      <span style="color:${pcolor};font-weight:700;">${t.assignee}</span>
+    </div>
+  </div>`;
+}
 
 function renderCollab(){
   const wrap = document.getElementById('collabCols');
   if(!wrap) return;
   const canEdit = _collabCanEdit();
+  const visible = _collabTasks.filter(t=>!_collabArchived(t));
+  const byPerson = p => visible.filter(t=>t.assignee===p).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+
+  // ── 실장님 존 (상단 가운데) ──
+  const mgr = document.getElementById('collabManager');
+  if(mgr){
+    const mColor = COLLAB_PERSON_COLOR[COLLAB_MANAGER];
+    const mItems = byPerson(COLLAB_MANAGER);
+    mgr.dataset.person = COLLAB_MANAGER;
+    mgr.setAttribute('ondragover','collabDragOver(event)');
+    mgr.setAttribute('ondragleave','collabDragLeave(event)');
+    mgr.setAttribute('ondrop',`collabDrop(event,'${COLLAB_MANAGER}')`);
+    mgr.innerHTML = `
+      <div class="collab-manager-head">
+        <button class="collab-name-btn" style="background:${mColor};font-size:15px;"><span>★</span>${COLLAB_MANAGER}<span style="opacity:.85;font-weight:600;">${mItems.length}</span></button>
+        ${canEdit?`<button class="collab-add-btn" onclick="collabOpenNew('${COLLAB_MANAGER}')">＋ 업무 등록</button>`:''}
+      </div>
+      <div class="collab-manager-items">
+        ${mItems.map(t=>_collabCardHTML(t,canEdit)).join('') || `<div class="collab-manager-empty">실장님 업무 없음 — 등록 후 아래 직원에게 드래그해 분배하세요.</div>`}
+      </div>`;
+  }
+
+  // ── 직원 3인 컬럼 ──
   wrap.innerHTML = COLLAB_PEOPLE.map(person=>{
     const color = COLLAB_PERSON_COLOR[person];
-    const items = _collabTasks
-      .filter(t=>t.assignee===person)
-      .sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
-    const cards = items.map(t=>{
-      const st = COLLAB_STATUS[t.status] || COLLAB_STATUS.plan;
-      return `<div class="postit" style="border-left-color:${st.color};" draggable="${canEdit}"
-          ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
-          ondblclick="${canEdit?`collabOpenEdit('${t.id}')`:''}">
-        <div class="postit-top">
-          <span class="postit-badge" style="background:${st.color};">${st.label}</span>
-          ${canEdit?`<button class="postit-del" title="삭제" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
-        </div>
-        <div class="postit-title">${_esc(t.title)}</div>
-        ${t.detail?`<div class="postit-detail">${_esc(t.detail)}</div>`:''}
-        <div class="postit-foot">
-          <span>🕒 ${_collabFmtTime(t.created_at)}</span>
-          <span style="color:${color};font-weight:700;">${person}</span>
-        </div>
-      </div>`;
-    }).join('');
+    const items = byPerson(person);
+    const cards = items.map(t=>_collabCardHTML(t,canEdit)).join('');
     return `<div class="collab-col" data-person="${person}"
         ondragover="collabDragOver(event)" ondragleave="collabDragLeave(event)" ondrop="collabDrop(event,'${person}')">
       <div class="collab-col-head">
@@ -8432,13 +8509,41 @@ function renderCollab(){
   }).join('');
 }
 
+// ── 완료목록 모달 ──
+function collabOpenDone(){
+  const done = _collabTasks
+    .filter(t=>t.status==='done' && t.completed_at)
+    .sort((a,b)=> new Date(b.completed_at) - new Date(a.completed_at));
+  const body = document.getElementById('collabDoneBody');
+  if(done.length===0){
+    body.innerHTML = `<div style="text-align:center;color:var(--tx2);font-size:13px;padding:30px 0;">완료된 업무가 없습니다.</div>`;
+  }else{
+    body.innerHTML = done.map(t=>{
+      const pcolor = COLLAB_PERSON_COLOR[t.assignee] || '#888';
+      return `<div style="border:0.5px solid var(--bd);border-left:4px solid #3182F6;border-radius:9px;padding:10px 12px;background:var(--bg);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span style="font-size:13.5px;font-weight:700;color:var(--tx);">${_esc(t.title)}</span>
+          <span style="font-size:11px;font-weight:700;color:${pcolor};">${t.assignee}</span>
+        </div>
+        ${t.detail?`<div style="font-size:12px;color:var(--tx2);margin-top:3px;white-space:pre-wrap;">${_esc(t.detail)}</div>`:''}
+        <div style="font-size:11px;color:var(--tx2);margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;">
+          <span>🕒 등록 ${_collabFmtTime(t.created_at)}</span>
+          <span>✅ 완료 ${_collabFmtTime(t.completed_at)}</span>
+          <span style="color:#2563EB;">⏱ 소요 <b>${_collabDur(t.created_at, t.completed_at)}</b></span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  openModal('collabDoneModal');
+}
+
 function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ── 등록/수정 모달 ──
 function collabOpenNew(person){
   if(!_collabCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   _collabEditId = null;
-  _collabFormPerson = COLLAB_PEOPLE.includes(person) ? person : '유현';
+  _collabFormPerson = COLLAB_ALL.includes(person) ? person : '유현';
   _collabFormStatus = 'plan';
   document.getElementById('collabModalTitle').textContent = '📝 업무 등록';
   document.getElementById('collabTitle').value = '';
@@ -8460,7 +8565,7 @@ function collabOpenEdit(id){
   openModal('collabModal');
 }
 function _collabRenderPicks(){
-  document.getElementById('collabPersonPick').innerHTML = COLLAB_PEOPLE.map(p=>{
+  document.getElementById('collabPersonPick').innerHTML = COLLAB_ALL.map(p=>{
     const c = COLLAB_PERSON_COLOR[p];
     const on = p===_collabFormPerson;
     return `<div class="cl-chip ${on?'on':''}" style="${on?`background:${c};`:''}" onclick="collabPickPerson('${p}')">${p}</div>`;
@@ -8480,14 +8585,16 @@ async function collabSubmit(){
   if(!title){ toast('업무명을 입력하세요.'); return; }
   if(_collabEditId){
     const t = _collabTasks.find(x=>x.id===_collabEditId);
-    if(t){ t.assignee=_collabFormPerson; t.title=title; t.detail=detail; t.status=_collabFormStatus; t.updated_at=new Date().toISOString(); }
+    if(t){ t.assignee=_collabFormPerson; t.title=title; t.detail=detail; _collabSetStatus(t,_collabFormStatus); t.updated_at=new Date().toISOString(); }
   }else{
-    _collabTasks.push({
+    const t = {
       id: 'c'+Date.now()+Math.random().toString(36).slice(2,6),
-      assignee:_collabFormPerson, title, detail, status:_collabFormStatus,
+      assignee:_collabFormPerson, title, detail, status:'plan', completed_at:null,
       created_at:new Date().toISOString(), updated_at:new Date().toISOString(),
       author:(window.__CURRENT_USER&&window.__CURRENT_USER.name)||'',
-    });
+    };
+    _collabSetStatus(t,_collabFormStatus);
+    _collabTasks.push(t);
   }
   renderCollab();
   closeModal('collabModal');
@@ -8514,7 +8621,7 @@ function collabDragStart(ev, id){
 }
 function collabDragEnd(ev){
   ev.currentTarget.classList.remove('dragging');
-  document.querySelectorAll('.collab-col.drop-on').forEach(c=>c.classList.remove('drop-on'));
+  document.querySelectorAll('.drop-on').forEach(c=>c.classList.remove('drop-on'));
 }
 function collabDragOver(ev){
   if(!_collabDragId) return;
