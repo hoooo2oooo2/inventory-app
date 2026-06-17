@@ -52,8 +52,8 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-wrap{display:flex;flex-direction:row;gap:8px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
 .collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 /* 카테고리 세로 사이드바 — 보드와 보고서 사이 */
-.collab-cat-sidebar{flex:0 0 38px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
-.collab-cat-side-btn{flex:1;border:none;background:transparent;cursor:pointer;font-size:9px;font-weight:800;writing-mode:vertical-rl;text-orientation:mixed;color:var(--tx2);transition:background .12s,color .12s;border-bottom:0.5px solid var(--bd);padding:3px 0;line-height:38px;letter-spacing:.5px;}
+.collab-cat-sidebar{flex:0 0 26px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.collab-cat-side-btn{flex:1;border:none;background:transparent;cursor:pointer;font-size:8px;font-weight:800;writing-mode:vertical-rl;text-orientation:mixed;color:var(--tx2);transition:background .12s,color .12s;border-bottom:0.5px solid var(--bd);padding:2px 0;line-height:26px;letter-spacing:.5px;}
 .collab-cat-side-btn:last-child{border-bottom:none;}
 .collab-cat-side-btn.on{color:#fff!important;}
 .collab-cat-side-btn:hover:not(.on){background:var(--bg);}
@@ -92,8 +92,8 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-block-main{font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rp-block-sub{font-size:11px;color:var(--tx2);white-space:nowrap;flex-shrink:0;}
 .rp-block-cat{font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;color:#fff;flex-shrink:0;white-space:nowrap;}
-.rp-block-btns{display:flex;gap:2px;flex-shrink:0;align-items:center;opacity:0;transition:opacity .1s;}
-.rp-block:hover .rp-block-btns{opacity:1;}
+.rp-block-btns{display:flex;gap:2px;flex-shrink:0;align-items:center;opacity:0;pointer-events:none;transition:opacity .15s;}
+.rp-block:hover .rp-block-btns{opacity:1;pointer-events:auto;}
 .rp-block-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--tx2);padding:2px 4px;border-radius:3px;line-height:1;}
 .rp-block-btn:hover{background:var(--bd);}
 /* 블럭 인라인 폼 */
@@ -9417,14 +9417,21 @@ function _reportSetupKeyboard(){
     }
   });
 
-  // 에디터 빈 상태 클릭시 첫 줄 생성
+  // 에디터 빈 공간 클릭시: 라인 없으면 생성, 있으면 마지막 라인 포커스
   editor.addEventListener('click',e=>{
-    if(e.target===editor && !editor.querySelector('.rp-line')){
+    if(e.target!==editor) return;
+    const lines=editor.querySelectorAll('.rp-line');
+    if(!lines.length){
       const newId='l_c'+Date.now();
-      _reportEnsureEntry().content=[{id:newId,type:'line',text:'• '}];
-      editor.innerHTML=`<div class="rp-line" data-id="${newId}" contenteditable="true">• </div>`;
+      _reportEnsureEntry().content=[{id:newId,type:'line',text:''}];
+      editor.innerHTML=`<div class="rp-line" data-id="${newId}" contenteditable="true"></div>`;
       const line=editor.firstElementChild; line.focus();
       const r=document.createRange(); r.selectNodeContents(line); r.collapse(false);
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+    } else {
+      const lastLine=lines[lines.length-1];
+      lastLine.focus();
+      const r=document.createRange(); r.selectNodeContents(lastLine); r.collapse(false);
       window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
     }
   });
