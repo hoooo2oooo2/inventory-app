@@ -50,7 +50,52 @@ body{background:var(--bg2);min-height:100vh;}
 #page-collab.active{display:block;}
 .collab-wrap{display:flex;gap:12px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
 .collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-.collab-cal{flex:1;min-width:300px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;padding:8px;}
+.collab-cal{flex:1.6;min-width:480px;display:flex;flex-direction:row;gap:8px;background:transparent;border:none;padding:0;}
+.cal-iframe-col{flex:0 0 220px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.cal-iframe-col iframe{width:100%;border:none;flex:1;display:block;min-height:300px;}
+/* 업무보고서 native panel */
+.report-panel{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;position:relative;}
+.rp-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);}
+.rp-head-title{font-size:13px;font-weight:800;color:var(--tx);}
+.rp-date-nav{display:flex;align-items:center;gap:3px;}
+.rp-nav-btn{font-size:11px;background:none;border:0.5px solid var(--bd);border-radius:5px;padding:2px 6px;cursor:pointer;color:var(--tx2);}
+.rp-nav-btn:hover{background:var(--bg2);}
+.rp-date-label{font-size:11.5px;font-weight:700;color:var(--tx);padding:0 4px;white-space:nowrap;}
+.rp-person-tabs{display:flex;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);}
+.rp-ptab{flex:1;text-align:center;padding:7px 0;font-size:12px;font-weight:700;cursor:pointer;border:none;background:none;color:var(--tx2);border-bottom:2px solid transparent;transition:all .1s;}
+.rp-ptab.on{border-bottom-color:var(--pr);color:var(--pr);}
+.rp-pinned{background:#FFFBEB;border-bottom:0.5px solid #FDE68A;padding:7px 10px;flex-shrink:0;max-height:120px;overflow-y:auto;}
+.rp-pinned-title{font-size:10px;font-weight:800;color:#B45309;margin-bottom:4px;}
+.rp-pinned-item{font-size:11.5px;color:var(--tx);background:#FEF3C7;border:0.5px solid #FCD34D;border-radius:6px;padding:4px 8px;margin-bottom:3px;display:flex;align-items:center;gap:6px;line-height:1.4;}
+.rp-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);}
+.rp-textarea{flex:1;width:100%;border:none;outline:none;resize:none;font-family:inherit;font-size:13px;line-height:1.7;color:var(--tx);background:transparent;padding:10px 12px;box-sizing:border-box;}
+.rp-textarea::placeholder{color:var(--tx2);opacity:.7;}
+.rp-blocks{flex-shrink:0;max-height:200px;overflow-y:auto;padding:6px 10px 8px;border-top:0.5px dashed var(--bd);display:flex;flex-direction:column;gap:5px;}
+.rp-block{background:#F0F7FF;border:1px solid #C7DFFE;border-left:3px solid #3182F6;border-radius:8px;padding:6px 10px;display:flex;align-items:flex-start;gap:8px;}
+.rp-block.pinned{background:#FFFBEB;border-color:#FDE68A;border-left-color:#F59E0B;}
+.rp-block-content{flex:1;min-width:0;}
+.rp-block-task{font-size:12px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rp-block-meta{font-size:11px;color:var(--tx2);margin-top:2px;}
+.rp-block-btns{display:flex;gap:2px;flex-shrink:0;align-items:center;}
+.rp-block-btn{background:none;border:none;cursor:pointer;font-size:12px;color:var(--tx2);padding:2px 4px;border-radius:4px;line-height:1;}
+.rp-block-btn:hover{background:var(--bd);}
+/* Alt+Enter block popup */
+.rp-block-popup{position:absolute;bottom:0;left:0;right:0;z-index:20;background:rgba(0,0,0,.25);padding-top:30px;}
+.rp-bp-inner{background:var(--bg);border-radius:12px 12px 0 0;padding:14px 14px 18px;box-shadow:0 -4px 20px rgba(0,0,0,.1);}
+.rp-bp-title{font-size:13px;font-weight:800;color:var(--tx);margin-bottom:10px;}
+.rp-bp-input{width:100%;border:1.5px solid var(--bd);border-radius:8px;padding:8px 11px;font-size:13px;outline:none;margin-bottom:8px;box-sizing:border-box;font-family:inherit;background:var(--bg);}
+.rp-bp-input:focus{border-color:var(--pr);}
+.rp-bp-btns{display:flex;gap:8px;justify-content:flex-end;}
+.rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:7px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;}
+.rp-bp-save:hover{background:#2571E0;}
+/* Link dropdown */
+.rp-link-drop{position:absolute;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:30;min-width:200px;max-height:200px;overflow-y:auto;}
+.rp-link-drop-head{padding:5px 10px;font-size:10px;font-weight:800;color:var(--tx2);background:var(--bg2);border-bottom:0.5px solid var(--bd);position:sticky;top:0;}
+.rp-link-drop-item{padding:7px 10px;cursor:pointer;font-size:12px;color:var(--tx);border-bottom:0.5px solid var(--bd);}
+.rp-link-drop-item:last-child{border-bottom:none;}
+.rp-link-drop-item:hover{background:var(--bg2);}
+/* Modal NAS preview strip */
+.collab-nas-preview{margin-top:5px;padding:6px 9px;background:#EFF6FF;border-radius:7px;border:0.5px solid #BFDBFE;font-size:11.5px;line-height:1.7;}
 .collab-board-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--bd);}
 .collab-done-btn{font-size:11px;font-weight:700;color:#3182F6;background:var(--prl);border:none;border-radius:7px;padding:5px 11px;cursor:pointer;}
 .collab-done-btn:hover{background:#DCE8FF;}
@@ -84,13 +129,13 @@ body{background:var(--bg2);min-height:100vh;}
 .cw-add:hover{background:#FDE9B8;}
 .collab-col-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;}
 .collab-col-empty{color:var(--tx2);font-size:12px;text-align:center;padding:24px 6px;line-height:1.6;}
-.postit{background:#fff;border:1px solid var(--bd);border-left:5px solid #ccc;border-radius:9px;padding:9px 10px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .08s,box-shadow .12s;display:flex;flex-direction:column;min-height:148px;}
+.postit{background:#fff;border:1px solid var(--bd);border-left:5px solid #ccc;border-radius:9px;padding:7px 9px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .08s,box-shadow .12s;display:flex;flex-direction:column;min-height:88px;}
 .postit:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);}
 .postit.dragging{opacity:.45;}
-.postit-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;}
-.postit-badge{font-size:10px;font-weight:800;color:#fff;border-radius:20px;padding:2px 9px;white-space:nowrap;}
-.postit-title{font-size:13px;font-weight:700;color:var(--tx);word-break:break-word;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:34px;}
-.postit-detail{font-size:11.5px;color:var(--tx2);margin-top:4px;word-break:break-word;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:34px;}
+.postit-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;}
+.postit-badge{font-size:10px;font-weight:800;color:#fff;border-radius:20px;padding:2px 8px;white-space:nowrap;}
+.postit-title{font-size:12.5px;font-weight:700;color:var(--tx);word-break:break-word;line-height:1.3;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;max-height:17px;}
+.postit-detail{font-size:11px;color:var(--tx2);margin-top:3px;word-break:break-word;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;max-height:16px;}
 .nas-link{cursor:pointer;text-decoration:none;font-size:14px;}
 .nas-link:hover{filter:brightness(1.1);}
 .postit-detail a{color:#2563EB;text-decoration:underline;word-break:break-all;}
@@ -684,8 +729,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
       <div>
         <div class="cl-lbl">상세내용</div>
-        <textarea id="collabDetail" placeholder="상세 내용을 입력하세요" rows="3"
-          style="width:100%;border:1.5px solid var(--bd);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit;"></textarea>
+        <textarea id="collabDetail" placeholder="상세 내용을 입력하세요&#10;(\\\\서버\폴더 경로 붙여넣으면 📂 클릭 가능)" rows="3"
+          style="width:100%;border:1.5px solid var(--bd);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit;"
+          oninput="collabDetailPreview()"></textarea>
+        <div id="collabDetailPreview" class="collab-nas-preview" style="display:none;"></div>
       </div>
       <div>
         <div class="cl-lbl">업무 진행</div>
@@ -756,11 +803,43 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="collab-manager" id="collabManager"></div>
       <div class="collab-cols" id="collabCols"></div>
     </div>
-    <!-- 우측: 업무 캘린더 -->
+    <!-- 우측: 캘린더 iframe + 업무보고서 패널 -->
     <div class="collab-cal">
-      <div class="collab-board-head" style="border:none;"><span style="font-size:13px;font-weight:700;color:var(--tx2);">📅 캘린더</span></div>
-      <iframe id="collabCalFrame" src="" title="협업 캘린더"
-        style="width:100%;border:none;flex:1;min-height:480px;display:block;border-radius:10px;background:#fff;"></iframe>
+      <!-- 캘린더 iframe (좁게) -->
+      <div class="cal-iframe-col">
+        <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
+      </div>
+      <!-- 업무보고서 네이티브 패널 -->
+      <div class="report-panel" id="reportPanel">
+        <div class="rp-head">
+          <span class="rp-head-title">📋 업무 보고서</span>
+          <div class="rp-date-nav">
+            <button class="rp-nav-btn" onclick="reportPrevDay()">‹</button>
+            <span class="rp-date-label" id="rpDateLabel">—</span>
+            <button class="rp-nav-btn" onclick="reportNextDay()">›</button>
+            <button class="rp-nav-btn" onclick="reportTodayBtn()">오늘</button>
+          </div>
+        </div>
+        <div class="rp-person-tabs" id="rpPersonTabs"></div>
+        <div class="rp-pinned" id="rpPinned" style="display:none;"></div>
+        <div class="rp-body">
+          <textarea id="rpTextarea" class="rp-textarea"
+            placeholder="업무 내용을 자유롭게 입력하세요.&#10;&#10;[ Alt + Enter ] → 업무 소요시간 블럭 추가"></textarea>
+          <div class="rp-blocks" id="rpBlocks" style="display:none;"></div>
+        </div>
+        <!-- Alt+Enter 블럭 팝업 -->
+        <div class="rp-block-popup" id="rpBlockPopup" style="display:none;">
+          <div class="rp-bp-inner">
+            <div class="rp-bp-title">⏱ 업무 소요시간 등록</div>
+            <input id="rpBpTask" class="rp-bp-input" placeholder="업무명을 입력하세요">
+            <input id="rpBpTime" class="rp-bp-input" placeholder="소요시간 (예: 30분, 2시간 30분)">
+            <div class="rp-bp-btns">
+              <button class="btn" onclick="rpBlockPopupClose()">취소</button>
+              <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -8386,12 +8465,15 @@ let _collabFormStatus = 'plan';
 function _collabCanEdit(){ return _menuPerm('collab')==='edit'; }
 
 function loadCollabPage(){
-  // 우측 캘린더 1회 로드
+  // 캘린더 iframe 1회 로드
   const f = document.getElementById('collabCalFrame');
   if(f && !_collabCalLoaded){ f.src = 'calendar.html?v=20260611b'; _collabCalLoaded = true; }
-  // 데이터 로드 + 실시간 구독 + 폴링 시작
+  // 협업업무 데이터 로드 + 실시간 구독 + 폴링
   collabReload().then(renderCollab);
   collabStartRealtime();
+  // 업무보고서 패널 초기화
+  if(!_reportDate) _reportDate = _reportTodayStr();
+  loadReport().then(()=>{ renderReport(); _reportSetupKeyboard(); });
 }
 
 async function collabReload(){
@@ -8684,6 +8766,298 @@ function collabOpenDone(){
 
 function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// ══════════════════════════════════════════════
+// 모달 상세내용 NAS 경로 미리보기 (📂 클릭 가능)
+// ══════════════════════════════════════════════
+let _collabModalPaths = [];
+function collabDetailPreview(){
+  _collabModalPaths = [];
+  const raw = (document.getElementById('collabDetail')||{}).value || '';
+  const preview = document.getElementById('collabDetailPreview');
+  if(!preview) return;
+  const re = /(\\\\[^\s<>"']+)/g;
+  let html = '', m;
+  while((m = re.exec(raw))){
+    const unc = m[1];
+    const nasUrl = 'nasopen:' + encodeURIComponent(unc);
+    const idx = _collabModalPaths.push({unc, nasUrl}) - 1;
+    html += `<span style="display:flex;align-items:center;gap:5px;margin-top:2px;">
+      <span style="color:var(--tx2);">${_esc(unc)}</span>
+      <a class="nas-link" href="${nasUrl}" title="폴더 열기" onclick="collabModalFolderClick(event,${idx})">📂</a>
+    </span>`;
+  }
+  if(html){
+    preview.style.display = '';
+    preview.innerHTML = `<span style="font-size:10.5px;font-weight:700;color:#2563EB;">📂 NAS 경로 감지 — 클릭하여 열기</span>${html}`;
+  } else {
+    preview.style.display = 'none';
+  }
+}
+function collabModalFolderClick(ev, idx){
+  ev.stopPropagation();
+  const p = _collabModalPaths[idx]; if(!p) return;
+  try{ navigator.clipboard.writeText(p.unc); }catch(e){}
+  toast('📂 폴더 여는 중… (안 열리면 "폴더열기 설정" 1회 실행)');
+}
+
+// ══════════════════════════════════════════════
+// 업무보고서 (Report Panel) — 네이티브 에디터
+// ══════════════════════════════════════════════
+const REPORT_KIND = 'work_report_v1';
+let _reportAllData = {};   // { 'person|YYYY-MM-DD': { text, blocks } }
+let _reportPerson  = '유현';
+let _reportDate    = '';
+let _reportLoaded  = false;
+let _reportSaveTimer = null;
+let _reportKbSetup   = false;
+let _rpLinkDropId    = null;
+
+function _reportTodayStr(){ return new Date().toISOString().slice(0,10); }
+function _reportKey(p, d){ return `${p||_reportPerson}|${d||_reportDate}`; }
+function _reportCurrent(){
+  return _reportAllData[_reportKey()] || { text:'', blocks:[] };
+}
+
+async function loadReport(){
+  const d = await cloudKvLoad(REPORT_KIND);
+  _reportAllData = (d && typeof d==='object' && !Array.isArray(d)) ? d : {};
+  _reportLoaded = true;
+}
+async function _reportFlushSave(){
+  await cloudKvSave(REPORT_KIND, _reportAllData);
+}
+function _reportAutoSave(){
+  if(_reportSaveTimer) clearTimeout(_reportSaveTimer);
+  _reportSaveTimer = setTimeout(_reportFlushSave, 1500);
+}
+function _reportCommitText(){
+  const ta = document.getElementById('rpTextarea');
+  if(!ta) return;
+  const k = _reportKey();
+  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[] };
+  _reportAllData[k].text = ta.value;
+}
+
+function reportSetPerson(p){
+  _reportCommitText();
+  _reportPerson = p;
+  renderReport();
+}
+function reportPrevDay(){
+  _reportCommitText();
+  const d = new Date(_reportDate + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  _reportDate = d.toISOString().slice(0,10);
+  renderReport();
+}
+function reportNextDay(){
+  _reportCommitText();
+  const d = new Date(_reportDate + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  _reportDate = d.toISOString().slice(0,10);
+  renderReport();
+}
+function reportTodayBtn(){
+  _reportCommitText();
+  _reportDate = _reportTodayStr();
+  renderReport();
+}
+
+function renderReport(){
+  if(!document.getElementById('reportPanel')) return;
+  // 날짜 레이블
+  const lbl = document.getElementById('rpDateLabel');
+  if(lbl){
+    const d = new Date(_reportDate + 'T00:00:00');
+    const days = ['일','월','화','수','목','금','토'];
+    lbl.textContent = `${_reportDate} (${days[d.getDay()]})`;
+  }
+  // 담당자 탭
+  const tabs = document.getElementById('rpPersonTabs');
+  if(tabs){
+    tabs.innerHTML = COLLAB_PEOPLE.map(p=>{
+      const c = COLLAB_PERSON_COLOR[p];
+      const on = p === _reportPerson;
+      return `<button class="rp-ptab ${on?'on':''}" style="${on?`color:${c};border-bottom-color:${c};`:''}" onclick="reportSetPerson('${p}')">${p}</button>`;
+    }).join('');
+  }
+  const entry = _reportCurrent();
+  // 텍스트 (포커스 중엔 덮어쓰지 않음)
+  const ta = document.getElementById('rpTextarea');
+  if(ta && ta !== document.activeElement) ta.value = entry.text || '';
+  // 고정 섹션
+  const pinned = (entry.blocks||[]).filter(b=>b.pinned);
+  const pinnedDiv = document.getElementById('rpPinned');
+  if(pinnedDiv){
+    if(pinned.length){
+      pinnedDiv.style.display = '';
+      pinnedDiv.innerHTML = `<div class="rp-pinned-title">📌 고정됨</div>` +
+        pinned.map(b=>`<div class="rp-pinned-item">
+          <span style="flex:1;">⏱ <b>${_esc(b.task)}</b>${b.time?' — '+_esc(b.time):''}${b.linked_title?` <span style="color:#7C3AED;font-size:10.5px;">[🔗${_esc(b.linked_title)}]</span>`:''}</span>
+          <button class="rp-block-btn" title="고정 해제" onclick="reportTogglePin('${b.id}')">📌</button>
+        </div>`).join('');
+    } else { pinnedDiv.style.display = 'none'; }
+  }
+  // 블럭 목록 (비고정)
+  const nonPinned = (entry.blocks||[]).filter(b=>!b.pinned);
+  const blocksDiv = document.getElementById('rpBlocks');
+  if(blocksDiv){
+    if(nonPinned.length){
+      blocksDiv.style.display = '';
+      blocksDiv.innerHTML = nonPinned.map(b=>`
+        <div class="rp-block${b.pinned?' pinned':''}" id="rpb-${b.id}">
+          <div class="rp-block-content">
+            <div class="rp-block-task">⏱ ${_esc(b.task)}</div>
+            <div class="rp-block-meta">${b.time?_esc(b.time):'소요시간 미입력'}${b.linked_title?` · <span style="color:#7C3AED;">🔗 ${_esc(b.linked_title)}</span>`:''}</div>
+          </div>
+          <div class="rp-block-btns">
+            <button class="rp-block-btn" title="상단 고정" onclick="reportTogglePin('${b.id}')">${b.pinned?'📌':'📍'}</button>
+            <button class="rp-block-btn" title="협업업무 연동 / 블럭 가져오기" onclick="reportLinkBlock(event,'${b.id}')">▼</button>
+            <button class="rp-block-btn" title="삭제" onclick="reportDelBlock('${b.id}')" style="color:#DC2626;">✕</button>
+          </div>
+        </div>`).join('');
+    } else { blocksDiv.style.display = 'none'; }
+  }
+}
+
+function reportTogglePin(id){
+  const k = _reportKey();
+  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[] };
+  const b = (_reportAllData[k].blocks||[]).find(x=>x.id===id);
+  if(b){ b.pinned = !b.pinned; renderReport(); _reportAutoSave(); }
+}
+function reportDelBlock(id){
+  const k = _reportKey();
+  if(!_reportAllData[k]) return;
+  _reportAllData[k].blocks = (_reportAllData[k].blocks||[]).filter(x=>x.id!==id);
+  renderReport(); _reportAutoSave();
+}
+
+// Alt+Enter 팝업 열기/닫기/저장
+function rpBlockPopupOpen(){
+  const p = document.getElementById('rpBlockPopup');
+  if(!p) return;
+  p.style.display = '';
+  document.getElementById('rpBpTask').value = '';
+  document.getElementById('rpBpTime').value = '';
+  setTimeout(()=>document.getElementById('rpBpTask').focus(), 50);
+}
+function rpBlockPopupClose(){
+  const p = document.getElementById('rpBlockPopup');
+  if(p) p.style.display = 'none';
+}
+function rpBlockSave(){
+  const task = (document.getElementById('rpBpTask').value||'').trim();
+  const time = (document.getElementById('rpBpTime').value||'').trim();
+  if(!task){ toast('업무명을 입력하세요.'); return; }
+  _reportCommitText();
+  const k = _reportKey();
+  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[] };
+  (_reportAllData[k].blocks = _reportAllData[k].blocks||[]).push({
+    id: 'b'+Date.now()+Math.random().toString(36).slice(2,5),
+    task, time, pinned:false, linked_task_id:null, linked_title:null
+  });
+  rpBlockPopupClose();
+  renderReport();
+  _reportAutoSave();
+}
+
+// ▼ 화살표 클릭 → 드롭다운 (협업업무 연동 + 기존 블럭 가져오기)
+function reportLinkBlock(ev, id){
+  ev.stopPropagation();
+  _rpLinkDropId = id;
+  document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
+
+  const panel  = document.getElementById('reportPanel');
+  const btnRect = ev.currentTarget.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+
+  const drop = document.createElement('div');
+  drop.className = 'rp-link-drop';
+  const top = btnRect.bottom - panelRect.top + 2;
+  const right = panelRect.right - btnRect.right;
+  drop.style.cssText = `right:${right}px;top:${top}px;`;
+
+  // 협업업무 목록
+  const personTasks = (_collabTasks||[]).filter(t=>!t.weekly && t.assignee===_reportPerson && !_collabArchived(t));
+  let html = `<div class="rp-link-drop-head">🤝 협업업무 연동 (${_reportPerson})</div>`;
+  if(personTasks.length){
+    html += personTasks.map(t=>{
+      const lbl = COLLAB_STATUS[t.status]?.label||'';
+      const clr = COLLAB_STATUS[t.status]?.color||'#888';
+      const safeTitle = t.title.replace(/'/g,"\\'");
+      return `<div class="rp-link-drop-item" onclick="reportLinkApply('${t.id}','${safeTitle}')">
+        <span style="color:${clr};font-size:10px;font-weight:700;margin-right:4px;">${lbl}</span>${_esc(t.title)}
+      </div>`;
+    }).join('');
+  } else {
+    html += `<div class="rp-link-drop-item" style="color:var(--tx2);">연동할 협업업무 없음</div>`;
+  }
+
+  // 기존 블럭 가져오기 (최근 5개)
+  const allPrevBlocks = [];
+  for(const [k,v] of Object.entries(_reportAllData)){
+    if(k.startsWith(_reportPerson+'|') && k!==_reportKey() && v.blocks){
+      const date = k.split('|')[1];
+      v.blocks.forEach(b=>{ if(b.task) allPrevBlocks.push({...b, date}); });
+    }
+  }
+  allPrevBlocks.sort((a,b)=>b.date.localeCompare(a.date));
+  const recent = allPrevBlocks.slice(0,5);
+  html += `<div class="rp-link-drop-head">📋 이전 블럭 가져오기</div>`;
+  if(recent.length){
+    html += recent.map(b=>{
+      const safeTask = b.task.replace(/'/g,"\\'");
+      const safeTime = (b.time||'').replace(/'/g,"\\'");
+      return `<div class="rp-link-drop-item" onclick="reportBlockCopy('${safeTask}','${safeTime}')">
+        <span style="color:var(--tx2);font-size:10px;">${b.date}</span> ${_esc(b.task)}${b.time?' — '+_esc(b.time):''}
+      </div>`;
+    }).join('');
+  } else {
+    html += `<div class="rp-link-drop-item" style="color:var(--tx2);">이전 블럭 없음</div>`;
+  }
+  drop.innerHTML = html;
+  panel.appendChild(drop);
+  setTimeout(()=>{ document.addEventListener('click', ()=>{ drop.remove(); _rpLinkDropId=null; }, {once:true}); }, 50);
+}
+function reportLinkApply(taskId, title){
+  const k = _reportKey();
+  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[] };
+  const b = (_reportAllData[k].blocks||[]).find(x=>x.id===_rpLinkDropId);
+  if(b){ b.linked_task_id=taskId; b.linked_title=title; renderReport(); _reportAutoSave(); }
+  document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
+}
+function reportBlockCopy(task, time){
+  _reportCommitText();
+  const k = _reportKey();
+  if(!_reportAllData[k]) _reportAllData[k] = { text:'', blocks:[] };
+  (_reportAllData[k].blocks = _reportAllData[k].blocks||[]).push({
+    id:'b'+Date.now()+Math.random().toString(36).slice(2,5),
+    task, time, pinned:false, linked_task_id:null, linked_title:null
+  });
+  renderReport(); _reportAutoSave();
+  document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
+}
+
+// 키보드 이벤트 & textarea 자동저장 — 한번만 등록
+function _reportSetupKeyboard(){
+  if(_reportKbSetup) return;
+  _reportKbSetup = true;
+  const ta = document.getElementById('rpTextarea');
+  if(!ta) return;
+  ta.addEventListener('keydown', e=>{
+    if(e.altKey && e.key==='Enter'){ e.preventDefault(); rpBlockPopupOpen(); }
+  });
+  ta.addEventListener('input', ()=>{
+    _reportCommitText(); _reportAutoSave();
+  });
+  // 팝업 내 Enter키
+  const bpTask = document.getElementById('rpBpTask');
+  if(bpTask) bpTask.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('rpBpTime').focus(); }});
+  const bpTime = document.getElementById('rpBpTime');
+  if(bpTime) bpTime.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); rpBlockSave(); }});
+}
+
 // ── 등록/수정 모달 ──
 function collabOpenNew(person){
   if(!_collabCanEdit()){ toast('수정 권한이 없습니다.'); return; }
@@ -8694,6 +9068,7 @@ function collabOpenNew(person){
   document.getElementById('collabTitle').value = '';
   document.getElementById('collabDetail').value = '';
   _collabRenderPicks();
+  collabDetailPreview();
   openModal('collabModal');
   setTimeout(()=>document.getElementById('collabTitle').focus(), 50);
 }
@@ -8707,6 +9082,7 @@ function collabOpenEdit(id){
   document.getElementById('collabTitle').value = t.title || '';
   document.getElementById('collabDetail').value = t.detail || '';
   _collabRenderPicks();
+  collabDetailPreview();
   openModal('collabModal');
 }
 function _collabRenderPicks(){
