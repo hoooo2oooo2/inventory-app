@@ -73,6 +73,15 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-filter{display:flex;gap:5px;}
 .cf-chip{flex:1;font-size:10px;font-weight:700;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;cursor:pointer;background:var(--bg);white-space:nowrap;transition:all .1s;}
 .cf-chip:hover{filter:brightness(.97);}
+/* 주간 목표 섹션 */
+.collab-weekly{padding:8px 9px;border-bottom:0.5px solid var(--bd);background:#FFFBEB;}
+.cw-title{font-size:10px;font-weight:800;color:#B45309;letter-spacing:.5px;margin-bottom:6px;}
+.cw-block{display:flex;align-items:flex-start;gap:6px;background:#fff;border:1px solid #FDE68A;border-radius:7px;padding:6px 8px;margin-bottom:5px;font-size:11.5px;color:var(--tx);line-height:1.35;}
+.cw-block .cw-text{flex:1;word-break:break-word;}
+.cw-del{color:#ccc;cursor:pointer;font-size:12px;background:none;border:none;padding:0 2px;line-height:1;}
+.cw-del:hover{color:#DC2626;}
+.cw-add{width:100%;font-size:11px;font-weight:700;color:#B45309;background:#FEF3C7;border:1px dashed #FCD34D;border-radius:7px;padding:5px;cursor:pointer;}
+.cw-add:hover{background:#FDE9B8;}
 .collab-col-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;}
 .collab-col-empty{color:var(--tx2);font-size:12px;text-align:center;padding:24px 6px;line-height:1.6;}
 .postit{background:#fff;border:1px solid var(--bd);border-left:5px solid #ccc;border-radius:9px;padding:9px 10px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .08s,box-shadow .12s;display:flex;flex-direction:column;min-height:148px;}
@@ -740,6 +749,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <span style="font-size:15px;font-weight:800;color:var(--tx);">🤝 협업업무 보드</span>
         <div style="display:flex;align-items:center;gap:10px;">
           <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
+          <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 폴더가 클릭으로 안 열릴 때, PC당 1회 실행하면 바로 열립니다">📂 폴더열기 설정</button>
           <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
         </div>
       </div>
@@ -8461,12 +8471,16 @@ function collabFilter(person, status){
 // 담당자 이름 옆 진행예정/진행중/완료 필터 버튼
 function _collabStatusBtns(person, baseItems){
   const cur = _collabFilter[person] || 'all';
-  return `<div class="collab-filter">` + Object.entries(COLLAB_STATUS).map(([k,v])=>{
+  const onAll = cur==='all';
+  const allStyle = onAll ? `background:#475569;border-color:#475569;color:#fff;` : `color:#475569;border-color:#47556955;`;
+  const allChip = `<button class="cf-chip" style="${allStyle}" onclick="collabFilter('${person}','all')">전체 ${baseItems.length}</button>`;
+  const rest = Object.entries(COLLAB_STATUS).map(([k,v])=>{
     const n = baseItems.filter(t=>t.status===k).length;
     const on = cur===k;
     const style = on ? `background:${v.color};border-color:${v.color};color:#fff;` : `color:${v.color};border-color:${v.color}55;`;
     return `<button class="cf-chip" style="${style}" onclick="collabFilter('${person}','${k}')">${_collabFilterShort[k]} ${n}</button>`;
-  }).join('') + `</div>`;
+  }).join('');
+  return `<div class="collab-filter">${allChip}${rest}</div>`;
 }
 // NAS(UNC) 경로 자동 감지 → 📂 링크 + http(s) 링크화 (HTML 이스케이프 포함)
 function _collabLinkify(raw){
@@ -8477,9 +8491,9 @@ function _collabLinkify(raw){
     out += _esc(raw.slice(last, m.index));
     if(m[1]){ // UNC 경로
       const unc = m[1];
-      const url = 'file:' + unc.replace(/\\/g,'/');
-      const idx = _collabPaths.push({ unc, url })-1;
-      out += _esc(unc) + ` <a class="nas-link" title="폴더 열기 / 경로 복사" onclick="collabOpenFolder(event,${idx})">📂</a>`;
+      const nasUrl = 'nasopen:' + encodeURIComponent(unc);
+      const idx = _collabPaths.push({ unc, nasUrl })-1;
+      out += _esc(unc) + ` <a class="nas-link" href="${nasUrl}" title="폴더 열기 / 경로 복사" onclick="collabFolderClick(event,${idx})">📂</a>`;
     } else { // http(s) URL
       const u = m[2];
       out += `<a href="${_esc(u)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${_esc(u)}</a>`;
@@ -8489,13 +8503,30 @@ function _collabLinkify(raw){
   out += _esc(raw.slice(last));
   return out;
 }
-// 📂 클릭 — 폴더 열기 시도 + 경로 클립보드 복사(폴백)
-function collabOpenFolder(ev, idx){
-  ev.preventDefault(); ev.stopPropagation();
+// 📂 클릭 — nasopen 프로토콜로 폴더 열기 + 경로 클립보드 복사(폴백)
+//   (href=nasopen: 가 기본 동작으로 실행되므로 preventDefault 하지 않음)
+function collabFolderClick(ev, idx){
+  ev.stopPropagation();
   const p = _collabPaths[idx]; if(!p) return;
   try{ navigator.clipboard.writeText(p.unc); }catch(e){}
-  try{ window.open(p.url, '_blank'); }catch(e){}
-  toast('📂 폴더 경로 복사됨 — 안 열리면 탐색기 주소창에 붙여넣기(Ctrl+V)');
+  toast('📂 폴더 여는 중… (안 열리면 우측 상단 "폴더열기 설정" 1회 실행)');
+}
+// 폴더 바로 열기용 nasopen 프로토콜 등록 파일(.reg) 다운로드 — PC당 최초 1회
+function collabDownloadOpener(){
+  const cmd = '@="powershell -NoProfile -WindowStyle Hidden -Command \\"$u=(\'%1\' -replace \'^nasopen:\',\'\');Add-Type -AssemblyName System.Web;$p=[System.Web.HttpUtility]::UrlDecode($u);Invoke-Item -LiteralPath $p\\""';
+  const lines = [
+    'Windows Registry Editor Version 5.00','',
+    '[HKEY_CURRENT_USER\\Software\\Classes\\nasopen]',
+    '@="URL:NAS Folder Open"',
+    '"URL Protocol"=""','',
+    '[HKEY_CURRENT_USER\\Software\\Classes\\nasopen\\shell\\open\\command]',
+    cmd,''
+  ];
+  const blob = new Blob(['﻿'+lines.join('\r\n')], { type:'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'NAS폴더열기-설정.reg'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  alert('📂 폴더 바로 열기 설정 (PC 1대당 최초 1회)\n\n1) 방금 받은 [NAS폴더열기-설정.reg] 파일을 더블클릭\n2) 보안 경고가 뜨면 "예 / 실행 / 계속"\n3) 브라우저 새로고침 후 📂 를 클릭하면 폴더가 바로 열립니다.\n\n※ 설정 전에는 경로가 클립보드에 복사되니 탐색기 주소창에 붙여넣기(Ctrl+V) 하시면 됩니다.');
 }
 
 // 포스트잇 카드 HTML
@@ -8527,7 +8558,7 @@ function renderCollab(){
   if(!wrap) return;
   _collabPaths = [];                          // NAS 경로 인덱스 초기화
   const canEdit = _collabCanEdit();
-  const visible = _collabTasks.filter(t=>!_collabArchived(t));
+  const visible = _collabTasks.filter(t=>!t.weekly && !_collabArchived(t));
   const baseOf = p => visible.filter(t=>t.assignee===p).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
   const shownOf = (p, base) => { const f=_collabFilter[p]; return (f && f!=='all') ? base.filter(t=>t.status===f) : base; };
 
@@ -8570,11 +8601,57 @@ function renderCollab(){
         </div>
         ${_collabStatusBtns(person, base)}
       </div>
+      ${_collabWeeklyHTML(person, canEdit)}
       <div class="collab-col-body">
         ${cards || `<div class="collab-col-empty">${emptyMsg}</div>`}
       </div>
     </div>`;
   }).join('');
+}
+
+// 주간 목표 업무 섹션 (직원 업무 리스트 위)
+function _collabWeeklyHTML(person, canEdit){
+  const goals = _collabTasks.filter(t=>t.weekly && t.assignee===person)
+    .sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  const blocks = goals.map(g=>`
+    <div class="cw-block">
+      <span class="cw-text" ${canEdit?`onclick="collabEditWeekly('${g.id}')" title="클릭하여 수정"`:''}>${_collabLinkify(g.title)}</span>
+      ${canEdit?`<button class="cw-del" title="삭제" onclick="collabDelWeekly(event,'${g.id}')">✕</button>`:''}
+    </div>`).join('');
+  return `<div class="collab-weekly">
+    <div class="cw-title">📌 주간 목표</div>
+    ${blocks}
+    ${canEdit?`<button class="cw-add" onclick="collabAddWeekly('${person}')">＋ 주간 목표 추가</button>`:''}
+  </div>`;
+}
+function collabAddWeekly(person){
+  if(!_collabCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  const text = (prompt('주간 목표 업무를 입력하세요')||'').trim();
+  if(!text) return;
+  _collabTasks.push({
+    id:'w'+Date.now()+Math.random().toString(36).slice(2,6),
+    assignee:person, weekly:true, title:text,
+    created_at:new Date().toISOString(), updated_at:new Date().toISOString(),
+  });
+  renderCollab();
+  collabSaveCloud();
+}
+function collabEditWeekly(id){
+  if(!_collabCanEdit()) return;
+  const g = _collabTasks.find(t=>t.id===id); if(!g) return;
+  const text = (prompt('주간 목표 수정', g.title)||'').trim();
+  if(text===null || text==='') return;
+  g.title = text; g.updated_at = new Date().toISOString();
+  renderCollab();
+  collabSaveCloud();
+}
+async function collabDelWeekly(ev, id){
+  ev.stopPropagation();
+  if(!_collabCanEdit()) return;
+  if(!confirm('주간 목표를 삭제할까요?')) return;
+  _collabTasks = _collabTasks.filter(t=>t.id!==id);
+  renderCollab();
+  await collabSaveCloud();
 }
 
 // ── 완료목록 모달 ──
