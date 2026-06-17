@@ -1049,6 +1049,14 @@ window.__injectReports = function(data) {
   updateToolButtons();
 };
 
+// 새 업무보고서(index.html _reportAllData) 기반 점 데이터 주입
+// dotsMap: { 'YYYY-MM-DD': true, ... }  — 현재 담당자 기준
+window._newReportDots = null;
+window.__injectNewReportDots = function(dotsMap) {
+  window._newReportDots = dotsMap || {};
+  renderCalendar();
+};
+
 // ── 재고 시스템 연동: 발주/입고 일정 자동 주입 ──
 window.__addInventoryEvents = function(events) {
   // events: [{date:'YYYY-MM-DD', title:'...', priority:'high|medium|low'}]
@@ -1674,7 +1682,9 @@ function renderCalendar() {
     const ds  = `${y}-${pad(m)}-${pad(d)}`;
     const dow = new Date(y,m-1,d).getDay();
     const r   = N.reports[ds] || {};
-    const hasReport = !!(r.workDone || r.issues);
+    const hasReport = window._newReportDots
+      ? !!(window._newReportDots[ds])
+      : !!(r.workDone || r.issues);
     const dotHtml = hasReport ? `<div class="cal-dots"><div class="dot dot-report"></div></div>` : '';
     const cls = [
       'cal-cell',
