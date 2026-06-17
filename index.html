@@ -52,7 +52,7 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-wrap{display:flex;flex-direction:row;gap:10px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
 .collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;}
-.collab-cal-top{flex:0 0 205px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-cal-top{flex:0 0 285px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-top iframe{width:100%;height:100%;border:none;display:block;}
 /* 업무보고서 native panel */
 .report-panel{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;position:relative;z-index:1;}
@@ -9219,6 +9219,11 @@ function reportLinkBlock(ev,id){
   } else html+=`<div class="rp-link-drop-item" style="color:var(--tx2);">이전 블럭 없음</div>`;
   drop.innerHTML=html;
   document.body.appendChild(drop);
+  // 뷰포트 하단 넘침 시 위쪽으로 뒤집기
+  const dropH=drop.offsetHeight;
+  if(rect.bottom+4+dropH>window.innerHeight-10){
+    drop.style.top=Math.max(10,rect.top-dropH-4)+'px';
+  }
   setTimeout(()=>document.addEventListener('click',()=>{ drop.remove(); _rpLinkDropId=null; },{once:true}),50);
 }
 function reportLinkApply(taskId,title){
