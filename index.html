@@ -48,64 +48,70 @@ body{background:var(--bg2);min-height:100vh;}
 
 /* ── 협업업무(collab) ── */
 #page-collab.active{display:block;}
-/* ── 협업업무 레이아웃: 좌=보드(전체높이) / 우=달력(위)+보고서(아래) ── */
-.collab-wrap{display:flex;flex-direction:row;gap:10px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
+/* ── 협업업무 레이아웃: 좌=보드 / 중=카테고리사이드바 / 우=달력+보고서 ── */
+.collab-wrap{display:flex;flex-direction:row;gap:8px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
 .collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-.collab-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;}
+/* 카테고리 세로 사이드바 — 보드와 보고서 사이 */
+.collab-cat-sidebar{flex:0 0 38px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
+.collab-cat-side-btn{flex:1;border:none;background:transparent;cursor:pointer;font-size:9px;font-weight:800;writing-mode:vertical-rl;text-orientation:mixed;color:var(--tx2);transition:background .12s,color .12s;border-bottom:0.5px solid var(--bd);padding:3px 0;line-height:38px;letter-spacing:.5px;}
+.collab-cat-side-btn:last-child{border-bottom:none;}
+.collab-cat-side-btn.on{color:#fff!important;}
+.collab-cat-side-btn:hover:not(.on){background:var(--bg);}
+.collab-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
 .collab-cal-top{flex:0 0 285px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-top iframe{width:100%;height:100%;border:none;display:block;}
-/* 업무보고서 native panel */
+/* 업무보고서 패널 */
 .report-panel{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;position:relative;z-index:1;}
-/* 카테고리 필터 바 */
-.rp-cat-bar{display:flex;gap:5px;padding:5px 10px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);flex-wrap:wrap;}
-.rp-cat-btn{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:10px;border:1.5px solid;cursor:pointer;background:transparent;transition:background .12s,color .12s;white-space:nowrap;}
-.rp-cat-btn.on{color:#fff!important;border-color:transparent!important;}
-.rp-block-cat{font-size:9px;font-weight:800;padding:0px 5px;border-radius:7px;color:#fff;flex-shrink:0;line-height:1.7;}
-.rp-bp-cat{font-size:11px;border:1px solid var(--bd);border-radius:5px;padding:2px 5px;background:var(--bg);color:var(--tx);cursor:pointer;flex-shrink:0;}
-.rp-filter-date{font-size:10px;font-weight:700;color:var(--tx2);padding:4px 2px 2px;margin-top:6px;border-top:0.5px solid var(--bd);}
-.rp-filter-date:first-child{margin-top:0;border-top:none;}
-.rp-empty-msg{text-align:center;color:var(--tx2);font-size:12px;padding:40px 20px;line-height:1.9;}
-.rp-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;position:relative;z-index:2;}
-.rp-head-left{display:flex;align-items:center;gap:8px;}
+.rp-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;position:relative;z-index:2;}
+.rp-head-left{display:flex;align-items:center;gap:6px;}
 .rp-head-title{font-size:13px;font-weight:800;color:var(--tx);}
-.rp-pin-add-btn{font-size:11px;background:#FFFBEB;border:0.5px solid #FCD34D;border-radius:5px;padding:2px 7px;cursor:pointer;color:#B45309;font-weight:700;}
+.rp-pin-add-btn{font-size:10.5px;background:#FFFBEB;border:0.5px solid #FCD34D;border-radius:5px;padding:2px 6px;cursor:pointer;color:#B45309;font-weight:700;}
 .rp-pin-add-btn:hover{background:#FEF3C7;}
+.rp-add-block-btn{font-size:10.5px;background:#EFF6FF;border:0.5px solid #93C5FD;border-radius:5px;padding:2px 6px;cursor:pointer;color:#1D4ED8;font-weight:700;}
+.rp-add-block-btn:hover{background:#DBEAFE;}
+.rp-cat-active-badge{font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;color:#fff;}
 .rp-date-nav{display:flex;align-items:center;gap:3px;}
-.rp-nav-btn{font-size:11px;background:none;border:0.5px solid var(--bd);border-radius:5px;padding:2px 6px;cursor:pointer;color:var(--tx2);}
+.rp-nav-btn{font-size:11px;background:none;border:0.5px solid var(--bd);border-radius:5px;padding:2px 7px;cursor:pointer;color:var(--tx2);}
 .rp-nav-btn:hover{background:var(--bg2);}
 .rp-date-label{font-size:11.5px;font-weight:700;color:var(--tx);padding:0 4px;white-space:nowrap;}
 .rp-person-tabs{display:flex;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);}
-.rp-ptab{flex:1;text-align:center;padding:7px 0;font-size:12px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .1s;}
+.rp-ptab{flex:1;text-align:center;padding:6px 0;font-size:12px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .1s;}
 .rp-ptab.on{border-bottom-width:2.5px;}
-.rp-pinned{background:#FFFBEB;border-bottom:0.5px solid #FDE68A;padding:7px 10px;flex-shrink:0;max-height:120px;overflow-y:auto;}
-.rp-pinned-title{font-size:10px;font-weight:800;color:#B45309;margin-bottom:4px;}
+.rp-pinned{background:#FFFBEB;border-bottom:0.5px solid #FDE68A;padding:6px 10px;flex-shrink:0;max-height:110px;overflow-y:auto;}
+.rp-pinned-title{font-size:10px;font-weight:800;color:#B45309;margin-bottom:3px;}
 .rp-pinned-item{font-size:11.5px;color:var(--tx);background:#FEF3C7;border:0.5px solid #FCD34D;border-radius:6px;padding:4px 8px;margin-bottom:3px;display:flex;align-items:center;gap:6px;line-height:1.4;}
 .rp-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);border-radius:0 0 12px 12px;}
-/* contenteditable 에디터 — 텍스트 라인 + 블럭 혼합 */
+/* 에디터 — 텍스트 라인 + 블럭 혼합 */
 .rp-editor{flex:1;overflow-y:auto;padding:8px 10px;outline:none;}
 .rp-line{outline:none;min-height:22px;font-size:12.5px;line-height:1.75;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
-.rp-line:empty::before{content:'•';color:var(--bd);pointer-events:none;}
-/* 블럭 = 텍스트 라인 안에 인라인으로 들어가는 컴팩트 카드 */
-.rp-block{border:1px solid #D1E9FF;border-left:2.5px solid #3182F6;border-radius:4px;padding:1px 7px;font-size:12px;line-height:1.55;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:6px;margin:1px 0;user-select:none;-webkit-user-select:none;}
+.rp-line[data-empty-ph]:empty::before{content:attr(data-empty-ph);color:var(--tx2);opacity:.4;pointer-events:none;font-style:italic;}
+/* 블럭 카드 */
+.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:3px 8px 3px 9px;font-size:12px;line-height:1.6;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;user-select:none;-webkit-user-select:none;}
 .rp-block.pinned{border-color:#FDE68A;border-left-color:#F59E0B;background:#FFFEF5;}
-.rp-block-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.rp-block-main{font-weight:700;font-size:11.5px;}
-.rp-block-sub{font-size:10.5px;color:var(--tx2);margin-left:3px;}
-.rp-block-btns{display:flex;gap:1px;flex-shrink:0;align-items:center;opacity:0;transition:opacity .1s;}
+.rp-block-text{flex:1;min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden;}
+.rp-block-main{font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rp-block-sub{font-size:11px;color:var(--tx2);white-space:nowrap;flex-shrink:0;}
+.rp-block-cat{font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;color:#fff;flex-shrink:0;white-space:nowrap;}
+.rp-block-btns{display:flex;gap:2px;flex-shrink:0;align-items:center;opacity:0;transition:opacity .1s;}
 .rp-block:hover .rp-block-btns{opacity:1;}
-.rp-block-btn{background:none;border:none;cursor:pointer;font-size:10px;color:var(--tx2);padding:1px 3px;border-radius:3px;line-height:1;}
+.rp-block-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--tx2);padding:2px 4px;border-radius:3px;line-height:1;}
 .rp-block-btn:hover{background:var(--bd);}
-/* Alt+Enter 인라인 팝업 — 라인 사이에 삽입 */
-.rp-bp-form{display:flex;align-items:center;gap:4px;padding:4px 7px;background:var(--bg);border:1.5px solid var(--pr);border-radius:6px;margin:2px 0;}
-.rp-bp-input{flex:1;min-width:0;border:none;outline:none;font-size:11.5px;font-family:inherit;padding:2px 3px;background:transparent;color:var(--tx);}
+/* 블럭 인라인 폼 */
+.rp-bp-form{display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--bg);border:1.5px solid var(--pr);border-radius:7px;margin:3px 0;}
+.rp-bp-input{flex:1;min-width:0;border:none;outline:none;font-size:12px;font-family:inherit;padding:2px 4px;background:transparent;color:var(--tx);}
 .rp-bp-input::placeholder{color:var(--tx2);font-size:11px;}
-.rp-bp-input+.rp-bp-input{border-left:0.5px solid var(--bd);padding-left:6px;flex:0.7;}
-.rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
-.rp-bp-cancel{background:none;border:none;font-size:11px;cursor:pointer;color:var(--tx2);padding:1px 3px;}
-/* Link dropdown — 패널 바깥으로 넘칠 수 있게 fixed */
-.rp-link-drop{position:fixed;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:9999;max-height:240px;overflow-y:auto;}
-.rp-link-drop-head{padding:5px 10px;font-size:10px;font-weight:800;color:var(--tx2);background:var(--bg2);border-bottom:0.5px solid var(--bd);position:sticky;top:0;}
-.rp-link-drop-item{padding:7px 10px;cursor:pointer;font-size:12px;color:var(--tx);border-bottom:0.5px solid var(--bd);}
+.rp-bp-input+.rp-bp-input{border-left:0.5px solid var(--bd);padding-left:7px;flex:0.7;}
+.rp-bp-cat{font-size:11px;border:1px solid var(--bd);border-radius:5px;padding:2px 5px;background:var(--bg);color:var(--tx);cursor:pointer;flex-shrink:0;}
+.rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.rp-bp-cancel{background:none;border:none;font-size:12px;cursor:pointer;color:var(--tx2);padding:2px 4px;}
+/* 카테고리 필터 뷰 날짜 구분선 */
+.rp-filter-date{font-size:10.5px;font-weight:700;color:var(--tx2);padding:5px 0 3px;margin-top:8px;border-top:0.5px solid var(--bd);}
+.rp-filter-date:first-child{margin-top:0;border-top:none;}
+.rp-empty-msg{text-align:center;color:var(--tx2);font-size:12px;padding:30px 20px;line-height:1.9;}
+/* Link dropdown */
+.rp-link-drop{position:fixed;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 18px rgba(0,0,0,.18);z-index:9999;max-height:260px;overflow-y:auto;}
+.rp-link-drop-head{padding:6px 11px;font-size:10px;font-weight:800;color:var(--tx2);background:var(--bg2);border-bottom:0.5px solid var(--bd);position:sticky;top:0;}
+.rp-link-drop-item{padding:8px 11px;cursor:pointer;font-size:12px;color:var(--tx);border-bottom:0.5px solid var(--bd);}
 .rp-link-drop-item:last-child{border-bottom:none;}
 .rp-link-drop-item:hover{background:var(--bg2);}
 /* Modal NAS preview strip */
@@ -817,7 +823,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="collab-manager" id="collabManager"></div>
       <div class="collab-cols" id="collabCols"></div>
     </div>
-    <!-- 우: 달력(위 컴팩트) + 업무보고서(아래 넓게) -->
+    <!-- 중: 카테고리 세로 사이드바 -->
+    <div class="collab-cat-sidebar" id="collabCatSidebar"></div>
+    <!-- 우: 달력(위) + 업무보고서(아래) -->
     <div class="collab-right">
       <div class="collab-cal-top">
         <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
@@ -826,9 +834,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rp-head">
           <div class="rp-head-left">
             <span class="rp-head-title">📋 업무 보고서</span>
+            <button class="rp-add-block-btn" onclick="rpAddBlockAtEnd()" title="블럭 추가 (Alt+Enter)">＋ 블럭</button>
             <button class="rp-pin-add-btn" onclick="reportAddPin()" title="고정 메모 추가">📌 고정</button>
+            <span id="rpCatActiveBadge" style="display:none;"></span>
           </div>
-          <div class="rp-date-nav">
+          <div class="rp-date-nav" id="rpDateNav">
             <button class="rp-nav-btn" onclick="reportPrevDay()">‹</button>
             <span class="rp-date-label" id="rpDateLabel">—</span>
             <button class="rp-nav-btn" onclick="reportNextDay()">›</button>
@@ -836,7 +846,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </div>
         </div>
         <div class="rp-person-tabs" id="rpPersonTabs"></div>
-        <div class="rp-cat-bar" id="rpCatBar"></div>
         <div class="rp-pinned" id="rpPinned" style="display:none;"></div>
         <div class="rp-body">
           <div class="rp-editor" id="rpEditor"></div>
@@ -8478,6 +8487,7 @@ function loadCollabPage(){
   collabStartRealtime();
   // 업무보고서 패널 초기화 + 구 calendar.html 데이터 1회 마이그레이션
   if(!_reportDate) _reportDate = _reportTodayStr();
+  _renderCatSidebar();
   loadReport().then(async ()=>{
     await _reportMigrateFromCalendar();
     renderReportPanel();
@@ -8900,14 +8910,39 @@ window.addEventListener('message', e=>{
   }
 });
 
+function _renderCatSidebar(){
+  const bar=document.getElementById('collabCatSidebar');
+  if(!bar) return;
+  bar.innerHTML=REPORT_CATS.map(cat=>{
+    const c=REPORT_CAT_COLOR[cat], on=cat===_reportCategoryFilter;
+    return `<button class="collab-cat-side-btn ${on?'on':''}"
+      style="${on?`background:${c};color:#fff;`:`color:${c};`}"
+      onclick="reportSetCategory('${cat}')" title="${cat}">${cat}</button>`;
+  }).join('');
+}
+
 function renderReportPanel(){
   if(!document.getElementById('reportPanel')) return;
-  // 날짜 레이블
+  // 날짜 레이블 + 카테고리 활성 배지
   const lbl=document.getElementById('rpDateLabel');
+  const badge=document.getElementById('rpCatActiveBadge');
+  const dateNav=document.getElementById('rpDateNav');
   if(lbl){
     const d=new Date(_reportDate+'T00:00:00');
     const days=['일','월','화','수','목','금','토'];
     lbl.textContent=`${_reportDate} (${days[d.getDay()]})`;
+  }
+  if(badge){
+    if(_reportCategoryFilter){
+      const c=REPORT_CAT_COLOR[_reportCategoryFilter]||'#888';
+      badge.style.display='';
+      badge.innerHTML=`<span class="rp-cat-active-badge" style="background:${c};">${_reportCategoryFilter} 전체보기</span>
+        <button style="font-size:10px;background:none;border:none;cursor:pointer;color:var(--tx2);padding:0 2px;" onclick="reportSetCategory(_reportCategoryFilter)" title="필터 해제">✕</button>`;
+      if(dateNav) dateNav.style.opacity='0.4';
+    } else {
+      badge.style.display='none';
+      if(dateNav) dateNav.style.opacity='';
+    }
   }
   // 담당자 탭
   const tabs=document.getElementById('rpPersonTabs');
@@ -8919,16 +8954,7 @@ function renderReportPanel(){
         onclick="reportSetPerson('${p}')">${p}</button>`;
     }).join('');
   }
-  // 카테고리 필터 바
-  const catBar=document.getElementById('rpCatBar');
-  if(catBar){
-    catBar.innerHTML=REPORT_CATS.map(cat=>{
-      const c=REPORT_CAT_COLOR[cat], on=cat===_reportCategoryFilter;
-      return `<button class="rp-cat-btn ${on?'on':''}"
-        style="color:${c};border-color:${c};${on?`background:${c};`:''};"
-        onclick="reportSetCategory('${cat}')">${cat}</button>`;
-    }).join('');
-  }
+  _renderCatSidebar();
   _rpRenderPinned();
   _rpBuildEditor();
 }
@@ -8958,31 +8984,22 @@ function _rpRenderPinned(){
 function _rpBuildEditor(){
   const editor=document.getElementById('rpEditor');
   if(!editor) return;
-  if(_reportCategoryFilter){ _rpBuildEditorFiltered(); return; }
-  const content=_reportGetEntry().content||[];
-  const hasReal=content.some(i=>i.type==='block'||(i.type==='line'&&(i.text||'').replace(/^•\s*/,'').trim()));
-  if(!hasReal){
-    editor.innerHTML=`<div class="rp-empty-msg">✏️ 이날의 업무보고서가 비어있습니다.<br><span style="font-size:11px;">Alt+Enter 로 블럭 추가, Enter 로 줄 추가</span></div>
-      <div class="rp-line" data-id="${content[0]?.id||'l_e0'}" contenteditable="true" style="display:none;"></div>`;
-    editor.onclick=e=>{ if(e.target===editor||e.target.classList.contains('rp-empty-msg')||e.target.closest('.rp-empty-msg')){
-      editor.onclick=null;
-      const entry=_reportEnsureEntry();
-      if(!entry.content.length) entry.content.push({id:'l_c'+Date.now(),type:'line',text:''});
-      editor.innerHTML=entry.content.map(item=>{
-        if(item.type==='line') return `<div class="rp-line" data-id="${item.id}" contenteditable="true">${_esc(item.text||'')}</div>`;
-        if(item.type==='block') return _rpBlockHTML(item);
-        return '';
-      }).join('');
-      editor.querySelector('.rp-line')?.focus();
-    }};
-    return;
-  }
   editor.onclick=null;
+  if(_reportCategoryFilter){ _rpBuildEditorFiltered(); return; }
+  const entry=_reportGetEntry();
+  const content=entry.content||[];
+  // 라인이 없으면 빈 라인 1개 보장
+  if(!content.some(i=>i.type==='line')){
+    const newId='l_s'+Date.now();
+    content.push({id:newId,type:'line',text:''});
+    entry.content=content;
+  }
   editor.innerHTML=content.map(item=>{
-    if(item.type==='line')
-      return `<div class="rp-line" data-id="${item.id}" contenteditable="true">${_esc(item.text||'')}</div>`;
-    if(item.type==='block')
-      return _rpBlockHTML(item);
+    if(item.type==='line'){
+      const isEmpty=!(item.text||'').trim();
+      return `<div class="rp-line" data-id="${item.id}" contenteditable="true"${isEmpty?' data-empty-ph="업무 내용을 입력하세요… (Alt+Enter: 블럭 추가)"':''}>${_esc(item.text||'')}</div>`;
+    }
+    if(item.type==='block') return _rpBlockHTML(item);
     return '';
   }).join('');
 }
@@ -9004,7 +9021,8 @@ function _rpBuildEditorFiltered(){
     const c=REPORT_CAT_COLOR[cat]||'#888';
     editor.innerHTML=`<div class="rp-empty-msg">
       <span style="display:inline-block;background:${c};color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:9px;margin-bottom:8px;">${cat}</span><br>
-      아직 이 카테고리의 블럭이 없습니다.<br><span style="font-size:11px;">블럭 생성 시 카테고리를 선택하면 여기에 표시됩니다.</span></div>`;
+      아직 이 카테고리의 블럭이 없습니다.<br>
+      <span style="font-size:11px;">사이드바 카테고리를 클릭 해제하고 날짜에서 블럭을 추가하세요.</span></div>`;
     return;
   }
   editor.innerHTML=groups.map(({date,blocks})=>{
@@ -9055,7 +9073,32 @@ function reportEditBlock(id){
     <button class="rp-bp-save" onclick="reportEditBlockSave('${id}')">저장</button>
     <button class="rp-bp-cancel" onclick="reportEditBlockCancel('${id}')">✕</button>`;
   el.replaceWith(form);
-  setTimeout(()=>{ document.getElementById('rpBpETask')?.focus(); document.getElementById('rpBpETask')?.select(); },20);
+  setTimeout(()=>{
+    const t=document.getElementById('rpBpETask');
+    const tm=document.getElementById('rpBpETime');
+    t?.focus(); t?.select();
+    t?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tm?.focus();} });
+    tm?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();reportEditBlockSave(id);} });
+  },20);
+}
+function rpAddBlockAtEnd(){
+  if(_reportCategoryFilter){ toast('카테고리 필터 해제 후 블럭을 추가하세요.'); return; }
+  const entry=_reportEnsureEntry();
+  const editor=document.getElementById('rpEditor');
+  editor.onclick=null;
+  // 라인 없으면 생성
+  if(!entry.content.some(i=>i.type==='line')){
+    const newId='l_a'+Date.now();
+    entry.content.push({id:newId,type:'line',text:''});
+    const newLine=document.createElement('div');
+    newLine.className='rp-line'; newLine.dataset.id=newId;
+    newLine.contentEditable='true'; newLine.textContent='';
+    editor.appendChild(newLine);
+  }
+  // 마지막 라인에서 블럭 팝업
+  const lines=editor.querySelectorAll('.rp-line[data-id]');
+  const lastLine=lines[lines.length-1];
+  if(lastLine){ lastLine.focus(); rpShowInlinePopup(lastLine.dataset.id); }
 }
 function reportEditBlockSave(id){
   const task=(document.getElementById('rpBpETask')?.value||'').trim();
@@ -9065,6 +9108,7 @@ function reportEditBlockSave(id){
   const key=_reportFindBlockKey(id); if(!key) return;
   const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
   item.task=task; item.time=time; item.category=category||null;
+  // linked 필드 보존 (수정 시 연동 링크 유지)
   const form=document.getElementById('rpEditor')?.querySelector(`[data-edit-id="${id}"]`);
   if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item); form.replaceWith(tpl.content.firstElementChild); }
   _rpRenderPinned(); _reportAutoSave();
@@ -9091,14 +9135,17 @@ function reportDelPin(id){
   _rpRenderPinned(); _reportAutoSave();
 }
 function reportTogglePin(id){
-  const entry=_reportAllData[_reportKey()]; if(!entry) return;
+  const key=_reportFindBlockKey(id)||_reportKey();
+  const entry=_reportAllData[key]; if(!entry) return;
   const item=(entry.content||[]).find(i=>i.id===id); if(!item) return;
   item.pinned=!item.pinned;
   const el=document.getElementById('rpEditor')?.querySelector(`[data-id="${id}"]`);
   if(el){
     el.classList.toggle('pinned',item.pinned);
-    const btn=el.querySelector('.rp-block-btn');
-    if(btn){ btn.textContent=item.pinned?'📌':'📍'; btn.title=item.pinned?'고정 해제':'상단 고정'; }
+    // 첫 번째 버튼이 ✏️이므로 두 번째가 📍/📌
+    const btns=el.querySelectorAll('.rp-block-btn');
+    const pinBtn=btns[1];
+    if(pinBtn){ pinBtn.textContent=item.pinned?'📌':'📍'; pinBtn.title=item.pinned?'고정 해제':'상단 고정'; }
   }
   _rpRenderPinned(); _reportAutoSave();
 }
@@ -9212,8 +9259,11 @@ function reportLinkBlock(ev,id){
     html+=allPrev.slice(0,5).map(b=>{
       const st=b.task.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       const sm=(b.time||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      return `<div class="rp-link-drop-item" onclick="reportBlockCopy('${st}','${sm}')">
-        <span style="color:var(--tx2);font-size:10px;margin-right:4px;">${b.date}</span>${_esc(b.task)}${b.time?' — '+_esc(b.time):''}
+      const sc=(b.category||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const catC=b.category?REPORT_CAT_COLOR[b.category]||'#888':'';
+      const catBadge=b.category?`<span style="background:${catC};color:#fff;font-size:9px;font-weight:700;padding:0 4px;border-radius:5px;margin-right:3px;">${_esc(b.category)}</span>`:'';
+      return `<div class="rp-link-drop-item" onclick="reportBlockCopy('${st}','${sm}','${sc}')">
+        <span style="color:var(--tx2);font-size:10px;margin-right:4px;">${b.date}</span>${catBadge}${_esc(b.task)}${b.time?' — '+_esc(b.time):''}
       </div>`;
     }).join('');
   } else html+=`<div class="rp-link-drop-item" style="color:var(--tx2);">이전 블럭 없음</div>`;
@@ -9243,9 +9293,9 @@ function reportLinkApply(taskId,title){
   document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
   _reportAutoSave();
 }
-function reportBlockCopy(task,time){
+function reportBlockCopy(task,time,category){
   const newBlock={id:'b'+Date.now()+Math.random().toString(36).slice(2,4),type:'block',
-    task,time,pinned:false,linked_task_id:null,linked_title:null};
+    task,time,category:category||null,pinned:false,linked_task_id:null,linked_title:null};
   const entry=_reportEnsureEntry();
   entry.content.push(newBlock);
   const editor=document.getElementById('rpEditor');
