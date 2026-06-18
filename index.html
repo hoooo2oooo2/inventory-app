@@ -10632,16 +10632,16 @@ function foSwitchTab(tab){
 // 패밀리 오더 — 수입 입고 관리
 // ══════════════════════════════════════════════
 const FAMILY_IMPORTS_KIND='family_imports_v1';
-let _foImports={};      // {[orderId_rowIdx]: [qty1, qty2, ...]}
-let _foImportDates={};  // {0: 'YYYY-MM-DD', 1: 'YYYY-MM-DD', ...} — 차수별 공통 날짜
+let _foImports={};           // {[orderId_rowIdx]: [qty1, qty2, ...]}
+let _foOrderImportDates={};  // {[orderId]: {[colIdx]: 'YYYY-MM-DD', ...}} — 주문건별 차수 날짜
 let _foImportCols=3;
 
 async function _foLoadImports(){
   const data=await cloudKvLoad(FAMILY_IMPORTS_KIND);
   if(data && typeof data==='object' && !Array.isArray(data)){
-    if(data.__dates && typeof data.__dates==='object') _foImportDates=data.__dates;
-    delete data.__dates;
-    // 구버전(객체 배열 or 숫자) → 숫자 배열로 마이그레이션
+    if(data.__orderDates && typeof data.__orderDates==='object') _foOrderImportDates=data.__orderDates;
+    delete data.__orderDates;
+    delete data.__dates; // 구버전 글로벌 날짜 키 제거
     Object.keys(data).forEach(k=>{
       data[k]=(data[k]||[]).map(v=>typeof v==='object'&&v!==null?(parseFloat(v.qty)||0):(parseFloat(v)||0));
     });
@@ -10651,7 +10651,7 @@ async function _foLoadImports(){
   }
 }
 async function _foFlushImports(){
-  await cloudKvSave(FAMILY_IMPORTS_KIND,{..._foImports, __dates:_foImportDates});
+  await cloudKvSave(FAMILY_IMPORTS_KIND,{..._foImports, __orderDates:_foOrderImportDates});
 }
 
 function foAddImportCol(){
@@ -10659,10 +10659,11 @@ function foAddImportCol(){
   foRenderImportTab();
 }
 
-function foUpdateImportColDate(colIdx,dateVal){
-  _foImportDates[colIdx]=dateVal;
-  clearTimeout(foUpdateImportColDate._t);
-  foUpdateImportColDate._t=setTimeout(()=>_foFlushImports(),800);
+function foUpdateOrderDate(orderId,colIdx,dateVal){
+  if(!_foOrderImportDates[orderId]) _foOrderImportDates[orderId]={};
+  _foOrderImportDates[orderId][colIdx]=dateVal;
+  clearTimeout(foUpdateOrderDate._t);
+  foUpdateOrderDate._t=setTimeout(()=>_foFlushImports(),800);
 }
 
 function foUpdateImportQty(key,colIdx,val,totalQty){
@@ -10695,14 +10696,9 @@ function foRenderImportTab(){
   const maxCols=Math.max(_foImportCols,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0),1);
   const totalCols=7+maxCols+2;
 
-  // 헤더: 차수별 날짜 picker를 헤더에 삽입
-  let hdr='<tr><th style="white-space:nowrap;">주문일</th><th>업체</th><th style="min-width:140px;text-align:left;">품명</th><th style="width:80px;">코드번호</th><th style="width:56px;">박스당</th><th style="width:48px;">박스</th><th style="width:60px;">총수량</th>';
-  for(let i=0;i<maxCols;i++){
-    hdr+=`<th style="width:100px;padding:4px 5px;">
-      <div style="font-size:11px;font-weight:700;margin-bottom:3px;">${i+1}차 입고</div>
-      <input type="date" value="${_foImportDates[i]||''}" style="width:100%;border:1px solid #d0d7e2;border-radius:4px;font-size:10px;padding:2px 3px;box-sizing:border-box;font-family:inherit;background:var(--bg);color:var(--tx);" onchange="foUpdateImportColDate(${i},this.value)">
-    </th>`;
-  }
+  // 헤더 (날짜는 각 주문건 행에서 설정)
+  let hdr='<tr><th style="white-space:nowrap;min-width:90px;">주문일</th><th style="min-width:60px;">업체</th><th style="min-width:150px;text-align:left;">품명</th><th style="width:80px;">코드번호</th><th style="width:56px;">박스당</th><th style="width:48px;">박스</th><th style="width:60px;">총수량</th>';
+  for(let i=0;i<maxCols;i++) hdr+=`<th style="width:110px;">${i+1}차 입고<br><span style="font-size:9px;font-weight:400;color:var(--tx2);">날짜 · 수량</span></th>`;
   hdr+='<th style="width:60px;">총입고</th><th style="width:66px;">남은수량</th></tr>';
   hdrEl.innerHTML=hdr;
 
@@ -10723,7 +10719,7 @@ function foRenderImportTab(){
     (allDone?completedOrders:activeOrders).push(order);
   });
 
-  // 진행중 주문만 테이블로 렌더
+  // 진행중 주문만 테이블로 렌더 (주문건마다 날짜 행 삽입)
   let rows='';
   VENDORS.forEach(vendor=>{
     const vOrders=activeOrders.filter(o=>o.vendor===vendor);
@@ -10733,6 +10729,27 @@ function foRenderImportTab(){
       <span style="font-size:11px;font-weight:700;color:${vc};">▎${vendor}</span>
     </td></tr>`;
     vOrders.forEach(order=>{
+      const orderDates=_foOrderImportDates[order.id]||{};
+      // 주문건별 날짜 설정 행
+      let dateCells='';
+      for(let i=0;i<maxCols;i++){
+        dateCells+=`<td style="padding:3px 5px;background:#F0F6FF;border-bottom:2px solid ${vc}30;">
+          <input type="date" value="${orderDates[i]||''}"
+            style="width:100%;border:1px solid #BFDBFE;border-radius:4px;font-size:10.5px;padding:2px 4px;box-sizing:border-box;font-family:inherit;background:#fff;color:var(--tx);"
+            onchange="foUpdateOrderDate('${order.id}',${i},this.value)">
+        </td>`;
+      }
+      rows+=`<tr style="background:#F0F6FF;">
+        <td colspan="2" style="padding:5px 10px;background:#F0F6FF;border-bottom:2px solid ${vc}30;">
+          <span style="font-size:11px;font-weight:700;color:${vc};">${order.date||''}</span>
+          <span style="font-size:10px;font-weight:700;color:${vc};background:${vc}20;border-radius:3px;padding:1px 6px;margin-left:6px;">${order.vendor||''}</span>
+          <span style="font-size:10px;color:#6B7280;margin-left:6px;">차수별 입고 날짜</span>
+        </td>
+        <td colspan="5" style="background:#F0F6FF;border-bottom:2px solid ${vc}30;"></td>
+        ${dateCells}
+        <td colspan="2" style="background:#F0F6FF;border-bottom:2px solid ${vc}30;"></td>
+      </tr>`;
+      // 품목 행
       (order.rows||[]).forEach((row,idx)=>{
         const rawKey=`${order.id}_${idx}`;
         const safeKey=rawKey.replace(/[^a-z0-9]/gi,'_');
@@ -10748,7 +10765,7 @@ function foRenderImportTab(){
           </td>`;
         }
         rows+=`<tr>
-          <td style="padding:4px 6px;white-space:nowrap;font-size:11px;text-align:center;">${order.date||''}</td>
+          <td style="padding:4px 6px;white-space:nowrap;font-size:10.5px;text-align:center;color:var(--tx2);">${order.date||''}</td>
           <td style="padding:4px 6px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${vc};background:${vc}18;border-radius:4px;padding:1px 5px;">${order.vendor||''}</span></td>
           <td style="padding:4px 8px;font-size:11.5px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.name||''}">${row.name||''}</td>
           <td style="padding:4px 6px;font-size:10.5px;color:var(--tx2);text-align:center;">${row.code||''}</td>
@@ -10811,11 +10828,12 @@ function foEditCompletedOrder(orderId){
   const VC={태광:'#3182F6',다경:'#059669',제이:'#DC2626'};
   const vc=VC[order.vendor]||'#555';
   const maxCols=Math.max(_foImportCols,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0),1);
+  const orderDatesEdit=_foOrderImportDates[orderId]||{};
   let thCols='';
   for(let i=0;i<maxCols;i++){
-    thCols+=`<th style="padding:6px 8px;border:1px solid #e0e0e0;white-space:nowrap;min-width:100px;">
+    thCols+=`<th style="padding:6px 8px;border:1px solid #e0e0e0;white-space:nowrap;min-width:110px;">
       ${i+1}차 입고<br>
-      <input type="date" value="${_foImportDates[i]||''}" style="width:100%;border:1px solid #ccc;border-radius:3px;font-size:10px;padding:1px 2px;margin-top:2px;font-family:inherit;" onchange="foUpdateImportColDate(${i},this.value)">
+      <input type="date" id="foEditDate_${orderId}_${i}" value="${orderDatesEdit[i]||''}" style="width:100%;border:1px solid #ccc;border-radius:3px;font-size:10px;padding:1px 2px;margin-top:2px;font-family:inherit;">
     </th>`;
   }
   let tbody='';
@@ -10869,6 +10887,13 @@ function foEditCompletedOrder(orderId){
 function foSaveEditedReceipts(orderId,maxCols){
   const order=_foOrders.find(o=>o.id===orderId);
   if(!order) return;
+  // 날짜 저장
+  if(!_foOrderImportDates[orderId]) _foOrderImportDates[orderId]={};
+  for(let i=0;i<maxCols;i++){
+    const dEl=document.getElementById(`foEditDate_${orderId}_${i}`);
+    if(dEl) _foOrderImportDates[orderId][i]=dEl.value;
+  }
+  // 수량 저장
   (order.rows||[]).forEach((row,idx)=>{
     const key=`${order.id}_${idx}`;
     _foImports[key]=[];
@@ -10911,7 +10936,8 @@ function foShowCompletedDetail(orderId){
   const vc=VC[order.vendor]||'#555';
   const maxCols=Math.max(_foImportCols,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0),1);
   let thCols='';
-  for(let i=0;i<maxCols;i++) thCols+=`<th style="padding:6px 8px;border:1px solid #e0e0e0;white-space:nowrap;">${i+1}차<br><span style="font-size:10px;font-weight:400;color:#888;">${_foImportDates[i]||'날짜없음'}</span></th>`;
+  const orderDatesDetail=_foOrderImportDates[orderId]||{};
+  for(let i=0;i<maxCols;i++) thCols+=`<th style="padding:6px 8px;border:1px solid #e0e0e0;white-space:nowrap;">${i+1}차<br><span style="font-size:10px;font-weight:400;color:#888;">${orderDatesDetail[i]||'날짜없음'}</span></th>`;
   let tbody='';
   let grandTotal=0, grandRecv=0;
   (order.rows||[]).forEach((row,idx)=>{
