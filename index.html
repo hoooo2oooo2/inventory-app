@@ -846,14 +846,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="collab-cal-top">
           <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
         </div>
-        <div class="today-summary" id="todaySummary">
-          <div class="ts-head">📌 오늘의 업무 요약</div>
-          <div class="ts-tabs" id="tsTabs"></div>
-          <div class="ts-body" id="tsBody"><div class="ts-empty">데이터를 불러오는 중…</div></div>
+        <div class="today-summary" id="catPanel">
+          <div class="ts-head">📁 카테고리</div>
+          <div class="ts-tabs" id="catPanelTabs"></div>
+          <div class="ts-body" id="catPanelBody"><div class="ts-empty">카테고리를 선택하면<br>전체 업무 내역을 볼 수 있습니다</div></div>
         </div>
       </div>
       <div class="collab-report-row">
-      <div class="collab-cat-sidebar" id="collabCatSidebar"></div>
       <div class="report-panel" id="reportPanel">
         <div class="rp-head">
           <div class="rp-head-left">
@@ -8520,7 +8519,7 @@ function loadCollabPage(){
   loadReport().then(async ()=>{
     await _reportMigrateFromCalendar();
     renderReportPanel();
-    renderTodaySummary();
+    renderCatPanel();
     _reportSetupKeyboard();
   });
 }
@@ -8905,7 +8904,7 @@ async function loadReport(){
 async function _reportFlushSave(){
   await cloudKvSave(REPORT_KIND, _reportAllData);
   _reportInjectCalDots();
-  renderTodaySummary();
+  renderCatPanel();
 }
 
 // 업무보고서 데이터가 있는 날짜를 캘린더 iframe에 주입 (주황 점 동기화)
@@ -8937,6 +8936,7 @@ function reportSetPerson(p){ _reportPerson=p; renderReportPanel(); _reportInject
 function reportSetCategory(cat){
   _reportCategoryFilter = (_reportCategoryFilter===cat) ? null : cat;
   renderReportPanel();
+  renderCatPanel();
 }
 function reportPrevDay(){
   const base=_reportDate||_reportTodayStr();
@@ -9055,42 +9055,55 @@ function _rpBuildEditor(){
   }).join('');
 }
 
-// ── 오늘의 업무 요약 위젯 ──
-function renderTodaySummary(){
-  const tabs = document.getElementById('tsTabs');
-  const body = document.getElementById('tsBody');
+// ── 카테고리 패널 (캘린더 옆, 전체 담당자×전체 날짜) ──
+function renderCatPanel(){
+  const tabs = document.getElementById('catPanelTabs');
+  const body = document.getElementById('catPanelBody');
   if(!tabs || !body) return;
-  // 탭
+  // 카테고리 탭
   tabs.innerHTML = REPORT_CATS.map(cat=>{
     const c = REPORT_CAT_COLOR[cat];
-    const on = cat === _todaySumCat;
+    const on = cat === _reportCategoryFilter;
     return `<button class="ts-tab ${on?'on':''}"
       style="${on?`color:${c};border-bottom-color:${c};background:${c}18;`:''}"
-      onclick="_todaySumCat='${cat}';renderTodaySummary();">${cat}</button>`;
+      onclick="reportSetCategory('${cat}');">${cat}</button>`;
   }).join('');
-  // 오늘 날짜 기준 전 담당자 블록 수집
-  const today = _reportTodayStr();
-  const items = [];
-  for(const person of COLLAB_PEOPLE){
-    const key = `${person}|${today}`;
-    const entry = _reportAllData[key];
-    if(!entry) continue;
-    (entry.content||[]).filter(i=>i.type==='block' && i.category===_todaySumCat).forEach(b=>{
-      items.push({person, task:b.task||'', time:b.time||''});
-    });
+  if(!_reportCategoryFilter){
+    body.innerHTML = `<div class="ts-empty">카테고리를 선택하면<br>전체 업무 내역을 볼 수 있습니다</div>`;
+    return;
   }
-  if(!items.length){
+  const cat = _reportCategoryFilter;
+  // 전체 담당자 × 전체 날짜에서 해당 카테고리 블록 수집
+  const byDate = {};
+  for(const key of Object.keys(_reportAllData)){
+    const parts = key.split('|');
+    if(parts.length !== 2) continue;
+    const [person, date] = parts;
+    const blocks = (_reportAllData[key].content||[]).filter(i=>i.type==='block' && i.category===cat);
+    if(!blocks.length) continue;
+    if(!byDate[date]) byDate[date] = [];
+    blocks.forEach(b => byDate[date].push({task:b.task||'', time:b.time||'', person}));
+  }
+  const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  if(!dates.length){
     body.innerHTML = `<div class="ts-empty">해당 카테고리의 업무가 없습니다</div>`;
-  } else {
-    body.innerHTML = items.map(it=>{
-      const c = COLLAB_PERSON_COLOR[it.person]||'#888';
-      return `<div class="ts-item">
-        <div class="ts-item-text">${_esc(it.task)}${it.time?` <span class="ts-item-time">— ${_esc(it.time)}</span>`:''}
-        </div>
-        <div class="ts-item-person" style="color:${c};">${_esc(it.person)}</div>
-      </div>`;
-    }).join('');
+    return;
   }
+  const daysKr = ['일','월','화','수','목','금','토'];
+  body.innerHTML = dates.map(d=>{
+    const dd = new Date(d+'T00:00:00');
+    const dateStr = `${d} (${daysKr[dd.getDay()]})`;
+    return `<div class="rp-filter-date" style="cursor:pointer;" title="이 날짜로 이동"
+        onclick="_reportDate='${d}';_reportCategoryFilter=null;renderReportPanel();renderCatPanel();">${dateStr} ›</div>`+
+      byDate[d].map(b=>{
+        const pc = COLLAB_PERSON_COLOR[b.person]||'#888';
+        return `<div class="ts-item">
+          <div class="ts-item-text">${_esc(b.task)}${b.time?` <span class="ts-item-time">— ${_esc(b.time)}</span>`:''}
+          </div>
+          <div class="ts-item-person" style="color:${pc};">${_esc(b.person)}</div>
+        </div>`;
+      }).join('');
+  }).join('');
 }
 
 // 카테고리 필터 뷰 — 전체 날짜 통합 출력
