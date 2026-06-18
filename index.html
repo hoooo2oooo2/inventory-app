@@ -879,6 +879,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="today-summary" id="catPanel">
           <div class="ts-head">📁 카테고리</div>
           <div class="ts-tabs" id="catPanelTabs"></div>
+          <div id="catPanelPersonBar" style="display:flex;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg2);"></div>
           <div class="ts-body" id="catPanelBody"><div class="ts-empty">카테고리를 선택하면<br>전체 업무 내역을 볼 수 있습니다</div></div>
         </div>
       </div>
@@ -8949,6 +8950,7 @@ let _rpLinkDropId    = null;
 let _rpInsertAfterId = null;  // Alt+Enter: 이 라인 id 다음에 블럭 삽입
 let _reportCategoryFilter = null;
 let _todaySumCat = '디자인';
+let _catPanelPerson = null; // null = 전체
 
 const REPORT_CATS = ['디자인','광고관리','품절관리','매출관리','기타'];
 const REPORT_CAT_COLOR = {
@@ -9146,6 +9148,7 @@ function renderCatPanel(){
   const tabs = document.getElementById('catPanelTabs');
   const body = document.getElementById('catPanelBody');
   if(!tabs || !body) return;
+
   // 카테고리 탭
   tabs.innerHTML = REPORT_CATS.map(cat=>{
     const c = REPORT_CAT_COLOR[cat];
@@ -9154,17 +9157,35 @@ function renderCatPanel(){
       style="${on?`color:${c};border-bottom-color:${c};background:${c}18;`:''}"
       onclick="reportSetCategory('${cat}');">${cat}</button>`;
   }).join('');
+
+  // 담당자 필터 행 (탭 아래)
+  const personBar = document.getElementById('catPanelPersonBar');
+  if(personBar){
+    const people = [null, ...COLLAB_PEOPLE]; // null = 전체
+    personBar.innerHTML = people.map(p=>{
+      const on = p === _catPanelPerson;
+      const c = p ? (COLLAB_PERSON_COLOR[p]||'#888') : '#555';
+      const label = p || '전체';
+      return `<button style="flex:1;border:none;padding:3px 4px;font-size:10.5px;font-weight:${on?800:600};cursor:pointer;
+        background:${on?c+'20':'transparent'};color:${on?c:'var(--tx2)'};
+        border-bottom:2px solid ${on?c:'transparent'};transition:all .1s;"
+        onclick="_catPanelPerson=${p?`'${p}'`:'null'};renderCatPanel();">${label}</button>`;
+    }).join('');
+  }
+
   if(!_reportCategoryFilter){
     body.innerHTML = `<div class="ts-empty">카테고리를 선택하면<br>전체 업무 내역을 볼 수 있습니다</div>`;
     return;
   }
   const cat = _reportCategoryFilter;
-  // 전체 담당자 × 전체 날짜에서 해당 카테고리 블록 수집
+
+  // 전체(또는 선택) 담당자 × 전체 날짜에서 해당 카테고리 블록 수집
   const byDate = {};
   for(const key of Object.keys(_reportAllData)){
     const parts = key.split('|');
     if(parts.length !== 2) continue;
     const [person, date] = parts;
+    if(_catPanelPerson && person !== _catPanelPerson) continue; // 담당자 필터
     const blocks = (_reportAllData[key].content||[]).filter(i=>i.type==='block' && i.category===cat);
     if(!blocks.length) continue;
     if(!byDate[date]) byDate[date] = [];
@@ -9224,7 +9245,7 @@ function _rpBlockHTML(item){
   const sub=[item.time, item.linked_title?`🔗${item.linked_title}`:''].filter(Boolean).join(' ');
   const catColor=item.category?REPORT_CAT_COLOR[item.category]||'#888':'';
   const catBadge=item.category?`<span class="rp-block-cat" style="background:${catColor};">${_esc(item.category)}</span>`:'';
-  return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" contenteditable="false">
+  return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" contenteditable="false" tabindex="0" title="클릭 후 Enter: 텍스트 줄 추가">
     <div class="rp-block-text">
       ${catBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${sub?`<span class="rp-block-sub"> — ${_esc(sub)}</span>`:''}
     </div>
@@ -9540,6 +9561,30 @@ function _reportSetupKeyboard(){
     if(!line) return;
     _reportSyncLine(line.dataset.id, line.textContent);
     _reportAutoSave();
+  });
+
+  // 블럭 포커스 상태에서 Enter → 블럭 다음에 새 텍스트 라인 삽입
+  editor.addEventListener('keydown',e=>{
+    const block=e.target.closest?.('.rp-block');
+    if(block && e.key==='Enter' && !e.altKey && !e.ctrlKey){
+      e.preventDefault();
+      const blockId=block.dataset.id;
+      const newId='l'+Date.now()+Math.random().toString(36).slice(2,4);
+      const newLine=document.createElement('div');
+      newLine.className='rp-line'; newLine.dataset.id=newId;
+      newLine.contentEditable='true'; newLine.textContent='• ';
+      block.after(newLine);
+      const r=document.createRange();
+      const tn=newLine.firstChild;
+      if(tn){r.setStart(tn,2);r.collapse(true);}
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+      newLine.focus();
+      const entry=_reportEnsureEntry();
+      const idx=entry.content.findIndex(i=>i.id===blockId);
+      entry.content.splice(idx<0?entry.content.length:idx+1,0,{id:newId,type:'line',text:'• '});
+      _reportAutoSave();
+      return;
+    }
   });
 
   editor.addEventListener('keydown',e=>{
