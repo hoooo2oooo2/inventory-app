@@ -650,11 +650,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* ── 패밀리 오더 ── */
 .fo-wrap{display:flex;height:calc(100vh - 102px);overflow:hidden;gap:0;}
 .fo-left{flex:0 0 30%;min-width:240px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
-.fo-right{flex:1;min-width:0;background:var(--bg2);overflow-y:auto;display:flex;flex-direction:column;}
-.fo-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-bottom:0.5px solid var(--bd);flex-shrink:0;}
+.fo-right{flex:1;min-width:0;background:var(--bg2);display:flex;flex-direction:column;overflow:hidden;}
+.fo-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;gap:4px;}
 .fo-head-title{font-size:13px;font-weight:800;color:var(--tx);}
-.fo-add-btn{font-size:11px;font-weight:700;color:var(--pr);background:var(--prl);border:none;border-radius:7px;padding:4px 10px;cursor:pointer;}
+.fo-add-btn{font-size:11px;font-weight:700;color:var(--pr);background:var(--prl);border:none;border-radius:7px;padding:4px 10px;cursor:pointer;white-space:nowrap;}
 .fo-add-btn:hover{background:#DCE8FF;}
+/* 업체 필터 바 */
+.fo-vendor-bar{display:flex;gap:3px;padding:5px 10px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg2);flex-wrap:wrap;}
+.fo-vbtn{font-size:10.5px;font-weight:700;border:1px solid var(--bd);border-radius:6px;padding:2px 8px;cursor:pointer;background:var(--bg);color:var(--tx2);transition:all .1s;}
+.fo-vbtn:hover{border-color:var(--pr);color:var(--pr);}
+.fo-vbtn.on{color:#fff;border-color:transparent;}
+/* 상품 추가 폼 */
 .fo-form{padding:10px 12px;border-bottom:1px solid var(--bd);background:#F0F7FF;flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
 .fo-form-row{display:flex;flex-direction:column;gap:2px;}
 .fo-form-lbl{font-size:10.5px;font-weight:700;color:var(--tx2);}
@@ -663,18 +669,59 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .fo-form-btns{display:flex;gap:6px;margin-top:2px;}
 .fo-save-btn{flex:1;background:var(--pr);color:#fff;border:none;border-radius:6px;padding:6px 0;font-size:12px;font-weight:700;cursor:pointer;}
 .fo-cancel-btn{background:none;border:1px solid var(--bd);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--tx2);}
-.fo-list{flex:1;overflow-y:auto;padding:8px;}
-.fo-item{background:var(--bg);border:0.5px solid var(--bd);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;flex-direction:column;gap:3px;transition:box-shadow .12s;}
-.fo-item:hover{box-shadow:0 2px 8px rgba(0,0,0,.08);}
-.fo-item-top{display:flex;align-items:center;justify-content:space-between;}
-.fo-item-name{font-size:12.5px;font-weight:700;color:var(--tx);}
-.fo-item-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:13px;padding:0 2px;}
-.fo-item-del:hover{color:#DC2626;}
-.fo-item-meta{font-size:11px;color:var(--tx2);display:flex;flex-wrap:wrap;gap:6px;}
-.fo-item-tag{background:var(--bg2);border:0.5px solid var(--bd);border-radius:5px;padding:1px 6px;font-size:10.5px;color:var(--tx2);}
+/* 상품 목록 (클릭 추가) */
+.fo-list{flex:1;overflow-y:auto;padding:4px 0;}
 .fo-empty{text-align:center;color:var(--tx2);font-size:12px;padding:30px 12px;line-height:1.8;}
-.fo-right-inner{padding:20px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;}
-.fo-placeholder{color:var(--tx2);font-size:14px;text-align:center;line-height:2;margin-top:60px;}
+.fo-prod-group{padding:5px 10px 2px;font-size:10px;font-weight:800;color:var(--tx2);letter-spacing:.5px;text-transform:uppercase;}
+.fo-prod-row{display:flex;align-items:center;padding:5px 10px;cursor:pointer;gap:6px;transition:background .1s;}
+.fo-prod-row:hover{background:var(--prl);}
+.fo-prod-info{flex:1;min-width:0;}
+.fo-prod-name{font-size:11.5px;font-weight:600;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fo-prod-meta{font-size:10px;color:var(--tx2);}
+.fo-prod-add{font-size:11px;font-weight:700;color:var(--pr);background:var(--prl);border:none;border-radius:5px;padding:2px 7px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.fo-prod-add:hover{background:#DCE8FF;}
+.fo-item-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 3px;flex-shrink:0;}
+.fo-item-del:hover{color:#DC2626;}
+/* 우측: 저장 목록 + 주문서 */
+.fo-order-list{flex:0 0 200px;background:var(--bg);border-bottom:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;}
+.fo-ol-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:0.5px solid var(--bd);flex-shrink:0;}
+.fo-ol-title{font-size:12px;font-weight:800;color:var(--tx);}
+.fo-ol-filters{display:flex;gap:3px;}
+.fo-ol-fbtn{font-size:10px;border:1px solid var(--bd);border-radius:5px;padding:2px 6px;cursor:pointer;background:var(--bg);color:var(--tx2);font-weight:700;}
+.fo-ol-fbtn.on{background:var(--pr);color:#fff;border-color:var(--pr);}
+.fo-ol-body{flex:1;overflow-y:auto;padding:4px 6px;}
+.fo-ol-empty{color:var(--tx2);font-size:11.5px;text-align:center;padding:20px 10px;}
+.fo-ol-card{background:var(--bg2);border:0.5px solid var(--bd);border-radius:7px;padding:6px 9px;margin-bottom:4px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:all .12s;}
+.fo-ol-card:hover,.fo-ol-card.active{border-color:var(--pr);background:var(--prl);}
+.fo-ol-date{font-size:11px;font-weight:700;color:var(--tx);}
+.fo-ol-sub{font-size:10px;color:var(--tx2);margin-top:1px;}
+.fo-ol-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 3px;}
+.fo-ol-del:hover{color:#DC2626;}
+/* 주문서 편집 */
+.fo-order-edit{flex:1;overflow-y:auto;padding:10px 14px 16px;}
+.fo-order-title{font-size:15px;font-weight:800;color:var(--tx);text-align:center;padding-bottom:8px;border-bottom:1.5px solid #333;margin-bottom:10px;letter-spacing:4px;}
+.fo-order-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+.fo-order-meta label{font-size:11.5px;color:var(--tx2);font-weight:600;display:flex;align-items:center;gap:5px;}
+.fo-order-meta input[type=date],.fo-order-meta select,.fo-order-meta input[type=number]{border:1px solid var(--bd);border-radius:5px;padding:3px 7px;font-size:11.5px;font-family:inherit;color:var(--tx);background:var(--bg);outline:none;}
+.fo-order-meta input[type=date]:focus,.fo-order-meta select:focus,.fo-order-meta input[type=number]:focus{border-color:var(--pr);}
+.fo-order-tbl-wrap{overflow-x:auto;margin-bottom:8px;}
+.fo-tbl{width:100%;border-collapse:collapse;font-size:11.5px;min-width:820px;}
+.fo-tbl th{background:#f0f2f5;border:1px solid #bbb;padding:5px 4px;font-size:11px;font-weight:700;white-space:nowrap;text-align:center;}
+.fo-tbl td{border:1px solid #ccc;height:28px;padding:0;vertical-align:middle;}
+.fo-tbl td input{width:100%;border:none;outline:none;font:inherit;background:transparent;padding:3px 5px;box-sizing:border-box;text-align:center;}
+.fo-tbl td.fo-ro{background:#f9f9f9;text-align:right;padding:3px 7px;font-size:11.5px;color:var(--tx);}
+.fo-tbl tr.fo-total-row td{background:#f0f2f5;font-weight:800;text-align:right;padding:5px 7px;font-size:12px;}
+.fo-tbl tr.fo-total-row td:first-child{text-align:center;}
+.fo-payment-row{display:flex;justify-content:flex-end;gap:20px;padding:6px 4px;font-size:12px;font-weight:700;color:var(--tx);border-top:0.5px solid var(--bd);margin-top:4px;}
+.fo-pay-lbl{color:var(--tx2);font-weight:500;margin-right:4px;}
+.fo-order-btns{display:flex;gap:6px;justify-content:flex-end;padding-top:8px;border-top:0.5px solid var(--bd);margin-top:6px;}
+.fo-order-btn{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:none;}
+.fo-obtn-save{background:var(--pr);color:#fff;}
+.fo-obtn-save:hover{background:#1a6ef5;}
+.fo-obtn-new{background:var(--bg2);color:var(--tx);border:1px solid var(--bd);}
+.fo-obtn-new:hover{background:var(--bg);}
+.fo-obtn-addrow{background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;}
+.fo-obtn-addrow:hover{background:#D1FAE5;}
 </style>
 </head>
 <body>
@@ -1321,21 +1368,27 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 패밀리 오더 ═══ -->
 <div class="page" id="page-family">
   <div class="fo-wrap">
-    <!-- 좌 30%: 상품 등록 -->
+    <!-- 좌 30%: 상품 목록 -->
     <div class="fo-left">
       <div class="fo-head">
         <span class="fo-head-title">📦 상품 목록</span>
         <button class="fo-add-btn" onclick="foToggleForm()">＋ 상품추가</button>
       </div>
+      <!-- 업체 필터 바 -->
+      <div class="fo-vendor-bar" id="foVendorBar"></div>
       <!-- 인라인 추가 폼 -->
       <div class="fo-form" id="foForm" style="display:none;">
         <div class="fo-form-row">
           <div class="fo-form-lbl">업체분류</div>
-          <input class="fo-form-inp" id="foVendor" placeholder="예: 브라이트투광등">
+          <select class="fo-form-inp" id="foVendor">
+            <option value="태광">태광</option>
+            <option value="다경">다경</option>
+            <option value="제이">제이</option>
+          </select>
         </div>
         <div class="fo-form-row">
           <div class="fo-form-lbl">상품코드</div>
-          <input class="fo-form-inp" id="foCode" placeholder="예: BT-5M">
+          <input class="fo-form-inp" id="foCode" placeholder="예: TK-001">
         </div>
         <div class="fo-form-row">
           <div class="fo-form-lbl">상품명</div>
@@ -1343,11 +1396,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
         <div style="display:flex;gap:8px;">
           <div class="fo-form-row" style="flex:1;">
-            <div class="fo-form-lbl">박스당 수량</div>
+            <div class="fo-form-lbl">박스당수량</div>
             <input class="fo-form-inp" id="foQtyBox" type="number" min="1" placeholder="예: 10">
           </div>
           <div class="fo-form-row" style="flex:1;">
-            <div class="fo-form-lbl">단가 (원)</div>
+            <div class="fo-form-lbl">도착가(원)</div>
             <input class="fo-form-inp" id="foPrice" type="number" min="0" placeholder="예: 15000">
           </div>
         </div>
@@ -1356,17 +1409,74 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <button class="fo-cancel-btn" onclick="foToggleForm(false)">취소</button>
         </div>
       </div>
-      <!-- 상품 목록 -->
+      <!-- 상품 목록 (클릭 → 주문서에 추가) -->
       <div class="fo-list" id="foList">
-        <div class="fo-empty">상품을 추가해주세요</div>
+        <div class="fo-empty">상품 목록을 불러오는 중...</div>
       </div>
     </div>
-    <!-- 우 70%: 주문서 영역 -->
+    <!-- 우 70%: 저장 목록 + 주문서 -->
     <div class="fo-right">
-      <div class="fo-right-inner">
-        <div class="fo-placeholder">
-          📋 주문서 양식<br>
-          <span style="font-size:12px;">이 영역에 주문서 양식이 구성될 예정입니다</span>
+      <!-- 상단 ~200px: 저장된 주문서 목록 -->
+      <div class="fo-order-list">
+        <div class="fo-ol-head">
+          <span class="fo-ol-title">📋 저장된 주문서</span>
+          <div class="fo-ol-filters" id="foOlFilters"></div>
+        </div>
+        <div class="fo-ol-body" id="foOlBody">
+          <div class="fo-ol-empty">저장된 주문서가 없습니다</div>
+        </div>
+      </div>
+      <!-- 하단: 주문서 편집 -->
+      <div class="fo-order-edit" id="foOrderEdit">
+        <div class="fo-order-title">수입의뢰 주문전리스트</div>
+        <div class="fo-order-meta">
+          <label>주문일 <input type="date" id="foOrderDate"></label>
+          <label>업체 <select id="foOrderVendor" onchange="foUpdateVendorRows()">
+            <option value="태광">태광</option>
+            <option value="다경">다경</option>
+            <option value="제이">제이</option>
+          </select></label>
+          <label>할증(%) <input type="number" id="foSurcharge" value="0" min="0" step="0.1" style="width:60px;" oninput="foRecalc()"></label>
+        </div>
+        <div class="fo-order-tbl-wrap">
+          <table class="fo-tbl" id="foTbl">
+            <thead>
+              <tr>
+                <th style="width:36px;">NO</th>
+                <th style="min-width:140px;">품명</th>
+                <th style="width:80px;">코드번호</th>
+                <th style="width:68px;">박스당수량</th>
+                <th style="width:60px;">박스수</th>
+                <th style="width:68px;">총수량</th>
+                <th style="width:80px;">도착가</th>
+                <th style="width:80px;">총금액</th>
+                <th style="width:90px;">총금액VAT+</th>
+                <th style="width:80px;">할증금액</th>
+                <th style="width:32px;"></th>
+              </tr>
+            </thead>
+            <tbody id="foTblBody"></tbody>
+            <tfoot>
+              <tr class="fo-total-row">
+                <td colspan="5" style="text-align:center;">합 계</td>
+                <td id="ftTotalQty"></td>
+                <td></td>
+                <td id="ftTotalAmt"></td>
+                <td id="ftTotalVat"></td>
+                <td id="ftTotalSur"></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="fo-payment-row">
+          <span><span class="fo-pay-lbl">1차 입금액 (50%)</span><span id="foPay1"></span></span>
+          <span><span class="fo-pay-lbl">2차 입금액 (50%)</span><span id="foPay2"></span></span>
+        </div>
+        <div class="fo-order-btns">
+          <button class="fo-order-btn fo-obtn-addrow" onclick="foAddRow()">＋ 행 추가</button>
+          <button class="fo-order-btn fo-obtn-new" onclick="foNewOrder()">새 주문서</button>
+          <button class="fo-order-btn fo-obtn-save" onclick="foSaveOrder()">💾 저장</button>
         </div>
       </div>
     </div>
@@ -10063,18 +10173,105 @@ loadAll().then(async ()=>{
 });
 
 // ══════════════════════════════════════════════
-// 패밀리 오더 — 상품 목록 관리
+// 패밀리 오더 — 상품 목록 & 주문서 관리
 // ══════════════════════════════════════════════
 const FAMILY_KIND = 'family_products_v1';
-let _foProducts = [];
-let _foEditId = null;
+const FAMILY_ORDERS_KIND = 'family_orders_v1';
 
-async function loadFamilyProducts(){
-  const d = await cloudKvLoad(FAMILY_KIND);
-  _foProducts = Array.isArray(d) ? d : [];
+const FO_DEFAULT_PRODUCTS = [
+  {id:'fp_tk1', vendor:'태광', code:'TKSCD243A', name:'태양광 육각등 프로(말뚝형)-흰빛', qtyBox:18, price:9618},
+  {id:'fp_tk2', vendor:'태광', code:'TKSCD243C', name:'태양광 육각등 프로(말뚝형)-노란빛', qtyBox:18, price:9618},
+  {id:'fp_tk3', vendor:'태광', code:'TKSCD003A', name:'태양광 육각등 프리미엄(말뚝형)-흰빛', qtyBox:18, price:12730},
+  {id:'fp_tk4', vendor:'태광', code:'TKSCD003C', name:'태양광 육각등 프리미엄(말뚝형)-노란빛', qtyBox:18, price:12730},
+  {id:'fp_tk5', vendor:'태광', code:'TKSCD146A', name:'태양광 COB 180구 정원등-올인원(흰빛)', qtyBox:6, price:27700},
+  {id:'fp_tk6', vendor:'태광', code:'TKSCD146C', name:'태양광 COB 180구 정원등-올인원(노란빛)', qtyBox:6, price:27700},
+  {id:'fp_tk7', vendor:'태광', code:'TKSCD082B', name:'태양광 미니 꼬마등-노란빛', qtyBox:300, price:850},
+  {id:'fp_dk1', vendor:'다경', code:'DGSCD152A', name:'[2세대] 태양광 카페등_80 (데크-흰빛)', qtyBox:25, price:10970},
+  {id:'fp_dk2', vendor:'다경', code:'DGSCD152D', name:'[2세대] 태양광 카페등_80 (데크-노란빛)', qtyBox:25, price:10970},
+  {id:'fp_dk3', vendor:'다경', code:'DGSCD153A', name:'[2세대] 태양광 카페등_100 (데크-흰빛)', qtyBox:18, price:11840},
+  {id:'fp_dk4', vendor:'다경', code:'DGSCD153D', name:'[2세대] 태양광 카페등_100 (데크-노란빛)', qtyBox:18, price:11840},
+  {id:'fp_dk5', vendor:'다경', code:'DGSCD144A', name:'태양광 COB 100구 정원등-말뚝(흰빛)', qtyBox:12, price:14280},
+  {id:'fp_dk6', vendor:'다경', code:'DGSCD144C', name:'태양광 COB 100구 정원등-말뚝(노란빛)', qtyBox:12, price:14280},
+  {id:'fp_j1',  vendor:'제이', code:'STSCD229A', name:'태양광 블랙 감지일체형 100w', qtyBox:4, price:38510},
+  {id:'fp_j2',  vendor:'제이', code:'STSCD229B', name:'태양광 블랙 감지일체형 200w', qtyBox:4, price:48940},
+  {id:'fp_j3',  vendor:'제이', code:'STSCD229C', name:'태양광 블랙 감지일체형 300w', qtyBox:4, price:60580},
+  {id:'fp_j4',  vendor:'제이', code:'STSCD228A', name:'태양광 100w 부착가로등', qtyBox:4, price:56750},
+  {id:'fp_j5',  vendor:'제이', code:'STSCD228B', name:'태양광 200w 부착가로등', qtyBox:4, price:71090},
+  {id:'fp_j6',  vendor:'제이', code:'STSCD228C', name:'태양광 300w 부착가로등', qtyBox:3, price:81410},
+  {id:'fp_j7',  vendor:'제이', code:'STSCD228D', name:'태양광 400w 부착가로등', qtyBox:3, price:89440},
+  {id:'fp_j8',  vendor:'제이', code:'STSCD228F', name:'태양광 600w 부착가로등', qtyBox:2, price:103200},
+  {id:'fp_j9',  vendor:'제이', code:'STSCE016G', name:'분리형 가로등 기둥-블랙(2M) 114-76', qtyBox:1, price:53030},
+  {id:'fp_j10', vendor:'제이', code:'STSCE016H', name:'분리형 가로등 기둥-블랙(3M) 114-76', qtyBox:1, price:64580},
+  {id:'fp_j11', vendor:'제이', code:'STSCE016I', name:'분리형 가로등 기둥-블랙(4M) 114-76', qtyBox:1, price:74550},
+  {id:'fp_j12', vendor:'제이', code:'STSCE016D3', name:'분리형 가로등 기둥-그레이(3M) 114-76', qtyBox:1, price:66675},
+  {id:'fp_j13', vendor:'제이', code:'STSCE016D4', name:'분리형 가로등 기둥-그레이(4M) 114-76', qtyBox:1, price:76335},
+  {id:'fp_j14', vendor:'제이', code:'STSCD230A', name:'태양광 UFO 가로등-800w', qtyBox:2, price:104300},
+  {id:'fp_j15', vendor:'제이', code:'STSCD230B', name:'태양광 UFO 가로등-1200w', qtyBox:2, price:120000},
+];
+
+let _foProducts = [];
+let _foVendorFilter = null;
+let _foOrders = [];
+let _foOlFilter = null;
+let _foCurOrderId = null;
+let _foCurRows = [];
+
+async function _foLoadData(){
+  const [prods, orders] = await Promise.all([
+    cloudKvLoad(FAMILY_KIND),
+    cloudKvLoad(FAMILY_ORDERS_KIND),
+  ]);
+  if(Array.isArray(prods) && prods.length > 0){
+    _foProducts = prods;
+  } else {
+    _foProducts = JSON.parse(JSON.stringify(FO_DEFAULT_PRODUCTS));
+    await cloudKvSave(FAMILY_KIND, _foProducts);
+  }
+  _foOrders = Array.isArray(orders) ? orders : [];
 }
-async function _foFlushSave(){
-  await cloudKvSave(FAMILY_KIND, _foProducts);
+async function _foFlushProducts(){ await cloudKvSave(FAMILY_KIND, _foProducts); }
+async function _foFlushOrders(){ await cloudKvSave(FAMILY_ORDERS_KIND, _foOrders); }
+
+// ── 좌측 상품 목록 ──
+function foRenderVendorBar(){
+  const bar = document.getElementById('foVendorBar');
+  if(!bar) return;
+  const vendors = ['전체','태광','다경','제이'];
+  const colors = {태광:'#3182F6', 다경:'#059669', 제이:'#DC2626'};
+  bar.innerHTML = vendors.map(v=>{
+    const val = v==='전체' ? null : v;
+    const on = v==='전체' ? _foVendorFilter===null : _foVendorFilter===v;
+    const c = colors[v]||'#555';
+    return `<button class="fo-vbtn${on?' on':''}" style="${on?`background:${c};color:#fff;border-color:${c};`:''}"
+      onclick="_foVendorFilter=${val?`'${val}'`:'null'};foRenderProductList();">${v}</button>`;
+  }).join('');
+}
+
+function foRenderProductList(){
+  foRenderVendorBar();
+  const el = document.getElementById('foList');
+  if(!el) return;
+  const filtered = _foVendorFilter ? _foProducts.filter(p=>p.vendor===_foVendorFilter) : _foProducts;
+  if(!filtered.length){ el.innerHTML='<div class="fo-empty">상품이 없습니다</div>'; return; }
+  let html='';
+  ['태광','다경','제이'].forEach(v=>{
+    const list = filtered.filter(p=>p.vendor===v);
+    if(!list.length) return;
+    html += `<div class="fo-prod-group">${v}</div>`;
+    list.forEach(p=>{
+      const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const pj = esc(JSON.stringify(p));
+      html += `<div class="fo-prod-row" onclick='foAddToOrder(${JSON.stringify(p)})'>
+        <div class="fo-prod-info">
+          <div class="fo-prod-name">${_esc(p.name)}</div>
+          <div class="fo-prod-meta">${_esc(p.code)} · ${(p.qtyBox||0).toLocaleString()}개/박스 · ${(p.price||0).toLocaleString()}원</div>
+        </div>
+        <button class="fo-prod-add" onclick="event.stopPropagation();foAddToOrder(${pj})">＋</button>
+        <button class="fo-item-del" onclick="event.stopPropagation();foDeleteProduct('${p.id}')" title="삭제">✕</button>
+      </div>`;
+    });
+  });
+  el.innerHTML = html;
 }
 
 function foToggleForm(open){
@@ -10083,80 +10280,196 @@ function foToggleForm(open){
   const show = (open !== undefined) ? !!open : (form.style.display === 'none');
   form.style.display = show ? '' : 'none';
   if(show && open === undefined){
-    _foEditId = null;
-    ['foVendor','foCode','foName','foQtyBox','foPrice'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.value='';
-    });
+    ['foCode','foName','foQtyBox','foPrice'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    const vs = document.getElementById('foVendor'); if(vs) vs.selectedIndex=0;
   }
-  if(show) setTimeout(()=>{ const v=document.getElementById('foVendor'); if(v) v.focus(); },50);
+  if(show) setTimeout(()=>{ const v=document.getElementById('foCode'); if(v) v.focus(); },50);
 }
 
 function foSaveProduct(){
-  const vendor = (document.getElementById('foVendor').value||'').trim();
+  const vendor = document.getElementById('foVendor').value||'태광';
   const code   = (document.getElementById('foCode').value||'').trim();
   const name   = (document.getElementById('foName').value||'').trim();
   const qtyBox = parseInt(document.getElementById('foQtyBox').value)||0;
   const price  = parseInt(document.getElementById('foPrice').value)||0;
   if(!name){ toast('상품명을 입력해주세요.'); return; }
-  if(_foEditId){
-    const p = _foProducts.find(p=>p.id===_foEditId);
-    if(p){ p.vendor=vendor; p.code=code; p.name=name; p.qtyBox=qtyBox; p.price=price; }
-    _foEditId = null;
-  } else {
-    _foProducts.push({ id:'fp'+Date.now(), vendor, code, name, qtyBox, price });
-  }
-  _foFlushSave();
+  _foProducts.push({id:'fp'+Date.now(), vendor, code, name, qtyBox, price});
+  _foFlushProducts();
   foToggleForm(false);
-  foRenderList();
+  foRenderProductList();
 }
 
 function foDeleteProduct(id){
   if(!confirm('상품을 삭제하시겠습니까?')) return;
   _foProducts = _foProducts.filter(p=>p.id!==id);
-  _foFlushSave();
-  foRenderList();
+  _foFlushProducts();
+  foRenderProductList();
 }
 
-function foEditProduct(id){
-  const p = _foProducts.find(p=>p.id===id);
-  if(!p) return;
-  _foEditId = id;
-  const form = document.getElementById('foForm');
-  if(form) form.style.display = '';
-  document.getElementById('foVendor').value = p.vendor||'';
-  document.getElementById('foCode').value   = p.code||'';
-  document.getElementById('foName').value   = p.name||'';
-  document.getElementById('foQtyBox').value = p.qtyBox||'';
-  document.getElementById('foPrice').value  = p.price||'';
-  setTimeout(()=>{ const v=document.getElementById('foVendor'); if(v) v.focus(); },50);
+// ── 우측 주문서 ──
+function foAddToOrder(p){
+  if(typeof p === 'string') try{ p=JSON.parse(p); }catch(e){}
+  _foCurRows.push({name:p.name||'', code:p.code||'', qtyBox:p.qtyBox||0, boxes:1, price:p.price||0});
+  foRenderOrderTable();
 }
 
-function foRenderList(){
-  const el = document.getElementById('foList');
-  if(!el) return;
-  if(!_foProducts.length){
-    el.innerHTML = '<div class="fo-empty">＋ 상품추가를 클릭해 상품을 등록하세요</div>';
-    return;
+function foAddRow(){
+  _foCurRows.push({name:'', code:'', qtyBox:0, boxes:0, price:0});
+  foRenderOrderTable();
+}
+
+function foRemoveRow(idx){
+  foSyncRows();
+  _foCurRows.splice(idx,1);
+  foRenderOrderTable();
+}
+
+function foSyncRows(){
+  _foCurRows.forEach((row,i)=>{
+    const g = id => { const el=document.getElementById(id); return el ? el.value : null; };
+    const n=g(`fo_name_${i}`), c=g(`fo_code_${i}`), q=g(`fo_qtybox_${i}`), b=g(`fo_boxes_${i}`), pr=g(`fo_price_${i}`);
+    if(n!==null) row.name=n;
+    if(c!==null) row.code=c;
+    if(q!==null) row.qtyBox=parseFloat(q)||0;
+    if(b!==null) row.boxes=parseFloat(b)||0;
+    if(pr!==null) row.price=parseFloat(pr)||0;
+  });
+}
+
+function foRecalc(){
+  foSyncRows();
+  const sur = parseFloat(document.getElementById('foSurcharge')?.value)||0;
+  let tQty=0, tAmt=0, tVat=0, tSur=0;
+  _foCurRows.forEach((row,i)=>{
+    const qty=(row.qtyBox||0)*(row.boxes||0);
+    const amt=qty*(row.price||0);
+    const vat=Math.round(amt*1.1);
+    const surAmt=Math.round(vat*(sur/100));
+    tQty+=qty; tAmt+=Math.round(amt); tVat+=vat; tSur+=surAmt;
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v?Math.round(v).toLocaleString():'0'; };
+    set(`fo_qty_${i}`,qty); set(`fo_amt_${i}`,amt); set(`fo_vat_${i}`,vat); set(`fo_sur_${i}`,surAmt);
+  });
+  const fmt=v=>Math.round(v).toLocaleString();
+  const se=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(v); };
+  se('ftTotalQty',tQty); se('ftTotalAmt',tAmt); se('ftTotalVat',tVat); se('ftTotalSur',tSur);
+  const pay1=Math.round(tVat/2);
+  const el1=document.getElementById('foPay1'), el2=document.getElementById('foPay2');
+  if(el1) el1.textContent=pay1.toLocaleString()+'원';
+  if(el2) el2.textContent=(tVat-pay1).toLocaleString()+'원';
+}
+
+function foRenderOrderTable(){
+  const tbody=document.getElementById('foTblBody');
+  if(!tbody) return;
+  const sur=parseFloat(document.getElementById('foSurcharge')?.value)||0;
+  const inp=(id,type,val,ph)=>`<input id="${id}" type="${type}" value="${val}" placeholder="${ph}" oninput="foRecalc()" style="width:100%;border:none;outline:none;font:inherit;padding:3px 5px;box-sizing:border-box;${type==='number'?'text-align:right;':''}">`;
+  tbody.innerHTML = _foCurRows.map((row,i)=>{
+    const qty=(row.qtyBox||0)*(row.boxes||0);
+    const amt=Math.round(qty*(row.price||0));
+    const vat=Math.round(amt*1.1);
+    const surAmt=Math.round(vat*(sur/100));
+    const fmt=v=>v?Math.round(v).toLocaleString():'0';
+    return `<tr>
+      <td style="text-align:center;font-size:11px;color:var(--tx2);">${i+1}</td>
+      <td>${inp(`fo_name_${i}`,'text',_esc(row.name),'품명')}</td>
+      <td style="text-align:center;">${inp(`fo_code_${i}`,'text',_esc(row.code),'코드')}</td>
+      <td>${inp(`fo_qtybox_${i}`,'number',row.qtyBox||'','수량')}</td>
+      <td>${inp(`fo_boxes_${i}`,'number',row.boxes||'','박스')}</td>
+      <td class="fo-ro" id="fo_qty_${i}">${fmt(qty)}</td>
+      <td>${inp(`fo_price_${i}`,'number',row.price||'','단가')}</td>
+      <td class="fo-ro" id="fo_amt_${i}">${fmt(amt)}</td>
+      <td class="fo-ro" id="fo_vat_${i}">${fmt(vat)}</td>
+      <td class="fo-ro" id="fo_sur_${i}">${fmt(surAmt)}</td>
+      <td style="text-align:center;"><button class="fo-item-del" onclick="foRemoveRow(${i})" title="삭제">✕</button></td>
+    </tr>`;
+  }).join('');
+  foRecalc();
+}
+
+function foUpdateVendorRows(){ foRecalc(); }
+
+async function foSaveOrder(){
+  foSyncRows();
+  if(!_foCurRows.length){ toast('주문서에 상품을 추가해주세요.'); return; }
+  const date=document.getElementById('foOrderDate')?.value||new Date().toISOString().slice(0,10);
+  const vendor=document.getElementById('foOrderVendor')?.value||'';
+  const sur=parseFloat(document.getElementById('foSurcharge')?.value)||0;
+  const rows=JSON.parse(JSON.stringify(_foCurRows));
+  if(_foCurOrderId){
+    const idx=_foOrders.findIndex(o=>o.id===_foCurOrderId);
+    if(idx>=0){ _foOrders[idx]={id:_foCurOrderId,date,vendor,sur,rows,savedAt:new Date().toISOString()}; }
+    else { _foCurOrderId=null; }
   }
-  el.innerHTML = _foProducts.map(p=>{
-    const priceStr = p.price ? Number(p.price).toLocaleString()+'원' : '—';
-    return `<div class="fo-item">
-      <div class="fo-item-top">
-        <span class="fo-item-name" onclick="foEditProduct('${p.id}')" style="cursor:pointer;" title="클릭하여 수정">${_esc(p.name)}</span>
-        <button class="fo-item-del" onclick="foDeleteProduct('${p.id}')" title="삭제">✕</button>
+  if(!_foCurOrderId){
+    const newId='fo'+Date.now();
+    _foOrders.unshift({id:newId,date,vendor,sur,rows,savedAt:new Date().toISOString()});
+    _foCurOrderId=newId;
+  }
+  await _foFlushOrders();
+  foRenderOrderList();
+  toast('주문서가 저장되었습니다.');
+}
+
+function foNewOrder(){
+  _foCurOrderId=null; _foCurRows=[];
+  const d=document.getElementById('foOrderDate'); if(d) d.value=new Date().toISOString().slice(0,10);
+  const s=document.getElementById('foSurcharge'); if(s) s.value='0';
+  foRenderOrderTable();
+  document.querySelectorAll('.fo-ol-card').forEach(c=>c.classList.remove('active'));
+}
+
+function foLoadOrder(id){
+  const o=_foOrders.find(o=>o.id===id);
+  if(!o) return;
+  _foCurOrderId=id;
+  _foCurRows=JSON.parse(JSON.stringify(o.rows||[]));
+  const d=document.getElementById('foOrderDate'); if(d) d.value=o.date||'';
+  const vs=document.getElementById('foOrderVendor'); if(vs) vs.value=o.vendor||'태광';
+  const s=document.getElementById('foSurcharge'); if(s) s.value=o.sur||0;
+  foRenderOrderTable();
+  document.querySelectorAll('.fo-ol-card').forEach(c=>c.classList.remove('active'));
+  const card=document.querySelector(`.fo-ol-card[data-id="${id}"]`);
+  if(card) card.classList.add('active');
+}
+
+async function foDeleteOrder(id){
+  if(!confirm('주문서를 삭제하시겠습니까?')) return;
+  _foOrders=_foOrders.filter(o=>o.id!==id);
+  await _foFlushOrders();
+  if(_foCurOrderId===id){ _foCurOrderId=null; _foCurRows=[]; foRenderOrderTable(); }
+  foRenderOrderList();
+}
+
+function foRenderOrderList(){
+  const filtersEl=document.getElementById('foOlFilters');
+  const bodyEl=document.getElementById('foOlBody');
+  if(!filtersEl||!bodyEl) return;
+  filtersEl.innerHTML=['전체','태광','다경','제이'].map(v=>{
+    const on=v==='전체'?_foOlFilter===null:_foOlFilter===v;
+    return `<button class="fo-ol-fbtn${on?' on':''}" onclick="_foOlFilter=${v==='전체'?'null':`'${v}'`};foRenderOrderList();">${v}</button>`;
+  }).join('');
+  const filtered=_foOlFilter?_foOrders.filter(o=>o.vendor===_foOlFilter):_foOrders;
+  if(!filtered.length){ bodyEl.innerHTML='<div class="fo-ol-empty">저장된 주문서가 없습니다</div>'; return; }
+  bodyEl.innerHTML=filtered.map(o=>{
+    const isActive=o.id===_foCurOrderId;
+    const cnt=(o.rows||[]).length;
+    return `<div class="fo-ol-card${isActive?' active':''}" data-id="${o.id}" onclick="foLoadOrder('${o.id}')">
+      <div style="flex:1;min-width:0;">
+        <div class="fo-ol-date">${o.date||'날짜없음'} <span style="font-size:10px;color:var(--tx2);font-weight:500;">${o.vendor||''}</span></div>
+        <div class="fo-ol-sub">${cnt}개 품목</div>
       </div>
-      <div class="fo-item-meta">
-        ${p.vendor?`<span class="fo-item-tag">🏢 ${_esc(p.vendor)}</span>`:''}
-        ${p.code?`<span class="fo-item-tag">🔖 ${_esc(p.code)}</span>`:''}
-        ${p.qtyBox?`<span class="fo-item-tag">📦 ${p.qtyBox}개/박스</span>`:''}
-        <span class="fo-item-tag">💰 ${priceStr}</span>
-      </div>
+      <button class="fo-ol-del" onclick="event.stopPropagation();foDeleteOrder('${o.id}')" title="삭제">✕</button>
     </div>`;
   }).join('');
 }
 
-function initFamilyPage(){
-  loadFamilyProducts().then(foRenderList);
+async function initFamilyPage(){
+  await _foLoadData();
+  foRenderProductList();
+  foRenderOrderList();
+  _foCurRows=[]; _foCurOrderId=null;
+  const d=document.getElementById('foOrderDate'); if(d) d.value=new Date().toISOString().slice(0,10);
+  foRenderOrderTable();
 }
 
 
