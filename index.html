@@ -59,8 +59,24 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-cat-side-btn.on{color:#fff!important;}
 .collab-cat-side-btn:hover:not(.on){background:var(--bg);}
 .collab-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
-.collab-cal-top{flex:0 0 285px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+/* 달력 + 오늘의 업무 요약 가로 행 */
+.collab-cal-row{flex:0 0 285px;display:flex;flex-direction:row;gap:8px;}
+.collab-cal-top{flex:0 0 45%;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-top iframe{width:100%;height:100%;border:none;display:block;}
+/* 오늘의 업무 요약 위젯 */
+.today-summary{flex:1;min-width:0;background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;}
+.ts-head{padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:12px;font-weight:800;color:var(--tx);flex-shrink:0;}
+.ts-tabs{display:flex;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);}
+.ts-tab{flex:1;text-align:center;padding:5px 2px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:2.5px solid transparent;transition:all .1s;color:var(--tx2);white-space:nowrap;}
+.ts-tab:hover{color:var(--tx);}
+.ts-tab.on{font-weight:800;}
+.ts-body{flex:1;overflow-y:auto;padding:5px 7px;}
+.ts-item{display:flex;align-items:flex-start;justify-content:space-between;padding:4px 6px;border-radius:6px;margin-bottom:2px;gap:6px;}
+.ts-item:hover{background:var(--bg2);}
+.ts-item-text{flex:1;font-size:11.5px;color:var(--tx);line-height:1.45;word-break:break-word;}
+.ts-item-time{font-size:10.5px;color:var(--tx2);}
+.ts-item-person{font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.ts-empty{text-align:center;color:var(--tx2);font-size:11.5px;padding:24px 10px;line-height:1.8;}
 /* 업무보고서 패널 */
 .report-panel{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;position:relative;z-index:1;}
 .rp-head{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);border-radius:12px 12px 0 0;position:relative;z-index:2;}
@@ -824,10 +840,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="collab-manager" id="collabManager"></div>
       <div class="collab-cols" id="collabCols"></div>
     </div>
-    <!-- 우: 달력(위) + [카테고리사이드바+업무보고서](아래) -->
+    <!-- 우: [달력+오늘의업무요약](위) + [카테고리사이드바+업무보고서](아래) -->
     <div class="collab-right">
-      <div class="collab-cal-top">
-        <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
+      <div class="collab-cal-row">
+        <div class="collab-cal-top">
+          <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
+        </div>
+        <div class="today-summary" id="todaySummary">
+          <div class="ts-head">📌 오늘의 업무 요약</div>
+          <div class="ts-tabs" id="tsTabs"></div>
+          <div class="ts-body" id="tsBody"><div class="ts-empty">데이터를 불러오는 중…</div></div>
+        </div>
       </div>
       <div class="collab-report-row">
       <div class="collab-cat-sidebar" id="collabCatSidebar"></div>
@@ -8497,6 +8520,7 @@ function loadCollabPage(){
   loadReport().then(async ()=>{
     await _reportMigrateFromCalendar();
     renderReportPanel();
+    renderTodaySummary();
     _reportSetupKeyboard();
   });
 }
@@ -8839,6 +8863,7 @@ let _reportKbSetup   = false;
 let _rpLinkDropId    = null;
 let _rpInsertAfterId = null;  // Alt+Enter: 이 라인 id 다음에 블럭 삽입
 let _reportCategoryFilter = null;
+let _todaySumCat = '디자인';
 
 const REPORT_CATS = ['디자인','광고관리','품절관리','매출관리','기타'];
 const REPORT_CAT_COLOR = {
@@ -8880,6 +8905,7 @@ async function loadReport(){
 async function _reportFlushSave(){
   await cloudKvSave(REPORT_KIND, _reportAllData);
   _reportInjectCalDots();
+  renderTodaySummary();
 }
 
 // 업무보고서 데이터가 있는 날짜를 캘린더 iframe에 주입 (주황 점 동기화)
@@ -9027,6 +9053,44 @@ function _rpBuildEditor(){
     if(item.type==='block') return _rpBlockHTML(item);
     return '';
   }).join('');
+}
+
+// ── 오늘의 업무 요약 위젯 ──
+function renderTodaySummary(){
+  const tabs = document.getElementById('tsTabs');
+  const body = document.getElementById('tsBody');
+  if(!tabs || !body) return;
+  // 탭
+  tabs.innerHTML = REPORT_CATS.map(cat=>{
+    const c = REPORT_CAT_COLOR[cat];
+    const on = cat === _todaySumCat;
+    return `<button class="ts-tab ${on?'on':''}"
+      style="${on?`color:${c};border-bottom-color:${c};background:${c}18;`:''}"
+      onclick="_todaySumCat='${cat}';renderTodaySummary();">${cat}</button>`;
+  }).join('');
+  // 오늘 날짜 기준 전 담당자 블록 수집
+  const today = _reportTodayStr();
+  const items = [];
+  for(const person of COLLAB_PEOPLE){
+    const key = `${person}|${today}`;
+    const entry = _reportAllData[key];
+    if(!entry) continue;
+    (entry.content||[]).filter(i=>i.type==='block' && i.category===_todaySumCat).forEach(b=>{
+      items.push({person, task:b.task||'', time:b.time||''});
+    });
+  }
+  if(!items.length){
+    body.innerHTML = `<div class="ts-empty">해당 카테고리의 업무가 없습니다</div>`;
+  } else {
+    body.innerHTML = items.map(it=>{
+      const c = COLLAB_PERSON_COLOR[it.person]||'#888';
+      return `<div class="ts-item">
+        <div class="ts-item-text">${_esc(it.task)}${it.time?` <span class="ts-item-time">— ${_esc(it.time)}</span>`:''}
+        </div>
+        <div class="ts-item-person" style="color:${c};">${_esc(it.person)}</div>
+      </div>`;
+    }).join('');
+  }
 }
 
 // 카테고리 필터 뷰 — 전체 날짜 통합 출력
