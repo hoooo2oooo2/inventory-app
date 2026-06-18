@@ -10586,7 +10586,7 @@ function foRenderOrderList(){
           <span style="font-size:10px;font-weight:700;color:${vc};background:${vc}18;border-radius:4px;padding:1px 5px;">${o.vendor||''}</span>
           <span style="font-size:9.5px;color:var(--tx2);">${cnt}품목</span>
         </div>
-        <div style="margin-top:3px;font-size:11px;font-weight:700;color:var(--tx);">총 ${fmt(tVat)}원 <span style="font-weight:400;color:var(--tx2);font-size:10px;">(VAT+)</span>${tSur>0?` +할증 ${fmt(tSur)}원`:''}</div>
+        <div style="margin-top:3px;font-size:11px;font-weight:700;color:var(--tx);">총 ${fmt(tVat)}원 <span style="font-weight:400;color:var(--tx2);font-size:10px;">(VAT+)</span>${tSur>0?` +할증 ${fmt(tSur)}원 <span style="font-weight:400;color:var(--tx2);font-size:10px;">= 합계</span> <span style="color:${vc};">${fmt(totalPay)}원</span>`:''}</div>
         <div style="margin-top:2px;display:flex;gap:8px;font-size:10px;color:var(--tx2);">
           <span>1차 <b style="color:${vc};">${fmt(pay1)}원</b></span>
           <span>2차 <b style="color:${vc};">${fmt(pay2)}원</b></span>
@@ -10630,9 +10630,17 @@ const FAMILY_IMPORTS_KIND='family_imports_v1';
 let _foImports={};
 let _foImportCols=3;
 
+// 구조: _foImports[key] = [{qty:number, date:string}, ...] (구버전 number[] 자동 마이그레이션)
+function _foReceiptQty(v){ return typeof v==='object'&&v!==null ? (parseFloat(v.qty)||0) : (parseFloat(v)||0); }
+function _foReceiptDate(v){ return typeof v==='object'&&v!==null ? (v.date||'') : ''; }
+
 async function _foLoadImports(){
   const data=await cloudKvLoad(FAMILY_IMPORTS_KIND);
   if(data && typeof data==='object' && !Array.isArray(data)){
+    // 구버전(숫자 배열) → 신버전(객체 배열) 마이그레이션
+    Object.keys(data).forEach(k=>{
+      data[k]=(data[k]||[]).map(v=>(typeof v==='object'&&v!==null)?v:{qty:parseFloat(v)||0,date:''});
+    });
     _foImports=data;
     const maxExisting=Math.max(0,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0));
     if(maxExisting>_foImportCols) _foImportCols=maxExisting;
@@ -10645,21 +10653,30 @@ function foAddImportCol(){
   foRenderImportTab();
 }
 
-function foUpdateImport(key,colIdx,val,totalQty){
+function foUpdateImportQty(key,colIdx,val,totalQty){
   if(!_foImports[key]) _foImports[key]=[];
-  while(_foImports[key].length<=colIdx) _foImports[key].push(0);
-  _foImports[key][colIdx]=parseFloat(val)||0;
-  // 총입고, 남은수량 직접 업데이트
+  while(_foImports[key].length<=colIdx) _foImports[key].push({qty:0,date:''});
+  const ex=_foImports[key][colIdx];
+  _foImports[key][colIdx]={qty:parseFloat(val)||0, date:_foReceiptDate(ex)};
   const receipts=_foImports[key];
-  const totalRecv=receipts.reduce((s,v)=>s+(parseFloat(v)||0),0);
+  const totalRecv=receipts.reduce((s,v)=>s+_foReceiptQty(v),0);
   const rem=totalQty-totalRecv;
-  const recvEl=document.getElementById('fo-recv-'+key.replace(/[^a-z0-9]/gi,'_'));
-  const remEl=document.getElementById('fo-rem-'+key.replace(/[^a-z0-9]/gi,'_'));
+  const sk=key.replace(/[^a-z0-9]/gi,'_');
+  const recvEl=document.getElementById('fo-recv-'+sk);
+  const remEl=document.getElementById('fo-rem-'+sk);
   if(recvEl) recvEl.textContent=totalRecv.toLocaleString();
   if(remEl){ remEl.textContent=rem.toLocaleString(); remEl.style.color=rem<=0?'#059669':'#DC2626'; }
-  // 800ms 후 클라우드 저장
-  clearTimeout(foUpdateImport._t);
-  foUpdateImport._t=setTimeout(()=>_foFlushImports(),800);
+  clearTimeout(foUpdateImportQty._t);
+  foUpdateImportQty._t=setTimeout(()=>_foFlushImports(),800);
+}
+
+function foUpdateImportDate(key,colIdx,dateVal){
+  if(!_foImports[key]) _foImports[key]=[];
+  while(_foImports[key].length<=colIdx) _foImports[key].push({qty:0,date:''});
+  const ex=_foImports[key][colIdx];
+  _foImports[key][colIdx]={qty:_foReceiptQty(ex), date:dateVal};
+  clearTimeout(foUpdateImportDate._t);
+  foUpdateImportDate._t=setTimeout(()=>_foFlushImports(),800);
 }
 
 function foRenderImportTab(){
@@ -10667,46 +10684,100 @@ function foRenderImportTab(){
   const bodyEl=document.getElementById('foImportBody');
   if(!hdrEl||!bodyEl) return;
   if(!_foOrders.length){
-    bodyEl.innerHTML='<tr><td colspan="20" style="text-align:center;padding:24px;color:var(--tx2);">저장된 주문서가 없습니다</td></tr>';
+    bodyEl.innerHTML='<tr><td colspan="30" style="text-align:center;padding:24px;color:var(--tx2);">저장된 주문서가 없습니다</td></tr>';
     hdrEl.innerHTML='';
     return;
   }
   const maxCols=Math.max(_foImportCols,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0),1);
+  const totalCols=7+maxCols+2;
+
   // 헤더
-  let hdr='<tr><th>주문일</th><th>업체</th><th style="min-width:140px;text-align:left;">품명</th><th style="width:80px;">코드번호</th><th style="width:68px;">박스당수량</th><th style="width:60px;">박스수</th><th style="width:68px;">총수량</th>';
-  for(let i=0;i<maxCols;i++) hdr+=`<th style="width:72px;">${i+1}차 입고</th>`;
-  hdr+='<th style="width:72px;">총입고</th><th style="width:72px;">남은수량</th></tr>';
+  let hdr='<tr><th style="white-space:nowrap;">주문일</th><th>업체</th><th style="min-width:140px;text-align:left;">품명</th><th style="width:80px;">코드번호</th><th style="width:58px;">박스당</th><th style="width:50px;">박스</th><th style="width:62px;">총수량</th>';
+  for(let i=0;i<maxCols;i++) hdr+=`<th style="width:110px;padding:4px 6px;">${i+1}차 입고<br><span style="font-size:9px;font-weight:400;color:var(--tx2);">날짜 · 수량</span></th>`;
+  hdr+='<th style="width:62px;">총입고</th><th style="width:68px;">남은수량</th></tr>';
   hdrEl.innerHTML=hdr;
+
   const VC={태광:'#3182F6',다경:'#059669',제이:'#DC2626'};
-  let rows='';
+  const VENDORS=['태광','다경','제이'];
+
+  // 완료/진행중 분류: 모든 row의 잔여수량이 0이면 완료
+  const activeOrders=[], completedOrders=[];
   _foOrders.forEach(order=>{
-    (order.rows||[]).forEach((row,idx)=>{
-      const rawKey=`${order.id}_${idx}`;
-      const safeKey=rawKey.replace(/[^a-z0-9]/gi,'_');
-      const receipts=_foImports[rawKey]||[];
+    const rows=order.rows||[];
+    if(!rows.length) return;
+    const allDone=rows.every((row,idx)=>{
+      const key=`${order.id}_${idx}`;
       const totalQty=(row.qtyBox||0)*(row.boxes||0);
-      const totalRecv=receipts.reduce((s,v)=>s+(parseFloat(v)||0),0);
-      const rem=totalQty-totalRecv;
-      const vc=VC[order.vendor]||'#555';
-      let tdInputs='';
-      for(let i=0;i<maxCols;i++){
-        tdInputs+=`<td style="padding:0;"><input type="number" min="0" style="width:100%;border:none;outline:none;font:inherit;padding:3px 5px;box-sizing:border-box;text-align:right;" value="${receipts[i]||''}" placeholder="0" oninput="foUpdateImport('${rawKey}',${i},this.value,${totalQty})"></td>`;
-      }
-      rows+=`<tr>
-        <td style="padding:4px 6px;white-space:nowrap;font-size:11px;text-align:center;">${order.date||''}</td>
-        <td style="padding:4px 6px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${vc};background:${vc}18;border-radius:4px;padding:1px 5px;">${order.vendor||''}</span></td>
-        <td style="padding:4px 8px;font-size:11.5px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.name||''}">${row.name||''}</td>
-        <td style="padding:4px 6px;font-size:10.5px;color:var(--tx2);text-align:center;">${row.code||''}</td>
-        <td class="fo-td-val">${(row.qtyBox||0).toLocaleString()}</td>
-        <td class="fo-td-val">${(row.boxes||0).toLocaleString()}</td>
-        <td class="fo-td-val" style="font-weight:700;">${totalQty.toLocaleString()}</td>
-        ${tdInputs}
-        <td class="fo-td-val" id="fo-recv-${safeKey}" style="font-weight:600;color:#059669;">${totalRecv.toLocaleString()}</td>
-        <td class="fo-td-rem fo-td-val" id="fo-rem-${safeKey}" style="color:${rem<=0?'#059669':'#DC2626'};">${rem.toLocaleString()}</td>
-      </tr>`;
+      if(totalQty<=0) return true;
+      const totalRecv=(_foImports[key]||[]).reduce((s,v)=>s+_foReceiptQty(v),0);
+      return totalRecv>=totalQty;
     });
+    (allDone?completedOrders:activeOrders).push(order);
   });
-  bodyEl.innerHTML=rows||'<tr><td colspan="20" style="text-align:center;padding:20px;color:var(--tx2);">등록된 주문 품목이 없습니다</td></tr>';
+
+  const renderSection=(orders,isCompleted)=>{
+    let html='';
+    VENDORS.forEach(vendor=>{
+      const vOrders=orders.filter(o=>o.vendor===vendor);
+      if(!vOrders.length) return;
+      const vc=VC[vendor]||'#555';
+      html+=`<tr><td colspan="${totalCols}" style="padding:5px 10px;background:${vc}0d;border-top:2px solid ${vc}40;border-bottom:1px solid ${vc}20;">
+        <span style="font-size:11px;font-weight:700;color:${vc};">▎${vendor}</span>
+      </td></tr>`;
+      vOrders.forEach(order=>{
+        (order.rows||[]).forEach((row,idx)=>{
+          const rawKey=`${order.id}_${idx}`;
+          const safeKey=rawKey.replace(/[^a-z0-9]/gi,'_');
+          const receipts=_foImports[rawKey]||[];
+          const totalQty=(row.qtyBox||0)*(row.boxes||0);
+          const totalRecv=receipts.reduce((s,v)=>s+_foReceiptQty(v),0);
+          const rem=totalQty-totalRecv;
+          let tdInputs='';
+          for(let i=0;i<maxCols;i++){
+            const r=receipts[i];
+            const rQty=r?_foReceiptQty(r):'';
+            const rDate=r?_foReceiptDate(r):'';
+            if(isCompleted){
+              tdInputs+=`<td style="padding:3px 5px;text-align:center;vertical-align:middle;">
+                ${rDate?`<div style="font-size:9.5px;color:var(--tx2);">${rDate}</div>`:''}
+                ${rQty?`<div style="font-size:11px;font-weight:600;color:#059669;">${parseFloat(rQty).toLocaleString()}</div>`:'<div style="color:#ccc;font-size:11px;">—</div>'}
+              </td>`;
+            } else {
+              tdInputs+=`<td style="padding:2px 3px;vertical-align:middle;">
+                <input type="date" value="${rDate}" style="width:100%;border:1px solid #ddd;border-radius:3px;font-size:10px;padding:1px 3px;box-sizing:border-box;font-family:inherit;color:var(--tx2);" onchange="foUpdateImportDate('${rawKey}',${i},this.value)">
+                <input type="number" min="0" value="${rQty||''}" placeholder="0" style="width:100%;border:1px solid #ddd;border-radius:3px;font-size:11px;padding:2px 4px;box-sizing:border-box;text-align:right;font-family:inherit;margin-top:2px;" oninput="foUpdateImportQty('${rawKey}',${i},this.value,${totalQty})">
+              </td>`;
+            }
+          }
+          const rowBg=isCompleted?'background:#f9fbf9;opacity:0.8;':'';
+          html+=`<tr style="${rowBg}">
+            <td style="padding:4px 6px;white-space:nowrap;font-size:11px;text-align:center;">${order.date||''}</td>
+            <td style="padding:4px 6px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${vc};background:${vc}18;border-radius:4px;padding:1px 5px;">${order.vendor||''}</span></td>
+            <td style="padding:4px 8px;font-size:11.5px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.name||''}">${row.name||''}</td>
+            <td style="padding:4px 6px;font-size:10.5px;color:var(--tx2);text-align:center;">${row.code||''}</td>
+            <td class="fo-td-val">${(row.qtyBox||0).toLocaleString()}</td>
+            <td class="fo-td-val">${(row.boxes||0).toLocaleString()}</td>
+            <td class="fo-td-val" style="font-weight:700;">${totalQty.toLocaleString()}</td>
+            ${tdInputs}
+            <td class="fo-td-val" id="fo-recv-${safeKey}" style="font-weight:600;color:#059669;">${totalRecv.toLocaleString()}</td>
+            <td class="fo-td-rem fo-td-val" id="fo-rem-${safeKey}" style="color:${rem<=0?'#059669':'#DC2626'};">${rem.toLocaleString()}</td>
+          </tr>`;
+        });
+      });
+    });
+    return html;
+  };
+
+  let rows=renderSection(activeOrders,false);
+
+  if(completedOrders.length){
+    rows+=`<tr><td colspan="${totalCols}" style="padding:10px 12px 6px;background:#F0FDF4;border-top:2px solid #059669;border-bottom:1px solid #bbf7d0;">
+      <span style="font-size:12px;font-weight:700;color:#059669;">✅ 수입 완료 (${completedOrders.length}건)</span>
+    </td></tr>`;
+    rows+=renderSection(completedOrders,true);
+  }
+
+  bodyEl.innerHTML=rows||'<tr><td colspan="30" style="text-align:center;padding:20px;color:var(--tx2);">등록된 주문 품목이 없습니다</td></tr>';
 }
 
 
