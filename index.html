@@ -646,6 +646,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .qt-mgr-btn.active{background:#3182F6;color:#fff;border-color:#3182F6;}
 .qt-vat-sel{border:none;outline:none;background:transparent;font:inherit;font-size:12px;font-weight:700;color:#2563EB;text-align:center;cursor:pointer;width:100%;padding:4px;appearance:auto;}
 .qt-doc.qt-printing .qt-noprint{display:none !important;}
+
+/* ── 패밀리 오더 ── */
+.fo-wrap{display:flex;height:calc(100vh - 102px);overflow:hidden;gap:0;}
+.fo-left{flex:0 0 30%;min-width:240px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
+.fo-right{flex:1;min-width:0;background:var(--bg2);overflow-y:auto;display:flex;flex-direction:column;}
+.fo-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;border-bottom:0.5px solid var(--bd);flex-shrink:0;}
+.fo-head-title{font-size:13px;font-weight:800;color:var(--tx);}
+.fo-add-btn{font-size:11px;font-weight:700;color:var(--pr);background:var(--prl);border:none;border-radius:7px;padding:4px 10px;cursor:pointer;}
+.fo-add-btn:hover{background:#DCE8FF;}
+.fo-form{padding:10px 12px;border-bottom:1px solid var(--bd);background:#F0F7FF;flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
+.fo-form-row{display:flex;flex-direction:column;gap:2px;}
+.fo-form-lbl{font-size:10.5px;font-weight:700;color:var(--tx2);}
+.fo-form-inp{border:1px solid var(--bd);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;color:var(--tx);background:var(--bg);outline:none;width:100%;}
+.fo-form-inp:focus{border-color:var(--pr);}
+.fo-form-btns{display:flex;gap:6px;margin-top:2px;}
+.fo-save-btn{flex:1;background:var(--pr);color:#fff;border:none;border-radius:6px;padding:6px 0;font-size:12px;font-weight:700;cursor:pointer;}
+.fo-cancel-btn{background:none;border:1px solid var(--bd);border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--tx2);}
+.fo-list{flex:1;overflow-y:auto;padding:8px;}
+.fo-item{background:var(--bg);border:0.5px solid var(--bd);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;flex-direction:column;gap:3px;transition:box-shadow .12s;}
+.fo-item:hover{box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.fo-item-top{display:flex;align-items:center;justify-content:space-between;}
+.fo-item-name{font-size:12.5px;font-weight:700;color:var(--tx);}
+.fo-item-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:13px;padding:0 2px;}
+.fo-item-del:hover{color:#DC2626;}
+.fo-item-meta{font-size:11px;color:var(--tx2);display:flex;flex-wrap:wrap;gap:6px;}
+.fo-item-tag{background:var(--bg2);border:0.5px solid var(--bd);border-radius:5px;padding:1px 6px;font-size:10.5px;color:var(--tx2);}
+.fo-empty{text-align:center;color:var(--tx2);font-size:12px;padding:30px 12px;line-height:1.8;}
+.fo-right-inner{padding:20px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;}
+.fo-placeholder{color:var(--tx2);font-size:14px;text-align:center;line-height:2;margin-top:60px;}
 </style>
 </head>
 <body>
@@ -820,6 +849,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-revenue" onclick="goMenu('revenue')">💰 매출관리</div>
   <div class="ni" id="nav-price" onclick="goMenu('price')">🧮 단가계산기</div>
   <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서</div>
+  <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
 </nav>
@@ -1284,6 +1314,61 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     </div>
     <div style="font-size:11px;color:var(--tx2);margin-bottom:12px;">선택하면 모델명·수량·단가(할인가)·판매가가 견적서에 채워집니다. 불러온 뒤 수정할 수 있습니다.</div>
     <div id="qt-loadcalc-list" style="overflow-y:auto;flex:1;border:1px solid var(--bd);border-radius:10px;"></div>
+  </div>
+</div>
+
+<!-- ═══ 패밀리 오더 ═══ -->
+<div class="page" id="page-family">
+  <div class="fo-wrap">
+    <!-- 좌 30%: 상품 등록 -->
+    <div class="fo-left">
+      <div class="fo-head">
+        <span class="fo-head-title">📦 상품 목록</span>
+        <button class="fo-add-btn" onclick="foToggleForm()">＋ 상품추가</button>
+      </div>
+      <!-- 인라인 추가 폼 -->
+      <div class="fo-form" id="foForm" style="display:none;">
+        <div class="fo-form-row">
+          <div class="fo-form-lbl">업체분류</div>
+          <input class="fo-form-inp" id="foVendor" placeholder="예: 브라이트투광등">
+        </div>
+        <div class="fo-form-row">
+          <div class="fo-form-lbl">상품코드</div>
+          <input class="fo-form-inp" id="foCode" placeholder="예: BT-5M">
+        </div>
+        <div class="fo-form-row">
+          <div class="fo-form-lbl">상품명</div>
+          <input class="fo-form-inp" id="foName" placeholder="상품명 입력">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div class="fo-form-row" style="flex:1;">
+            <div class="fo-form-lbl">박스당 수량</div>
+            <input class="fo-form-inp" id="foQtyBox" type="number" min="1" placeholder="예: 10">
+          </div>
+          <div class="fo-form-row" style="flex:1;">
+            <div class="fo-form-lbl">단가 (원)</div>
+            <input class="fo-form-inp" id="foPrice" type="number" min="0" placeholder="예: 15000">
+          </div>
+        </div>
+        <div class="fo-form-btns">
+          <button class="fo-save-btn" onclick="foSaveProduct()">저장</button>
+          <button class="fo-cancel-btn" onclick="foToggleForm(false)">취소</button>
+        </div>
+      </div>
+      <!-- 상품 목록 -->
+      <div class="fo-list" id="foList">
+        <div class="fo-empty">상품을 추가해주세요</div>
+      </div>
+    </div>
+    <!-- 우 70%: 주문서 영역 -->
+    <div class="fo-right">
+      <div class="fo-right-inner">
+        <div class="fo-placeholder">
+          📋 주문서 양식<br>
+          <span style="font-size:12px;">이 영역에 주문서 양식이 구성될 예정입니다</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2306,7 +2391,7 @@ const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', 
 //   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
-  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit' } },
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit' } },
 };
@@ -2399,7 +2484,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family'] },
   { id:'design', label:'디자인팀',  menus:['collab','calendar'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales'] },
 ];
@@ -2992,7 +3077,7 @@ function goPage(p){
   // 권한 없는 메뉴 접근 차단
   if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   currentPage=p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','collab','calendar'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===p);
   });
@@ -3019,6 +3104,7 @@ function goPage(p){
   if(p==='revenue') loadRevenuePage().then(()=>goRevPage(_revPage));
   if(p==='price'){ pcEnsureBackdata(); pcRenderEstimates(); pcLoadEstimatesCloud(); }
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
+  if(p==='family') initFamilyPage();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
   if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote'||p==='collab'||p==='calendar') ? 'hidden' : '';
@@ -9097,7 +9183,8 @@ function renderCatPanel(){
         onclick="_reportDate='${d}';_reportCategoryFilter=null;renderReportPanel();renderCatPanel();">${dateStr} ›</div>`+
       byDate[d].map(b=>{
         const pc = COLLAB_PERSON_COLOR[b.person]||'#888';
-        return `<div class="ts-item">
+        return `<div class="ts-item" style="cursor:pointer;" title="${_esc(b.person)} 업무보고서로 이동"
+          onclick="_reportDate='${d}';_reportPerson='${b.person}';_reportCategoryFilter=null;renderReportPanel();renderCatPanel();">
           <div class="ts-item-text">${_esc(b.task)}${b.time?` <span class="ts-item-time">— ${_esc(b.time)}</span>`:''}
           </div>
           <div class="ts-item-person" style="color:${pc};">${_esc(b.person)}</div>
@@ -9929,6 +10016,103 @@ loadAll().then(async ()=>{
     }
   }
 });
+
+// ══════════════════════════════════════════════
+// 패밀리 오더 — 상품 목록 관리
+// ══════════════════════════════════════════════
+const FAMILY_KIND = 'family_products_v1';
+let _foProducts = [];
+let _foEditId = null;
+
+async function loadFamilyProducts(){
+  const d = await cloudKvLoad(FAMILY_KIND);
+  _foProducts = Array.isArray(d) ? d : [];
+}
+async function _foFlushSave(){
+  await cloudKvSave(FAMILY_KIND, _foProducts);
+}
+
+function foToggleForm(open){
+  const form = document.getElementById('foForm');
+  if(!form) return;
+  const show = (open !== undefined) ? !!open : (form.style.display === 'none');
+  form.style.display = show ? '' : 'none';
+  if(show && open === undefined){
+    _foEditId = null;
+    ['foVendor','foCode','foName','foQtyBox','foPrice'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+  }
+  if(show) setTimeout(()=>{ const v=document.getElementById('foVendor'); if(v) v.focus(); },50);
+}
+
+function foSaveProduct(){
+  const vendor = (document.getElementById('foVendor').value||'').trim();
+  const code   = (document.getElementById('foCode').value||'').trim();
+  const name   = (document.getElementById('foName').value||'').trim();
+  const qtyBox = parseInt(document.getElementById('foQtyBox').value)||0;
+  const price  = parseInt(document.getElementById('foPrice').value)||0;
+  if(!name){ toast('상품명을 입력해주세요.'); return; }
+  if(_foEditId){
+    const p = _foProducts.find(p=>p.id===_foEditId);
+    if(p){ p.vendor=vendor; p.code=code; p.name=name; p.qtyBox=qtyBox; p.price=price; }
+    _foEditId = null;
+  } else {
+    _foProducts.push({ id:'fp'+Date.now(), vendor, code, name, qtyBox, price });
+  }
+  _foFlushSave();
+  foToggleForm(false);
+  foRenderList();
+}
+
+function foDeleteProduct(id){
+  if(!confirm('상품을 삭제하시겠습니까?')) return;
+  _foProducts = _foProducts.filter(p=>p.id!==id);
+  _foFlushSave();
+  foRenderList();
+}
+
+function foEditProduct(id){
+  const p = _foProducts.find(p=>p.id===id);
+  if(!p) return;
+  _foEditId = id;
+  const form = document.getElementById('foForm');
+  if(form) form.style.display = '';
+  document.getElementById('foVendor').value = p.vendor||'';
+  document.getElementById('foCode').value   = p.code||'';
+  document.getElementById('foName').value   = p.name||'';
+  document.getElementById('foQtyBox').value = p.qtyBox||'';
+  document.getElementById('foPrice').value  = p.price||'';
+  setTimeout(()=>{ const v=document.getElementById('foVendor'); if(v) v.focus(); },50);
+}
+
+function foRenderList(){
+  const el = document.getElementById('foList');
+  if(!el) return;
+  if(!_foProducts.length){
+    el.innerHTML = '<div class="fo-empty">＋ 상품추가를 클릭해 상품을 등록하세요</div>';
+    return;
+  }
+  el.innerHTML = _foProducts.map(p=>{
+    const priceStr = p.price ? Number(p.price).toLocaleString()+'원' : '—';
+    return `<div class="fo-item">
+      <div class="fo-item-top">
+        <span class="fo-item-name" onclick="foEditProduct('${p.id}')" style="cursor:pointer;" title="클릭하여 수정">${_esc(p.name)}</span>
+        <button class="fo-item-del" onclick="foDeleteProduct('${p.id}')" title="삭제">✕</button>
+      </div>
+      <div class="fo-item-meta">
+        ${p.vendor?`<span class="fo-item-tag">🏢 ${_esc(p.vendor)}</span>`:''}
+        ${p.code?`<span class="fo-item-tag">🔖 ${_esc(p.code)}</span>`:''}
+        ${p.qtyBox?`<span class="fo-item-tag">📦 ${p.qtyBox}개/박스</span>`:''}
+        <span class="fo-item-tag">💰 ${priceStr}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function initFamilyPage(){
+  loadFamilyProducts().then(foRenderList);
+}
 
 
 
