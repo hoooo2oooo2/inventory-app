@@ -648,7 +648,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .qt-doc.qt-printing .qt-noprint{display:none !important;}
 
 /* ── 패밀리 오더 ── */
-.fo-wrap{display:flex;height:calc(100vh - 102px);overflow:hidden;gap:0;}
+#page-family.active{display:flex;flex-direction:column;}
+.fo-subtabs{display:flex;border-bottom:1px solid var(--bd);background:var(--bg);padding:0 16px;flex-shrink:0;}
+.fo-stab{padding:8px 18px;border:none;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:var(--tx2);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .15s;}
+.fo-stab.active{color:var(--pr);border-bottom-color:var(--pr);}
+.fo-tabcontent{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+.fo-wrap{display:flex;height:100%;overflow:hidden;gap:0;}
 .fo-left{flex:0 0 30%;min-width:240px;border-right:1px solid var(--bd);display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
 .fo-right{flex:1;min-width:0;background:var(--bg2);display:flex;flex-direction:column;overflow:hidden;}
 .fo-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--bd);flex-shrink:0;gap:4px;}
@@ -683,7 +688,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .fo-item-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 3px;flex-shrink:0;}
 .fo-item-del:hover{color:#DC2626;}
 /* 우측: 저장 목록 + 주문서 */
-.fo-order-list{flex:0 0 200px;background:var(--bg);border-bottom:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;}
+.fo-order-list{flex:0 0 260px;background:var(--bg);border-bottom:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;}
 .fo-ol-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:0.5px solid var(--bd);flex-shrink:0;}
 .fo-ol-title{font-size:12px;font-weight:800;color:var(--tx);}
 .fo-ol-filters{display:flex;gap:3px;}
@@ -691,10 +696,26 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .fo-ol-fbtn.on{background:var(--pr);color:#fff;border-color:var(--pr);}
 .fo-ol-body{flex:1;overflow-y:auto;padding:4px 6px;}
 .fo-ol-empty{color:var(--tx2);font-size:11.5px;text-align:center;padding:20px 10px;}
-.fo-ol-card{background:var(--bg2);border:0.5px solid var(--bd);border-radius:7px;padding:6px 9px;margin-bottom:4px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:all .12s;}
-.fo-ol-card:hover,.fo-ol-card.active{border-color:var(--pr);background:var(--prl);}
-.fo-ol-date{font-size:11px;font-weight:700;color:var(--tx);}
-.fo-ol-sub{font-size:10px;color:var(--tx2);margin-top:1px;}
+.fo-ol-card{background:var(--bg2);border-left:3px solid var(--bd);border-top:0.5px solid var(--bd);border-right:0.5px solid var(--bd);border-bottom:0.5px solid var(--bd);border-radius:7px;padding:7px 10px;margin-bottom:4px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px;transition:all .12s;}
+.fo-ol-card:hover{background:var(--prl);}
+.fo-ol-card.active{border-left-color:var(--pr);background:var(--prl);}
+.fo-ol-card[data-vendor="태광"]{border-left-color:#3182F6;}
+.fo-ol-card[data-vendor="다경"]{border-left-color:#059669;}
+.fo-ol-card[data-vendor="제이"]{border-left-color:#DC2626;}
+.fo-ol-card.active[data-vendor="태광"]{background:#EFF6FF;}
+.fo-ol-card.active[data-vendor="다경"]{background:#F0FDF4;}
+.fo-ol-card.active[data-vendor="제이"]{background:#FEF2F2;}
+.fo-ol-date{font-size:11.5px;font-weight:700;color:var(--tx);}
+.fo-ol-sub{font-size:10px;color:var(--tx2);margin-top:2px;}
+.fo-ol-amount{font-size:10.5px;font-weight:700;color:var(--tx);text-align:right;flex-shrink:0;}
+.fo-ol-pay{font-size:9.5px;color:var(--tx2);margin-top:1px;text-align:right;}
+/* 입고 관리 테이블 */
+.fo-imp-tbl{width:100%;border-collapse:collapse;font-size:11.5px;}
+.fo-imp-tbl th{background:#f0f2f5;border:1px solid #bbb;padding:5px 6px;font-size:11px;font-weight:700;white-space:nowrap;text-align:center;position:sticky;top:0;z-index:1;}
+.fo-imp-tbl td{border:1px solid #ccc;height:28px;padding:0;vertical-align:middle;}
+.fo-imp-tbl td.fo-td-val{background:#f9f9f9;text-align:right;padding:3px 7px;}
+.fo-imp-tbl td.fo-td-rem{font-weight:700;text-align:right;padding:3px 7px;}
+.fo-imp-tbl td input{width:100%;border:none;outline:none;font:inherit;background:transparent;padding:3px 5px;box-sizing:border-box;text-align:right;}
 .fo-ol-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 3px;}
 .fo-ol-del:hover{color:#DC2626;}
 /* 주문서 편집 */
@@ -1200,7 +1221,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- 견적 저장 모달 -->
 <div id="pcSaveModal" class="pc-modal-bg">
   <div style="background:var(--bg);border-radius:14px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
-    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:16px;">💾 견적 저장</div>
+    <div id="pcSaveModalTitle" style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:16px;">💾 견적 저장</div>
     <div class="pc-lbl" style="margin-bottom:6px;">견적명</div>
     <input type="text" id="pc-est-name-inp" placeholder="예: 거래처A 2026년 6월 견적" class="pc-inp" style="margin-bottom:16px;" onkeydown="if(event.key==='Enter')pcConfirmSave()"/>
     <div style="display:flex;gap:8px;">
@@ -1213,9 +1234,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- 견적 조회 모달 -->
 <div id="pcViewModal" class="pc-modal-bg">
   <div style="background:var(--bg);border-radius:14px;width:min(95vw,880px);max-height:82vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2);">
-    <div style="padding:13px 18px;border-bottom:0.5px solid var(--bd);display:flex;justify-content:space-between;align-items:center;">
-      <div id="pcViewTitle" style="font-size:14px;font-weight:700;color:var(--tx);"></div>
-      <button onclick="document.getElementById('pcViewModal').style.display='none'" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--tx2);line-height:1;padding:0 4px;">✕</button>
+    <div style="padding:13px 18px;border-bottom:0.5px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div id="pcViewTitle" style="font-size:14px;font-weight:700;color:var(--tx);flex:1;min-width:0;"></div>
+      <button id="pcViewEditBtn" onclick="pcLoadEstimateForEdit(window._pcViewingEstId)" style="padding:5px 12px;border:1px solid #D97706;border-radius:6px;background:transparent;color:#D97706;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✏️ 수정하기</button>
+      <button onclick="document.getElementById('pcViewModal').style.display='none'" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--tx2);line-height:1;padding:0 4px;flex-shrink:0;">✕</button>
     </div>
     <div id="pcViewContent" style="overflow:auto;padding:14px;flex:1;"></div>
   </div>
@@ -1367,6 +1389,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 <!-- ═══ 패밀리 오더 ═══ -->
 <div class="page" id="page-family">
+  <!-- 서브탭 -->
+  <div class="fo-subtabs">
+    <button class="fo-stab active" id="foStab-order" onclick="foSwitchTab('order')">📋 주문서</button>
+    <button class="fo-stab" id="foStab-import" onclick="foSwitchTab('import')">📦 수입 입고 관리</button>
+  </div>
+  <!-- 주문서 탭 -->
+  <div class="fo-tabcontent" id="foTab-order">
   <div class="fo-wrap">
     <!-- 좌 30%: 상품 목록 -->
     <div class="fo-left">
@@ -1481,6 +1510,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
     </div>
   </div>
+  </div><!-- /fo-tabcontent#foTab-order -->
+
+  <!-- 입고 관리 탭 -->
+  <div class="fo-tabcontent" id="foTab-import" style="display:none;overflow:auto;padding:12px 16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:13px;font-weight:700;color:var(--tx);">📦 수입 입고 관리</span>
+      <div style="display:flex;gap:6px;">
+        <button onclick="foAddImportCol()" style="padding:5px 12px;border:1px solid #059669;border-radius:6px;background:#ECFDF5;color:#059669;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">+ 입고 컬럼 추가</button>
+        <button onclick="_foFlushImports().then(()=>toast('저장 완료'))" style="padding:5px 12px;border:none;border-radius:6px;background:#3182F6;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">💾 저장</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="fo-imp-tbl">
+        <thead id="foImportTblHead"></thead>
+        <tbody id="foImportBody"></tbody>
+      </table>
+    </div>
+  </div><!-- /fo-tabcontent#foTab-import -->
 </div>
 
 <!-- ═══ 판매분석 ═══ -->
@@ -3232,6 +3279,7 @@ let _pcRawPrice  = null;
 let _pcItems     = [];
 let _pcItemNextId= 1;
 let _pcEditId    = null;
+let _pcEditEstId = null;   // 수정 중인 견적 id (null=신규)
 let _pcEstimates = [];
 let _pcEstNextId = 1;
 try{
@@ -3446,11 +3494,24 @@ function pcReset(){
 // ── 견적 저장/조회 ──
 function pcOpenSaveModal(){
   if(!_pcItems.length){alert('추가된 항목이 없습니다.');return;}
-  document.getElementById('pc-est-name-inp').value='';
+  const existingEst=_pcEditEstId!==null?_pcEstimates.find(x=>x.id===_pcEditEstId):null;
+  document.getElementById('pc-est-name-inp').value=existingEst?existingEst.name:'';
+  const titleEl=document.getElementById('pcSaveModalTitle');
+  if(titleEl) titleEl.textContent=existingEst?'✏️ 견적 수정':'💾 견적 저장';
+  const saveBtn=document.querySelector('#pcSaveModal button[onclick="pcConfirmSave()"]');
+  if(saveBtn) saveBtn.style.background=existingEst?'#D97706':'#059669';
   document.getElementById('pcSaveModal').style.display='flex';
   setTimeout(()=>document.getElementById('pc-est-name-inp').focus(),80);
 }
-function pcCloseSaveModal(){document.getElementById('pcSaveModal').style.display='none';}
+function pcCloseSaveModal(){
+  document.getElementById('pcSaveModal').style.display='none';
+  // 취소 시 수정 모드 해제 (저장 성공 시에는 pcConfirmSave에서 이미 null로 설정됨)
+  if(_pcEditEstId!==null && !arguments[0]){
+    _pcEditEstId=null;
+    const banner=document.getElementById('pc-edit-banner');
+    if(banner) banner.remove();
+  }
+}
 function pcConfirmSave(){
   const name=document.getElementById('pc-est-name-inp').value.trim();
   if(!name){alert('견적명을 입력하세요.');return;}
@@ -3461,16 +3522,53 @@ function pcConfirmSave(){
   const tR=tS>0?(tM/tS*100):0;
   const now=new Date();
   const dateStr=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
-  const est={id:_pcEstNextId++,name,date:dateStr,ts:now.getTime(),
-    items:JSON.parse(JSON.stringify(_pcItems)),
-    totals:{tC,tS,tSh,tM,tR}};
-  _pcEstimates.unshift(est);
+  if(_pcEditEstId!==null){
+    // 기존 견적 수정
+    const idx=_pcEstimates.findIndex(x=>x.id===_pcEditEstId);
+    if(idx>=0){
+      _pcEstimates[idx]={id:_pcEditEstId,name,date:dateStr,ts:now.getTime(),
+        items:JSON.parse(JSON.stringify(_pcItems)),totals:{tC,tS,tSh,tM,tR}};
+    }
+    _pcEditEstId=null;
+  } else {
+    const est={id:_pcEstNextId++,name,date:dateStr,ts:now.getTime(),
+      items:JSON.parse(JSON.stringify(_pcItems)),totals:{tC,tS,tSh,tM,tR}};
+    _pcEstimates.unshift(est);
+  }
   try{localStorage.setItem('pc_estimates',JSON.stringify(_pcEstimates));}catch(e){}
-  cloudKvSave('pc_estimates', _pcEstimates);   // 클라우드 공유 저장
+  cloudKvSave('pc_estimates', _pcEstimates);
   addHistory({menu:'단가계산기',type:'edit',code:'-',name,desc:'견적 저장',before:'-',after:`${_pcItems.length}개 품목`,user:'수동'});
   pcCloseSaveModal();
   pcRenderEstimates();
   alert(`"${name}" 견적이 저장되었습니다.`);
+}
+
+function pcLoadEstimateForEdit(id){
+  const e=_pcEstimates.find(x=>x.id===id); if(!e) return;
+  if(!confirm(`"${e.name}" 견적을 불러와서 수정하시겠습니까?\n현재 작업 중인 항목은 초기화됩니다.`)) return;
+  _pcEditEstId=id;
+  _pcItems=JSON.parse(JSON.stringify(e.items));
+  _pcItemNextId=_pcItems.length?Math.max(..._pcItems.map(x=>x.id||0))+1:1;
+  _pcEditId=null;
+  document.getElementById('pc-add-btn').innerHTML='➕ 추가하기';
+  pcRenderList();
+  pcReset();
+  // 수정 모드 배너 표시
+  const saveArea=document.getElementById('pc-totals');
+  if(saveArea){
+    let banner=document.getElementById('pc-edit-banner');
+    if(!banner){
+      banner=document.createElement('div');
+      banner.id='pc-edit-banner';
+      banner.style.cssText='margin-bottom:8px;padding:6px 12px;background:#FFF7ED;border:1px solid #D97706;border-radius:6px;font-size:11px;color:#D97706;font-weight:600;display:flex;justify-content:space-between;align-items:center;';
+      saveArea.parentNode.insertBefore(banner,saveArea);
+    }
+    banner.innerHTML=`✏️ "${e.name}" 수정 중 — 항목 편집 후 💾 견적 저장하기를 누르세요. <button onclick="_pcEditEstId=null;document.getElementById('pc-edit-banner').remove();" style="font-size:10px;padding:2px 7px;border:1px solid #D97706;border-radius:4px;background:transparent;color:#D97706;cursor:pointer;font-family:inherit;">취소</button>`;
+    banner.style.display='';
+  }
+  document.getElementById('pcViewModal').style.display='none';
+  document.getElementById('pc-left-panel')?.scrollTo({top:0,behavior:'smooth'});
+  toast(`"${e.name}" 견적을 불러왔습니다.`);
 }
 
 function pcRenderEstimates(){
@@ -3500,6 +3598,7 @@ function pcRenderEstimates(){
           <div style="font-size:10px;color:var(--tx2);">마진율</div>
           <div style="font-size:12px;font-weight:600;color:${mc(e.totals.tR)};">${e.totals.tR.toFixed(1)}%</div>
         </div>
+        <button onclick="event.stopPropagation();pcLoadEstimateForEdit(${e.id})" style="padding:3px 8px;border:1px solid #D97706;border-radius:5px;background:transparent;color:#D97706;font-size:10px;cursor:pointer;margin-right:4px;">수정</button>
         <button onclick="event.stopPropagation();pcDeleteEstimate(${e.id})" style="padding:3px 8px;border:1px solid #DC2626;border-radius:5px;background:transparent;color:#DC2626;font-size:10px;cursor:pointer;">삭제</button>
       </div>
     </div>`).join('');
@@ -3507,6 +3606,7 @@ function pcRenderEstimates(){
 
 function pcViewEstimate(id){
   const e=_pcEstimates.find(x=>x.id===id);if(!e)return;
+  window._pcViewingEstId=id;
   const fmt=n=>n.toLocaleString('ko-KR')+'원';
   const mc=v=>v>=0?'#16A34A':'#DC2626';
   document.getElementById('pcViewTitle').innerHTML=`📋 ${e.name} <span style="font-size:11px;color:var(--tx2);font-weight:400;margin-left:8px;">${e.date}</span>`;
@@ -10309,6 +10409,16 @@ function foDeleteProduct(id){
 // ── 우측 주문서 ──
 function foAddToOrder(p){
   if(typeof p === 'string') try{ p=JSON.parse(p); }catch(e){}
+  const vs=document.getElementById('foOrderVendor');
+  if(_foCurRows.length===0){
+    if(vs && p.vendor) vs.value=p.vendor;
+  } else {
+    const curVendor=vs?vs.value:'';
+    if(curVendor && p.vendor && curVendor!==p.vendor){
+      toast(`⚠ 판매처가 다릅니다. 현재 주문서는 "${curVendor}" 주문입니다.`);
+      return;
+    }
+  }
   _foCurRows.push({name:p.name||'', code:p.code||'', qtyBox:p.qtyBox||0, boxes:1, price:p.price||0});
   foRenderOrderTable();
 }
@@ -10352,10 +10462,11 @@ function foRecalc(){
   const fmt=v=>Math.round(v).toLocaleString();
   const se=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(v); };
   se('ftTotalQty',tQty); se('ftTotalAmt',tAmt); se('ftTotalVat',tVat); se('ftTotalSur',tSur);
-  const pay1=Math.round(tVat/2);
+  const totalPayable=tVat+tSur;
+  const pay1=Math.round(totalPayable/2);
   const el1=document.getElementById('foPay1'), el2=document.getElementById('foPay2');
   if(el1) el1.textContent=pay1.toLocaleString()+'원';
-  if(el2) el2.textContent=(tVat-pay1).toLocaleString()+'원';
+  if(el2) el2.textContent=(totalPayable-pay1).toLocaleString()+'원';
 }
 
 function foRenderOrderTable(){
@@ -10444,19 +10555,42 @@ function foRenderOrderList(){
   const filtersEl=document.getElementById('foOlFilters');
   const bodyEl=document.getElementById('foOlBody');
   if(!filtersEl||!bodyEl) return;
+  const VC={태광:'#3182F6',다경:'#059669',제이:'#DC2626'};
   filtersEl.innerHTML=['전체','태광','다경','제이'].map(v=>{
     const on=v==='전체'?_foOlFilter===null:_foOlFilter===v;
-    return `<button class="fo-ol-fbtn${on?' on':''}" onclick="_foOlFilter=${v==='전체'?'null':`'${v}'`};foRenderOrderList();">${v}</button>`;
+    const c=VC[v]||'var(--pr)';
+    return `<button class="fo-ol-fbtn${on?' on':''}" style="${on&&v!=='전체'?`background:${c};border-color:${c};`:''}" onclick="_foOlFilter=${v==='전체'?'null':`'${v}'`};foRenderOrderList();">${v}</button>`;
   }).join('');
   const filtered=_foOlFilter?_foOrders.filter(o=>o.vendor===_foOlFilter):_foOrders;
   if(!filtered.length){ bodyEl.innerHTML='<div class="fo-ol-empty">저장된 주문서가 없습니다</div>'; return; }
   bodyEl.innerHTML=filtered.map(o=>{
     const isActive=o.id===_foCurOrderId;
     const cnt=(o.rows||[]).length;
-    return `<div class="fo-ol-card${isActive?' active':''}" data-id="${o.id}" onclick="foLoadOrder('${o.id}')">
+    const vc=VC[o.vendor]||'#555';
+    // 총금액VAT+, 할증금액 계산
+    let tVat=0, tSur=0;
+    (o.rows||[]).forEach(r=>{
+      const qty=(r.qtyBox||0)*(r.boxes||0);
+      const vat=Math.round(qty*(r.price||0)*1.1);
+      tVat+=vat;
+      tSur+=Math.round(vat*((o.sur||0)/100));
+    });
+    const totalPay=tVat+tSur;
+    const pay1=Math.round(totalPay/2);
+    const pay2=totalPay-pay1;
+    const fmt=v=>v.toLocaleString('ko-KR');
+    return `<div class="fo-ol-card${isActive?' active':''}" data-id="${o.id}" data-vendor="${o.vendor||''}" onclick="foLoadOrder('${o.id}')">
       <div style="flex:1;min-width:0;">
-        <div class="fo-ol-date">${o.date||'날짜없음'} <span style="font-size:10px;color:var(--tx2);font-weight:500;">${o.vendor||''}</span></div>
-        <div class="fo-ol-sub">${cnt}개 품목</div>
+        <div class="fo-ol-date" style="display:flex;align-items:center;gap:5px;">
+          <span>${o.date||'날짜없음'}</span>
+          <span style="font-size:10px;font-weight:700;color:${vc};background:${vc}18;border-radius:4px;padding:1px 5px;">${o.vendor||''}</span>
+          <span style="font-size:9.5px;color:var(--tx2);">${cnt}품목</span>
+        </div>
+        <div style="margin-top:3px;font-size:11px;font-weight:700;color:var(--tx);">총 ${fmt(tVat)}원 <span style="font-weight:400;color:var(--tx2);font-size:10px;">(VAT+)</span>${tSur>0?` +할증 ${fmt(tSur)}원`:''}</div>
+        <div style="margin-top:2px;display:flex;gap:8px;font-size:10px;color:var(--tx2);">
+          <span>1차 <b style="color:${vc};">${fmt(pay1)}원</b></span>
+          <span>2차 <b style="color:${vc};">${fmt(pay2)}원</b></span>
+        </div>
       </div>
       <button class="fo-ol-del" onclick="event.stopPropagation();foDeleteOrder('${o.id}')" title="삭제">✕</button>
     </div>`;
@@ -10465,11 +10599,114 @@ function foRenderOrderList(){
 
 async function initFamilyPage(){
   await _foLoadData();
+  await _foLoadImports();
   foRenderProductList();
   foRenderOrderList();
   _foCurRows=[]; _foCurOrderId=null;
   const d=document.getElementById('foOrderDate'); if(d) d.value=new Date().toISOString().slice(0,10);
   foRenderOrderTable();
+  // 탭 초기화
+  foSwitchTab('order');
+}
+
+// ══════════════════════════════════════════════
+// 패밀리 오더 — 서브탭 전환
+// ══════════════════════════════════════════════
+function foSwitchTab(tab){
+  const orderTab=document.getElementById('foTab-order');
+  const importTab=document.getElementById('foTab-import');
+  if(orderTab) orderTab.style.display=tab==='order'?'flex':'none';
+  if(importTab) importTab.style.display=tab==='import'?'flex':'none';
+  document.querySelectorAll('.fo-stab').forEach(b=>b.classList.remove('active'));
+  const activeBtn=document.getElementById('foStab-'+tab);
+  if(activeBtn) activeBtn.classList.add('active');
+  if(tab==='import') foRenderImportTab();
+}
+
+// ══════════════════════════════════════════════
+// 패밀리 오더 — 수입 입고 관리
+// ══════════════════════════════════════════════
+const FAMILY_IMPORTS_KIND='family_imports_v1';
+let _foImports={};
+let _foImportCols=3;
+
+async function _foLoadImports(){
+  const data=await cloudKvLoad(FAMILY_IMPORTS_KIND);
+  if(data && typeof data==='object' && !Array.isArray(data)){
+    _foImports=data;
+    const maxExisting=Math.max(0,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0));
+    if(maxExisting>_foImportCols) _foImportCols=maxExisting;
+  }
+}
+async function _foFlushImports(){ await cloudKvSave(FAMILY_IMPORTS_KIND,_foImports); }
+
+function foAddImportCol(){
+  _foImportCols++;
+  foRenderImportTab();
+}
+
+function foUpdateImport(key,colIdx,val,totalQty){
+  if(!_foImports[key]) _foImports[key]=[];
+  while(_foImports[key].length<=colIdx) _foImports[key].push(0);
+  _foImports[key][colIdx]=parseFloat(val)||0;
+  // 총입고, 남은수량 직접 업데이트
+  const receipts=_foImports[key];
+  const totalRecv=receipts.reduce((s,v)=>s+(parseFloat(v)||0),0);
+  const rem=totalQty-totalRecv;
+  const recvEl=document.getElementById('fo-recv-'+key.replace(/[^a-z0-9]/gi,'_'));
+  const remEl=document.getElementById('fo-rem-'+key.replace(/[^a-z0-9]/gi,'_'));
+  if(recvEl) recvEl.textContent=totalRecv.toLocaleString();
+  if(remEl){ remEl.textContent=rem.toLocaleString(); remEl.style.color=rem<=0?'#059669':'#DC2626'; }
+  // 800ms 후 클라우드 저장
+  clearTimeout(foUpdateImport._t);
+  foUpdateImport._t=setTimeout(()=>_foFlushImports(),800);
+}
+
+function foRenderImportTab(){
+  const hdrEl=document.getElementById('foImportTblHead');
+  const bodyEl=document.getElementById('foImportBody');
+  if(!hdrEl||!bodyEl) return;
+  if(!_foOrders.length){
+    bodyEl.innerHTML='<tr><td colspan="20" style="text-align:center;padding:24px;color:var(--tx2);">저장된 주문서가 없습니다</td></tr>';
+    hdrEl.innerHTML='';
+    return;
+  }
+  const maxCols=Math.max(_foImportCols,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0),1);
+  // 헤더
+  let hdr='<tr><th>주문일</th><th>업체</th><th style="min-width:140px;text-align:left;">품명</th><th style="width:80px;">코드번호</th><th style="width:68px;">박스당수량</th><th style="width:60px;">박스수</th><th style="width:68px;">총수량</th>';
+  for(let i=0;i<maxCols;i++) hdr+=`<th style="width:72px;">${i+1}차 입고</th>`;
+  hdr+='<th style="width:72px;">총입고</th><th style="width:72px;">남은수량</th></tr>';
+  hdrEl.innerHTML=hdr;
+  const VC={태광:'#3182F6',다경:'#059669',제이:'#DC2626'};
+  let rows='';
+  _foOrders.forEach(order=>{
+    (order.rows||[]).forEach((row,idx)=>{
+      const rawKey=`${order.id}_${idx}`;
+      const safeKey=rawKey.replace(/[^a-z0-9]/gi,'_');
+      const receipts=_foImports[rawKey]||[];
+      const totalQty=(row.qtyBox||0)*(row.boxes||0);
+      const totalRecv=receipts.reduce((s,v)=>s+(parseFloat(v)||0),0);
+      const rem=totalQty-totalRecv;
+      const vc=VC[order.vendor]||'#555';
+      let tdInputs='';
+      for(let i=0;i<maxCols;i++){
+        tdInputs+=`<td style="padding:0;"><input type="number" min="0" style="width:100%;border:none;outline:none;font:inherit;padding:3px 5px;box-sizing:border-box;text-align:right;" value="${receipts[i]||''}" placeholder="0" oninput="foUpdateImport('${rawKey}',${i},this.value,${totalQty})"></td>`;
+      }
+      rows+=`<tr>
+        <td style="padding:4px 6px;white-space:nowrap;font-size:11px;text-align:center;">${order.date||''}</td>
+        <td style="padding:4px 6px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${vc};background:${vc}18;border-radius:4px;padding:1px 5px;">${order.vendor||''}</span></td>
+        <td style="padding:4px 8px;font-size:11.5px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.name||''}">${row.name||''}</td>
+        <td style="padding:4px 6px;font-size:10.5px;color:var(--tx2);text-align:center;">${row.code||''}</td>
+        <td class="fo-td-val">${(row.qtyBox||0).toLocaleString()}</td>
+        <td class="fo-td-val">${(row.boxes||0).toLocaleString()}</td>
+        <td class="fo-td-val" style="font-weight:700;">${totalQty.toLocaleString()}</td>
+        ${tdInputs}
+        <td class="fo-td-val" id="fo-recv-${safeKey}" style="font-weight:600;color:#059669;">${totalRecv.toLocaleString()}</td>
+        <td class="fo-td-rem fo-td-val" id="fo-rem-${safeKey}" style="color:${rem<=0?'#059669':'#DC2626'};">${rem.toLocaleString()}</td>
+      </tr>`;
+    });
+  });
+  bodyEl.innerHTML=rows||'<tr><td colspan="20" style="text-align:center;padding:20px;color:var(--tx2);">등록된 주문 품목이 없습니다</td></tr>';
 }
 
 
