@@ -624,6 +624,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .qt-tbl{width:100%;border-collapse:collapse;table-layout:fixed;}
 .qt-tbl th{background:#f0f2f5;border:1px solid #bbb;padding:6px 4px;font-size:12px;font-weight:700;}
 .qt-tbl td{border:1px solid #ccc;padding:0;height:30px;overflow:hidden;}
+.qt-tbl td.qt-model{height:auto;min-height:30px;overflow:visible;}
 .qt-tbl td input{width:100%;border:none;outline:none;font:inherit;background:transparent;padding:4px 6px;color:#000;box-sizing:border-box;}
 .qt-tbl td.qt-num input{text-align:right;}
 .qt-tbl td .qt-del{width:100%;border:none;background:transparent;color:#c00;cursor:pointer;font-size:13px;}
@@ -1284,12 +1285,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <table class="qt-tbl">
           <thead>
             <tr>
-              <th style="width:16%;">품명</th>
-              <th style="width:26%;">모델명</th>
-              <th style="width:9%;">수량</th>
-              <th style="width:14%;">단가</th>
-              <th style="width:15%;">판매가</th>
-              <th style="width:12%;">비고</th>
+              <th style="width:10%;">품명</th>
+              <th style="width:37%;">모델명</th>
+              <th style="width:7%;">수량</th>
+              <th style="width:11%;">단가</th>
+              <th style="width:12%;">판매가</th>
+              <th style="width:11%;">비고</th>
               <th style="width:4%;" class="qt-noprint">×</th>
             </tr>
           </thead>
@@ -3788,12 +3789,13 @@ function qtRowSale(r){
 function qtRenderRows(){
   const tb=document.getElementById('qt-rows'); if(!tb) return;
   const fmt=n=>n?n.toLocaleString('ko-KR')+'원':'';
+  const fmtUnit=v=>{ const n=parseFloat(String(v||'').replace(/,/g,'')); return isNaN(n)||n===0?'':(n.toLocaleString('ko-KR')); };
   tb.innerHTML=_qtRows.map(r=>`
     <tr>
       <td><input value="${(r.name||'').replace(/"/g,'&quot;')}" oninput="qtCellInput(${r.id},'name',this.value)"></td>
-      <td><input value="${(r.model||'').replace(/"/g,'&quot;')}" oninput="qtCellInput(${r.id},'model',this.value)"></td>
+      <td class="qt-model"><input data-col="model" value="${(r.model||'').replace(/"/g,'&quot;')}" oninput="qtCellInput(${r.id},'model',this.value)"></td>
       <td class="qt-num"><input inputmode="numeric" value="${r.qty}" oninput="qtCellInput(${r.id},'qty',this.value)"></td>
-      <td class="qt-num"><input inputmode="numeric" value="${r.unit}" oninput="qtCellInput(${r.id},'unit',this.value)"></td>
+      <td class="qt-num"><input inputmode="numeric" value="${fmtUnit(r.unit)}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=this.value?(Number(this.value.replace(/,/g,''))||0).toLocaleString('ko-KR'):this.value" oninput="qtCellInput(${r.id},'unit',this.value.replace(/,/g,''))"></td>
       <td class="qt-num" style="background:#f8fafc;"><div style="padding:4px 6px;text-align:right;color:#2563EB;font-weight:600;" id="qt-sale-${r.id}">${fmt(qtRowSale(r))}</div></td>
       <td><input value="${(r.note||'').replace(/"/g,'&quot;')}" oninput="qtCellInput(${r.id},'note',this.value)"></td>
       <td class="qt-noprint" style="text-align:center;"><button class="qt-del" onclick="qtDelRow(${r.id})" title="행 삭제">✕</button></td>
@@ -4036,13 +4038,24 @@ async function qtCaptureDoc(doc){
         cDoc.querySelectorAll('input, select, textarea').forEach((el,i)=>{
           const f=fields[i]; if(!f||f.hidden) return;
           const justify=f.textAlign==='right'?'flex-end':(f.textAlign==='center'?'center':'flex-start');
+          const isModel=el.getAttribute('data-col')==='model';
           const span=cdoc.createElement('div');
           span.textContent=f.text;
-          span.style.cssText=`box-sizing:border-box;width:100%;height:100%;min-height:1.2em;`+
-            `display:flex;align-items:center;justify-content:${justify};`+
-            `font-size:${f.fontSize};font-family:${f.fontFamily};font-weight:${f.fontWeight};font-style:${f.fontStyle};`+
-            `color:${f.color||'#000'};padding:${f.padding};`+
-            `line-height:1.2;white-space:nowrap;overflow:hidden;`;
+          if(isModel){
+            span.style.cssText=`box-sizing:border-box;width:100%;min-height:1.2em;`+
+              `display:block;`+
+              `font-size:${f.fontSize};font-family:${f.fontFamily};font-weight:${f.fontWeight};font-style:${f.fontStyle};`+
+              `color:${f.color||'#000'};padding:${f.padding};`+
+              `line-height:1.4;white-space:normal;word-break:break-all;overflow:visible;`;
+            const td=el.parentNode;
+            if(td){ td.style.height='auto'; td.style.overflow='visible'; td.style.verticalAlign='middle'; }
+          } else {
+            span.style.cssText=`box-sizing:border-box;width:100%;height:100%;min-height:1.2em;`+
+              `display:flex;align-items:center;justify-content:${justify};`+
+              `font-size:${f.fontSize};font-family:${f.fontFamily};font-weight:${f.fontWeight};font-style:${f.fontStyle};`+
+              `color:${f.color||'#000'};padding:${f.padding};`+
+              `line-height:1.2;white-space:nowrap;overflow:hidden;`;
+          }
           el.parentNode.replaceChild(span,el);
         });
       }});
