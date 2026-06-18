@@ -10774,22 +10774,126 @@ function foRenderCompletedSection(completedOrders){
   const VC={태광:'#3182F6',다경:'#059669',제이:'#DC2626'};
   let html=`<div style="margin-top:20px;border-top:2px solid #059669;padding-top:14px;">
     <div style="font-size:13px;font-weight:700;color:#059669;margin-bottom:10px;">✅ 수입 완료 (${completedOrders.length}건)</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;">`;
+    <div style="display:flex;flex-direction:column;gap:8px;">`;
   completedOrders.forEach(order=>{
     const vc=VC[order.vendor]||'#555';
     const cnt=(order.rows||[]).length;
-    html+=`<div onclick="foShowCompletedDetail('${order.id}')"
-      style="cursor:pointer;padding:9px 16px;border:1.5px solid ${vc}30;border-left:4px solid ${vc};border-radius:8px;background:var(--bg);display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);"
+    html+=`<div style="padding:10px 14px;border:1.5px solid ${vc}30;border-left:4px solid ${vc};border-radius:8px;background:var(--bg);display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);"
       onmouseenter="this.style.boxShadow='0 4px 14px rgba(0,0,0,.12)'" onmouseleave="this.style.boxShadow='0 1px 4px rgba(0,0,0,.06)'">
-      <span style="font-size:11.5px;color:var(--tx2);">${order.date||''}</span>
-      <span style="font-size:12px;font-weight:700;color:${vc};">${order.vendor||''}</span>
-      <span style="font-size:12px;color:var(--tx);">오더건</span>
-      <span style="font-size:10.5px;color:var(--tx2);">(${cnt}품목)</span>
-      <span style="font-size:11px;color:#059669;font-weight:700;">▶ 상세보기</span>
+      <div onclick="foShowCompletedDetail('${order.id}')" style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;">
+        <span style="font-size:11.5px;color:var(--tx2);">${order.date||''}</span>
+        <span style="font-size:12px;font-weight:700;color:${vc};">${order.vendor||''}</span>
+        <span style="font-size:12px;color:var(--tx);">오더건</span>
+        <span style="font-size:10.5px;color:var(--tx2);">(${cnt}품목)</span>
+        <span style="font-size:11px;color:#059669;font-weight:600;">▶ 상세보기</span>
+      </div>
+      <button onclick="foEditCompletedOrder('${order.id}')"
+        style="padding:5px 12px;border:1px solid #D97706;border-radius:6px;background:#FFFBEB;color:#D97706;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">✏️ 수정</button>
+      <button onclick="foDeleteCompletedOrder('${order.id}')"
+        style="padding:5px 12px;border:1px solid #DC2626;border-radius:6px;background:#FEF2F2;color:#DC2626;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">🗑️ 삭제</button>
     </div>`;
   });
   html+='</div></div>';
   el.innerHTML=html;
+}
+
+function foEditCompletedOrder(orderId){
+  const order=_foOrders.find(o=>o.id===orderId);
+  if(!order) return;
+  let modal=document.getElementById('foCompEditModal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='foCompEditModal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9100;display:flex;align-items:center;justify-content:center;';
+    modal.onclick=e=>{ if(e.target===modal) modal.style.display='none'; };
+    document.body.appendChild(modal);
+  }
+  const VC={태광:'#3182F6',다경:'#059669',제이:'#DC2626'};
+  const vc=VC[order.vendor]||'#555';
+  const maxCols=Math.max(_foImportCols,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0),1);
+  let thCols='';
+  for(let i=0;i<maxCols;i++){
+    thCols+=`<th style="padding:6px 8px;border:1px solid #e0e0e0;white-space:nowrap;min-width:100px;">
+      ${i+1}차 입고<br>
+      <input type="date" value="${_foImportDates[i]||''}" style="width:100%;border:1px solid #ccc;border-radius:3px;font-size:10px;padding:1px 2px;margin-top:2px;font-family:inherit;" onchange="foUpdateImportColDate(${i},this.value)">
+    </th>`;
+  }
+  let tbody='';
+  (order.rows||[]).forEach((row,idx)=>{
+    const key=`${order.id}_${idx}`;
+    const receipts=_foImports[key]||[];
+    const totalQty=(row.qtyBox||0)*(row.boxes||0);
+    let tdInputs='';
+    for(let i=0;i<maxCols;i++){
+      tdInputs+=`<td style="padding:3px 4px;border:1px solid #e0e0e0;">
+        <input type="number" min="0" id="foEditQty_${orderId}_${idx}_${i}" value="${receipts[i]||''}" placeholder="0"
+          style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 5px;text-align:right;font-size:12px;font-family:inherit;box-sizing:border-box;">
+      </td>`;
+    }
+    tbody+=`<tr>
+      <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.name||''}">${row.name||''}</td>
+      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:center;font-size:11px;color:#888;">${row.code||''}</td>
+      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;font-weight:700;">${totalQty.toLocaleString()}</td>
+      ${tdInputs}
+    </tr>`;
+  });
+  modal.innerHTML=`<div style="background:var(--bg);border-radius:14px;width:92%;max-width:860px;max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.3);">
+    <div style="padding:15px 20px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg);z-index:1;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;font-weight:700;color:var(--tx);">${order.date||''}</span>
+        <span style="font-size:13px;font-weight:700;color:${vc};background:${vc}18;border-radius:5px;padding:2px 9px;">${order.vendor||''}</span>
+        <span style="font-size:12px;color:var(--tx2);">오더건 — 입고 수량 수정</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="foSaveEditedReceipts('${orderId}',${maxCols})"
+          style="padding:6px 16px;border:none;border-radius:7px;background:#3182F6;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">💾 저장</button>
+        <button onclick="document.getElementById('foCompEditModal').style.display='none'"
+          style="border:none;background:transparent;font-size:20px;cursor:pointer;color:var(--tx2);line-height:1;">✕</button>
+      </div>
+    </div>
+    <div style="padding:16px;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#f5f7fa;">
+          <th style="padding:6px 8px;border:1px solid #e0e0e0;text-align:left;">품명</th>
+          <th style="padding:6px 8px;border:1px solid #e0e0e0;">코드</th>
+          <th style="padding:6px 8px;border:1px solid #e0e0e0;">총수량</th>
+          ${thCols}
+        </tr></thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+  </div>`;
+  modal.style.display='flex';
+}
+
+function foSaveEditedReceipts(orderId,maxCols){
+  const order=_foOrders.find(o=>o.id===orderId);
+  if(!order) return;
+  (order.rows||[]).forEach((row,idx)=>{
+    const key=`${order.id}_${idx}`;
+    _foImports[key]=[];
+    for(let i=0;i<maxCols;i++){
+      const el=document.getElementById(`foEditQty_${orderId}_${idx}_${i}`);
+      _foImports[key][i]=el?(parseFloat(el.value)||0):0;
+    }
+  });
+  _foFlushImports().then(()=>{
+    toast('저장 완료');
+    document.getElementById('foCompEditModal').style.display='none';
+    foRenderImportTab();
+  });
+}
+
+function foDeleteCompletedOrder(orderId){
+  const order=_foOrders.find(o=>o.id===orderId);
+  if(!order) return;
+  if(!confirm(`"${order.date||''} ${order.vendor||''} 오더건"을 삭제하시겠습니까?\n입고 이력도 함께 삭제됩니다.`)) return;
+  (order.rows||[]).forEach((_,idx)=>{ delete _foImports[`${orderId}_${idx}`]; });
+  _foOrders=_foOrders.filter(o=>o.id!==orderId);
+  Promise.all([_foFlushOrders(),_foFlushImports()]).then(()=>{
+    foRenderOrderList();
+    foRenderImportTab();
+  });
 }
 
 function foShowCompletedDetail(orderId){
