@@ -4835,12 +4835,12 @@ async function loadShippingFees(){
       _shipData=cloud;
     } else {
       // 클라우드 없음 → localStorage 로드 후 클라우드 마이그레이션
-      try{ const raw=localStorage.getItem(SHIP_LS_KEY); _shipData=raw?JSON.parse(raw):[]; }catch(){ _shipData=[]; }
+      try{ const raw=localStorage.getItem(SHIP_LS_KEY); _shipData=raw?JSON.parse(raw):[]; }catch{ _shipData=[]; }
       if(_shipData.length) await cloudKvSave(SHIP_CLOUD_KEY, _shipData); // 1회 마이그레이션
     }
   }catch(e){
     console.warn('택배비 클라우드 로드 실패, localStorage 사용:', e.message);
-    try{ const raw=localStorage.getItem(SHIP_LS_KEY); _shipData=raw?JSON.parse(raw):[]; }catch(){ _shipData=[]; }
+    try{ const raw=localStorage.getItem(SHIP_LS_KEY); _shipData=raw?JSON.parse(raw):[]; }catch{ _shipData=[]; }
   }
   _shipData.sort((a,b)=> (a.channel||'')!==(b.channel||'') ? ((a.channel||'')<(b.channel||'')?-1:1) : (String(a.item_no)<String(b.item_no)?-1:1));
   _shipMap={};
