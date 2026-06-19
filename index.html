@@ -164,6 +164,8 @@ body{background:var(--bg2);min-height:100vh;}
 .plan-card.expanded .plan-card-detail{display:block;}
 .plan-card-drag-hint{font-size:9px;color:var(--tx2);position:absolute;bottom:4px;right:7px;opacity:0;transition:opacity .1s;}
 .plan-card:hover .plan-card-drag-hint{opacity:.7;}
+.plan-card.wip-card{border-left-color:#F59E0B;}
+.plan-card.wip-card .plan-card-title::before{content:'🔥 ';}
 /* assignee toggle chips in modal */
 .pp-chip{font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;border:2px solid transparent;cursor:pointer;opacity:.45;transition:opacity .1s,border .1s;}
 .pp-chip.on{opacity:1;border-color:currentColor;}
@@ -9072,7 +9074,8 @@ function renderPlanProjects(){
       const pri = PLAN_PRI[p.priority||'mid'];
       const isExp = _planExpanded.has(p.id);
       const deadlineColor = p.deadline && p.deadline < today ? '#DC2626' : 'var(--tx2)';
-      return `<div class="plan-card${isExp?' expanded':''}"
+      const isWip = p.status==='wip';
+      return `<div class="plan-card${isExp?' expanded':''}${isWip?' wip-card':''}"
         draggable="true"
         ondragstart="planCardDragStart(event,'${p.id}')"
         ondragend="planCardDragEnd(event)"
@@ -9714,12 +9717,14 @@ function _rpBuildEditorFiltered(){
 }
 
 function _rpBlockHTML(item){
-  const sub=[item.time, item.linked_title?`🔗${item.linked_title}`:''].filter(Boolean).join(' ');
-  const catColor=item.category?REPORT_CAT_COLOR[item.category]||'#888':'';
-  const catBadge=item.category?`<span class="rp-block-cat" style="background:${catColor};">${_esc(item.category)}</span>`:'';
+  const timePart = item.time ? ` — ${_esc(item.time)}` : '';
+  // linked_title: 선택한 업무/프로젝트 배지로 표시
+  const linkedBadge = item.linked_title
+    ? `<span class="rp-block-cat" style="background:${item.linked_type==='plan'?'#05C072':'#6B7280'};">🔗 ${_esc(item.linked_title)}</span>`
+    : (item.category ? `<span class="rp-block-cat" style="background:${REPORT_CAT_COLOR[item.category]||'#888'};">${_esc(item.category)}</span>` : '');
   return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" contenteditable="false" tabindex="0" title="클릭 후 Enter: 텍스트 줄 추가">
     <div class="rp-block-text">
-      ${catBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${sub?`<span class="rp-block-sub"> — ${_esc(sub)}</span>`:''}
+      ${linkedBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${timePart?`<span class="rp-block-sub">${timePart}</span>`:''}
     </div>
     <div class="rp-block-btns">
       <button class="rp-block-btn" title="수정" onclick="reportEditBlock('${item.id}')">✏️</button>
@@ -9746,10 +9751,20 @@ function reportEditBlock(id){
   const key=_reportFindBlockKey(id); if(!key) return;
   const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
   const el=document.getElementById('rpEditor')?.querySelector(`[data-id="${id}"]`); if(!el) return;
+  // 현재 linked 정보를 초기값으로 복원
+  _rpLinkedSel = item.linked_task_id ? {id:item.linked_task_id, title:item.linked_title||'', type:item.linked_type||'task'} : null;
   const form=document.createElement('div');
   form.className='rp-bp-form'; form.dataset.editId=id;
   const timeOpts=`<option value="">소요시간</option>`+RP_TIME_OPTS.map(o=>`<option${item.time===o?' selected':''}>${o}</option>`).join('');
-  form.innerHTML=`<input id="rpBpETask" class="rp-bp-input" value="${(item.task||'').replace(/"/g,'&quot;')}">
+  // 프로젝트/업무 선택 드롭다운 - 현재 linked 항목 선택 표시
+  let selOpts = _rpBuildSelOpts();
+  // selected 표시: option value = "type:id"
+  if(item.linked_task_id && item.linked_type){
+    const selVal = `${item.linked_type}:${item.linked_task_id}`;
+    selOpts = selOpts.replace(`value="${selVal}"`, `value="${selVal}" selected`);
+  }
+  form.innerHTML=`<select id="rpBpEWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this,true)">${selOpts}</select>
+    <input id="rpBpETask" class="rp-bp-input" value="${(item.task||'').replace(/"/g,'&quot;')}">
     <select class="rp-bp-cat" id="rpBpETime">${timeOpts}</select>
     <button class="rp-bp-save" onclick="reportEditBlockSave('${id}')">저장</button>
     <button class="rp-bp-cancel" onclick="reportEditBlockCancel('${id}')">✕</button>`;
@@ -9778,10 +9793,12 @@ function rpAddBlockAtEnd(){
 function reportEditBlockSave(id){
   const task=(document.getElementById('rpBpETask')?.value||'').trim();
   const time=(document.getElementById('rpBpETime')?.value||'').trim();
-  if(!task){ toast('업무명을 입력하세요.'); return; }
+  if(!task){ toast('업무 내용을 입력하세요.'); return; }
   const key=_reportFindBlockKey(id); if(!key) return;
   const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
   item.task=task; item.time=time;
+  if(_rpLinkedSel){ item.linked_task_id=_rpLinkedSel.id; item.linked_title=_rpLinkedSel.title; item.linked_type=_rpLinkedSel.type; }
+  _rpLinkedSel=null;
   // linked 필드 보존 (수정 시 연동 링크 유지)
   const form=document.getElementById('rpEditor')?.querySelector(`[data-edit-id="${id}"]`);
   if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item); form.replaceWith(tpl.content.firstElementChild); }
@@ -9831,38 +9848,66 @@ function reportDelBlock(id){
 }
 
 const RP_TIME_OPTS = ['10분이내','10분','20분','30분','30~1시간이내','1시간','2시간','3시간','4시간','5시간'];
+let _rpLinkedSel = null; // {id, title, type:'plan'|'task'}
+
+function _rpBuildSelOpts(){
+  const ST = {plan:'진행예정', wip:'진행중', doing:'진행중'};
+  // 진행예정 프로젝트 (active/wip 모두)
+  const plans = (_planProjects||[]).filter(p=>p.status!=='done');
+  // 현재 담당자 업무 (완료 제외)
+  const tasks = (_collabTasks||[]).filter(t=>!t.weekly && t.assignee===_reportPerson && t.status!=='done');
+  const total = plans.length + tasks.length;
+  let html = `<option value="">── 프로젝트/업무 선택 (${total}건) ──</option>`;
+  if(plans.length){
+    html += `<optgroup label="📋 진행예정 프로젝트">`;
+    html += plans.map(p=>`<option value="plan:${p.id}">[진행예정] ${_esc(p.title)}</option>`).join('');
+    html += `</optgroup>`;
+  }
+  if(tasks.length){
+    html += `<optgroup label="🔧 개인 업무 (${_reportPerson})">`;
+    html += tasks.map(t=>`<option value="task:${t.id}">[${ST[t.status]||'진행중'}] ${_esc(t.title)}</option>`).join('');
+    html += `</optgroup>`;
+  }
+  return html;
+}
 
 // Alt+Enter 인라인 팝업 — 해당 라인 바로 아래 삽입
 function rpShowInlinePopup(afterLineId){
   _rpInsertAfterId=afterLineId;
+  _rpLinkedSel=null;
   document.querySelectorAll('.rp-bp-form').forEach(f=>f.remove());
   const editor=document.getElementById('rpEditor');
   const line=editor?.querySelector(`.rp-line[data-id="${afterLineId}"]`);
   if(!line) return;
   const form=document.createElement('div');
   form.className='rp-bp-form';
-  // 현재 담당자의 진행중/진행예정 업무 목록 (완료 제외)
-  const STATUS_LABEL = {plan:'진행예정', wip:'진행중', doing:'진행중'};
-  const wipTasks=(_collabTasks||[]).filter(t=>!t.weekly && t.assignee===_reportPerson && t.status!=='done');
-  const wipOpts=`<option value="">── 업무 선택 (${wipTasks.length}건) ──</option>`
-    +wipTasks.map(t=>`<option value="${_esc(t.title)}">[${STATUS_LABEL[t.status]||'진행중'}] ${_esc(t.title)}</option>`).join('');
   const timeOpts=`<option value="">소요시간</option>`+RP_TIME_OPTS.map(o=>`<option>${o}</option>`).join('');
-  form.innerHTML=`<select id="rpBpWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this)">${wipOpts}</select>
-    <input id="rpBpTask" class="rp-bp-input" placeholder="업무명 직접 입력">
+  form.innerHTML=`<select id="rpBpWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this,false)">${_rpBuildSelOpts()}</select>
+    <input id="rpBpTask" class="rp-bp-input" placeholder="업무 내용 입력">
     <select id="rpBpTime" class="rp-bp-cat">${timeOpts}</select>
     <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
     <button class="rp-bp-cancel" onclick="rpHideInlinePopup()">✕</button>`;
   line.after(form);
-  setTimeout(()=>{
-    document.getElementById('rpBpTask')?.focus();
-  },30);
+  setTimeout(()=>{ document.getElementById('rpBpWipSel')?.focus(); },30);
 }
-function rpWipSelChange(sel){
-  const v=sel.value;
-  if(v){
-    document.getElementById('rpBpTask').value=v;
-    document.getElementById('rpBpTask').focus();
+
+function rpWipSelChange(sel, isEdit){
+  const v = sel.value;
+  if(!v){ _rpLinkedSel=null; return; }
+  const [type, id] = v.split(':');
+  let title = '';
+  if(type==='plan'){
+    const p = (_planProjects||[]).find(x=>x.id===id);
+    title = p ? p.title : '';
+  } else {
+    const t = (_collabTasks||[]).find(x=>x.id===id);
+    title = t ? t.title : '';
   }
+  _rpLinkedSel = {id, title, type};
+  // 내용 입력란이 비어있으면 업무명으로 자동 채우기
+  const taskEl = document.getElementById(isEdit ? 'rpBpETask' : 'rpBpTask');
+  if(taskEl && !taskEl.value.trim()) taskEl.value = title;
+  taskEl?.focus();
 }
 function rpHideInlinePopup(){
   document.querySelectorAll('.rp-bp-form').forEach(f=>f.remove());
@@ -9871,15 +9916,23 @@ function rpHideInlinePopup(){
 function rpBlockPopupOpen(){ /* compat — no-op, replaced by rpShowInlinePopup */ }
 function rpBlockPopupClose(){ rpHideInlinePopup(); }
 
-function rpBlockSave(){
+async function rpBlockSave(){
   const task=(document.getElementById('rpBpTask')?.value||'').trim();
   const time=(document.getElementById('rpBpTime')?.value||'').trim();
-  const category=null; // 카테고리 미사용
-  if(!task){ toast('업무명을 입력하세요.'); return; }
+  if(!task){ toast('업무 내용을 입력하세요.'); return; }
+  const linked = _rpLinkedSel;
   const afterId=_rpInsertAfterId;
   rpHideInlinePopup();
   const newBlock={id:'b'+Date.now()+Math.random().toString(36).slice(2,4),type:'block',
-    task,time,category,pinned:false,linked_task_id:null,linked_title:null};
+    task,time,category:null,pinned:false,
+    linked_task_id: linked ? linked.id : null,
+    linked_title: linked ? linked.title : null,
+    linked_type: linked ? linked.type : null };
+  // 진행예정 프로젝트 선택 + 시간 입력 시 → 자동으로 진행중(wip) 전환
+  if(linked && linked.type==='plan' && time){
+    const proj = (_planProjects||[]).find(p=>p.id===linked.id);
+    if(proj){ proj.status='wip'; proj.updated_at=new Date().toISOString(); renderPlanProjects(); planProjSaveCloud(); }
+  }
   const entry=_reportEnsureEntry();
   const idx=afterId ? entry.content.findIndex(i=>i.id===afterId) : entry.content.length-1;
   entry.content.splice(idx<0?entry.content.length:idx+1,0,newBlock);
