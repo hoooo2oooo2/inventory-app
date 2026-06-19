@@ -102,6 +102,9 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-pinned{background:#FFFBEB;border-bottom:0.5px solid #FDE68A;padding:6px 10px;flex-shrink:0;max-height:110px;overflow-y:auto;}
 .rp-pinned-title{font-size:10px;font-weight:800;color:#B45309;margin-bottom:3px;}
 .rp-pinned-item{font-size:11.5px;color:var(--tx);background:#FEF3C7;border:0.5px solid #FCD34D;border-radius:6px;padding:4px 8px;margin-bottom:3px;display:flex;align-items:center;gap:6px;line-height:1.4;}
+.rp-pin-editable{border-radius:3px;outline:none;min-width:10px;}
+.rp-pin-editable:hover{background:rgba(0,0,0,.06);}
+.rp-pin-editable:focus{background:#fff8dc;box-shadow:0 0 0 1.5px #FCD34D;}
 .rp-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);border-radius:0 0 12px 12px;}
 /* 에디터 — 텍스트 라인 + 블럭 혼합 */
 .rp-editor{min-height:80px;padding:6px 10px 10px;outline:none;}
@@ -9271,7 +9274,11 @@ function renderCollab(){
   _collabPaths = [];
   const canEdit = _collabCanEdit();
   const visible = _collabTasks.filter(t=>!t.weekly && !_collabArchived(t));
-  const baseOf = p => visible.filter(t=>t.assignee===p).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+  const _ST_ORD={wip:0,done:1,todo:2};
+  const baseOf = p => visible.filter(t=>t.assignee===p).sort((a,b)=>{
+    const so=(_ST_ORD[a.status??'todo']??2)-(_ST_ORD[b.status??'todo']??2);
+    return so||new Date(b.created_at)-new Date(a.created_at);
+  });
   const shownOf = (p, base) => { const f=_collabFilter[p]; return (f && f!=='all') ? base.filter(t=>t.status===f) : base; };
 
   // ── 진행 예정 프로젝트 존 ──
@@ -9624,10 +9631,10 @@ function _rpRenderPinned(){
     if(!pArr.length){ div.innerHTML=''; return; }
     div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+pArr.map(p=>{
       if(p.type==='text'){
-        return `<div class="rp-pinned-item"><span style="flex:1;">${_esc(p.text)}</span>
+        return `<div class="rp-pinned-item"><span class="rp-pin-editable" style="flex:1;" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${_esc(p.text)}</span>
           <button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
       }
-      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b>${_esc(p.task)}</b>${p.time?' — '+_esc(p.time):''}${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
+      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${_esc(p.task)}</b>${p.time?` — <span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','time',this)">${_esc(p.time)}</span>`:''}${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
         <button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
     }).join('');
   });
@@ -9910,6 +9917,15 @@ function reportPinLine(id, section){
   _rpRenderPinned(); _reportAutoSave();
 }
 // 고정 스냅샷 삭제 (고정 영역의 ✕ 버튼)
+function reportEditPin(pinId, section, field, el){
+  const gp=_rpGlobalPins();
+  const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
+  const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
+  const val=(el.textContent||'').trim();
+  if(pin[field]===val) return;
+  pin[field]=val;
+  _reportAutoSave();
+}
 function reportDelPinById(pinId, section){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
