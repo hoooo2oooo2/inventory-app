@@ -46,25 +46,29 @@ body{background:var(--bg2);min-height:100vh;}
 .page{display:none;}
 .page.active{display:block;}
 
-/* ── 협업업무(collab) ── */
+/* ── 협업업무(collab) — 새 레이아웃 ── */
 #page-collab.active{display:block;}
-/* ── 협업업무 레이아웃: 좌=보드 / 중=카테고리사이드바 / 우=달력+보고서 ── */
 .collab-wrap{display:flex;flex-direction:row;gap:8px;padding:12px;height:calc(100vh - 110px);box-sizing:border-box;}
-.collab-board{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-/* 카테고리 세로 사이드바 — 보드와 보고서 사이 */
-.collab-report-row{flex:1;min-height:0;display:flex;flex-direction:row;gap:8px;}
-.collab-cat-sidebar{flex:0 0 26px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;}
-.collab-cat-side-btn{flex:1;border:none;background:transparent;cursor:pointer;font-size:8px;font-weight:800;writing-mode:vertical-rl;text-orientation:mixed;color:var(--tx2);transition:background .12s,color .12s;border-bottom:0.5px solid var(--bd);padding:2px 0;line-height:26px;letter-spacing:.5px;}
-.collab-cat-side-btn:last-child{border-bottom:none;}
-.collab-cat-side-btn.on{color:#fff!important;}
-.collab-cat-side-btn:hover:not(.on){background:var(--bg);}
-.collab-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
-/* 달력 + 오늘의 업무 요약 가로 행 */
-.collab-cal-row{flex:0 0 285px;display:flex;flex-direction:row;gap:8px;}
-.collab-cal-top{flex:0 0 45%;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
-.collab-cal-top iframe{width:100%;height:100%;border:none;display:block;}
-/* 오늘의 업무 요약 위젯 */
+/* 메인 영역: 진행예정+캘린더(상단) / 4칸보드(하단) */
+.collab-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
+.collab-top-row{flex:0 0 38%;display:flex;gap:8px;min-height:0;overflow:hidden;}
+.collab-projects{flex:3;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-cal-box{flex:1;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-cal-box iframe{width:100%;height:100%;border:none;display:block;}
+/* 업무보고서 사이드바 (우측 전체높이) */
+.collab-report-sidebar{width:282px;flex-shrink:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+/* 기존 클래스 호환 유지 */
+.collab-board{flex:1;min-width:0;display:flex;flex-direction:column;}
 .today-summary{flex:1;min-width:0;background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;}
+/* 담당자 선택 팝업 (업무보고서 헤더) */
+.rp-assignee-pick{position:relative;display:inline-block;}
+.rp-assignee-btn{font-size:10.5px;background:#EEF4FF;border:0.5px solid #93C5FD;border-radius:5px;padding:2px 7px;cursor:pointer;color:#1D4ED8;font-weight:700;}
+.rp-assignee-btn:hover{background:#DBEAFE;}
+.rp-assignee-pop{position:absolute;top:calc(100% + 4px);left:0;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:9999;min-width:90px;overflow:hidden;}
+.rp-ap-item{display:block;width:100%;text-align:left;padding:7px 12px;border:none;background:transparent;cursor:pointer;font-size:12px;font-family:inherit;color:var(--tx);border-bottom:0.5px solid var(--bd);}
+.rp-ap-item:last-child{border-bottom:none;}
+.rp-ap-item:hover{background:var(--bg2);}
+.rp-ap-item.on{font-weight:800;background:var(--bg2);}
 .ts-head{padding:6px 10px;border-bottom:0.5px solid var(--bd);font-size:12px;font-weight:800;color:var(--tx);flex-shrink:0;}
 .ts-tabs{display:flex;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg);}
 .ts-tab{flex:1;text-align:center;padding:5px 2px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:2.5px solid transparent;transition:all .1s;color:var(--tx2);white-space:nowrap;}
@@ -143,7 +147,7 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-manager-items{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;width:100%;}
 .collab-manager-items .postit{width:208px;}
 .collab-manager-empty{color:var(--tx2);font-size:12px;text-align:center;padding:4px 0;}
-.collab-cols{flex:1;display:flex;gap:10px;padding:14px 12px 12px;overflow:hidden;}
+.collab-cols{flex:1;display:flex;gap:8px;padding:8px 10px 10px;overflow:hidden;min-height:0;}
 .collab-col{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;transition:box-shadow .12s,outline .12s;}
 .collab-col.drop-on{outline:2px dashed var(--pr);outline-offset:-3px;background:var(--prl);}
 .collab-col-head{display:flex;flex-direction:column;gap:7px;padding:9px 10px;border-bottom:0.5px solid var(--bd);}
@@ -166,21 +170,31 @@ body{background:var(--bg2);min-height:100vh;}
 .cw-add:hover{background:#FDE9B8;}
 .collab-col-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;}
 .collab-col-empty{color:var(--tx2);font-size:12px;text-align:center;padding:24px 6px;line-height:1.6;}
-.postit{background:#fff;border:1px solid var(--bd);border-left:5px solid #ccc;border-radius:9px;padding:7px 9px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .08s,box-shadow .12s;display:flex;flex-direction:column;min-height:88px;}
+.postit{background:#fff;border:1px solid var(--bd);border-left:5px solid #ccc;border-radius:9px;padding:6px 8px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .08s,box-shadow .12s;display:flex;flex-direction:column;height:66px;overflow:hidden;flex-shrink:0;}
+.postit.expanded{height:auto;overflow:visible;}
 .postit:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);}
 .postit.dragging{opacity:.45;}
 .postit-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;}
-.postit-badge{font-size:10px;font-weight:800;color:#fff;border-radius:20px;padding:2px 8px;white-space:nowrap;}
-.postit-title{font-size:12.5px;font-weight:700;color:var(--tx);word-break:break-word;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.postit-detail{font-size:11px;color:var(--tx2);margin-top:3px;word-break:break-word;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.postit-badge{font-size:9.5px;font-weight:800;color:#fff;border-radius:20px;padding:1px 7px;white-space:nowrap;}
+.postit-title{font-size:12px;font-weight:700;color:var(--tx);word-break:break-word;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+/* 상세내용: 기본 숨김, expanded 시 표시 */
+.postit-detail{display:none;font-size:11px;color:var(--tx2);margin-top:3px;word-break:break-word;line-height:1.4;}
+.postit.expanded .postit-detail{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
 .nas-link{cursor:pointer;text-decoration:none;font-size:14px;}
 .nas-link:hover{filter:brightness(1.1);}
 .postit-detail a{color:#2563EB;text-decoration:underline;word-break:break-all;}
-.postit-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:7px;border-top:0.5px dashed var(--bd);font-size:10.5px;color:var(--tx2);}
-.postit-del{font-size:14px;color:#bbb;background:none;border:none;cursor:pointer;padding:0 2px;line-height:1;}
+/* 하단 정보: expanded 시만 표시 */
+.postit-foot{display:none;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:6px;border-top:0.5px dashed var(--bd);font-size:10px;color:var(--tx2);}
+.postit.expanded .postit-foot{display:flex;}
+.postit-actions{display:flex;align-items:center;gap:2px;opacity:0;transition:opacity .15s;}
+.postit:hover .postit-actions{opacity:1;}
+.postit-act{background:none;border:none;cursor:pointer;font-size:11px;color:#aaa;padding:0 2px;line-height:1;}
+.postit-act:hover{color:var(--tx);}
+.postit-del{font-size:13px;color:#ccc;background:none;border:none;cursor:pointer;padding:0 2px;line-height:1;}
 .postit-del:hover{color:#DC2626;}
 .postit-done{margin-top:6px;padding:6px 8px;background:#EFF6FF;border-radius:7px;font-size:10.5px;color:#2563EB;line-height:1.5;}
 .postit-done b{color:#1D4ED8;}
+.collab-col-body{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
 .cl-lbl{font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:6px;}
 .cl-person-pick,.cl-status-pick{display:flex;gap:8px;}
 .cl-chip{flex:1;text-align:center;font-size:13px;font-weight:700;border:1.5px solid var(--bd);border-radius:8px;padding:9px 0;cursor:pointer;background:var(--bg);color:var(--tx2);transition:all .1s;}
@@ -926,54 +940,55 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 협업업무 (디자인팀) ═══ -->
 <div class="page" id="page-collab">
   <div class="collab-wrap">
-    <!-- 좌: 협업업무 보드 (전체 높이) -->
-    <div class="collab-board">
-      <div class="collab-board-head">
-        <span style="font-size:15px;font-weight:800;color:var(--tx);">🤝 협업업무 보드</span>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
-          <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 폴더가 클릭으로 안 열릴 때, PC당 1회 실행하면 바로 열립니다">📂 폴더열기 설정</button>
-          <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
+    <!-- 메인 영역 (진행예정+캘린더 상단 / 4칸보드 하단) -->
+    <div class="collab-main">
+      <!-- 상단 행: 진행 예정 프로젝트 + 캘린더 -->
+      <div class="collab-top-row">
+        <!-- 진행 예정 프로젝트 (기존 실장님 존 대체) -->
+        <div class="collab-projects">
+          <div class="collab-board-head">
+            <span style="font-size:14px;font-weight:800;color:var(--tx);">📋 진행 예정 프로젝트</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
+              <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 PC당 1회 실행 필요">📂 폴더열기</button>
+              <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
+            </div>
+          </div>
+          <div class="collab-manager" id="collabManager" style="flex:1;overflow-y:auto;"></div>
         </div>
-      </div>
-      <div class="collab-manager" id="collabManager"></div>
-      <div class="collab-cols" id="collabCols"></div>
-    </div>
-    <!-- 우: [달력+오늘의업무요약](위) + [카테고리사이드바+업무보고서](아래) -->
-    <div class="collab-right">
-      <div class="collab-cal-row">
-        <div class="collab-cal-top">
+        <!-- 캘린더 -->
+        <div class="collab-cal-box">
           <iframe id="collabCalFrame" src="" title="협업 캘린더" style="width:100%;height:100%;border:none;display:block;"></iframe>
         </div>
-        <div class="today-summary" id="catPanel">
-          <div class="ts-head">📁 카테고리</div>
-          <div class="ts-tabs" id="catPanelTabs"></div>
-          <div id="catPanelPersonBar" style="display:flex;border-bottom:0.5px solid var(--bd);flex-shrink:0;background:var(--bg2);"></div>
-          <div class="ts-body" id="catPanelBody"><div class="ts-empty">카테고리를 선택하면<br>전체 업무 내역을 볼 수 있습니다</div></div>
+      </div>
+      <!-- 하단 행: 4칸 협업 보드 (실장님 포함) -->
+      <div class="collab-cols" id="collabCols" style="flex:1;min-height:0;"></div>
+    </div>
+    <!-- 우: 업무보고서 사이드바 (전체 높이) -->
+    <div class="collab-report-sidebar report-panel" id="reportPanel">
+      <div class="rp-head">
+        <div class="rp-head-left">
+          <span class="rp-head-title">📋 업무 보고서</span>
+          <button class="rp-add-block-btn" onclick="rpAddBlockAtEnd()" title="블럭 추가 (Alt+Enter)">＋ 블럭</button>
+          <button class="rp-pin-add-btn" onclick="reportAddPin()" title="고정 메모 추가">📌 고정</button>
+          <!-- 고정핀 옆 담당자 스크롤 선택 버튼 -->
+          <div class="rp-assignee-pick">
+            <button class="rp-assignee-btn" id="rpAssigneeBtn" onclick="toggleRpAssigneePop(event)">전체 ▾</button>
+            <div class="rp-assignee-pop" id="rpAssigneePop" style="display:none;"></div>
+          </div>
+          <span id="rpCatActiveBadge" style="display:none;"></span>
+        </div>
+        <div class="rp-date-nav" id="rpDateNav">
+          <button class="rp-nav-btn" onclick="reportPrevDay()">‹</button>
+          <span class="rp-date-label" id="rpDateLabel">—</span>
+          <button class="rp-nav-btn" onclick="reportNextDay()">›</button>
+          <button class="rp-nav-btn" onclick="reportTodayBtn()">오늘</button>
         </div>
       </div>
-      <div class="collab-report-row">
-      <div class="report-panel" id="reportPanel">
-        <div class="rp-head">
-          <div class="rp-head-left">
-            <span class="rp-head-title">📋 업무 보고서</span>
-            <button class="rp-add-block-btn" onclick="rpAddBlockAtEnd()" title="블럭 추가 (Alt+Enter)">＋ 블럭</button>
-            <button class="rp-pin-add-btn" onclick="reportAddPin()" title="고정 메모 추가">📌 고정</button>
-            <span id="rpCatActiveBadge" style="display:none;"></span>
-          </div>
-          <div class="rp-date-nav" id="rpDateNav">
-            <button class="rp-nav-btn" onclick="reportPrevDay()">‹</button>
-            <span class="rp-date-label" id="rpDateLabel">—</span>
-            <button class="rp-nav-btn" onclick="reportNextDay()">›</button>
-            <button class="rp-nav-btn" onclick="reportTodayBtn()">오늘</button>
-          </div>
-        </div>
-        <div class="rp-person-tabs" id="rpPersonTabs"></div>
-        <div class="rp-pinned" id="rpPinned" style="display:none;"></div>
-        <div class="rp-body">
-          <div class="rp-editor" id="rpEditor"></div>
-        </div>
-      </div>
+      <div class="rp-person-tabs" id="rpPersonTabs" style="display:none;"></div>
+      <div class="rp-pinned" id="rpPinned" style="display:none;"></div>
+      <div class="rp-body">
+        <div class="rp-editor" id="rpEditor"></div>
       </div>
     </div>
   </div>
@@ -8816,8 +8831,8 @@ function loadCalPage() {
 // 협업업무 보드 (실시간 공유: Supabase realtime + 폴링 폴백)
 // ══════════════════════════════════════════════
 const COLLAB_MANAGER = '실장님';
-const COLLAB_PEOPLE = ['유현','보라','연정'];
-const COLLAB_ALL = [COLLAB_MANAGER, ...COLLAB_PEOPLE];
+const COLLAB_PEOPLE = ['실장님','유현','보라','연정'];
+const COLLAB_ALL = COLLAB_PEOPLE;
 const COLLAB_PERSON_COLOR = { '실장님':'#0D9488', '유현':'#3182F6', '보라':'#8B5CF6', '연정':'#EC4899' };
 const COLLAB_STATUS = {
   plan:  { label:'진행예정', color:'#05C072' },
@@ -8833,8 +8848,9 @@ let _collabPoll = null;
 let _collabDragId = null;
 let _collabBusy = false;        // 저장 중(자기 변경) — 폴링/실시간 덮어쓰기 방지
 let _collabEditId = null;       // 수정 중인 포스트잇 id
-let _collabFormPerson = '유현';
+let _collabFormPerson = '실장님';
 let _collabFormStatus = 'plan';
+const _collabExpanded = new Set(); // 펼쳐진 카드 id 추적
 
 function _collabCanEdit(){ return _menuPerm('collab')==='edit'; }
 
@@ -8996,22 +9012,31 @@ function collabDownloadOpener(){
 }
 
 // 포스트잇 카드 HTML
+function collabToggleExpand(ev, id){
+  ev.stopPropagation();
+  if(_collabExpanded.has(id)) _collabExpanded.delete(id); else _collabExpanded.add(id);
+  renderCollab();
+}
 function _collabCardHTML(t, canEdit){
   const st = COLLAB_STATUS[t.status] || COLLAB_STATUS.plan;
   const pcolor = COLLAB_PERSON_COLOR[t.assignee] || '#888';
+  const isExp = _collabExpanded.has(t.id);
   const doneBox = (t.status==='done' && t.completed_at)
     ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabDur(t.created_at, t.completed_at)}</b></div>`
     : '';
-  return `<div class="postit" style="border-left-color:${st.color};" draggable="${canEdit}"
+  return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};" draggable="${canEdit&&!isExp}"
       ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
-      ondblclick="${canEdit?`collabOpenEdit('${t.id}')`:''}">
+      ondblclick="collabToggleExpand(event,'${t.id}')">
     <div class="postit-top">
       <span class="postit-badge" style="background:${st.color};">${st.label}</span>
-      ${canEdit?`<button class="postit-del" title="삭제" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
+      <div class="postit-actions">
+        ${canEdit?`<button class="postit-act" title="수정" onclick="event.stopPropagation();collabOpenEdit('${t.id}')">✎</button>`:''}
+        ${canEdit?`<button class="postit-del" title="삭제" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
+      </div>
     </div>
     <div class="postit-title">${_esc(t.title)}</div>
-    ${t.detail?`<div class="postit-detail">${_collabLinkify(t.detail)}</div>`:''}
-    ${doneBox}
+    <div class="postit-detail">${t.detail?_collabLinkify(t.detail):''}</div>
+    ${isExp?doneBox:''}
     <div class="postit-foot">
       <span>🕒 ${_collabFmtTime(t.created_at)}</span>
       <span style="color:${pcolor};font-weight:700;">${t.assignee}</span>
@@ -9022,42 +9047,51 @@ function _collabCardHTML(t, canEdit){
 function renderCollab(){
   const wrap = document.getElementById('collabCols');
   if(!wrap) return;
-  _collabPaths = [];                          // NAS 경로 인덱스 초기화
+  _collabPaths = [];
   const canEdit = _collabCanEdit();
   const visible = _collabTasks.filter(t=>!t.weekly && !_collabArchived(t));
   const baseOf = p => visible.filter(t=>t.assignee===p).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
   const shownOf = (p, base) => { const f=_collabFilter[p]; return (f && f!=='all') ? base.filter(t=>t.status===f) : base; };
 
-  // ── 실장님 존 (상단 가운데) ──
+  // ── 진행 예정 프로젝트 존 (기존 실장님 자리) ──
   const mgr = document.getElementById('collabManager');
   if(mgr){
-    const mColor = COLLAB_PERSON_COLOR[COLLAB_MANAGER];
-    const mBase = baseOf(COLLAB_MANAGER);
-    const mShown = shownOf(COLLAB_MANAGER, mBase);
-    mgr.dataset.person = COLLAB_MANAGER;
-    mgr.setAttribute('ondragover','collabDragOver(event)');
-    mgr.setAttribute('ondragleave','collabDragLeave(event)');
-    mgr.setAttribute('ondrop',`collabDrop(event,'${COLLAB_MANAGER}')`);
+    const planTasks = visible.filter(t=>t.status==='plan').sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
     mgr.innerHTML = `
-      <div class="collab-manager-head">
-        <button class="collab-name-btn" style="background:${mColor};font-size:15px;"><span>★</span>${COLLAB_MANAGER}<span style="opacity:.85;font-weight:600;">${mBase.length}</span></button>
-        ${canEdit?`<button class="collab-add-btn" onclick="collabOpenNew('${COLLAB_MANAGER}')">＋ 업무 등록</button>`:''}
-        <div style="width:240px;">${_collabStatusBtns(COLLAB_MANAGER, mBase)}</div>
+      <div style="padding:8px 12px 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:11px;font-weight:700;color:var(--tx2);">진행예정 업무 전체 <span style="color:#05C072;font-weight:800;">${planTasks.length}건</span></span>
       </div>
-      <div class="collab-manager-items">
-        ${mShown.map(t=>_collabCardHTML(t,canEdit)).join('') || `<div class="collab-manager-empty">실장님 업무 없음 — 등록 후 아래 직원에게 드래그해 분배하세요.</div>`}
+      <div style="flex:1;overflow-y:auto;padding:4px 12px 10px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
+        ${planTasks.length ? planTasks.map(t=>{
+          const pcolor = COLLAB_PERSON_COLOR[t.assignee]||'#888';
+          const isExp = _collabExpanded.has(t.id);
+          return `<div class="postit${isExp?' expanded':''}" style="border-left-color:#05C072;width:200px;height:${isExp?'auto':'66px'};" draggable="${canEdit&&!isExp}"
+              ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
+              ondblclick="collabToggleExpand(event,'${t.id}')">
+            <div class="postit-top">
+              <span style="font-size:9px;font-weight:700;color:${pcolor};">${t.assignee}</span>
+              <div class="postit-actions">
+                ${canEdit?`<button class="postit-act" onclick="event.stopPropagation();collabOpenEdit('${t.id}')">✎</button>`:''}
+                ${canEdit?`<button class="postit-del" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
+              </div>
+            </div>
+            <div class="postit-title">${_esc(t.title)}</div>
+            <div class="postit-detail">${t.detail?_collabLinkify(t.detail):''}</div>
+            <div class="postit-foot"><span>🕒 ${_collabFmtTime(t.created_at)}</span></div>
+          </div>`;
+        }).join('') : `<div style="color:var(--tx2);font-size:12px;padding:20px;text-align:center;width:100%;">진행예정 업무가 없습니다.<br>각 담당자 컬럼에서 등록하세요.</div>`}
       </div>`;
   }
 
-  // ── 직원 3인 컬럼 ──
+  // ── 4인 컬럼 (실장님 포함) ──
   wrap.innerHTML = COLLAB_PEOPLE.map(person=>{
     const color = COLLAB_PERSON_COLOR[person];
     const base = baseOf(person);
     const shown = shownOf(person, base);
     const cards = shown.map(t=>_collabCardHTML(t,canEdit)).join('');
     const emptyMsg = (_collabFilter[person] && _collabFilter[person]!=='all')
-      ? '해당 상태의 업무가 없습니다.'
-      : `등록된 업무가 없습니다.${canEdit?'<br>＋ 등록을 눌러 추가하세요.':''}`;
+      ? '해당 상태 업무 없음'
+      : `업무 없음${canEdit?'<br>＋ 등록을 눌러 추가':''}`;
     return `<div class="collab-col" data-person="${person}"
         ondragover="collabDragOver(event)" ondragleave="collabDragLeave(event)" ondrop="collabDrop(event,'${person}')">
       <div class="collab-col-head">
@@ -9270,6 +9304,22 @@ function _reportSyncLine(id, text){
 }
 
 function reportSetPerson(p){ _reportPerson=p; renderReportPanel(); _reportInjectCalDots(); }
+function toggleRpAssigneePop(e){
+  e.stopPropagation();
+  const pop=document.getElementById('rpAssigneePop'); if(!pop) return;
+  if(pop.style.display==='none'){
+    const people=[null,...COLLAB_PEOPLE];
+    pop.innerHTML=people.map(p=>{
+      const label=p||'전체'; const c=p?COLLAB_PERSON_COLOR[p]||'#888':'#888';
+      const on=(p===_reportPerson||(p===null&&!_reportPerson));
+      return `<button class="rp-ap-item${on?' on':''}" style="color:${c};font-weight:${on?800:500};"
+        onclick="rpPickAssignee('${p||''}');document.getElementById('rpAssigneePop').style.display='none';">${label}</button>`;
+    }).join('');
+    pop.style.display='block';
+    setTimeout(()=>{ document.addEventListener('click',function h(){ pop.style.display='none'; document.removeEventListener('click',h); }); }, 0);
+  } else { pop.style.display='none'; }
+}
+function rpPickAssignee(p){ _reportPerson=p||null; renderReportPanel(); }
 function reportSetCategory(cat){
   _reportCategoryFilter = (_reportCategoryFilter===cat) ? null : cat;
   renderReportPanel();
@@ -9332,17 +9382,10 @@ function renderReportPanel(){
       if(dateNav) dateNav.style.opacity='';
     }
   }
-  // 담당자 탭
-  const tabs=document.getElementById('rpPersonTabs');
-  if(tabs){
-    tabs.innerHTML=COLLAB_PEOPLE.map(p=>{
-      const c=COLLAB_PERSON_COLOR[p], on=p===_reportPerson;
-      return `<button class="rp-ptab ${on?'on':''}"
-        style="color:${c};border-bottom-color:${on?c:'transparent'};${on?`background:${c}18;`:''}font-weight:${on?800:600};"
-        onclick="reportSetPerson('${p}')">${p}</button>`;
-    }).join('');
-  }
-  _renderCatSidebar();
+  // 담당자 선택 버튼 업데이트 (탭 대신 드롭다운 버튼)
+  const assigneeBtn=document.getElementById('rpAssigneeBtn');
+  if(assigneeBtn){ assigneeBtn.textContent = (_reportPerson||'전체') + ' ▾'; }
+  // 카테고리 사이드바는 더 이상 렌더링 안 함
   _rpRenderPinned();
   _rpBuildEditor();
 }
