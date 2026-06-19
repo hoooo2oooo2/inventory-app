@@ -9248,7 +9248,7 @@ function _collabCardHTML(t, canEdit){
   const doneBox = (t.status==='done' && t.completed_at)
     ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabDur(t.created_at, t.completed_at)}</b></div>`
     : '';
-  return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};" draggable="${canEdit&&!isExp}"
+  return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};${t.color?`background:${t.color};`:''}" draggable="${canEdit&&!isExp}"
       ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
       ondblclick="collabToggleExpand(event,'${t.id}')">
     <div class="postit-top">
@@ -9274,9 +9274,9 @@ function renderCollab(){
   _collabPaths = [];
   const canEdit = _collabCanEdit();
   const visible = _collabTasks.filter(t=>!t.weekly && !_collabArchived(t));
-  const _ST_ORD={wip:0,done:1,todo:2};
+  const _ST_ORD={doing:0,done:1,plan:2};
   const baseOf = p => visible.filter(t=>t.assignee===p).sort((a,b)=>{
-    const so=(_ST_ORD[a.status??'todo']??2)-(_ST_ORD[b.status??'todo']??2);
+    const so=(_ST_ORD[a.status??'plan']??2)-(_ST_ORD[b.status??'plan']??2);
     return so||new Date(b.created_at)-new Date(a.created_at);
   });
   const shownOf = (p, base) => { const f=_collabFilter[p]; return (f && f!=='all') ? base.filter(t=>t.status===f) : base; };
@@ -9630,7 +9630,9 @@ function _rpRenderPinned(){
     const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
     if(!pArr.length){ div.innerHTML=''; return; }
     const curDate=_reportDate||_reportTodayStr();
-    div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+pArr.map(p=>{
+    const visible=pArr.filter(p=>!p.deleted_at||p.deleted_at>curDate);
+    if(!visible.length){ div.innerHTML=''; return; }
+    div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+visible.map(p=>{
       if(p.type==='text'){
         const txt=_esc(_rpPinFieldAt(p,'text',curDate));
         return `<div class="rp-pinned-item"><span class="rp-pin-editable" style="flex:1;" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span>
@@ -9940,17 +9942,9 @@ function reportEditPin(pinId, section, field, el){
 function reportDelPinById(pinId, section){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
-  const idx=pArr.findIndex(p=>p.id===pinId); if(idx<0) return;
-  const sourceId=pArr[idx].source_id;
-  pArr.splice(idx,1);
-  // 원본 블럭 pinned 해제
-  const entry=_reportGetEntry();
-  for(const s of ['am','pm']){
-    const orig=_rpContentOf(entry,s).find(i=>i.id===sourceId);
-    if(orig){ orig.pinned=false; break; }
-  }
-  const el=document.querySelector(`[data-id="${sourceId}"]`);
-  if(el){ el.classList.remove('pinned'); const b=el.querySelectorAll('.rp-block-btn')[1]; if(b){b.textContent='📍';b.title='상단 고정';} }
+  const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
+  // 오늘 이후부터만 삭제 — 이전 날짜는 고정 내용 그대로 유지
+  pin.deleted_at=_reportDate||_reportTodayStr();
   _rpRenderPinned(); _reportAutoSave();
 }
 function reportDelBlock(id){
@@ -10055,7 +10049,7 @@ async function rpBlockSave(){
       _collabTasks.push({
         id:'ct'+Date.now()+Math.random().toString(36).slice(2,5),
         assignee:_reportPerson, title:proj.title, detail:proj.detail||'',
-        status:'wip', created_at:new Date().toISOString(), updated_at:new Date().toISOString()
+        status:'doing', color:proj.color||null, created_at:new Date().toISOString(), updated_at:new Date().toISOString()
       });
       _planProjects = _planProjects.filter(p=>p.id!==linked.id);
       renderCollab();
@@ -10066,8 +10060,8 @@ async function rpBlockSave(){
   // 기존 업무(task) 선택 → 진행중 상태로 자동 변경
   if(linked && linked.type==='task'){
     const t = (_collabTasks||[]).find(x=>x.id===linked.id);
-    if(t && t.status !== 'wip'){
-      t.status = 'wip';
+    if(t && t.status !== 'doing'){
+      t.status = 'doing';
       t.updated_at = new Date().toISOString();
       renderCollab();
       collabSaveCloud();
@@ -10514,7 +10508,8 @@ async function collabDrop(ev, person){
       assignee: person,
       title: proj.title,
       detail: proj.detail || '',
-      status: 'wip',
+      status: 'doing',
+      color: proj.color || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
