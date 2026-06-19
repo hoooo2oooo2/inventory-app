@@ -9235,6 +9235,7 @@ function _collabCardHTML(t, canEdit){
     <div class="postit-top">
       <span class="postit-badge" style="background:${st.color};">${st.label}</span>
       <div class="postit-actions">
+        ${canEdit?`<button class="postit-act" title="진행예정으로" onclick="event.stopPropagation();collabSendToPlan('${t.id}')" style="font-size:10px;">↩</button>`:''}
         ${canEdit?`<button class="postit-act" title="수정" onclick="event.stopPropagation();collabOpenEdit('${t.id}')">✎</button>`:''}
         ${canEdit?`<button class="postit-del" title="삭제" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
       </div>
@@ -9744,22 +9745,15 @@ function reportEditBlock(id){
   const key=_reportFindBlockKey(id); if(!key) return;
   const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
   const el=document.getElementById('rpEditor')?.querySelector(`[data-id="${id}"]`); if(!el) return;
-  const catOpts=REPORT_CATS.map(c=>`<option value="${c}"${item.category===c?' selected':''}>${c}</option>`).join('');
   const form=document.createElement('div');
   form.className='rp-bp-form'; form.dataset.editId=id;
-  form.innerHTML=`<select class="rp-bp-cat" id="rpBpECat"><option value="">카테고리</option>${catOpts}</select>
-    <input id="rpBpETask" class="rp-bp-input" value="${(item.task||'').replace(/"/g,'&quot;')}">
-    <input id="rpBpETime" class="rp-bp-input" placeholder="소요시간" value="${(item.time||'').replace(/"/g,'&quot;')}">
+  const timeOpts=`<option value="">소요시간</option>`+RP_TIME_OPTS.map(o=>`<option${item.time===o?' selected':''}>${o}</option>`).join('');
+  form.innerHTML=`<input id="rpBpETask" class="rp-bp-input" value="${(item.task||'').replace(/"/g,'&quot;')}">
+    <select class="rp-bp-cat" id="rpBpETime">${timeOpts}</select>
     <button class="rp-bp-save" onclick="reportEditBlockSave('${id}')">저장</button>
     <button class="rp-bp-cancel" onclick="reportEditBlockCancel('${id}')">✕</button>`;
   el.replaceWith(form);
-  setTimeout(()=>{
-    const t=document.getElementById('rpBpETask');
-    const tm=document.getElementById('rpBpETime');
-    t?.focus(); t?.select();
-    t?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tm?.focus();} });
-    tm?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();reportEditBlockSave(id);} });
-  },20);
+  setTimeout(()=>{ document.getElementById('rpBpETask')?.focus(); document.getElementById('rpBpETask')?.select(); },20);
 }
 function rpAddBlockAtEnd(){
   if(_reportCategoryFilter){ toast('카테고리 필터 해제 후 블럭을 추가하세요.'); return; }
@@ -9783,11 +9777,10 @@ function rpAddBlockAtEnd(){
 function reportEditBlockSave(id){
   const task=(document.getElementById('rpBpETask')?.value||'').trim();
   const time=(document.getElementById('rpBpETime')?.value||'').trim();
-  const category=document.getElementById('rpBpECat')?.value||null;
   if(!task){ toast('업무명을 입력하세요.'); return; }
   const key=_reportFindBlockKey(id); if(!key) return;
   const item=(_reportAllData[key].content||[]).find(i=>i.id===id); if(!item) return;
-  item.task=task; item.time=time; item.category=category||null;
+  item.task=task; item.time=time;
   // linked 필드 보존 (수정 시 연동 링크 유지)
   const form=document.getElementById('rpEditor')?.querySelector(`[data-edit-id="${id}"]`);
   if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item); form.replaceWith(tpl.content.firstElementChild); }
@@ -9836,6 +9829,8 @@ function reportDelBlock(id){
   _rpRenderPinned(); _reportAutoSave();
 }
 
+const RP_TIME_OPTS = ['10분이내','10분','20분','30분','30~1시간이내','1시간','2시간','3시간','4시간','5시간'];
+
 // Alt+Enter 인라인 팝업 — 해당 라인 바로 아래 삽입
 function rpShowInlinePopup(afterLineId){
   _rpInsertAfterId=afterLineId;
@@ -9845,20 +9840,23 @@ function rpShowInlinePopup(afterLineId){
   if(!line) return;
   const form=document.createElement('div');
   form.className='rp-bp-form';
-  const catOpts=REPORT_CATS.map(c=>`<option value="${c}"${_reportCategoryFilter===c?` selected`:''}">${c}</option>`).join('');
-  form.innerHTML=`<select id="rpBpCat" class="rp-bp-cat"><option value="">카테고리</option>${catOpts}</select>
-    <input id="rpBpTask" class="rp-bp-input" placeholder="업무명">
-    <input id="rpBpTime" class="rp-bp-input" placeholder="소요시간 (예: 30분)">
+  // 현재 담당자의 진행중 업무 목록
+  const wipTasks=(_collabTasks||[]).filter(t=>!t.weekly && t.assignee===_reportPerson && t.status==='wip');
+  const wipOpts=`<option value="">진행중 업무 선택</option>`+wipTasks.map(t=>`<option value="${_esc(t.title)}">${_esc(t.title)}</option>`).join('');
+  const timeOpts=`<option value="">소요시간</option>`+RP_TIME_OPTS.map(o=>`<option>${o}</option>`).join('');
+  form.innerHTML=`<select id="rpBpWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this)">${wipOpts}</select>
+    <input id="rpBpTask" class="rp-bp-input" placeholder="업무명 직접 입력">
+    <select id="rpBpTime" class="rp-bp-cat">${timeOpts}</select>
     <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
     <button class="rp-bp-cancel" onclick="rpHideInlinePopup()">✕</button>`;
   line.after(form);
   setTimeout(()=>{
-    const t=document.getElementById('rpBpTask');
-    const tm=document.getElementById('rpBpTime');
-    t?.focus();
-    t?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();tm?.focus();} });
-    tm?.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();rpBlockSave();} });
+    document.getElementById('rpBpTask')?.focus();
   },30);
+}
+function rpWipSelChange(sel){
+  const v=sel.value;
+  if(v) document.getElementById('rpBpTask').value=v;
 }
 function rpHideInlinePopup(){
   document.querySelectorAll('.rp-bp-form').forEach(f=>f.remove());
@@ -9870,7 +9868,7 @@ function rpBlockPopupClose(){ rpHideInlinePopup(); }
 function rpBlockSave(){
   const task=(document.getElementById('rpBpTask')?.value||'').trim();
   const time=(document.getElementById('rpBpTime')?.value||'').trim();
-  const category=(document.getElementById('rpBpCat')?.value||'').trim()||null;
+  const category=null; // 카테고리 미사용
   if(!task){ toast('업무명을 입력하세요.'); return; }
   const afterId=_rpInsertAfterId;
   rpHideInlinePopup();
@@ -10245,6 +10243,21 @@ function collabDragOver(ev){
   ev.currentTarget.classList.add('drop-on');
 }
 function collabDragLeave(ev){ ev.currentTarget.classList.remove('drop-on'); }
+async function collabSendToPlan(id){
+  if(!_collabCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  const t = _collabTasks.find(x=>x.id===id); if(!t) return;
+  _planProjects.unshift({
+    id:'pp'+Date.now()+Math.random().toString(36).slice(2,5),
+    title:t.title, detail:t.detail||'',
+    assignees:[t.assignee], priority:'mid', deadline:'', status:'active',
+    created_at:new Date().toISOString(), updated_at:new Date().toISOString()
+  });
+  _collabTasks = _collabTasks.filter(x=>x.id!==id);
+  renderCollab();
+  await Promise.all([collabSaveCloud(), planProjSaveCloud()]);
+  toast(`"${t.title}" → 진행예정 프로젝트로 이동됨`);
+}
+
 async function collabDrop(ev, person){
   ev.preventDefault();
   ev.currentTarget.classList.remove('drop-on');
