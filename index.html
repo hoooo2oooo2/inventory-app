@@ -56,7 +56,7 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-cal-box{flex:1;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-box iframe{width:100%;height:100%;border:none;display:block;}
 /* 업무보고서 사이드바 (우측 전체높이) */
-.collab-report-sidebar{width:282px;flex-shrink:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-report-sidebar{flex:0 0 35%;min-width:240px;max-width:460px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 /* 기존 클래스 호환 유지 */
 .collab-board{flex:1;min-width:0;display:flex;flex-direction:column;}
 .today-summary{flex:1;min-width:0;background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;}
@@ -140,13 +140,28 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-board-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:0.5px solid var(--bd);}
 .collab-done-btn{font-size:11px;font-weight:700;color:#3182F6;background:var(--prl);border:none;border-radius:7px;padding:5px 11px;cursor:pointer;}
 .collab-done-btn:hover{background:#DCE8FF;}
-/* 실장님 존 (상단 가운데) */
-.collab-manager{margin:8px 12px 0;padding:12px 14px;background:var(--bg);border:1.5px dashed var(--bd);border-radius:11px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:outline .12s,background .12s;}
-.collab-manager.drop-on{outline:2px dashed #0D9488;outline-offset:-3px;background:#ECFDF5;}
-.collab-manager-head{display:flex;align-items:center;justify-content:center;gap:10px;}
-.collab-manager-items{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;width:100%;}
-.collab-manager-items .postit{width:208px;}
-.collab-manager-empty{color:var(--tx2);font-size:12px;text-align:center;padding:4px 0;}
+/* 진행예정 프로젝트 존 */
+.collab-manager{display:flex;flex:1;overflow-y:auto;flex-direction:column;gap:0;}
+.plan-card{background:var(--bg);border:0.5px solid var(--bd);border-left:3px solid #05C072;border-radius:9px;padding:9px 11px;cursor:pointer;transition:box-shadow .1s;flex-shrink:0;}
+.plan-card:hover{box-shadow:0 2px 8px #0001;}
+.plan-card-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.plan-card-title{font-size:13px;font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.plan-card-acts{display:flex;gap:4px;opacity:0;transition:opacity .1s;}
+.plan-card:hover .plan-card-acts{opacity:1;}
+.plan-card-act{font-size:11px;border:none;background:none;cursor:pointer;color:var(--tx2);padding:2px 5px;border-radius:5px;}
+.plan-card-act:hover{background:var(--bd);}
+.plan-card-badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+.plan-assignee-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;color:#fff;}
+.plan-pri-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;}
+.plan-deadline-chip{font-size:10px;color:var(--tx2);padding:2px 6px;background:var(--bd);border-radius:20px;}
+.plan-card-detail{font-size:12px;color:var(--tx2);margin-top:6px;display:none;white-space:pre-wrap;word-break:break-all;}
+.plan-card.expanded .plan-card-detail{display:block;}
+.plan-card.expanded .plan-card-title{white-space:normal;}
+/* assignee toggle chips in modal */
+.pp-chip{font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;border:2px solid transparent;cursor:pointer;opacity:.45;transition:opacity .1s,border .1s;}
+.pp-chip.on{opacity:1;border-color:currentColor;}
+.pp-pri-btn{font-size:12px;font-weight:700;padding:5px 12px;border-radius:8px;border:2px solid var(--bd);cursor:pointer;background:var(--bg);color:var(--tx2);transition:all .1s;}
+.pp-pri-btn.on{border-color:currentColor;}
 .collab-cols{flex:1;display:flex;gap:8px;padding:8px 10px 10px;overflow:hidden;min-height:0;}
 .collab-col{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;transition:box-shadow .12s,outline .12s;}
 .collab-col.drop-on{outline:2px dashed var(--pr);outline-offset:-3px;background:var(--prl);}
@@ -862,6 +877,44 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- ═══ 진행 예정 프로젝트 등록/수정 ═══ -->
+<div class="modal-overlay" id="planProjModal">
+  <div class="modal" style="max-width:460px;">
+    <h3 id="planProjModalTitle">📋 프로젝트 등록</h3>
+    <div style="display:flex;flex-direction:column;gap:13px;margin-top:6px;">
+      <div>
+        <div class="cl-lbl">프로젝트명</div>
+        <input id="planProjTitle" placeholder="프로젝트명을 입력하세요" maxlength="80"
+          style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;" />
+      </div>
+      <div>
+        <div class="cl-lbl">상세내용</div>
+        <textarea id="planProjDetail" placeholder="상세 내용을 입력하세요" rows="3"
+          style="width:100%;border:1.5px solid var(--bd);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+      </div>
+      <div>
+        <div class="cl-lbl">업무 분배 (담당자 선택)</div>
+        <div id="planProjAssignees" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;"></div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;">
+          <div class="cl-lbl">우선순위</div>
+          <div id="planProjPriority" style="display:flex;gap:6px;margin-top:4px;"></div>
+        </div>
+        <div style="flex:1;">
+          <div class="cl-lbl">마감일 (선택)</div>
+          <input id="planProjDeadline" type="date"
+            style="width:100%;height:36px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;" />
+        </div>
+      </div>
+    </div>
+    <div class="ma" style="margin-top:16px;">
+      <button class="btn" onclick="closeModal('planProjModal')">취소</button>
+      <button class="btn btn-pr" onclick="planProjSubmit()">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ 협업업무 포스트잇 등록/수정 ═══ -->
 <div class="modal-overlay" id="collabModal">
   <div class="modal" style="max-width:420px;">
@@ -952,6 +1005,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
               <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 PC당 1회 실행 필요">📂 폴더열기</button>
               <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
+              <button class="collab-done-btn" style="color:#fff;background:#05C072;" id="planProjAddBtn" onclick="planProjOpenNew()">＋ 프로젝트 등록</button>
             </div>
           </div>
           <div class="collab-manager" id="collabManager" style="flex:1;overflow-y:auto;"></div>
@@ -8840,7 +8894,9 @@ const COLLAB_STATUS = {
   done:  { label:'완료',     color:'#3182F6' },
 };
 const COLLAB_KIND = 'collab_tasks';
+const PLAN_KIND = 'collab_projects';
 let _collabTasks = [];
+let _planProjects = [];
 let _collabLoaded = false;
 let _collabCalLoaded = false;
 let _collabChannel = null;
@@ -8851,6 +8907,10 @@ let _collabEditId = null;       // 수정 중인 포스트잇 id
 let _collabFormPerson = '실장님';
 let _collabFormStatus = 'plan';
 const _collabExpanded = new Set(); // 펼쳐진 카드 id 추적
+const _planExpanded = new Set();   // 진행예정 프로젝트 카드 펼침 추적
+let _planEditId = null;
+let _planFormAssignees = [];
+let _planFormPriority = 'mid';
 
 function _collabCanEdit(){ return _menuPerm('collab')==='edit'; }
 
@@ -8878,8 +8938,9 @@ function loadCollabPage(){
 
 async function collabReload(){
   if(_collabBusy) return;
-  const d = await cloudKvLoad(COLLAB_KIND);
+  const [d, pd] = await Promise.all([cloudKvLoad(COLLAB_KIND), cloudKvLoad(PLAN_KIND)]);
   _collabTasks = Array.isArray(d) ? d : [];
+  _planProjects = Array.isArray(pd) ? pd : [];
   _collabLoaded = true;
 }
 
@@ -8887,6 +8948,139 @@ async function collabSaveCloud(){
   _collabBusy = true;
   try { await cloudKvSave(COLLAB_KIND, _collabTasks); }
   finally { setTimeout(()=>{ _collabBusy = false; }, 600); }
+}
+
+async function planProjSaveCloud(){
+  await cloudKvSave(PLAN_KIND, _planProjects);
+}
+
+// ── 진행예정 프로젝트 모달 ──
+const PLAN_PRI = { high:{label:'높음',color:'#DC2626'}, mid:{label:'보통',color:'#F59E0B'}, low:{label:'낮음',color:'#6B7280'} };
+
+function planProjOpenNew(prefillPerson){
+  if(!_collabCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  _planEditId = null;
+  _planFormAssignees = prefillPerson ? [prefillPerson] : [];
+  _planFormPriority = 'mid';
+  document.getElementById('planProjModalTitle').textContent = '📋 프로젝트 등록';
+  document.getElementById('planProjTitle').value = '';
+  document.getElementById('planProjDetail').value = '';
+  document.getElementById('planProjDeadline').value = '';
+  _planRenderAssigneePick();
+  _planRenderPriorityPick();
+  document.getElementById('planProjModal').classList.add('open');
+  setTimeout(()=>document.getElementById('planProjTitle').focus(), 100);
+}
+
+function planProjOpenEdit(id){
+  if(!_collabCanEdit()) return;
+  const p = _planProjects.find(x=>x.id===id); if(!p) return;
+  _planEditId = id;
+  _planFormAssignees = Array.isArray(p.assignees) ? [...p.assignees] : [];
+  _planFormPriority = p.priority || 'mid';
+  document.getElementById('planProjModalTitle').textContent = '✏️ 프로젝트 수정';
+  document.getElementById('planProjTitle').value = p.title || '';
+  document.getElementById('planProjDetail').value = p.detail || '';
+  document.getElementById('planProjDeadline').value = p.deadline || '';
+  _planRenderAssigneePick();
+  _planRenderPriorityPick();
+  document.getElementById('planProjModal').classList.add('open');
+  setTimeout(()=>document.getElementById('planProjTitle').focus(), 100);
+}
+
+function _planRenderAssigneePick(){
+  const el = document.getElementById('planProjAssignees'); if(!el) return;
+  el.innerHTML = COLLAB_PEOPLE.map(p=>{
+    const color = COLLAB_PERSON_COLOR[p]||'#888';
+    const on = _planFormAssignees.includes(p);
+    return `<span class="pp-chip${on?' on':''}" style="color:${color};background:${on?color+'22':'var(--bg)'};"
+      onclick="_planToggleAssignee('${p}')">${p}</span>`;
+  }).join('');
+}
+
+function _planRenderPriorityPick(){
+  const el = document.getElementById('planProjPriority'); if(!el) return;
+  el.innerHTML = Object.entries(PLAN_PRI).map(([k,v])=>
+    `<button class="pp-pri-btn${_planFormPriority===k?' on':''}" style="color:${v.color};"
+      onclick="_planSetPri('${k}')">${v.label}</button>`
+  ).join('');
+}
+
+function _planToggleAssignee(p){
+  if(_planFormAssignees.includes(p)) _planFormAssignees = _planFormAssignees.filter(x=>x!==p);
+  else _planFormAssignees.push(p);
+  _planRenderAssigneePick();
+}
+
+function _planSetPri(k){
+  _planFormPriority = k;
+  _planRenderPriorityPick();
+}
+
+async function planProjSubmit(){
+  const title = document.getElementById('planProjTitle').value.trim();
+  if(!title){ toast('프로젝트명을 입력하세요.'); return; }
+  const detail = document.getElementById('planProjDetail').value.trim();
+  const deadline = document.getElementById('planProjDeadline').value;
+  if(_planEditId){
+    const p = _planProjects.find(x=>x.id===_planEditId);
+    if(p){ p.title=title; p.detail=detail; p.assignees=[..._planFormAssignees]; p.priority=_planFormPriority; p.deadline=deadline; p.updated_at=new Date().toISOString(); }
+  } else {
+    _planProjects.unshift({ id:'pp'+Date.now()+Math.random().toString(36).slice(2,5),
+      title, detail, assignees:[..._planFormAssignees], priority:_planFormPriority, deadline, status:'active',
+      created_at:new Date().toISOString(), updated_at:new Date().toISOString() });
+  }
+  closeModal('planProjModal');
+  renderPlanProjects();
+  await planProjSaveCloud();
+}
+
+async function planProjDelete(ev, id){
+  ev.stopPropagation();
+  if(!_collabCanEdit()) return;
+  if(!confirm('이 프로젝트를 삭제할까요?')) return;
+  _planProjects = _planProjects.filter(x=>x.id!==id);
+  renderPlanProjects();
+  await planProjSaveCloud();
+}
+
+function planProjToggleExpand(id){
+  if(_planExpanded.has(id)) _planExpanded.delete(id); else _planExpanded.add(id);
+  renderPlanProjects();
+}
+
+function renderPlanProjects(){
+  const mgr = document.getElementById('collabManager'); if(!mgr) return;
+  const canEdit = _collabCanEdit();
+  const active = _planProjects.filter(p=>p.status!=='done');
+  if(!active.length){
+    mgr.innerHTML = `<div style="color:var(--tx2);font-size:12px;padding:24px;text-align:center;">등록된 프로젝트가 없습니다.<br>＋ 프로젝트 등록 버튼으로 추가하세요.</div>`;
+    return;
+  }
+  mgr.innerHTML = `<div style="display:flex;flex-direction:column;gap:7px;padding:10px 12px;overflow-y:auto;flex:1;">
+    <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:2px;">프로젝트 <span style="color:#05C072;">${active.length}건</span></div>
+    ${active.map(p=>{
+      const pri = PLAN_PRI[p.priority||'mid'];
+      const isExp = _planExpanded.has(p.id);
+      const today = new Date().toISOString().slice(0,10);
+      const deadlineColor = p.deadline && p.deadline < today ? '#DC2626' : 'var(--tx2)';
+      return `<div class="plan-card${isExp?' expanded':''}" ondblclick="planProjToggleExpand('${p.id}')">
+        <div class="plan-card-top">
+          <span class="plan-card-title">${_esc(p.title)}</span>
+          <div class="plan-card-acts">
+            ${canEdit?`<button class="plan-card-act" title="수정" onclick="event.stopPropagation();planProjOpenEdit('${p.id}')">✎</button>`:''}
+            ${canEdit?`<button class="plan-card-act" title="삭제" onclick="planProjDelete(event,'${p.id}')">✕</button>`:''}
+          </div>
+        </div>
+        <div class="plan-card-badges">
+          ${(p.assignees||[]).map(a=>`<span class="plan-assignee-chip" style="background:${COLLAB_PERSON_COLOR[a]||'#888'};">${a}</span>`).join('')}
+          <span class="plan-pri-chip" style="color:${pri.color};background:${pri.color}22;">${pri.label}</span>
+          ${p.deadline?`<span class="plan-deadline-chip" style="color:${deadlineColor};">📅 ${p.deadline}</span>`:''}
+        </div>
+        ${p.detail?`<div class="plan-card-detail">${_esc(p.detail)}</div>`:''}
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function collabStartRealtime(){
@@ -9053,35 +9247,8 @@ function renderCollab(){
   const baseOf = p => visible.filter(t=>t.assignee===p).sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
   const shownOf = (p, base) => { const f=_collabFilter[p]; return (f && f!=='all') ? base.filter(t=>t.status===f) : base; };
 
-  // ── 진행 예정 프로젝트 존 (기존 실장님 자리) ──
-  const mgr = document.getElementById('collabManager');
-  if(mgr){
-    const planTasks = visible.filter(t=>t.status==='plan').sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
-    mgr.innerHTML = `
-      <div style="padding:8px 12px 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="font-size:11px;font-weight:700;color:var(--tx2);">진행예정 업무 전체 <span style="color:#05C072;font-weight:800;">${planTasks.length}건</span></span>
-      </div>
-      <div style="flex:1;overflow-y:auto;padding:4px 12px 10px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
-        ${planTasks.length ? planTasks.map(t=>{
-          const pcolor = COLLAB_PERSON_COLOR[t.assignee]||'#888';
-          const isExp = _collabExpanded.has(t.id);
-          return `<div class="postit${isExp?' expanded':''}" style="border-left-color:#05C072;width:200px;height:${isExp?'auto':'66px'};" draggable="${canEdit&&!isExp}"
-              ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
-              ondblclick="collabToggleExpand(event,'${t.id}')">
-            <div class="postit-top">
-              <span style="font-size:9px;font-weight:700;color:${pcolor};">${t.assignee}</span>
-              <div class="postit-actions">
-                ${canEdit?`<button class="postit-act" onclick="event.stopPropagation();collabOpenEdit('${t.id}')">✎</button>`:''}
-                ${canEdit?`<button class="postit-del" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
-              </div>
-            </div>
-            <div class="postit-title">${_esc(t.title)}</div>
-            <div class="postit-detail">${t.detail?_collabLinkify(t.detail):''}</div>
-            <div class="postit-foot"><span>🕒 ${_collabFmtTime(t.created_at)}</span></div>
-          </div>`;
-        }).join('') : `<div style="color:var(--tx2);font-size:12px;padding:20px;text-align:center;width:100%;">진행예정 업무가 없습니다.<br>각 담당자 컬럼에서 등록하세요.</div>`}
-      </div>`;
-  }
+  // ── 진행 예정 프로젝트 존 ──
+  renderPlanProjects();
 
   // ── 4인 컬럼 (실장님 포함) ──
   wrap.innerHTML = COLLAB_PEOPLE.map(person=>{
