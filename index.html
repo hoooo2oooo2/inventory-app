@@ -9928,10 +9928,20 @@ async function rpBlockSave(){
     linked_task_id: linked ? linked.id : null,
     linked_title: linked ? linked.title : null,
     linked_type: linked ? linked.type : null };
-  // 진행예정 프로젝트 선택 + 시간 입력 시 → 자동으로 진행중(wip) 전환
-  if(linked && linked.type==='plan' && time){
+  // 진행예정 프로젝트 선택 → 해당 담당자 업무 컬럼에 자동 등록 + 진행예정에서 제거
+  if(linked && linked.type==='plan'){
     const proj = (_planProjects||[]).find(p=>p.id===linked.id);
-    if(proj){ proj.status='wip'; proj.updated_at=new Date().toISOString(); renderPlanProjects(); planProjSaveCloud(); }
+    if(proj){
+      _collabTasks.push({
+        id:'ct'+Date.now()+Math.random().toString(36).slice(2,5),
+        assignee:_reportPerson, title:proj.title, detail:proj.detail||'',
+        status:'wip', created_at:new Date().toISOString(), updated_at:new Date().toISOString()
+      });
+      _planProjects = _planProjects.filter(p=>p.id!==linked.id);
+      renderCollab();
+      Promise.all([collabSaveCloud(), planProjSaveCloud()]);
+      toast(`📋 "${proj.title}" → ${_reportPerson} 업무로 자동 등록됨`);
+    }
   }
   const entry=_reportEnsureEntry();
   const idx=afterId ? entry.content.findIndex(i=>i.id===afterId) : entry.content.length-1;
