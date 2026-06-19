@@ -141,22 +141,28 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-done-btn{font-size:11px;font-weight:700;color:#3182F6;background:var(--prl);border:none;border-radius:7px;padding:5px 11px;cursor:pointer;}
 .collab-done-btn:hover{background:#DCE8FF;}
 /* 진행예정 프로젝트 존 */
-.collab-manager{display:flex;flex:1;overflow-y:auto;flex-direction:column;gap:0;}
-.plan-card{background:var(--bg);border:0.5px solid var(--bd);border-left:3px solid #05C072;border-radius:9px;padding:9px 11px;cursor:pointer;transition:box-shadow .1s;flex-shrink:0;}
-.plan-card:hover{box-shadow:0 2px 8px #0001;}
-.plan-card-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
-.plan-card-title{font-size:13px;font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.plan-card-acts{display:flex;gap:4px;opacity:0;transition:opacity .1s;}
+.collab-manager{flex:1;overflow-y:auto;padding:8px 10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;align-content:start;}
+.collab-manager-empty-msg{grid-column:1/-1;color:var(--tx2);font-size:12px;padding:20px;text-align:center;}
+.collab-manager-count{grid-column:1/-1;font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:2px;}
+.plan-card{background:var(--bg);border:0.5px solid var(--bd);border-left:3px solid #05C072;border-radius:9px;padding:8px 9px;cursor:grab;transition:box-shadow .1s;height:72px;overflow:hidden;box-sizing:border-box;position:relative;}
+.plan-card:hover{box-shadow:0 2px 8px #0002;}
+.plan-card.dragging{opacity:.5;}
+.plan-card.expanded{height:auto;cursor:default;}
+.plan-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:4px;}
+.plan-card-title{font-size:12px;font-weight:700;color:var(--tx);flex:1;min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.plan-card.expanded .plan-card-title{-webkit-line-clamp:unset;display:block;}
+.plan-card-acts{display:flex;gap:2px;flex-shrink:0;opacity:0;transition:opacity .1s;}
 .plan-card:hover .plan-card-acts{opacity:1;}
-.plan-card-act{font-size:11px;border:none;background:none;cursor:pointer;color:var(--tx2);padding:2px 5px;border-radius:5px;}
+.plan-card-act{font-size:11px;border:none;background:none;cursor:pointer;color:var(--tx2);padding:2px 4px;border-radius:5px;line-height:1;}
 .plan-card-act:hover{background:var(--bd);}
-.plan-card-badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
-.plan-assignee-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;color:#fff;}
-.plan-pri-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;}
-.plan-deadline-chip{font-size:10px;color:var(--tx2);padding:2px 6px;background:var(--bd);border-radius:20px;}
-.plan-card-detail{font-size:12px;color:var(--tx2);margin-top:6px;display:none;white-space:pre-wrap;word-break:break-all;}
+.plan-card-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.plan-assignee-chip{font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;color:#fff;}
+.plan-pri-chip{font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;}
+.plan-deadline-chip{font-size:9px;color:var(--tx2);padding:1px 5px;background:var(--bd);border-radius:20px;}
+.plan-card-detail{font-size:11px;color:var(--tx2);margin-top:5px;display:none;white-space:pre-wrap;word-break:break-all;}
 .plan-card.expanded .plan-card-detail{display:block;}
-.plan-card.expanded .plan-card-title{white-space:normal;}
+.plan-card-drag-hint{font-size:9px;color:var(--tx2);position:absolute;bottom:4px;right:7px;opacity:0;transition:opacity .1s;}
+.plan-card:hover .plan-card-drag-hint{opacity:.7;}
 /* assignee toggle chips in modal */
 .pp-chip{font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;border:2px solid transparent;cursor:pointer;opacity:.45;transition:opacity .1s,border .1s;}
 .pp-chip.on{opacity:1;border-color:currentColor;}
@@ -583,8 +589,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #rpage-backdata #bdTable{width:fit-content;white-space:nowrap;}
 #rpage-backdata .bd-layout{display:flex;gap:18px;align-items:flex-start;width:100%;}
 #rpage-backdata .bd-left{flex-shrink:0;}
-#rpage-backdata .bd-right{flex:1;min-width:440px;position:sticky;top:140px;}
-#rpage-backdata .bd-right .rev-tbl-card{width:100%;}
+#rpage-backdata .bd-right{flex:1;min-width:440px;position:sticky;top:140px;max-height:calc(100vh - 160px);display:flex;flex-direction:column;}
+#rpage-backdata .bd-right .rev-tbl-card{width:100%;flex:1;display:flex;flex-direction:column;min-height:0;}
+#rpage-backdata .bd-right .tw{flex:1;overflow-y:auto;min-height:0;}
 #rpage-backdata .bd-right #shipTable{width:100%;white-space:normal;}
 #rpage-backdata #bdEmpty{width:fit-content;min-width:400px;}
 #page-revenue .rev-up-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
@@ -9054,17 +9061,20 @@ function renderPlanProjects(){
   const canEdit = _collabCanEdit();
   const active = _planProjects.filter(p=>p.status!=='done');
   if(!active.length){
-    mgr.innerHTML = `<div style="color:var(--tx2);font-size:12px;padding:24px;text-align:center;">등록된 프로젝트가 없습니다.<br>＋ 프로젝트 등록 버튼으로 추가하세요.</div>`;
+    mgr.innerHTML = `<div class="collab-manager-empty-msg">등록된 프로젝트가 없습니다.<br>＋ 프로젝트 등록 버튼으로 추가하세요.</div>`;
     return;
   }
-  mgr.innerHTML = `<div style="display:flex;flex-direction:column;gap:7px;padding:10px 12px;overflow-y:auto;flex:1;">
-    <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:2px;">프로젝트 <span style="color:#05C072;">${active.length}건</span></div>
-    ${active.map(p=>{
+  const today = new Date().toISOString().slice(0,10);
+  mgr.innerHTML = `<div class="collab-manager-count">프로젝트 <span style="color:#05C072;">${active.length}건</span> — 카드를 담당자 컬럼으로 드래그하면 업무로 등록됩니다</div>`
+    + active.map(p=>{
       const pri = PLAN_PRI[p.priority||'mid'];
       const isExp = _planExpanded.has(p.id);
-      const today = new Date().toISOString().slice(0,10);
       const deadlineColor = p.deadline && p.deadline < today ? '#DC2626' : 'var(--tx2)';
-      return `<div class="plan-card${isExp?' expanded':''}" ondblclick="planProjToggleExpand('${p.id}')">
+      return `<div class="plan-card${isExp?' expanded':''}"
+        draggable="true"
+        ondragstart="planCardDragStart(event,'${p.id}')"
+        ondragend="planCardDragEnd(event)"
+        ondblclick="event.stopPropagation();planProjToggleExpand('${p.id}')">
         <div class="plan-card-top">
           <span class="plan-card-title">${_esc(p.title)}</span>
           <div class="plan-card-acts">
@@ -9073,14 +9083,12 @@ function renderPlanProjects(){
           </div>
         </div>
         <div class="plan-card-badges">
-          ${(p.assignees||[]).map(a=>`<span class="plan-assignee-chip" style="background:${COLLAB_PERSON_COLOR[a]||'#888'};">${a}</span>`).join('')}
           <span class="plan-pri-chip" style="color:${pri.color};background:${pri.color}22;">${pri.label}</span>
           ${p.deadline?`<span class="plan-deadline-chip" style="color:${deadlineColor};">📅 ${p.deadline}</span>`:''}
         </div>
-        ${p.detail?`<div class="plan-card-detail">${_esc(p.detail)}</div>`:''}
+        <span class="plan-card-drag-hint">↓ 드래그</span>
       </div>`;
-    }).join('')}
-  </div>`;
+    }).join('');
 }
 
 function collabStartRealtime(){
@@ -9088,10 +9096,13 @@ function collabStartRealtime(){
   if(!_collabPoll){
     _collabPoll = setInterval(async ()=>{
       if(currentPage!=='collab' || _collabBusy) return;
-      const before = JSON.stringify(_collabTasks);
-      const d = await cloudKvLoad(COLLAB_KIND);
+      const [d, pd] = await Promise.all([cloudKvLoad(COLLAB_KIND), cloudKvLoad(PLAN_KIND)]);
       const arr = Array.isArray(d) ? d : [];
-      if(JSON.stringify(arr) !== before){ _collabTasks = arr; renderCollab(); _collabSyncMark(); }
+      const planArr = Array.isArray(pd) ? pd : [];
+      let changed = false;
+      if(JSON.stringify(arr) !== JSON.stringify(_collabTasks)){ _collabTasks = arr; changed = true; }
+      if(JSON.stringify(planArr) !== JSON.stringify(_planProjects)){ _planProjects = planArr; renderPlanProjects(); }
+      if(changed){ renderCollab(); _collabSyncMark(); }
     }, 4000);
   }
   // Supabase realtime (즉시 반영) — 실패해도 폴링이 커버
@@ -10205,6 +10216,18 @@ async function collabDelete(ev, id){
 }
 
 // ── 드래그앤드롭: 담당자 이동 ──
+// ── 진행예정 프로젝트 카드 드래그 ──
+function planCardDragStart(ev, id){
+  _collabDragId = 'plan:' + id;
+  ev.dataTransfer.effectAllowed = 'move';
+  try{ ev.dataTransfer.setData('text/plain', 'plan:' + id); }catch(e){}
+  ev.currentTarget.classList.add('dragging');
+}
+function planCardDragEnd(ev){
+  ev.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.drop-on').forEach(c=>c.classList.remove('drop-on'));
+}
+
 function collabDragStart(ev, id){
   if(!_collabCanEdit()){ ev.preventDefault(); return; }
   _collabDragId = id;
@@ -10225,9 +10248,35 @@ function collabDragLeave(ev){ ev.currentTarget.classList.remove('drop-on'); }
 async function collabDrop(ev, person){
   ev.preventDefault();
   ev.currentTarget.classList.remove('drop-on');
-  const id = _collabDragId || ev.dataTransfer.getData('text/plain');
+  const raw = _collabDragId || ev.dataTransfer.getData('text/plain');
   _collabDragId = null;
-  const t = _collabTasks.find(x=>x.id===id);
+
+  // ── 진행예정 프로젝트 → 담당자 컬럼으로 드롭 ──
+  if(raw && raw.startsWith('plan:')){
+    const pid = raw.slice(5);
+    const proj = _planProjects.find(x=>x.id===pid);
+    if(!proj) return;
+    // 프로젝트를 해당 담당자의 업무(진행중)로 등록
+    const newTask = {
+      id: 'ct'+Date.now()+Math.random().toString(36).slice(2,5),
+      assignee: person,
+      title: proj.title,
+      detail: proj.detail || '',
+      status: 'wip',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    _collabTasks.push(newTask);
+    // 프로젝트 완료 처리 (목록에서 제거)
+    _planProjects = _planProjects.filter(x=>x.id!==pid);
+    renderCollab();
+    await Promise.all([collabSaveCloud(), planProjSaveCloud()]);
+    toast(`📋 "${proj.title}" → ${person} 업무로 등록됨`);
+    return;
+  }
+
+  // ── 기존 업무 카드 담당자 변경 ──
+  const t = _collabTasks.find(x=>x.id===raw);
   if(!t || t.assignee===person) return;
   t.assignee = person;
   t.updated_at = new Date().toISOString();
