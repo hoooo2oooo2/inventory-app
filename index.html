@@ -4816,14 +4816,32 @@ function _renderRevCurrentPage(){
   if(_revPage==='daily')    renderDailyReport();
 }
 
-// ── 택배비 CRUD (브라우저 로컬 저장소 기반, 설정 불필요) ──
+// ── 택배비 CRUD (Supabase cloud 저장 + localStorage 백업) ──
 const SHIP_LS_KEY='shipping_fees_v1';
-function _shipPersist(){ try{ localStorage.setItem(SHIP_LS_KEY, JSON.stringify(_shipData)); }catch(e){ console.warn(e); } }
+const SHIP_CLOUD_KEY='shipping_fees';
+
+// 택배비 저장: cloud(Supabase) + localStorage 백업 + _shipMap 재구성
+async function _shipPersist(){
+  try{ localStorage.setItem(SHIP_LS_KEY, JSON.stringify(_shipData)); }catch(e){}
+  await cloudKvSave(SHIP_CLOUD_KEY, _shipData);
+  _shipMap={};
+  _shipData.forEach(r=>{ _shipMap[`${r.channel}|${r.item_no}`]={fee:r.fee||0, perUnit:!!r.perUnit}; });
+}
+
 async function loadShippingFees(){
   try{
-    const raw=localStorage.getItem(SHIP_LS_KEY);
-    _shipData = raw ? JSON.parse(raw) : [];
-  }catch(e){ _shipData=[]; }
+    const cloud=await cloudKvLoad(SHIP_CLOUD_KEY);
+    if(cloud && Array.isArray(cloud) && cloud.length){
+      _shipData=cloud;
+    } else {
+      // 클라우드 없음 → localStorage 로드 후 클라우드 마이그레이션
+      try{ const raw=localStorage.getItem(SHIP_LS_KEY); _shipData=raw?JSON.parse(raw):[]; }catch(){ _shipData=[]; }
+      if(_shipData.length) await cloudKvSave(SHIP_CLOUD_KEY, _shipData); // 1회 마이그레이션
+    }
+  }catch(e){
+    console.warn('택배비 클라우드 로드 실패, localStorage 사용:', e.message);
+    try{ const raw=localStorage.getItem(SHIP_LS_KEY); _shipData=raw?JSON.parse(raw):[]; }catch(){ _shipData=[]; }
+  }
   _shipData.sort((a,b)=> (a.channel||'')!==(b.channel||'') ? ((a.channel||'')<(b.channel||'')?-1:1) : (String(a.item_no)<String(b.item_no)?-1:1));
   _shipMap={};
   _shipData.forEach(r=>{ _shipMap[`${r.channel}|${r.item_no}`]={fee:r.fee||0, perUnit:!!r.perUnit}; });
@@ -4854,10 +4872,10 @@ function renderShipTable(){
 
 async function toggleShipPerUnit(id, checked){
   const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
-  r.perUnit=checked; _shipPersist(); await loadShippingFees();
+  r.perUnit=checked;
+  await _shipPersist();
   const n=await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:checked});
   renderShipTable();
-  // 조용히 반영 (alert 생략)
   console.log(`${r.channel} ${r.item_no} 수량비례=${checked} → ${n}건 재계산`);
 }
 
@@ -4900,8 +4918,7 @@ async function saveShipModal(){
       if(ex){ ex.item_name=item_name; ex.fee=fee; perUnit=!!ex.perUnit; }
       else _shipData.push({id:Date.now()+Math.floor(Math.random()*1000),channel,item_no,item_name,fee,perUnit:false});
     }
-    _shipPersist();
-    await loadShippingFees();
+    await _shipPersist();
     renderShipTable();
     closeModal('shipModal');
     // 해당 판매처·상품번호의 통합 데이터 배송비·마진 즉시 재계산
@@ -4915,8 +4932,8 @@ async function deleteShip(id){
   const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
   if(!confirm(`[${r.channel}] ${r.item_no} 택배비를 삭제할까요?\n(통합 데이터 배송비는 기본 규칙으로 재계산됩니다)`)) return;
   _shipData=_shipData.filter(x=>String(x.id)!==String(id));
-  _shipPersist();
-  await loadShippingFees(); renderShipTable();
+  await _shipPersist();
+  renderShipTable();
   // 기본 규칙(공식)으로 재계산
   const n=await recalcShippingForKey(r.channel,r.item_no,null);
   addHistory({menu:'매출관리',type:'edit',code:r.item_no,name:r.item_name||r.channel,desc:`배송비 삭제 (${r.channel})`,before:`${r.fee}원`,after:'삭제',user:'수동'});
@@ -5199,7 +5216,11 @@ function goRevPage(p){
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
-  _renderRevCurrentPage();
+  if(!_revLoaded){
+    loadRevenueData(); // 데이터 미갱신 상태이면 재로드 후 렌더링
+  } else {
+    _renderRevCurrentPage();
+  }
   _applyWriteLockUI();
 }
 
@@ -5994,7 +6015,7 @@ function _buildDailyChartXml(sheetName, serials, saleVals, adVals, firstR, lastR
     +`<c:gapWidth val="60"/><c:overlap val="-20"/><c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>`
     +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
     +phSer(2,2)
-    +ser(3,3,'F','광고비','F',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
+    +ser(3,3,'G','광고비','G',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
     +`<c:gapWidth val="60"/><c:overlap val="-20"/><c:axId val="333333333"/><c:axId val="444444444"/></c:barChart>`
     +`<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="mm-dd" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="222222222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
     +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:title><c:tx><c:rich><a:bodyPr rot="0" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>판매가</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
@@ -6048,23 +6069,27 @@ async function downloadDailyExcel(){
       const rs=rows.filter(r=>r.date===ds);
       const dd=parseInt(ds.split('-')[1]);
       const sale=rs.reduce((s,r)=>s+(r.salePrice||0),0);
-      const gross=rs.reduce((s,r)=>s+(r.margin||0),0);
+      const settle=rs.reduce((s,r)=>s+(r.settlement||0),0);
+      const cost=rs.reduce((s,r)=>s+(r.costPrice||0),0);
+      const margin=settle-cost;                           // 마진 = 정산예정금액 - 매입금액
       const ad=sumAdSpend({year:yy,month:mm,day:dd,ch:chFilter});
       const pkgs=new Set(rs.map(pkgKey)).size;
-      return {serial:_excelSerial(yy,mm,dd), sale, net:gross-ad, rate:sale>0?(gross-ad)/sale:0, pkgs, ad};
+      const finalMargin=margin-ad;                        // 최종마진 = 마진 - 광고비
+      const rate=settle>0?margin/settle:0;
+      return {serial:_excelSerial(yy,mm,dd), sale, settle, margin, rate, pkgs, ad, finalMargin};
     });
     const s=[];
     s.push([`일일보고 핵심지표 - ${name} [${chLabel}]`]);
     for(let i=0;i<15;i++) s.push([]);
     s.push(['■ 핵심 지표']);
-    s.push(['날짜','판매가','마진','마진율','택배건수','광고비','비고']);
-    agg.forEach(d=>s.push([d.serial,d.sale,d.net,d.rate,d.pkgs,d.ad,'']));
+    s.push(['날짜','판매가','정산예정금액','마진','마진율','택배건수','광고비','최종마진']);
+    agg.forEach(d=>s.push([d.serial,d.sale,d.settle,d.margin,d.rate,d.pkgs,d.ad,d.finalMargin]));
     const ws=U.aoa_to_sheet(s);
-    ws['!cols']=[{wch:13},{wch:14},{wch:13},{wch:9},{wch:10},{wch:12},{wch:18}];
-    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
+    ws['!cols']=[{wch:13},{wch:14},{wch:14},{wch:13},{wch:9},{wch:10},{wch:12},{wch:13}];
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];
     sc(ws,0,0,SECT); sc(ws,16,0,SECT);
-    for(let c=0;c<7;c++) sc(ws,17,c,HEAD);
-    agg.forEach((d,i)=>{ const r=18+i; fmt(ws,r,0,DATEFMT); fmt(ws,r,1,WON); fmt(ws,r,2,MARGIN_FMT); fmt(ws,r,3,PCT); fmt(ws,r,4,'#,##0'); fmt(ws,r,5,WON); });
+    for(let c=0;c<8;c++) sc(ws,17,c,HEAD);
+    agg.forEach((d,i)=>{ const r=18+i; fmt(ws,r,0,DATEFMT); fmt(ws,r,1,WON); fmt(ws,r,2,WON); fmt(ws,r,3,MARGIN_FMT); fmt(ws,r,4,PCT); fmt(ws,r,5,'#,##0'); fmt(ws,r,6,WON); fmt(ws,r,7,MARGIN_FMT); });
     U.book_append_sheet(wb,ws,name);
     monthCharts.push({name, serials:agg.map(d=>d.serial), sales:agg.map(d=>d.sale), ads:agg.map(d=>d.ad), firstR:19, lastR:18+agg.length, sheetIdx:monthCharts.length+1});
   });
@@ -7285,6 +7310,7 @@ async function submitRevUpload(){
     _revUpFiles = {};
     renderRevUpSlots();
     _revLoaded = false;
+    if(totalRows > 0) await loadRevenueData(); // 새 행 포함한 통합 데이터 캐시 즉시 갱신
 
     let msg = `✅ ${totalRows}건 업로드 완료`;
     if(errors.length) msg += `\n\n${errors.join('\n')}`;
