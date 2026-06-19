@@ -9629,12 +9629,16 @@ function _rpRenderPinned(){
     if(!div) return;
     const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
     if(!pArr.length){ div.innerHTML=''; return; }
+    const curDate=_reportDate||_reportTodayStr();
     div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+pArr.map(p=>{
       if(p.type==='text'){
-        return `<div class="rp-pinned-item"><span class="rp-pin-editable" style="flex:1;" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${_esc(p.text)}</span>
+        const txt=_esc(_rpPinFieldAt(p,'text',curDate));
+        return `<div class="rp-pinned-item"><span class="rp-pin-editable" style="flex:1;" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span>
           <button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
       }
-      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${_esc(p.task)}</b>${p.time?` — <span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','time',this)">${_esc(p.time)}</span>`:''}${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
+      const task=_esc(_rpPinFieldAt(p,'task',curDate));
+      const time=_rpPinFieldAt(p,'time',curDate);
+      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b>${time?` — <span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','time',this)">${_esc(time)}</span>`:''}${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
         <button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
     }).join('');
   });
@@ -9917,13 +9921,20 @@ function reportPinLine(id, section){
   _rpRenderPinned(); _reportAutoSave();
 }
 // 고정 스냅샷 삭제 (고정 영역의 ✕ 버튼)
+function _rpPinFieldAt(pin, field, date){
+  const relevant=(pin.edits||[]).filter(e=>e.field===field&&e.date<=date).sort((a,b)=>b.date.localeCompare(a.date));
+  return relevant.length ? relevant[0].value : (pin[field]??'');
+}
 function reportEditPin(pinId, section, field, el){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
   const val=(el.textContent||'').trim();
-  if(pin[field]===val) return;
-  pin[field]=val;
+  const today=_reportDate||_reportTodayStr();
+  if(!pin.edits) pin.edits=[];
+  const existing=pin.edits.find(e=>e.date===today&&e.field===field);
+  if(existing){ if(existing.value===val) return; existing.value=val; }
+  else { pin.edits.push({date:today,field,value:val}); }
   _reportAutoSave();
 }
 function reportDelPinById(pinId, section){
