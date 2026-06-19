@@ -52,7 +52,8 @@ body{background:var(--bg2);min-height:100vh;}
 /* 메인 영역: 진행예정+캘린더(상단) / 4칸보드(하단) */
 .collab-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
 .collab-top-row{flex:0 0 38%;display:flex;gap:8px;min-height:0;overflow:hidden;}
-.collab-projects{flex:3;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
+.collab-projects{flex:3;min-width:0;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;transition:outline .1s,background .1s;}
+.collab-projects.drop-on{outline:2px dashed #05C072;outline-offset:-3px;background:#ECFDF522;}
 .collab-cal-box{flex:1;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-box iframe{width:100%;height:100%;border:none;display:block;}
 /* 업무보고서 사이드바 (우측 전체높이) */
@@ -1005,7 +1006,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <!-- 상단 행: 진행 예정 프로젝트 + 캘린더 -->
       <div class="collab-top-row">
         <!-- 진행 예정 프로젝트 (기존 실장님 존 대체) -->
-        <div class="collab-projects">
+        <div class="collab-projects" id="planDropZone"
+          ondragover="planDropOver(event)" ondragleave="planDropLeave(event)" ondrop="planDropDrop(event)">
           <div class="collab-board-head">
             <span style="font-size:14px;font-weight:800;color:var(--tx);">📋 진행 예정 프로젝트</span>
             <div style="display:flex;align-items:center;gap:8px;">
@@ -9235,7 +9237,6 @@ function _collabCardHTML(t, canEdit){
     <div class="postit-top">
       <span class="postit-badge" style="background:${st.color};">${st.label}</span>
       <div class="postit-actions">
-        ${canEdit?`<button class="postit-act" title="진행예정으로" onclick="event.stopPropagation();collabSendToPlan('${t.id}')" style="font-size:10px;">↩</button>`:''}
         ${canEdit?`<button class="postit-act" title="수정" onclick="event.stopPropagation();collabOpenEdit('${t.id}')">✎</button>`:''}
         ${canEdit?`<button class="postit-del" title="삭제" onclick="collabDelete(event,'${t.id}')">✕</button>`:''}
       </div>
@@ -9840,9 +9841,11 @@ function rpShowInlinePopup(afterLineId){
   if(!line) return;
   const form=document.createElement('div');
   form.className='rp-bp-form';
-  // 현재 담당자의 진행중 업무 목록
-  const wipTasks=(_collabTasks||[]).filter(t=>!t.weekly && t.assignee===_reportPerson && t.status==='wip');
-  const wipOpts=`<option value="">진행중 업무 선택</option>`+wipTasks.map(t=>`<option value="${_esc(t.title)}">${_esc(t.title)}</option>`).join('');
+  // 현재 담당자의 진행중/진행예정 업무 목록 (완료 제외)
+  const STATUS_LABEL = {plan:'진행예정', wip:'진행중', doing:'진행중'};
+  const wipTasks=(_collabTasks||[]).filter(t=>!t.weekly && t.assignee===_reportPerson && t.status!=='done');
+  const wipOpts=`<option value="">── 업무 선택 (${wipTasks.length}건) ──</option>`
+    +wipTasks.map(t=>`<option value="${_esc(t.title)}">[${STATUS_LABEL[t.status]||'진행중'}] ${_esc(t.title)}</option>`).join('');
   const timeOpts=`<option value="">소요시간</option>`+RP_TIME_OPTS.map(o=>`<option>${o}</option>`).join('');
   form.innerHTML=`<select id="rpBpWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this)">${wipOpts}</select>
     <input id="rpBpTask" class="rp-bp-input" placeholder="업무명 직접 입력">
@@ -9856,7 +9859,10 @@ function rpShowInlinePopup(afterLineId){
 }
 function rpWipSelChange(sel){
   const v=sel.value;
-  if(v) document.getElementById('rpBpTask').value=v;
+  if(v){
+    document.getElementById('rpBpTask').value=v;
+    document.getElementById('rpBpTask').focus();
+  }
 }
 function rpHideInlinePopup(){
   document.querySelectorAll('.rp-bp-form').forEach(f=>f.remove());
@@ -10243,6 +10249,27 @@ function collabDragOver(ev){
   ev.currentTarget.classList.add('drop-on');
 }
 function collabDragLeave(ev){ ev.currentTarget.classList.remove('drop-on'); }
+// ── 진행예정 패널로 드래그앤드롭 (task → plan project) ──
+function planDropOver(ev){
+  // plan 카드 자체나 드래그 없을 때 무시
+  if(!_collabDragId || String(_collabDragId).startsWith('plan:')) return;
+  ev.preventDefault(); ev.dataTransfer.dropEffect='move';
+  document.getElementById('planDropZone')?.classList.add('drop-on');
+}
+function planDropLeave(ev){
+  // 자식 요소로 이동할 때 오탈출 방지
+  if(ev.currentTarget.contains(ev.relatedTarget)) return;
+  ev.currentTarget.classList.remove('drop-on');
+}
+async function planDropDrop(ev){
+  ev.preventDefault();
+  document.getElementById('planDropZone')?.classList.remove('drop-on');
+  const id = _collabDragId || ev.dataTransfer.getData('text/plain');
+  _collabDragId = null;
+  if(!id || String(id).startsWith('plan:')) return;
+  await collabSendToPlan(id);
+}
+
 async function collabSendToPlan(id){
   if(!_collabCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   const t = _collabTasks.find(x=>x.id===id); if(!t) return;
