@@ -108,7 +108,7 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-line{outline:none;min-height:22px;font-size:12.5px;line-height:1.75;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
 .rp-line[data-empty-ph]:empty::before{content:attr(data-empty-ph);color:var(--tx2);opacity:.4;pointer-events:none;font-style:italic;}
 /* 블럭 카드 */
-.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:3px 8px 3px 9px;font-size:12px;line-height:1.6;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;user-select:none;-webkit-user-select:none;}
+.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:3px 8px 3px 9px;font-size:12px;line-height:1.6;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;user-select:none;-webkit-user-select:none;cursor:default;}
 .rp-block.pinned{border-color:#FDE68A;border-left-color:#F59E0B;background:#FFFEF5;}
 .rp-block-text{flex:1;min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden;}
 .rp-block-main{font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -9941,6 +9941,16 @@ async function rpBlockSave(){
       renderCollab();
       Promise.all([collabSaveCloud(), planProjSaveCloud()]);
       toast(`📋 "${proj.title}" → ${_reportPerson} 업무로 자동 등록됨`);
+    }
+  }
+  // 기존 업무(task) 선택 → 진행중 상태로 자동 변경
+  if(linked && linked.type==='task'){
+    const t = (_collabTasks||[]).find(x=>x.id===linked.id);
+    if(t && t.status !== 'wip'){
+      t.status = 'wip';
+      t.updated_at = new Date().toISOString();
+      renderCollab();
+      collabSaveCloud();
     }
   }
   const entry=_reportEnsureEntry();
