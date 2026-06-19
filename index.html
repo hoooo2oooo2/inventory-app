@@ -6070,8 +6070,7 @@ async function downloadDailyExcel(){
       const dd=parseInt(ds.split('-')[1]);
       const sale=rs.reduce((s,r)=>s+(r.salePrice||0),0);
       const settle=rs.reduce((s,r)=>s+(r.settlement||0),0);
-      const cost=rs.reduce((s,r)=>s+(r.costPrice||0),0);
-      const margin=settle-cost;                           // 마진 = 정산예정금액 - 매입금액
+      const margin=rs.reduce((s,r)=>s+(r.margin||0),0);  // 마진 = 정산예정금액 - 매입금액 - 배송비 (DB 저장값)
       const ad=sumAdSpend({year:yy,month:mm,day:dd,ch:chFilter});
       const pkgs=new Set(rs.map(pkgKey)).size;
       const finalMargin=margin-ad;                        // 최종마진 = 마진 - 광고비
