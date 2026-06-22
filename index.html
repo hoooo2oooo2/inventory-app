@@ -895,11 +895,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lst2-period{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:9px 13px;box-shadow:0 1px 2px rgba(0,0,0,0.03);}
 .lst2-period select{border:none;background:transparent;font-size:13px;font-weight:600;color:var(--tx);cursor:pointer;outline:none;}
 /* KPI 카드 */
-.lst2-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
-.lst2-kpi{display:flex;align-items:center;gap:13px;background:var(--bg);border:1px solid var(--bd);border-radius:15px;padding:17px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:box-shadow .16s,transform .16s;}
+.lst2-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:13px;margin-bottom:26px;}
+.lst2-kpi{display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--bd);border-radius:15px;padding:16px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:box-shadow .16s,transform .16s;}
 .lst2-kpi:hover{box-shadow:0 6px 18px rgba(0,0,0,0.07);transform:translateY(-2px);}
+.lst2-kpi.clickable{cursor:pointer;}
+.lst2-kpi.clickable:hover{border-color:var(--pr);}
+.lst2-kpi.clickable:active{transform:translateY(0) scale(0.99);}
 .lst2-kpi-ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;}
-.lst2-kpi-ic.blue{background:#EEF4FF;}.lst2-kpi-ic.green{background:#E7F8F0;}.lst2-kpi-ic.violet{background:#F1ECFE;}.lst2-kpi-ic.amber{background:#FEF3E2;}
+.lst2-kpi-ic.blue{background:#EEF4FF;}.lst2-kpi-ic.green{background:#E7F8F0;}.lst2-kpi-ic.violet{background:#F1ECFE;}.lst2-kpi-ic.amber{background:#FEF3E2;}.lst2-kpi-ic.indigo{background:#E7EAFE;}
+.lst2-kpi-link{color:var(--pr)!important;font-weight:700!important;}
+.lst2-prog-wait{color:#B45309;font-weight:700;font-size:12px;}
+@media(max-width:1024px){.lst2-kpis{grid-template-columns:repeat(3,1fr);}}
 .lst2-kpi-label{font-size:12px;color:var(--tx2);font-weight:600;margin-bottom:4px;}
 .lst2-kpi-val{font-size:21px;font-weight:800;color:var(--tx);letter-spacing:-0.02em;font-variant-numeric:tabular-nums;line-height:1.05;}
 .lst2-kpi-unit{font-size:12px;font-weight:600;color:var(--tx2);margin-left:3px;}
@@ -1404,10 +1410,22 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 진행중인 박스 주문 모달 -->
+<div class="modal-overlay" id="lstProgressModal">
+  <div class="modal" style="max-width:560px;">
+    <h3>🔄 진행중인 박스 주문 <span style="font-size:12px;color:var(--tx2);font-weight:500;">· 입고가 아직 끝나지 않은 주문</span></h3>
+    <div id="lstProgBody" style="max-height:56vh;overflow:auto;margin-top:6px;"></div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('lstProgressModal')">닫기</button>
+      <button class="btn btn-pr" onclick="gotoReceiving()">입고확인 하러가기 →</button>
+    </div>
+  </div>
+</div>
+
 <!-- 택배박스 주문 모달 -->
 <div class="modal-overlay" id="lbxOrderModal">
   <div class="modal" style="max-width:560px;">
-    <h3>🛒 택배박스 주문 <span style="font-size:12px;color:var(--tx2);font-weight:500;">(최대 5박스 선택)</span></h3>
+    <h3>🛒 택배박스 주문 <span style="font-size:12px;color:var(--tx2);font-weight:500;">(종류당 최대 5박스)</span></h3>
     <label class="lbx-datelab" style="margin:2px 0 10px;">주문일
       <input type="date" id="lbxOrderDate">
     </label>
@@ -3874,24 +3892,24 @@ function logiBoxOpenOrder(){
       <input type="checkbox" value="${b.id}" onchange="logiBoxOrderToggle(${b.id})">
       <span class="lbx-order-info">${_logiEsc(b.name||'(명칭없음)')} <small>· ${_logiEsc(b.company||'-')} · 박스당 ${_lbxComma(b.qtyPerBox)}개 · ${_lbxComma(b.pricePerBox)}원</small></span>
       <span class="lbx-order-stock">${stockTxt}${st==='need'?' ⚠️':''}</span>
-      <input class="lbx-order-qty" type="number" min="1" placeholder="박스수" id="lbxoq-${b.id}" disabled oninput="logiBoxOrderSum()">
+      <input class="lbx-order-qty" type="number" min="1" max="5" placeholder="박스수(최대5)" id="lbxoq-${b.id}" disabled oninput="logiBoxOrderClamp(this);logiBoxOrderSum()">
     </label>`;
   }).join('');
   document.getElementById('lbxOrderSum').textContent='';
   openModal('lbxOrderModal');
 }
 function logiBoxOrderToggle(id){
-  const checked=[...document.querySelectorAll('#lbxOrderList input[type=checkbox]:checked')];
   const cb=document.getElementById('lbxoi-'+id).querySelector('input[type=checkbox]');
-  if(cb.checked && checked.length>LBX_MAX_ORDER){
-    cb.checked=false; toast(`최대 ${LBX_MAX_ORDER}박스까지만 선택할 수 있습니다.`);
-  }
   const item=document.getElementById('lbxoi-'+id);
   const qty=document.getElementById('lbxoq-'+id);
   item.classList.toggle('sel', cb.checked);
   qty.disabled=!cb.checked;
   qty.value = cb.checked ? (qty.value||1) : '';
   logiBoxOrderSum();
+}
+// 한 종류당 최대 5박스로 제한 (선택 종류 수는 제한 없음)
+function logiBoxOrderClamp(el){
+  if(_lbxNum(el.value)>LBX_MAX_ORDER){ el.value=LBX_MAX_ORDER; toast(`한 종류당 최대 ${LBX_MAX_ORDER}박스까지 주문할 수 있습니다.`); }
 }
 function _logiBoxOrderRows(){
   const rows=[];
@@ -4026,17 +4044,48 @@ function logiStatusFillMonths(){
 }
 function _lstRenderKpis(d){
   const el=document.getElementById('lstKpis'); if(!el) return;
-  const card=(ic,acc,label,val,sub)=>`<div class="lst2-kpi"><div class="lst2-kpi-ic ${acc}">${ic}</div><div><div class="lst2-kpi-label">${label}</div><div class="lst2-kpi-val">${val}</div>${sub?`<div class="lst2-kpi-sub">${sub}</div>`:''}</div></div>`;
+  const card=(ic,acc,label,val,sub,opt)=>`<div class="lst2-kpi${opt&&opt.click?' clickable':''}"${opt&&opt.click?` onclick="openProgressOrders()" role="button" tabindex="0"`:''}><div class="lst2-kpi-ic ${acc}">${ic}</div><div><div class="lst2-kpi-label">${label}</div><div class="lst2-kpi-val">${val}</div>${sub?`<div class="lst2-kpi-sub${opt&&opt.linkSub?' lst2-kpi-link':''}">${sub}</div>`:''}</div></div>`;
   el.innerHTML =
     card('💰','blue','총 구매비용', _lbxComma(d.grand)+'<span class="lst2-kpi-unit">원</span>','')+
     card('📦','green','총 주문 박스', _lbxComma(d.totalBoxes)+'<span class="lst2-kpi-unit">박스</span>','')+
     card('🗂','violet','주문 박스 종류', _lbxComma(d.typeCount)+'<span class="lst2-kpi-unit">종</span>','')+
-    card('🚚','amber','입고 대기', _lbxComma(d.pending)+'<span class="lst2-kpi-unit">건</span>', d.pending>0?'입고확인이 필요해요':'모두 입고 완료');
+    card('🚚','amber','입고 대기', _lbxComma(d.pending)+'<span class="lst2-kpi-unit">건</span>', d.pending>0?'입고확인이 필요해요':'모두 입고 완료')+
+    card('🔄','indigo','진행중인 박스 주문', _lbxComma(d.inProgress)+'<span class="lst2-kpi-unit">건</span>', d.inProgress>0?'클릭해서 보기 →':'진행중 주문 없음', {click:true, linkSub:d.inProgress>0});
 }
+// 진행중인 박스 주문(입고 미완료) 모달
+function openProgressOrders(){
+  const orders=(_logiOrders||[]).filter(o=>(o.items||[]).some(it=>it.received!==true));
+  const wrap=document.getElementById('lstProgBody'); if(!wrap){ return; }
+  if(!orders.length){
+    wrap.innerHTML=`<div class="lbx-rcv-empty">진행중인 박스 주문이 없습니다. 모두 입고 완료되었어요. 🎉</div>`;
+  } else {
+    wrap.innerHTML=orders.map(o=>{
+      const items=(o.items||[]);
+      const rows=items.map(it=>{
+        const rcv=it.received===true;
+        return `<tr class="${rcv?'rcv-done':''}">
+          <td class="l">${_logiEsc(it.name||it.company||'-')}</td>
+          <td>${_lbxComma(it.boxCount)} 박스</td>
+          <td>${rcv?`<span class="lbx-rcv-ok">✓ 입고완료</span>`:`<span class="lst2-prog-wait">⏳ 입고대기</span>`}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="lbx-rcv-card" style="margin-bottom:12px;">
+        <div class="lbx-rcv-chead">
+          <span class="lbx-rcv-date">📅 ${o.date||'-'}</span>
+          ${o.by?`<span class="lbx-rcv-by">담당: ${_logiEsc(o.by)}</span>`:''}
+          <span class="lbx-rcv-badge wait">🔄 진행중</span>
+        </div>
+        <table class="lbx-rcv-tbl"><thead><tr><th style="text-align:left;">명칭</th><th>주문 수량</th><th>상태</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
+    }).join('');
+  }
+  openModal('lstProgressModal');
+}
+function gotoReceiving(){ closeModal('lstProgressModal'); goMenu('logibox'); goLogiBoxTab('rcv'); }
 function logiStatusRender(){
   const table=document.getElementById('lstTable'); if(!table) return;
   const orders=_logiOrders||[];
-  if(!orders.length){ table.innerHTML=`<tbody><tr><td class="lst-empty">아직 주문완료된 박스가 없습니다.<br><span style="font-size:12px;">택배박스 → 🛒 주문하기에서 주문하면 여기에 집계됩니다.</span></td></tr></tbody>`; _lstRenderKpis({grand:0,totalBoxes:0,typeCount:0,pending:0}); logiStatusAnalyze(); return; }
+  if(!orders.length){ table.innerHTML=`<tbody><tr><td class="lst-empty">아직 주문완료된 박스가 없습니다.<br><span style="font-size:12px;">택배박스 → 🛒 주문하기에서 주문하면 여기에 집계됩니다.</span></td></tr></tbody>`; _lstRenderKpis({grand:0,totalBoxes:0,typeCount:0,pending:0,inProgress:0}); logiStatusAnalyze(); return; }
   // 월 목록 (선택 필터 반영) + 박스별 집계
   const sel=document.getElementById('lstMonthSel');
   const pick=sel?sel.value:'all';
@@ -4086,7 +4135,9 @@ function logiStatusRender(){
   keys.forEach(k=>{ let kb=0; months.forEach(m=>{ kb+=qty[k][m]||0; }); if(kb>0){ _kpiBoxes+=kb; _kpiTypes.add(k); } });
   let _kpiPending=0;
   orders.forEach(o=>{ const m=(o.date||'').slice(0,7); if(pick&&pick!=='all'&&m!==pick) return; (o.items||[]).forEach(it=>{ if(it.received!==true) _kpiPending++; }); });
-  _lstRenderKpis({ grand, totalBoxes:_kpiBoxes, typeCount:_kpiTypes.size, pending:_kpiPending });
+  // 진행중인 주문(=입고 미완료 항목이 남은 주문)은 조회기간과 무관하게 현재 상태 기준으로 집계
+  const _kpiInProg = (_logiOrders||[]).filter(o=>(o.items||[]).some(it=>it.received!==true)).length;
+  _lstRenderKpis({ grand, totalBoxes:_kpiBoxes, typeCount:_kpiTypes.size, pending:_kpiPending, inProgress:_kpiInProg });
   document.getElementById('lstTable').innerHTML = head + `<tbody>${rowsHtml||`<tr><td class="lst-empty" colspan="${2+months.length*2+1}">선택한 기간에 주문 내역이 없습니다.</td></tr>`}${rowsHtml?totalRow:''}</tbody>`;
   logiStatusAnalyze();
 }
