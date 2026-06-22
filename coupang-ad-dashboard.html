@@ -1,0 +1,2482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>쿠팡 광고 관리 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<style>
+:root {
+  --white:#fff;--bg:#f5f7fb;--surface:#fff;--border:#e8ecf4;--border2:#d6dcea;
+  --blue:#3182f6;--blue-l:#ebf2ff;--blue-m:#c2d9ff;--blue-d:#1a5fd4;--blue-s:#f0f6ff;
+  --text:#191f28;--text2:#4e5968;--text3:#8b95a1;--text4:#b0b8c1;
+  --green:#05c072;--green-bg:#e6faf2;
+  --red:#f04452;--red-bg:#fff0f1;
+  --orange:#f5762a;--orange-bg:#fff4ec;--orange-d:#d4540e;
+  --yellow:#f5a623;--yellow-bg:#fff8eb;
+  --r:8px;--rl:14px;--rxl:18px;
+  --sh:0 1px 4px rgba(0,0,0,.06);--shm:0 2px 12px rgba(0,0,0,.08);--shb:0 4px 16px rgba(49,130,246,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Pretendard',-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+.app{display:flex;flex-direction:column;min-height:100vh;}
+
+/* HEADER */
+header{background:var(--white);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;padding:0 24px;position:sticky;top:0;z-index:200;box-shadow:var(--sh);}
+.h-left{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.logo-mark{width:30px;height:30px;background:var(--blue);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.logo-text{font-size:16px;font-weight:700;letter-spacing:-.4px;white-space:nowrap;}
+.logo-text em{color:var(--blue);font-style:normal;}
+.h-nav{display:flex;align-items:stretch;height:56px;margin-left:28px;flex:1;overflow-x:auto;scrollbar-width:none;}
+.h-nav::-webkit-scrollbar{display:none;}
+.nav-tab{display:flex;align-items:center;gap:5px;padding:0 15px;height:100%;font-size:13.5px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s;user-select:none;}
+.nav-tab:hover{color:var(--text2);}
+.nav-tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600;}
+.h-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:16px;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:100px;font-size:12px;font-weight:600;}
+.chip-blue{background:var(--blue-l);color:var(--blue);}
+.chip-gray{background:#f1f3f8;color:var(--text2);}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'Pretendard',sans-serif;transition:all .15s;white-space:nowrap;}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:var(--shb);}
+.btn-primary:hover{background:var(--blue-d);}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+.btn-ghost:hover{background:#f4f6fb;color:var(--text);}
+.btn-sm{padding:5px 11px;font-size:12px;}
+
+/* LAYOUT */
+.content{flex:1;padding:16px 20px;max-width:1600px;margin:0 auto;width:100%;}
+.panel{display:none;}
+.panel.active{display:block;animation:fadeUp .2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.page-hd{margin-bottom:12px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.page-title{font-size:20px;font-weight:700;letter-spacing:-.5px;}
+.page-title span{font-size:13px;font-weight:400;color:var(--text3);margin-left:8px;}
+
+/* ALERT BANNER — collapsible */
+.alert-wrap{margin-bottom:10px;}
+.alert-banner{display:none;background:#fff7f3;border:1.5px solid #ffd0b8;border-radius:var(--rl);overflow:hidden;}
+.alert-banner.show{display:block;}
+.alert-header{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;user-select:none;}
+.alert-header:hover{background:rgba(245,118,42,.04);}
+.alert-icon{font-size:16px;flex-shrink:0;}
+.alert-title{font-size:13px;font-weight:700;color:var(--orange-d);flex:1;}
+.alert-toggle{font-size:11px;color:var(--text3);transition:transform .2s;flex-shrink:0;}
+.alert-toggle.open{transform:rotate(180deg);}
+.alert-body{border-top:1px solid #ffd0b8;padding:10px 16px 12px;}
+.alert-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.alert-tag{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #ffd0b8;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:600;color:var(--orange-d);}
+.alert-tag .arrow{font-size:10px;color:var(--red);}
+
+/* PROGRESS TABS */
+.prog-tab-row{display:flex;gap:0;margin-bottom:12px;background:var(--bg);border-radius:8px;padding:3px;}
+.prog-tab{flex:1;text-align:center;padding:6px 0;font-size:12.5px;font-weight:600;color:var(--text3);cursor:pointer;border-radius:6px;transition:all .15s;}
+.prog-tab.active{background:var(--white);color:var(--blue);box-shadow:var(--sh);}
+
+/* CHART INNER TABS */
+.chart-tab-row{display:flex;gap:0;background:var(--bg);border-radius:8px;padding:3px;width:fit-content;}
+.chart-tab{padding:5px 14px;font-size:12px;font-weight:600;color:var(--text3);cursor:pointer;border-radius:6px;transition:all .15s;white-space:nowrap;}
+.chart-tab.active{background:var(--white);color:var(--blue);box-shadow:var(--sh);}
+.chart-panel{display:none;}
+.chart-panel.active{display:block;}
+
+/* NO-SCROLL OVERVIEW LAYOUT */
+.ov-layout{display:grid;grid-template-columns:200px 1fr 200px;grid-template-rows:auto 1fr auto;gap:12px;height:calc(100vh - 56px - 48px - 32px);}
+.ov-alert{grid-column:1/-1;}
+.ov-progress{grid-column:1/-1;}
+.ov-kpi-col{grid-row:3/4;display:flex;flex-direction:column;gap:8px;}
+.ov-ranking{grid-row:3/4;min-width:0;}
+.ov-charts{grid-row:3/4;min-width:0;}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+.kpi-card{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);padding:18px 20px;box-shadow:var(--sh);transition:box-shadow .15s,transform .15s;}
+.kpi-card:hover{box-shadow:var(--shm);transform:translateY(-1px);}
+.kpi-card.warn{background:#fff7f3;border-color:#ffd0b8;}
+.kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.kpi-label{font-size:12px;font-weight:600;color:var(--text3);}
+.kpi-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.kpi-icon.blue{background:var(--blue-l);}
+.kpi-icon.green{background:var(--green-bg);}
+.kpi-icon.red{background:var(--red-bg);}
+.kpi-icon.yellow{background:var(--yellow-bg);}
+.kpi-icon.orange{background:var(--orange-bg);}
+.kpi-value{font-size:23px;font-weight:800;letter-spacing:-.7px;line-height:1;margin-bottom:5px;}
+.kpi-value.blue{color:var(--blue);}
+.kpi-value.orange{color:var(--orange);}
+.kpi-sub{font-size:11.5px;color:var(--text3);}
+.kpi-badge{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:100px;}
+.kpi-badge.up{background:var(--green-bg);color:var(--green);}
+.kpi-badge.down{background:var(--red-bg);color:var(--red);}
+.kpi-badge.warn{background:var(--orange-bg);color:var(--orange);}
+.kpi-badge.flat{background:#f1f3f8;color:var(--text3);}
+
+/* PROGRESS BAR */
+.progress-card{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);padding:20px 22px;box-shadow:var(--sh);margin-bottom:20px;}
+.progress-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.progress-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px;}
+.progress-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);}
+.progress-meta{display:flex;gap:20px;align-items:center;}
+.progress-stat{text-align:center;}
+.progress-stat-label{font-size:11px;color:var(--text3);font-weight:500;margin-bottom:3px;}
+.progress-stat-val{font-size:15px;font-weight:700;letter-spacing:-.3px;}
+.progress-stat-val.blue{color:var(--blue);}
+.progress-stat-val.green{color:var(--green);}
+.progress-pct-big{font-size:28px;font-weight:800;letter-spacing:-.8px;color:var(--text);}
+.progress-pct-big span{font-size:14px;font-weight:500;color:var(--text3);}
+
+.progress-track-wrap{position:relative;margin-bottom:8px;}
+.progress-track{height:12px;background:#eef1f8;border-radius:100px;overflow:visible;position:relative;}
+.progress-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--blue),#5ba3f8);transition:width .8s cubic-bezier(.4,0,.2,1);position:relative;z-index:1;}
+.progress-fill.over50{background:linear-gradient(90deg,var(--blue),#34c97b);}
+.progress-fill.over75{background:linear-gradient(90deg,var(--blue),var(--green));}
+.progress-fill.done{background:linear-gradient(90deg,var(--green),#00e89a);}
+
+/* milestone markers */
+.milestone{position:absolute;top:-4px;width:2px;height:20px;border-radius:1px;z-index:2;}
+.milestone-50{background:rgba(49,130,246,.35);left:50%;}
+.milestone-75{background:rgba(5,192,114,.4);left:75%;}
+.milestone-label{position:absolute;top:22px;font-size:10px;font-weight:600;white-space:nowrap;transform:translateX(-50%);}
+.milestone-50 .milestone-label{color:var(--blue);}
+.milestone-75 .milestone-label{color:var(--green);}
+
+.progress-bottom{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text3);margin-top:6px;}
+
+/* GOAL INPUT */
+.goal-input-row{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.goal-input-label{font-size:12.5px;font-weight:600;color:var(--text2);white-space:nowrap;}
+.goal-input{width:160px;padding:7px 12px;border:1px solid var(--border2);border-radius:var(--r);font-size:13px;font-family:'Pretendard',sans-serif;color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s;}
+.goal-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(49,130,246,.1);}
+
+/* CHARTS */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);padding:20px 22px;box-shadow:var(--sh);}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.card-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px;}
+.card-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;}
+.card-sub{font-size:12px;color:var(--text3);}
+.chart-wrap{position:relative;height:230px;}
+.chart-wrap-md{position:relative;height:270px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr;}}
+
+/* TABLES */
+.table-card{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);box-shadow:var(--sh);overflow:hidden;margin-bottom:18px;}
+.table-top{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap;}
+.table-top-title{font-size:14px;font-weight:700;}
+.scroll-x{overflow-x:auto;}
+.scroll-x::-webkit-scrollbar{height:4px;}
+.scroll-x::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{background:#f8f9fc;padding:10px 14px;text-align:left;font-size:11.5px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--blue-s);}
+tbody tr.selected{background:var(--blue-l)!important;}
+td{padding:11px 14px;color:var(--text);white-space:nowrap;font-size:13px;}
+td.mono{font-variant-numeric:tabular-nums;letter-spacing:-.2px;}
+td.name{font-weight:500;}
+td.primary{color:var(--blue);font-weight:600;}
+.empty-row td{text-align:center;color:var(--text4);padding:44px;font-size:14px;}
+
+/* STATUS CHIPS */
+.s-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:100px;font-size:11.5px;font-weight:600;}
+.s-chip.good{background:var(--green-bg);color:var(--green);}
+.s-chip.warn{background:var(--yellow-bg);color:var(--yellow);}
+.s-chip.bad{background:var(--red-bg);color:var(--red);}
+
+/* ROAS BADGE */
+.roas-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11.5px;font-weight:700;letter-spacing:.1px;}
+.roas-badge.great{background:var(--green-bg);color:var(--green);}
+.roas-badge.mid{background:var(--orange-bg);color:var(--orange);}
+.roas-badge.low{background:var(--red-bg);color:var(--red);}
+
+/* ROAS BAR */
+.roas-bar{display:flex;align-items:center;gap:7px;min-width:120px;}
+.roas-track{flex:1;height:5px;background:#eef1f8;border-radius:3px;overflow:hidden;}
+.roas-fill{height:100%;border-radius:3px;background:var(--blue);transition:width .5s ease;}
+.roas-fill.great{background:var(--green);}
+.roas-fill.mid{background:var(--orange);}
+.roas-fill.low{background:var(--red);}
+.roas-val{font-size:11px;color:var(--text3);min-width:34px;}
+
+/* INPUTS */
+input[type=text],input[type=date],input[type=number],select{background:var(--white);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);padding:7px 11px;font-size:13px;font-family:'Pretendard',sans-serif;outline:none;transition:border-color .15s,box-shadow .15s;height:34px;}
+input[type=text]:focus,input[type=date]:focus,input[type=number]:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(49,130,246,.1);}
+select{cursor:pointer;}
+.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:12px 16px;background:var(--white);border:1px solid var(--border);border-radius:var(--rl);box-shadow:var(--sh);}
+.f-label{font-size:12px;font-weight:600;color:var(--text3);white-space:nowrap;}
+.f-div{width:1px;height:18px;background:var(--border);margin:0 2px;}
+
+/* SUMMARY CHIPS */
+.summary-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+.s-sum{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:7px 13px;font-size:12.5px;color:var(--text2);box-shadow:var(--sh);white-space:nowrap;}
+.s-sum strong{color:var(--blue);font-weight:700;}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--blue-m);border-radius:var(--rxl);padding:48px 24px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:18px;background:var(--blue-s);}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--blue);background:var(--blue-l);}
+.up-illust{font-size:40px;margin-bottom:12px;}
+.up-title{font-size:16px;font-weight:700;margin-bottom:5px;}
+.up-sub{font-size:13px;color:var(--text3);margin-bottom:18px;line-height:1.7;}
+
+.notice{display:flex;align-items:flex-start;gap:10px;background:var(--blue-l);border:1px solid var(--blue-m);border-radius:var(--rl);padding:13px 15px;font-size:13px;color:var(--blue-d);margin-bottom:18px;line-height:1.65;}
+.notice-icon{font-size:15px;flex-shrink:0;margin-top:1px;}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;justify-content:flex-end;gap:5px;padding:11px 14px;border-top:1px solid var(--border);}
+.pg-info{font-size:12px;color:var(--text3);margin-right:5px;}
+.pg-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-size:12px;font-family:'Pretendard',sans-serif;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.pg-btn:hover{background:var(--blue-l);border-color:var(--blue-m);color:var(--blue);}
+.pg-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
+
+/* CAMPAIGN EXPAND */
+.expand-btn{width:24px;height:24px;border:1px solid var(--border2);border-radius:6px;background:transparent;cursor:pointer;font-size:11px;color:var(--text3);display:inline-flex;align-items:center;justify-content:center;transition:all .15s;font-family:'Pretendard',sans-serif;}
+.expand-btn:hover{background:var(--blue-l);border-color:var(--blue-m);color:var(--blue);}
+.expand-btn.open{background:var(--blue);border-color:var(--blue);color:#fff;transform:rotate(180deg);}
+.campaign-products-row td{padding:0!important;background:var(--bg);}
+.campaign-products-inner{padding:12px 20px 12px 52px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--border);}
+.campaign-product-item{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--white);border:1px solid var(--border);border-radius:8px;font-size:12.5px;}
+.campaign-product-name{flex:1;font-weight:600;color:var(--text);}
+.campaign-product-stat{color:var(--text3);font-size:11.5px;font-variant-numeric:tabular-nums;}
+.campaign-product-stat strong{color:var(--text2);font-weight:700;}
+.t-up{color:var(--green);font-weight:600;font-size:12px;}
+.t-down{color:var(--red);font-weight:600;font-size:12px;}
+.t-flat{color:var(--text3);font-size:12px;}
+
+/* RANKING LIST */
+.rank-podium{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.rank-podium-item{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--rl);padding:16px 14px;display:flex;flex-direction:column;align-items:center;gap:6px;transition:box-shadow .15s,transform .15s;}
+.rank-podium-item:hover{box-shadow:var(--shm);transform:translateY(-2px);}
+.rank-podium-item.rank1{border-color:#f5c842;background:linear-gradient(160deg,#fffef5,#fff9e0);}
+.rank-podium-item.rank2{border-color:#d0d8e4;background:linear-gradient(160deg,#f9fafb,#f3f5f8);}
+.rank-podium-item.rank3{border-color:#e8c8a0;background:linear-gradient(160deg,#fffaf5,#fff3e8);}
+.rank-medal{font-size:26px;line-height:1;}
+.rank-name{font-size:13px;font-weight:700;color:var(--text);text-align:center;line-height:1.4;word-break:keep-all;}
+.rank-revenue{font-size:16px;font-weight:800;color:var(--blue);letter-spacing:-.4px;}
+.rank-roas-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px;}
+
+.rank-list{display:flex;flex-direction:column;gap:0;}
+.rank-list-item{display:flex;align-items:center;gap:14px;padding:11px 4px;border-bottom:1px solid var(--border);transition:background .1s;}
+.rank-list-item:last-child{border-bottom:none;}
+.rank-list-item:hover{background:var(--blue-s);border-radius:8px;}
+.rank-num{width:28px;text-align:center;font-size:13px;font-weight:700;color:var(--text3);flex-shrink:0;}
+.rank-list-name{flex:1;font-size:13.5px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rank-list-bar-wrap{width:140px;flex-shrink:0;}
+.rank-list-bar-track{height:5px;background:#eef1f8;border-radius:3px;overflow:hidden;margin-bottom:4px;}
+.rank-list-bar-fill{height:100%;border-radius:3px;background:var(--blue);}
+.rank-list-rev{font-size:12.5px;font-weight:700;color:var(--text2);text-align:right;min-width:90px;font-variant-numeric:tabular-nums;}
+
+.rank-page-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-size:12px;font-weight:600;font-family:'Pretendard',sans-serif;display:inline-flex;align-items:center;justify-content:center;transition:all .12s;}
+.rank-page-btn:hover{background:var(--blue-l);border-color:var(--blue-m);color:var(--blue);}
+.rank-page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+/* DANGER */
+.danger-card{border:1px solid #ffd6d9;background:#fff8f8;border-radius:var(--rl);padding:18px;}
+.danger-title{font-size:13.5px;font-weight:700;color:var(--red);margin-bottom:5px;}
+.danger-sub{font-size:13px;color:var(--text2);margin-bottom:14px;}
+.history-item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.history-item:last-child{border-bottom:none;}
+.h-rows{color:var(--blue);font-weight:700;font-size:12px;background:var(--blue-l);padding:2px 8px;border-radius:5px;}
+.h-date{color:var(--text3);font-size:11.5px;margin-left:auto;}
+
+#toast{position:fixed;bottom:26px;right:26px;background:var(--text);color:#fff;padding:12px 17px;border-radius:var(--rl);font-size:13.5px;font-weight:500;z-index:9999;transform:translateY(68px);opacity:0;transition:all .28s cubic-bezier(.34,1.56,.64,1);pointer-events:none;max-width:320px;box-shadow:var(--shm);display:flex;align-items:center;gap:7px;}
+#toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<header>
+  <div class="h-left">
+    <div class="logo-mark">📊</div>
+    <span class="logo-text">쿠팡 <em>광고</em> 관리</span>
+  </div>
+  <nav class="h-nav">
+    <div class="nav-tab active" onclick="showTab('overview',this)"><span>🏠</span> 대시보드</div>
+    <div class="nav-tab" onclick="showTab('ad',this)"><span>📣</span> 광고 성과</div>
+    <div class="nav-tab" onclick="showTab('sales',this)"><span>💰</span> 매출 정산</div>
+    <div class="nav-tab" onclick="showTab('products',this)"><span>📦</span> 상품별 분석</div>
+    <div class="nav-tab" onclick="showTab('raw',this)"><span>🗂</span> 전체 데이터</div>
+    <div class="nav-tab" onclick="showTab('upload',this)"><span>📤</span> 업로드</div>
+    <div class="nav-tab" onclick="showTab('leave',this)"><span>🗓</span> 연월차 관리</div>
+  </nav>
+  <div class="h-right">
+    <span class="chip chip-blue" id="dataChip">샘플 데이터</span>
+    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ 내보내기</button>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('fileInput').click()">+ 업로드</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple onchange="handleFileUpload(event)" style="display:none">
+  </div>
+</header>
+
+<div class="content">
+
+<!-- ══ 대시보드 ══ -->
+<div class="panel active" id="panel-overview">
+
+  <!-- Row 1: 헤더 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div class="page-title" style="font-size:17px">대시보드 <span style="font-size:12px;font-weight:400;color:var(--text3);margin-left:6px">전체 광고 성과</span></div>
+    <button class="btn btn-ghost btn-sm" onclick="loadSampleData()">↺ 샘플</button>
+  </div>
+
+  <!-- Row 3: 목표 달성률 (알림 배너 바로 아래) -->
+  <div class="progress-card" style="padding:10px 16px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap">
+      <!-- 타이틀 + 월/년 pill + 년도/월 선택 -->
+      <div style="display:flex;align-items:center;gap:7px;flex-shrink:0">
+        <span style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap">🎯 목표 달성률</span>
+        <div style="display:flex;align-items:center;background:#eef1f8;border-radius:100px;padding:2px">
+          <button id="prog-tab-month" onclick="switchProgTab('month')" style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:100px;transition:all .18s;background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3)">월</button>
+          <button id="prog-tab-year"  onclick="switchProgTab('year')"  style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:100px;transition:all .18s;background:transparent;color:var(--text3)">년</button>
+        </div>
+        <select id="progYearSelect" onchange="updateProgressBar(getParsed())"
+          style="height:26px;font-size:11px;padding:0 5px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none;width:64px">
+        </select>
+        <select id="progMonthSelect" onchange="updateProgressBar(getParsed())"
+          style="height:26px;font-size:11px;padding:0 6px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none">
+          <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+          <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+        </select>
+      </div>
+      <!-- 수치 3개 -->
+      <div style="display:flex;align-items:center;gap:0;background:var(--bg);border-radius:8px;overflow:hidden;flex-shrink:0">
+        <div style="padding:6px 12px;text-align:center;border-right:1px solid var(--border)">
+          <div style="font-size:9.5px;font-weight:600;color:var(--text3);margin-bottom:2px">현재</div>
+          <div style="font-size:12px;font-weight:800;color:var(--blue);letter-spacing:-.3px;white-space:nowrap" id="prog-current">—</div>
+        </div>
+        <div style="padding:6px 12px;text-align:center;border-right:1px solid var(--border)">
+          <div style="font-size:9.5px;font-weight:600;color:var(--text3);margin-bottom:2px">목표</div>
+          <div style="font-size:12px;font-weight:800;color:var(--text);letter-spacing:-.3px;white-space:nowrap" id="prog-target">—</div>
+        </div>
+        <div style="padding:6px 12px;text-align:center">
+          <div style="font-size:9.5px;font-weight:600;color:var(--text3);margin-bottom:2px">달성률</div>
+          <div style="font-size:14px;font-weight:800;color:var(--text);letter-spacing:-.5px" id="prog-pct">—<span style="font-size:10px;font-weight:500;color:var(--text3)">%</span></div>
+        </div>
+      </div>
+      <!-- 프로그레스 바 -->
+      <div style="flex:1;min-width:80px">
+        <div class="progress-track" style="height:8px">
+          <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+          <div class="milestone milestone-50"><div class="milestone-label" style="font-size:9px">50%</div></div>
+          <div class="milestone milestone-75"><div class="milestone-label" style="font-size:9px">75%</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:10px;color:var(--text3)" id="prog-remain">—</span>
+          <span style="font-size:10px" id="prog-status"></span>
+        </div>
+      </div>
+      <!-- 목표 입력 -->
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <div style="position:relative;display:flex;align-items:center">
+          <input type="text" class="goal-input" id="goalInput" placeholder="120,000,000" style="width:130px;padding-right:20px;height:28px;font-size:11.5px" oninput="formatGoalInput(this)">
+          <span style="position:absolute;right:7px;font-size:10px;color:var(--text3);pointer-events:none">원</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="applyGoal()" style="height:28px;padding:0 9px;font-size:11.5px">적용</button>
+        <span style="font-size:10.5px;color:var(--text3);white-space:nowrap" id="goalPreview"></span>
+        <span style="font-size:10px;color:var(--blue);font-weight:700;white-space:nowrap" id="prog-period-label"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 4: 주요 지표 KPI 2줄 -->
+  <div style="margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span style="font-size:11px;font-weight:700;color:var(--text2)">📊 주요 지표</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;background:#eef1f8;border-radius:100px;padding:2px">
+          <button id="kpi-tab-day"   onclick="switchKpiPeriod('day')"   style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:700;padding:3px 11px;border-radius:100px;transition:all .18s;background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3)">일</button>
+          <button id="kpi-tab-month" onclick="switchKpiPeriod('month')" style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:600;padding:3px 11px;border-radius:100px;transition:all .18s;background:transparent;color:var(--text3)">월</button>
+          <button id="kpi-tab-year"  onclick="switchKpiPeriod('year')"  style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:600;padding:3px 11px;border-radius:100px;transition:all .18s;background:transparent;color:var(--text3)">년</button>
+        </div>
+        <select id="kpiMonthSelect" onchange="updateKPIs(getParsed())" style="display:none;height:26px;font-size:11px;padding:0 6px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none">
+          <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+          <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+        </select>
+        <span id="kpi-period-label" style="font-size:10.5px;color:var(--blue);font-weight:700"></span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px">
+      <div class="kpi-card" id="kpi-card-revenue" style="padding:10px 14px">
+        <div class="kpi-top" style="margin-bottom:4px"><span class="kpi-label" style="font-size:10.5px">판매매출</span><div class="kpi-icon blue" style="width:22px;height:22px;font-size:11px">💵</div></div>
+        <div class="kpi-value blue" id="kpi-revenue" style="font-size:15px;margin-bottom:2px">—</div>
+        <div class="kpi-sub" id="kpi-revenue-sub" style="font-size:10px">기간 합계</div>
+      </div>
+      <div class="kpi-card" style="padding:10px 14px">
+        <div class="kpi-top" style="margin-bottom:4px"><span class="kpi-label" style="font-size:10.5px">마진총액</span><div class="kpi-icon green" style="width:22px;height:22px;font-size:11px">💚</div></div>
+        <div class="kpi-value" id="kpi-margin" style="font-size:15px;margin-bottom:2px">—</div>
+        <div class="kpi-sub" id="kpi-margin-sub" style="font-size:10px">매출 × 30%</div>
+      </div>
+      <div class="kpi-card" id="kpi-card-adcost" style="padding:10px 14px">
+        <div class="kpi-top" style="margin-bottom:4px"><span class="kpi-label" style="font-size:10.5px">광고비총액</span><div class="kpi-icon red" id="kpi-adcost-icon" style="width:22px;height:22px;font-size:11px">💸</div></div>
+        <div class="kpi-value" id="kpi-adcost" style="font-size:15px;margin-bottom:2px">—</div>
+        <div class="kpi-sub" id="kpi-adcost-sub" style="font-size:10px">기간 광고비</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <div class="kpi-card" style="padding:10px 14px">
+        <div class="kpi-top" style="margin-bottom:4px"><span class="kpi-label" style="font-size:10.5px">순수익</span><div class="kpi-icon blue" style="width:22px;height:22px;font-size:11px">✨</div></div>
+        <div class="kpi-value" id="kpi-net" style="font-size:15px;margin-bottom:2px">—</div>
+        <div class="kpi-sub" style="font-size:10px">마진 - 광고비</div>
+      </div>
+      <div class="kpi-card" id="kpi-card-roas" style="padding:10px 14px">
+        <div class="kpi-top" style="margin-bottom:4px"><span class="kpi-label" style="font-size:10.5px">평균 ROAS</span><div class="kpi-icon yellow" id="kpi-roas-icon" style="width:22px;height:22px;font-size:11px">📈</div></div>
+        <div class="kpi-value" id="kpi-roas" style="font-size:15px;margin-bottom:2px">—</div>
+        <div class="kpi-sub" id="kpi-roas-sub" style="font-size:10px">광고비 대비</div>
+      </div>
+      <div class="kpi-card" style="padding:10px 14px">
+        <div class="kpi-top" style="margin-bottom:4px"><span class="kpi-label" style="font-size:10.5px">전환율</span><div class="kpi-icon green" style="width:22px;height:22px;font-size:11px">✅</div></div>
+        <div class="kpi-value" id="kpi-cvr" style="font-size:15px;margin-bottom:2px">—</div>
+        <div class="kpi-sub" style="font-size:10px">클릭 대비 구매</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 5: 하단 메인 — 탭 카드(랭킹/매출/ROAS) -->
+  <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+
+    <!-- 탭 헤더 -->
+    <div style="display:flex;align-items:center;border-bottom:1px solid var(--border);padding:0 16px;background:var(--white);gap:0">
+
+      <div class="ov-main-tab active" id="mtab-rank" onclick="switchMainTab('rank')" style="display:flex;align-items:center;gap:5px;padding:10px 16px;font-size:13px;font-weight:600;color:var(--blue);cursor:pointer;border-bottom:2px solid var(--blue);white-space:nowrap;user-select:none">
+        <span>📦</span> 상품별 매출 랭킹
+      </div>
+      <div class="ov-main-tab" id="mtab-rev" onclick="switchMainTab('rev')" style="display:flex;align-items:center;gap:5px;padding:10px 16px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;user-select:none">
+        <span>📈</span> 매출 · 광고비
+      </div>
+      <div class="ov-main-tab" id="mtab-roas" onclick="switchMainTab('roas')" style="display:flex;align-items:center;gap:5px;padding:10px 16px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;user-select:none">
+        <span>📊</span> ROAS 추이
+      </div>
+
+      <!-- 오른쪽 공통 기간 선택 + 랭킹 전용 -->
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+
+        <!-- 랭킹 탭 전용: 월/년 pill + 드롭다운 + 페이지네이션 -->
+        <div id="rank-period-toggle" style="display:flex;align-items:center;gap:6px">
+          <!-- 월/년 pill -->
+          <div style="display:flex;align-items:center;background:#eef1f8;border-radius:100px;padding:2px">
+            <button id="rank-tab-month" onclick="switchRankTab('month')"
+              style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:100px;transition:all .18s;background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3)">월</button>
+            <button id="rank-tab-year" onclick="switchRankTab('year')"
+              style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:100px;transition:all .18s;background:transparent;color:var(--text3)">년</button>
+          </div>
+          <!-- 년도 드롭다운 -->
+          <select id="rankYearSelect" onchange="applyRankPeriod()"
+            style="height:26px;font-size:11px;padding:0 5px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none;width:64px">
+          </select>
+          <!-- 월 드롭다운 (월 모드) -->
+          <select id="rankMonthSelect" onchange="applyRankPeriod()"
+            style="height:26px;font-size:11px;padding:0 6px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none">
+            <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+            <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+          </select>
+          <span id="rankingPageInfo" style="font-size:11px;color:var(--text3);white-space:nowrap"></span>
+          <div style="display:flex;gap:3px;align-items:center" id="rankingPagination"></div>
+        </div>
+
+        <!-- 차트 탭 전용: 월별/년별 pill + 드롭다운 -->
+        <div id="chart-period-toggle" style="display:none;align-items:center;gap:6px">
+          <div style="display:flex;align-items:center;background:#eef1f8;border-radius:100px;padding:2px">
+            <button id="data-tab-month" onclick="switchDataPeriod('month')" style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:100px;transition:all .18s;background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3)">월별</button>
+            <button id="data-tab-year"  onclick="switchDataPeriod('year')"  style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:100px;transition:all .18s;background:transparent;color:var(--text3)">년별</button>
+          </div>
+          <select id="dataMonthSelect" onchange="applyDataPeriod()"
+            style="height:26px;font-size:11px;padding:0 6px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none">
+            <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+            <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+          </select>
+          <select id="dataYearSelect" onchange="applyDataPeriod()"
+            style="display:none;height:26px;font-size:11px;padding:0 6px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none">
+          </select>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 탭 콘텐츠 -->
+    <div style="padding:14px 16px;flex:1">
+
+      <!-- 랭킹 패널 -->
+      <div id="mpanel-rank" style="display:block">
+        <div id="rankingList"></div>
+      </div>
+
+      <!-- 매출·광고비 차트 패널 -->
+      <div id="mpanel-rev" style="display:none;position:relative">
+        <div style="position:absolute;top:6px;right:6px;display:flex;gap:12px;font-size:11.5px;color:var(--text3);align-items:center;z-index:10">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:var(--blue);display:inline-block;border-radius:2px"></span>매출</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:var(--red);display:inline-block;border-radius:2px"></span>광고비</span>
+        </div>
+        <div style="height:320px;position:relative;padding-top:28px"><canvas id="chartMain"></canvas></div>
+      </div>
+
+      <!-- ROAS 추이 패널 -->
+      <div id="mpanel-roas" style="display:none;position:relative">
+        <div style="position:absolute;top:6px;right:6px;display:flex;gap:12px;font-size:11.5px;color:var(--text3);align-items:center;z-index:10">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:var(--red);display:inline-block;border-radius:2px"></span>ROAS</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:18px;border-top:2px dashed #999;display:inline-block"></span>목표 3.5x</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:var(--blue);display:inline-block;border-radius:2px"></span>저효율</span>
+        </div>
+        <div style="height:320px;position:relative;padding-top:28px"><canvas id="chartRoas2"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ 광고 성과 ══ -->
+<div class="panel" id="panel-ad">
+  <div class="page-hd"><div class="page-title">광고 성과 <span>상품별 광고 데이터</span></div></div>
+
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 16px;background:var(--white);border:1px solid var(--border);border-radius:var(--rl);box-shadow:var(--sh)">
+    <span class="f-label">상품명 검색</span>
+    <input type="text" id="adSearch" placeholder="상품명으로 검색" style="width:200px;height:32px" oninput="renderAdTable()">
+    <div class="f-div"></div>
+    <span class="f-label">캠페인명 검색</span>
+    <input type="text" id="adCampSearch" placeholder="캠페인명으로 검색" style="width:200px;height:32px" oninput="renderAdTable()">
+    <div class="f-div"></div>
+    <span class="f-label">정렬</span>
+    <select id="adSort" style="width:130px;height:32px" onchange="renderAdTable()">
+      <option value="">기본순</option>
+      <option value="revenue">전환매출 높은 순</option>
+      <option value="roas">ROAS 높은 순</option>
+      <option value="adcost">광고비 높은 순</option>
+      <option value="net">순수익 높은 순</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="clearAdFilter()">초기화</button>
+  </div>
+
+  <div class="table-card">
+    <div class="table-top">
+      <span class="table-top-title">광고 성과 목록</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="card-sub">클릭 시 일별 상세 펼침</span>
+        <select id="adDetailYearSelect" onchange="renderAdTable()"
+          style="height:26px;font-size:11px;padding:0 5px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none;width:64px">
+        </select>
+        <select id="adDetailMonthSelect" onchange="renderAdTable()"
+          style="height:26px;font-size:11px;padding:0 6px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text);font-family:'Pretendard',sans-serif;cursor:pointer;outline:none">
+          <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+          <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+          <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+          <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+        </select>
+        <!-- 리스트 추가 버튼 -->
+        <button class="btn btn-ghost btn-sm" onclick="openAddAdRow()" style="height:26px;font-size:11.5px;padding:0 10px;gap:4px">
+          <span style="font-size:13px">+</span> 리스트 추가
+        </button>
+        <!-- 엑셀 업로드 버튼 -->
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('adExcelInput').click()" style="height:26px;font-size:11.5px;padding:0 10px;gap:4px">
+          <span style="font-size:12px">📥</span> 엑셀 업로드
+        </button>
+        <input type="file" id="adExcelInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleAdExcelUpload(event)">
+      </div>
+    </div>
+
+    <!-- 리스트 추가 폼 (숨김 → 버튼 클릭 시 표시) -->
+    <div id="adAddForm" style="display:none;padding:12px 16px;background:var(--blue-s);border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:12px;font-weight:700;color:var(--blue)">+ 행 추가</span>
+      <input type="text" id="addProd" placeholder="상품명" style="height:28px;width:130px;font-size:12px">
+      <input type="text" id="addCamp" placeholder="캠페인명" style="height:28px;width:120px;font-size:12px">
+      <input type="date" id="addDate" style="height:28px;width:130px;font-size:12px">
+      <input type="number" id="addImp" placeholder="노출수" style="height:28px;width:80px;font-size:12px">
+      <input type="number" id="addClicks" placeholder="클릭수" style="height:28px;width:70px;font-size:12px">
+      <input type="number" id="addConv" placeholder="주문수" style="height:28px;width:70px;font-size:12px">
+      <input type="number" id="addRevenue" placeholder="전환매출" style="height:28px;width:90px;font-size:12px">
+      <input type="number" id="addAdcost" placeholder="광고비" style="height:28px;width:80px;font-size:12px">
+      <input type="number" id="addMargin" placeholder="개당마진" style="height:28px;width:80px;font-size:12px">
+      <button class="btn btn-primary btn-sm" onclick="confirmAddAdRow()" style="height:28px;font-size:12px">추가</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('adAddForm').style.display='none'" style="height:28px;font-size:12px">취소</button>
+    </div>
+
+    <div class="scroll-x">
+      <table>
+        <thead><tr>
+          <th style="width:28px"></th>
+          <th>상품명</th>
+          <th>캠페인명</th>
+          <th>광고비(원)</th>
+          <th style="white-space:nowrap">노출수</th>
+          <th>클릭수</th>
+          <th>클릭률</th>
+          <th>주문수</th>
+          <th>구매전환율</th>
+          <th>전환매출(원)</th>
+          <th>ROAS</th>
+          <th>개당마진(원)</th>
+          <th>판매량</th>
+          <th>순수익(원)</th>
+          <th>순수익-광고비(원)</th>
+        </tr></thead>
+        <tbody id="adTableBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="adPagination"></div>
+  </div>
+</div>
+
+<!-- ══ 매출 정산 ══ -->
+<div class="panel" id="panel-sales">
+  <div class="page-hd"><div class="page-title">매출 정산 <span>월별 수익 현황</span></div></div>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">이번달 정산</span><div class="kpi-icon blue">💵</div></div>
+      <div class="kpi-value blue" id="s-rev">—</div>
+      <div class="kpi-sub" id="s-rev-chg">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">이번달 주문건수</span><div class="kpi-icon green">🛒</div></div>
+      <div class="kpi-value" id="s-orders">—</div>
+      <div class="kpi-sub">전환 완료 합계</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">건당 수익</span><div class="kpi-icon yellow">💡</div></div>
+      <div class="kpi-value" id="s-per">—</div>
+      <div class="kpi-sub">평균 주문당 수익</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">누적 총 수익</span><div class="kpi-icon blue">📊</div></div>
+      <div class="kpi-value" id="s-total">—</div>
+      <div class="kpi-sub">전체 기간 합산</div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-head"><div class="card-title"><span class="card-dot"></span>월별 매출 · 광고비</div></div>
+    <div class="chart-wrap-md"><canvas id="chartMonthly"></canvas></div>
+  </div>
+  <div class="table-card">
+    <div class="table-top"><span class="table-top-title">월별 정산 요약</span></div>
+    <div class="scroll-x">
+      <table>
+        <thead><tr><th>년월</th><th>주문건수</th><th>매출(원)</th><th>광고비(원)</th><th>순이익(원)</th><th>ROAS</th><th>전월 대비</th></tr></thead>
+        <tbody id="salesTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 상품별 분석 ══ -->
+<div class="panel" id="panel-products">
+  <div class="page-hd"><div class="page-title">상품별 분석 <span>상품 단위 성과</span></div></div>
+  <div class="filter-bar">
+    <span class="f-label">검색</span>
+    <input type="text" id="prodSearch" placeholder="상품명 검색" style="width:190px" oninput="renderProductTable()">
+    <div class="f-div"></div>
+    <span class="f-label">정렬</span>
+    <select id="prodSort" onchange="renderProductTable()" style="width:130px">
+      <option value="revenue">매출 높은 순</option>
+      <option value="roas">ROAS 높은 순</option>
+      <option value="cvr">전환율 높은 순</option>
+    </select>
+  </div>
+  <div class="table-card" style="margin-bottom:18px">
+    <div class="table-top">
+      <span class="table-top-title">상품 랭킹</span>
+      <span class="card-sub">행 클릭 시 하단 차트 반영</span>
+    </div>
+    <div class="scroll-x">
+      <table>
+        <thead><tr><th>#</th><th>상품명</th><th>노출수</th><th>전환수</th><th>전환율</th><th>매출(원)</th><th>광고비(원)</th><th>CPC</th><th>ROAS</th><th>ROAS 등급</th><th>시각화</th></tr></thead>
+        <tbody id="prodTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="card-dot"></span>선택 상품 매출 추이</div>
+        <span class="card-sub" id="selectedProdName" style="color:var(--blue);font-weight:600">상품을 선택하세요</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartProdTrend"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="card-dot" style="background:var(--green)"></span>상품별 ROAS 비교 TOP 10</div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartProdRoas"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 전체 데이터 ══ -->
+<div class="panel" id="panel-raw">
+  <div class="page-hd"><div class="page-title">전체 데이터 <span>원본 조회 및 내보내기</span></div></div>
+  <div class="filter-bar">
+    <span class="f-label">검색</span>
+    <input type="text" id="rawSearch" placeholder="전체 검색" style="width:190px" oninput="renderRawTable()">
+    <div class="f-div"></div>
+    <span class="f-label">기간</span>
+    <input type="date" id="rawFrom">
+    <span style="color:var(--text3);font-size:12px">~</span>
+    <input type="date" id="rawTo">
+    <button class="btn btn-primary btn-sm" onclick="renderRawTable()">적용</button>
+    <button class="btn btn-ghost btn-sm" onclick="clearRawFilter()">초기화</button>
+    <span id="rawCount" style="font-size:12px;color:var(--text3)"></span>
+  </div>
+  <div class="table-card">
+    <div class="table-top">
+      <span class="table-top-title">원본 데이터 전체</span>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ CSV</button>
+    </div>
+    <div class="scroll-x"><table><thead><tr id="rawHead"></tr></thead><tbody id="rawBody"></tbody></table></div>
+    <div class="pagination" id="rawPagination"></div>
+  </div>
+</div>
+
+<!-- ══ 업로드 ══ -->
+<div class="panel" id="panel-upload">
+  <div class="page-hd"><div class="page-title">파일 업로드 <span>쿠팡 파트너스 리포트</span></div></div>
+  <div class="notice">
+    <span class="notice-icon">ℹ️</span>
+    <span>엑셀(.xlsx) 또는 CSV를 업로드하면 자동 파싱됩니다.<br>
+    컬럼명에 <strong>날짜, 상품명, 노출수, 전환수, 수익, 광고비, CPC, ROAS</strong> 등이 포함되면 자동 매핑됩니다.</span>
+  </div>
+  <div class="upload-zone" id="uploadZone"
+    ondragover="event.preventDefault();this.classList.add('drag-over')"
+    ondragleave="this.classList.remove('drag-over')"
+    ondrop="handleDrop(event)"
+    onclick="document.getElementById('fileInput2').click()">
+    <div class="up-illust">📂</div>
+    <div class="up-title">파일을 드래그하거나 클릭해서 업로드</div>
+    <div class="up-sub">.xlsx / .xls / .csv 지원 · 여러 파일 동시 업로드 가능</div>
+    <button class="btn btn-primary" onclick="event.stopPropagation();document.getElementById('fileInput2').click()">파일 선택</button>
+    <input type="file" id="fileInput2" accept=".xlsx,.xls,.csv" multiple onchange="handleFileUpload(event)" style="display:none">
+  </div>
+  <div class="table-card" id="uploadPreview" style="display:none;margin-bottom:18px">
+    <div class="table-top">
+      <span class="table-top-title">👀 미리보기 <span style="font-size:12px;color:var(--text3);font-weight:400">(최근 10행)</span></span>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-primary btn-sm" onclick="confirmUpload()">✅ 업로드 확정</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelPreview()">✕ 취소</button>
+      </div>
+    </div>
+    <div class="scroll-x"><table><thead><tr id="previewHead"></tr></thead><tbody id="previewBody"></tbody></table></div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-head"><div class="card-title"><span class="card-dot"></span>업로드 내역</div></div>
+    <div id="uploadHistory"><p style="color:var(--text4);font-size:13px">업로드된 파일이 없습니다.</p></div>
+  </div>
+  <div class="danger-card">
+    <div class="danger-title">⚠️ 데이터 초기화</div>
+    <div class="danger-sub">모든 데이터를 삭제합니다. 되돌릴 수 없습니다.</div>
+    <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:#ffd6d9" onclick="resetData()">🗑 전체 삭제</button>
+  </div>
+</div>
+
+<!-- ══ 연월차 관리 ══ -->
+<div class="panel" id="panel-leave">
+  <div class="page-hd">
+    <div class="page-title">연월차 관리 <span>직원 연차 현황 및 사용 내역</span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="downloadLeaveTemplate()">📋 양식 다운로드</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('leaveExcelInput').click()">📥 엑셀 업로드</button>
+      <input type="file" id="leaveExcelInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleLeaveExcelUpload(event)">
+      <button class="btn btn-ghost btn-sm" onclick="toggleLeaveGuide()">❓ 양식 안내</button>
+      <button class="btn btn-ghost btn-sm" id="leaveMaskBtn" onclick="toggleLeaveMask()">🔓 마스킹 해제</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddEmployee()">+ 직원 추가</button>
+    </div>
+  </div>
+
+  <!-- 양식 안내 -->
+  <div id="leaveGuide" style="display:none;background:var(--blue-s);border:1px solid var(--blue-m);border-radius:var(--rl);padding:14px 18px;margin-bottom:12px;font-size:12.5px;color:var(--blue-dark);line-height:1.8">
+    <div style="font-weight:700;margin-bottom:8px">📋 엑셀 파일 양식 안내</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-weight:600;margin-bottom:4px;color:var(--text)">📄 시트 1 — 직원 정보</div>
+        <div style="background:var(--white);border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:2">
+          <span style="color:var(--text3)">컬럼명 예시:</span><br>
+          <b>이름</b> | <b>연락처</b> | <b>생년월일</b> | <b>입사일자</b> | <b>연차수량</b>
+        </div>
+      </div>
+      <div>
+        <div style="font-weight:600;margin-bottom:4px;color:var(--text)">📄 시트 2 — 연차 사용 내역 <span style="font-weight:400;color:var(--text3)">(또는 같은 시트)</span></div>
+        <div style="background:var(--white);border-radius:8px;padding:10px 12px;font-size:11.5px;line-height:2">
+          <span style="color:var(--text3)">컬럼명 예시:</span><br>
+          <b>이름</b> | <b>날짜</b> | <b>일수</b> | <b>시간</b> | <b>사유</b>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:11.5px;color:var(--text2)">
+      ※ 컬럼명이 다소 달라도 자동 매핑됩니다. 직원 시트와 연차 시트를 각각 분리하거나 하나의 파일로 업로드해도 됩니다.
+    </div>
+  </div>
+
+  <!-- 직원 추가 폼 -->
+  <div id="leaveAddForm" style="display:none;background:var(--blue-s);border:1px solid var(--blue-m);border-radius:var(--rl);padding:16px 20px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:12px">+ 직원 정보 입력</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">이름 *</label>
+        <input type="text" id="empName" placeholder="홍길동" style="height:32px;width:110px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">연락처</label>
+        <input type="text" id="empPhone" placeholder="010-0000-0000" style="height:32px;width:130px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">생년월일</label>
+        <input type="date" id="empBirth" style="height:32px;width:140px;font-size:12px;padding:0 8px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">입사일자 *</label>
+        <input type="date" id="empJoinDate" style="height:32px;width:140px;font-size:12px;padding:0 8px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">연차 수량</label>
+        <input type="number" id="empLeaveTotal" placeholder="15" min="0" style="height:32px;width:80px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="confirmAddEmployee()" style="height:32px">추가</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('leaveAddForm').style.display='none'" style="height:32px">취소</button>
+    </div>
+  </div>
+
+  <!-- 직원 카드 목록 -->
+  <div id="employeeList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-bottom:24px"></div>
+
+  <!-- 연차 사용 내역 추가 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <div class="card-title"><span class="card-dot"></span>연차 사용 등록</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">직원 선택 *</label>
+        <select id="leaveEmpSelect" style="height:32px;width:140px;font-size:12px;padding:0 8px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif;background:var(--white)">
+          <option value="">-- 선택 --</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">사용 날짜 *</label>
+        <input type="date" id="leaveDate" style="height:32px;width:140px;font-size:12px;padding:0 8px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <!-- 일수/시간 토글 -->
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">단위 선택</label>
+        <div style="display:flex;align-items:center;background:#eef1f8;border-radius:100px;padding:2px;height:32px">
+          <button id="leaveUnitDay" onclick="switchLeaveUnit('day')"
+            style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:11px;font-weight:700;padding:3px 12px;border-radius:100px;transition:all .15s;background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3)">일</button>
+          <button id="leaveUnitHour" onclick="switchLeaveUnit('hour')"
+            style="border:none;cursor:pointer;font-family:'Pretendard',sans-serif;font-size:11px;font-weight:600;padding:3px 12px;border-radius:100px;transition:all .15s;background:transparent;color:var(--text3)">시간</button>
+        </div>
+      </div>
+      <!-- 일수 입력 -->
+      <div style="display:flex;flex-direction:column;gap:4px" id="leaveDayField">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">사용 일수 *</label>
+        <input type="number" id="leaveDays" placeholder="1" min="0.5" step="0.5" style="height:32px;width:80px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <!-- 시간 입력 (숨김) -->
+      <div style="display:none;flex-direction:column;gap:4px" id="leaveHourField">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">사용 시간 *</label>
+        <div style="display:flex;align-items:center;gap:5px">
+          <input type="number" id="leaveHours" placeholder="1" min="1" max="8" step="1" style="height:32px;width:65px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+          <span style="font-size:12px;color:var(--text3);white-space:nowrap">시간<span id="leaveHourConvert" style="color:var(--blue);font-weight:600;margin-left:4px"></span></span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">사유</label>
+        <input type="text" id="leaveReason" placeholder="개인 사유" style="height:32px;width:160px;font-size:12px;padding:0 10px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addLeaveRecord()" style="height:32px">등록</button>
+    </div>
+  </div>
+
+  <!-- 연차 사용 내역 테이블 -->
+  <div class="table-card">
+    <div class="table-top">
+      <span class="table-top-title">연차 사용 내역</span>
+      <div style="display:flex;gap:8px">
+        <select id="leaveFilterEmp" onchange="renderLeaveTable()" style="height:28px;font-size:12px;padding:0 8px;border:1px solid var(--border2);border-radius:7px;outline:none;font-family:'Pretendard',sans-serif;background:var(--white)">
+          <option value="">전체 직원</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('leaveFilterEmp').value='';renderLeaveTable()">초기화</button>
+      </div>
+    </div>
+    <div class="scroll-x">
+      <table>
+        <thead><tr>
+          <th>직원명</th><th>사용 날짜</th><th>사용량</th><th>사유</th><th>잔여 연차</th><th style="width:60px"></th>
+        </tr></thead>
+        <tbody id="leaveTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+</div><!-- /app -->
+<div id="toast"></div>
+
+<script>
+Chart.defaults.font.family = "'Pretendard', sans-serif";
+
+// ─── STATE ───────────────────────────────
+let allData = [], pendingData = [], uploadHistory = [], charts = {};
+let goalRevenue = 0;
+
+// ═══ Supabase 연동 — 데이터 클라우드 저장/공유 (운영관리 통합) ═══
+//    메인 앱(index.html)과 동일한 work_calendar KV 패턴 사용 (person='__app__', kind별 JSON)
+const CP_SB = (window.supabase && window.supabase.createClient)
+  ? window.supabase.createClient(
+      'https://ywbekolvslixidpugepr.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs')
+  : null;
+async function cpCloudSave(kind,obj){
+  if(!CP_SB) return;
+  try{ await CP_SB.from('work_calendar').upsert({person:'__app__',kind,data:obj,updated_at:new Date().toISOString()},{onConflict:'person,kind'}); }
+  catch(e){ console.warn('cpCloudSave 실패',kind,e); }
+}
+async function cpCloudLoad(kind){
+  if(!CP_SB) return null;
+  try{ const {data,error}=await CP_SB.from('work_calendar').select('data').eq('person','__app__').eq('kind',kind).maybeSingle(); if(error) return null; return data?data.data:null; }
+  catch(e){ return null; }
+}
+// 광고/매출 데이터 저장(디바운스 — 연속 변경 시 1회만 업로드)
+let _cpSaveTimer=null;
+let _isSampleData=false;   // 데모 샘플 표시 중 여부 — 샘플은 클라우드에 저장하지 않음
+function saveAdData(){
+  if(_isSampleData) return;   // 샘플 데이터는 DB에 저장하지 않음(실데이터만 공유)
+  if(_cpSaveTimer) clearTimeout(_cpSaveTimer);
+  _cpSaveTimer=setTimeout(()=>{ cpCloudSave('coupang_ad_data',{allData,uploadHistory,goalRevenue}); },800);
+}
+
+// ═══ 연월차 개인정보 마스킹 (연락처·생년월일) — 비밀번호 1234로 해제 ═══
+let _leaveUnmasked=false;
+function maskPhone(p){
+  if(!p) return '연락처 없음';
+  if(_leaveUnmasked) return p;
+  const d=String(p).replace(/[^0-9]/g,'');
+  return d.length>=4 ? '***-****-'+d.slice(-4) : '****';
+}
+function maskBirth(b){
+  const iso=normalizeToISO(b);
+  if(!iso) return '—';
+  return _leaveUnmasked ? iso : '****-**-**';
+}
+function updateMaskBtn(){ const btn=document.getElementById('leaveMaskBtn'); if(btn) btn.textContent=_leaveUnmasked?'🔒 마스킹 적용':'🔓 마스킹 해제'; }
+function toggleLeaveMask(){
+  if(_leaveUnmasked){ _leaveUnmasked=false; renderEmployeeList(); updateMaskBtn(); toast('🔒 마스킹을 적용했습니다'); return; }
+  const pw=prompt('마스킹 해제 비밀번호를 입력하세요.');
+  if(pw===null) return;
+  if(pw==='1234'){ _leaveUnmasked=true; renderEmployeeList(); updateMaskBtn(); toast('🔓 마스킹을 해제했습니다'); }
+  else toast('❌ 비밀번호가 올바르지 않습니다');
+}
+
+// 클라우드에 저장된 실데이터로 화면 구성(연도 드롭다운 등). loadSampleData의 셋업을 실데이터 연도로 대체
+function applyLoadedAdData(){
+  _isSampleData=false;   // 클라우드 실데이터
+  if(goalRevenue){ const gi=document.getElementById('goalInput'); if(gi) gi.value=goalRevenue.toLocaleString(); const gp=document.getElementById('goalPreview'); if(gp) gp.textContent='= '+fmt(goalRevenue)+' 원'; }
+  const curMonth=new Date().getMonth()+1;
+  const yearSet=[...new Set(getParsed().map(r=>String(r.date).slice(0,4)).filter(y=>y.length===4))].sort();
+  const fill=(id,def)=>{ const s=document.getElementById(id); if(s){ s.innerHTML=yearSet.map(y=>`<option value="${y}">${y}년</option>`).join(''); s.value=def||yearSet[yearSet.length-1]||String(new Date().getFullYear()); } };
+  fill('progYearSelect'); fill('dataYearSelect'); fill('adDetailYearSelect', yearSet[0]); fill('rankYearSelect');
+  ['progMonthSelect','rankMonthSelect','dataMonthSelect'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=curMonth; });
+  const kM=document.getElementById('kpiMonthSelect'); if(kM){ kM.value=curMonth; kM.style.display='none'; }
+  updateAll();
+}
+const TARGET_ROAS = 3.5;
+const PAGE = 20;
+let adPage = 1, rawPage = 1;
+
+const COL = {
+  date:['날짜','date','일자','기간','period'],
+  product:['상품명','product','상품','제품명','item','keyword','키워드'],
+  impression:['노출수','impression','impressions','imp'],
+  clicks:['클릭수','clicks','click','클릭'],
+  conversions:['전환수','conversions','conversion','구매수','주문수','orders'],
+  revenue:['수익','revenue','정산','정산금액','earnings','수수료'],
+  adcost:['광고비','adcost','광고 비용','cost','비용','광고금액'],
+  cpc:['cpc','클릭당비용','클릭당 비용'],
+  roas:['roas','광고수익률'],
+};
+function detectCol(headers, aliases){
+  for(const h of headers){
+    const low=String(h).toLowerCase().replace(/\s/g,'');
+    if(aliases.some(a=>low.includes(a.toLowerCase().replace(/\s/g,'')))) return h;
+  }
+  return null;
+}
+
+// ─── FILE UPLOAD ──────────────────────────
+function handleDrop(e){e.preventDefault();document.getElementById('uploadZone').classList.remove('drag-over');handleFileUpload({target:{files:e.dataTransfer.files}});}
+function handleFileUpload(e){Array.from(e.target.files).forEach(f=>readFile(f));e.target.value='';}
+function readFile(file){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      let rows=[];
+      if(file.name.endsWith('.csv')) rows=parseCSV(ev.target.result);
+      else{ const wb=XLSX.read(ev.target.result,{type:'array'}); rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}); }
+      if(!rows.length){toast('⚠️ 데이터가 없습니다');return;}
+      pendingData=rows; showPreview(rows,file.name);
+    }catch(err){toast('❌ 오류: '+err.message);}
+  };
+  if(file.name.endsWith('.csv')) reader.readAsText(file,'utf-8'); else reader.readAsArrayBuffer(file);
+}
+function parseCSV(text){
+  const lines=text.trim().split('\n'); if(lines.length<2)return[];
+  const headers=lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+  return lines.slice(1).map(l=>{const vals=l.split(',').map(v=>v.replace(/"/g,'').trim());const obj={};headers.forEach((h,i)=>obj[h]=vals[i]||'');return obj;});
+}
+function showPreview(rows,name){
+  showTab('upload',document.querySelectorAll('.nav-tab')[5]);
+  const headers=Object.keys(rows[0]);
+  document.getElementById('previewHead').innerHTML=headers.map(h=>`<th>${h}</th>`).join('');
+  document.getElementById('previewBody').innerHTML=rows.slice(0,10).map(r=>`<tr>${headers.map(h=>`<td>${r[h]??''}</td>`).join('')}</tr>`).join('');
+  const prev=document.getElementById('uploadPreview'); prev.style.display=''; prev.dataset.name=name;
+  toast(`📂 ${name} — ${rows.length}행 파싱 완료`);
+}
+function confirmUpload(){
+  if(!pendingData.length)return;
+  const name=document.getElementById('uploadPreview').dataset.name||'파일';
+  // 데모 샘플을 보던 중 첫 실데이터 업로드면 샘플을 교체(누적 방지)
+  if(_isSampleData){ allData=[]; uploadHistory=[]; _isSampleData=false; }
+  allData=[...allData,...pendingData]; uploadHistory.push({name,rows:pendingData.length,date:new Date().toLocaleString('ko-KR')});
+  pendingData=[]; document.getElementById('uploadPreview').style.display='none';
+  updateAll(); saveAdData(); toast(`✅ ${name} 업로드 완료`);
+}
+function cancelPreview(){pendingData=[];document.getElementById('uploadPreview').style.display='none';}
+
+// ─── DATA UTILS ──────────────────────────
+function getVal(row,aliases){const key=detectCol(Object.keys(row),aliases);if(!key)return 0;const v=String(row[key]).replace(/,/g,'').replace(/[₩원%x]/g,'').trim();return parseFloat(v)||0;}
+function getStr(row,aliases){const key=detectCol(Object.keys(row),aliases);return key?String(row[key]||'').trim():'';}
+function parseRow(r){
+  const date=getStr(r,COL.date),product=getStr(r,COL.product)||'(미분류)';
+  const imp=getVal(r,COL.impression),clicks=getVal(r,COL.clicks),conv=getVal(r,COL.conversions);
+  const revenue=getVal(r,COL.revenue),adcost=getVal(r,COL.adcost);
+  const cpc=adcost>0&&clicks>0?adcost/clicks:getVal(r,COL.cpc);
+  const roas=adcost>0?revenue/adcost:getVal(r,COL.roas);
+  const cvr=clicks>0?conv/clicks*100:0;
+  // 캠페인명: 전용 컬럼 우선, 없으면 상품명 앞 2단어
+  const campKey = detectCol(Object.keys(r),['캠페인명','campaign','캠페인']);
+  const campaign = campKey ? String(r[campKey]||'').trim() : product.split(' ').slice(0,2).join(' ');
+  // 개당 마진
+  const marginKey = detectCol(Object.keys(r),['개당마진','마진','margin','단가마진']);
+  const marginPerUnit = marginKey ? (parseFloat(String(r[marginKey]).replace(/,/g,''))||0) : 0;
+  return{date,product,campaign,imp,clicks,conv,revenue,adcost,cpc,roas,cvr,marginPerUnit};
+}
+function getParsed(){return allData.map(parseRow);}
+function fmt(n){if(n>=1e8)return(n/1e8).toFixed(1)+'억';if(n>=1e4)return(n/1e4).toFixed(1)+'만';return Math.round(n).toLocaleString();}
+function fmtW(n){return Math.round(n).toLocaleString()+'원';}
+function fmtP(n){return n.toFixed(2)+'%';}
+function fmtR(n){return n.toFixed(2)+'x';}
+
+// ─── UPDATE ALL ──────────────────────────
+function updateAll(){
+  const d=getParsed();
+  updateKPIs(d); renderCharts(d);
+  renderAdTable(); renderSales(d); renderProductTable(); renderRawTable();
+  updateProgressBar(d); updateDataChip(); updateUploadHistory();
+  applyRankPeriod(); // 독립 랭킹 데이터 갱신
+}
+function updateDataChip(){const el=document.getElementById('dataChip');el.textContent=allData.length?`${allData.length.toLocaleString()}건`:'데이터 없음';el.className=allData.length?'chip chip-blue':'chip chip-gray';}
+function updateUploadHistory(){
+  const el=document.getElementById('uploadHistory');
+  if(!uploadHistory.length){el.innerHTML='<p style="color:var(--text4);font-size:13px">업로드된 파일이 없습니다.</p>';return;}
+  el.innerHTML=uploadHistory.map(h=>`<div class="history-item"><span>📄</span><span style="font-weight:600">${h.name}</span><span class="h-rows">${h.rows.toLocaleString()}행</span><span class="h-date">${h.date}</span></div>`).join('');
+}
+
+// ─── KPI PERIOD ──────────────────────────
+let kpiPeriodMode = 'day';
+
+function switchKpiPeriod(mode){
+  kpiPeriodMode = mode;
+  const ids = ['day','month','year'];
+  const on  = 'background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3);font-weight:700;';
+  const off = 'background:transparent;color:var(--text3);font-weight:600;';
+  ids.forEach(t=>{
+    const b = document.getElementById('kpi-tab-'+t);
+    if(b) b.style.cssText = b.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (t===mode?on:off);
+  });
+  const sel = document.getElementById('kpiMonthSelect');
+  if(sel) sel.style.display = mode==='month' ? '' : 'none';
+  updateKPIs(getParsed());
+}
+
+// ─── KPIs ────────────────────────────────
+function updateKPIs(d){
+  if(!d.length)return;
+  // 기간 필터
+  const now = new Date();
+  const year = now.getFullYear();
+  let filtered;
+  if(kpiPeriodMode==='day'){
+    const today = now.toISOString().slice(0,10);
+    filtered = d.filter(r=>r.date===today);
+    const sub = today;
+    ['kpi-revenue-sub','kpi-margin-sub','kpi-adcost-sub'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=sub;});
+  } else if(kpiPeriodMode==='month'){
+    const m = parseInt((document.getElementById('kpiMonthSelect')||{value:now.getMonth()+1}).value,10);
+    const prefix = `${year}-${String(m).padStart(2,'0')}`;
+    filtered = d.filter(r=>r.date.startsWith(prefix));
+    const sub = `${year}년 ${m}월`;
+    ['kpi-revenue-sub','kpi-margin-sub','kpi-adcost-sub'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=sub;});
+  } else {
+    filtered = d.filter(r=>r.date.startsWith(String(year)));
+    ['kpi-revenue-sub','kpi-margin-sub','kpi-adcost-sub'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=`${year}년`;});
+  }
+  if(!filtered.length) filtered = d; // fallback
+
+  const rev    = filtered.reduce((s,r)=>s+r.revenue,0);
+  const clicks = filtered.reduce((s,r)=>s+r.clicks,0);
+  const conv   = filtered.reduce((s,r)=>s+r.conv,0);
+  const adcost = filtered.reduce((s,r)=>s+r.adcost,0);
+  // 마진 추정: 매출의 30% (실제 마진율 미입력 시)
+  const MARGIN_RATE = 0.30;
+  const margin = rev * MARGIN_RATE;
+  const net    = margin - adcost;
+  const cvr    = clicks>0?conv/clicks*100:0;
+  const roas   = adcost>0?rev/adcost:0;
+
+  document.getElementById('kpi-revenue').textContent = fmt(rev)+'원';
+  const marginEl = document.getElementById('kpi-margin');
+  if(marginEl){ marginEl.textContent = fmt(margin)+'원'; marginEl.style.color = margin>=0?'var(--green)':'var(--red)'; }
+  document.getElementById('kpi-adcost').textContent = fmt(adcost)+'원';
+  const netEl = document.getElementById('kpi-net');
+  if(netEl){ netEl.textContent = fmt(net)+'원'; netEl.style.color = net>=0?'var(--blue)':'var(--red)'; }
+  document.getElementById('kpi-roas').textContent = roas>0?fmtR(roas):'—';
+  document.getElementById('kpi-cvr').textContent = fmtP(cvr);
+
+  // ROAS 카드 경고
+  const roasCard = document.getElementById('kpi-card-roas');
+  const roasVal  = document.getElementById('kpi-roas');
+  if(roas>0&&roas<TARGET_ROAS){
+    if(roasCard) roasCard.classList.add('warn');
+    if(roasVal)  roasVal.classList.add('orange');
+    const sub = document.getElementById('kpi-roas-sub');
+    if(sub) sub.innerHTML=`<span class="kpi-badge warn">⚠ 목표 ${TARGET_ROAS}x 미달</span>`;
+  } else {
+    if(roasCard) roasCard.classList.remove('warn');
+    if(roasVal)  roasVal.className='kpi-value';
+    const sub = document.getElementById('kpi-roas-sub');
+    if(sub) sub.textContent='광고비 대비';
+  }
+
+  // 광고비 카드 초기화
+  const adcostCard = document.getElementById('kpi-card-adcost');
+  if(adcostCard && !adcostCard.classList.contains('warn')){
+    const icon = document.getElementById('kpi-adcost-icon');
+    if(icon) icon.className='kpi-icon red';
+    if(document.getElementById('kpi-adcost-sub') && !document.getElementById('kpi-adcost-sub').querySelector('.kpi-badge'))
+      document.getElementById('kpi-adcost-sub').textContent='기간 광고비';
+  }
+
+  // 매출 정산 KPI (sales 탭)
+  const tM = `${year}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const lM = (()=>{const d2=new Date(now);d2.setMonth(d2.getMonth()-1);return `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}`;})();
+  const tRev = d.filter(r=>r.date.startsWith(tM)).reduce((s,r)=>s+r.revenue,0);
+  const lRev = d.filter(r=>r.date.startsWith(lM)).reduce((s,r)=>s+r.revenue,0);
+  const tOrd = d.filter(r=>r.date.startsWith(tM)).reduce((s,r)=>s+r.conv,0);
+  const chg  = lRev>0?(tRev-lRev)/lRev*100:0;
+  const sRev = document.getElementById('s-rev');
+  if(sRev) sRev.textContent=fmt(tRev||rev)+'원';
+  const chgEl=document.getElementById('s-rev-chg');
+  if(chgEl) chgEl.innerHTML=chg!==0?`<span class="kpi-badge ${chg>=0?'up':'down'}">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(1)}%</span> 전월 대비`:`<span class="kpi-badge flat">— 비교 없음</span>`;
+  const sOrd = document.getElementById('s-orders'); if(sOrd) sOrd.textContent=fmt(tOrd||conv);
+  const per  = (tOrd||conv)>0?(tRev||rev)/(tOrd||conv):0;
+  const sPer = document.getElementById('s-per'); if(sPer) sPer.textContent=fmtW(per);
+  const sTot = document.getElementById('s-total'); if(sTot) sTot.textContent=fmt(d.reduce((s,r)=>s+r.revenue,0))+'원';
+}
+
+// ─── SHARED DATA PERIOD ──────────────────
+let dataPeriodMode = 'month';
+
+function getDataPeriodFilter(){
+  const now = new Date();
+  const year = now.getFullYear();
+  if(dataPeriodMode === 'year'){
+    const ySel = document.getElementById('dataYearSelect');
+    const selYear = ySel ? parseInt(ySel.value)||year : year;
+    return r => r.date.startsWith(String(selYear));
+  } else {
+    const sel = document.getElementById('dataMonthSelect');
+    const m = sel ? parseInt(sel.value,10)||now.getMonth()+1 : now.getMonth()+1;
+    const prefix = `${year}-${String(m).padStart(2,'0')}`;
+    return r => r.date.startsWith(prefix);
+  }
+}
+
+function switchDataPeriod(mode){
+  dataPeriodMode = mode;
+  const ids = ['month','year'];
+  const on  = 'background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3);font-weight:700;';
+  const off = 'background:transparent;color:var(--text3);font-weight:600;';
+  ids.forEach(t=>{
+    const b = document.getElementById('data-tab-'+t);
+    if(b) b.style.cssText = b.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (t===mode?on:off);
+  });
+  const mSel = document.getElementById('dataMonthSelect');
+  const ySel = document.getElementById('dataYearSelect');
+  if(mSel) mSel.style.display = mode==='month' ? '' : 'none';
+  if(ySel) ySel.style.display = mode==='year'  ? '' : 'none';
+  applyDataPeriod();
+}
+
+function applyDataPeriod(){
+  const d = getParsed();
+  if(!d.length) return;
+  const filter = getDataPeriodFilter();
+  const filtered = d.filter(filter);
+  const src = filtered.length ? filtered : d; // 필터 결과 없으면 전체 데이터
+  renderChartsFiltered(src);
+  buildRankingData(src);
+  rankPage=1;
+  renderRankingList();
+}
+
+// ─── MAIN TAB (랭킹 / 매출·광고비 / ROAS) ─
+let mainTab = 'rank';
+function switchMainTab(tab){
+  mainTab = tab;
+  ['rank','rev','roas'].forEach(t=>{
+    const btn   = document.getElementById('mtab-'+t);
+    const panel = document.getElementById('mpanel-'+t);
+    const isActive = t === tab;
+    btn.style.color       = isActive ? 'var(--blue)' : 'var(--text3)';
+    btn.style.borderBottom= isActive ? '2px solid var(--blue)' : '2px solid transparent';
+    btn.style.fontWeight  = isActive ? '600' : '500';
+    panel.style.display   = isActive ? 'block' : 'none';
+  });
+  // 랭킹 탭 ↔ 차트 탭 컨트롤 전환
+  const rankCtrl  = document.getElementById('rank-period-toggle');
+  const chartCtrl = document.getElementById('chart-period-toggle');
+  if(rankCtrl)  rankCtrl.style.display  = tab==='rank' ? 'flex' : 'none';
+  if(chartCtrl) chartCtrl.style.display = (tab==='rev'||tab==='roas') ? 'flex' : 'none';
+  if(tab==='rev')  setTimeout(()=>buildMainChart('rev'),30);
+  if(tab==='roas') setTimeout(()=>buildMainChart('roas'),30);
+}
+
+// ─── INDEPENDENT RANKING DATA ─────────────
+const RANK_PRODUCTS = [
+  {name:'4K모니터 27인치',  baseRev:2800000},
+  {name:'무선이어폰 A3',    baseRev:2200000},
+  {name:'기계식키보드 TKL', baseRev:1900000},
+  {name:'노트북스탠드',     baseRev:1600000},
+  {name:'마우스 G300',      baseRev:1400000},
+  {name:'USB허브 7포트',    baseRev:1200000},
+  {name:'보조배터리 20000', baseRev:1050000},
+  {name:'블루투스 스피커 M5',baseRev:980000},
+  {name:'게이밍헤드셋 G7',  baseRev:870000},
+  {name:'웹캠 HD1080',      baseRev:760000},
+  {name:'충전기 65W',       baseRev:650000},
+  {name:'SSD 1TB',          baseRev:590000},
+];
+
+function getRankingDataForPeriod(){
+  const now = new Date();
+  const ySel = document.getElementById('rankYearSelect');
+  const mSel = document.getElementById('rankMonthSelect');
+  const selYear = ySel ? parseInt(ySel.value)||now.getFullYear() : now.getFullYear();
+  const selMonth = mSel ? parseInt(mSel.value)||now.getMonth()+1 : now.getMonth()+1;
+  const seed = rankPeriodMode==='year' ? selYear : selYear*100+selMonth;
+  const rng = (n)=>{ let x=Math.sin(seed*n+n*1.7)*10000; return x-Math.floor(x); };
+  return RANK_PRODUCTS.map((p,i)=>({
+    name: p.name,
+    rev:  Math.round(p.baseRev * (0.7 + rng(i+1)*0.6) * (rankPeriodMode==='year'?12:1)),
+    roas: parseFloat((1.5 + rng(i+5)*4).toFixed(2))
+  })).sort((a,b)=>b.rev-a.rev);
+}
+
+// ─── RANK PERIOD ─────────────────────────
+let rankPeriodMode = 'month';
+function switchRankTab(mode){
+  rankPeriodMode = mode;
+  const mBtn = document.getElementById('rank-tab-month');
+  const yBtn = document.getElementById('rank-tab-year');
+  const mSel = document.getElementById('rankMonthSelect');
+  const on  = 'background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3);font-weight:700;';
+  const off = 'background:transparent;color:var(--text3);font-weight:600;';
+  if(mBtn) mBtn.style.cssText = mBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (mode==='month'?on:off);
+  if(yBtn) yBtn.style.cssText = yBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (mode==='year'?on:off);
+  if(mSel) mSel.style.display = mode==='month' ? '' : 'none';
+  applyRankPeriod();
+}
+
+function applyRankPeriod(){
+  window._rankingData = getRankingDataForPeriod();
+  rankPage = 1;
+  renderRankingList();
+}
+
+// ─── CHART BUILD ─────────────────────────
+let _chartDates=[], _chartRev=[], _chartCost=[], _chartRoas=[];
+
+function buildMainChart(mode){
+  if(!_chartDates.length) return;
+  if(mode==='rev'){
+    mkChart('chartMain',{
+      type:'line',
+      data:{labels:_chartDates,datasets:[
+        {label:'매출',data:_chartRev,borderColor:CC.blue,backgroundColor:'rgba(49,130,246,0.08)',fill:true,tension:0.4,pointRadius:2,borderWidth:2},
+        {label:'광고비',data:_chartCost,borderColor:CC.red,backgroundColor:'rgba(240,68,82,0.06)',fill:true,tension:0.4,pointRadius:2,borderWidth:2}
+      ]},
+      options:baseOpts()
+    });
+  } else {
+    mkChart('chartRoas2',{
+      type:'line',
+      data:{labels:_chartDates,datasets:[
+        {label:'ROAS',data:_chartRoas,borderColor:CC.red,backgroundColor:'rgba(240,68,82,0.07)',fill:true,tension:0.4,pointRadius:3,borderWidth:2,
+          segment:{
+            borderColor:ctx=>{const v=ctx.p1.parsed.y;return v!==null&&v<TARGET_ROAS?CC.blue:CC.red;},
+            backgroundColor:ctx=>{const v=ctx.p1.parsed.y;return v!==null&&v<TARGET_ROAS?'rgba(49,130,246,0.08)':'rgba(240,68,82,0.07)';}
+          }
+        },
+        {label:'목표 ROAS (3.5x)',data:_chartDates.map(()=>TARGET_ROAS),borderColor:'rgba(100,100,100,0.45)',borderWidth:1.5,borderDash:[5,4],pointRadius:0,fill:false,tension:0}
+      ]},
+      options:{...baseOpts(),scales:{x:{grid:{color:CC.grid},ticks:{color:CC.text,maxRotation:45,font:{size:10}}},y:{grid:{color:CC.grid},ticks:{color:CC.text,font:{size:10}},suggestedMin:0}}}
+    });
+  }
+}
+
+// legacy switchChartTab kept as no-op (HTML references removed)
+function switchChartTab(){}
+
+
+// ─── PROGRESS TAB ────────────────────────
+let progMode = 'month';
+function switchProgTab(mode){
+  progMode = mode;
+  const mBtn = document.getElementById('prog-tab-month');
+  const yBtn = document.getElementById('prog-tab-year');
+  const mSel = document.getElementById('progMonthSelect');
+  const on  = 'background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3);font-weight:700;';
+  const off = 'background:transparent;color:var(--text3);font-weight:600;';
+  if(mBtn) mBtn.style.cssText = mBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (mode==='month'?on:off);
+  if(yBtn) yBtn.style.cssText = yBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (mode==='year'?on:off);
+  if(mSel) mSel.style.display = mode==='month' ? '' : 'none';
+  updateProgressBar(getParsed());
+}
+
+function buildRankingData(d){
+  const byP = {};
+  d.forEach(r=>{
+    if(!byP[r.product]) byP[r.product]={rev:0,cost:0};
+    byP[r.product].rev+=r.revenue; byP[r.product].cost+=r.adcost;
+  });
+  window._rankingData = Object.entries(byP)
+    .map(([name,v])=>({name,rev:v.rev,roas:v.cost>0?v.rev/v.cost:0}))
+    .sort((a,b)=>b.rev-a.rev);
+}
+
+
+// ─── PROGRESS BAR ────────────────────────
+function formatGoalInput(el){
+  const raw=el.value.replace(/[^0-9]/g,'');
+  const num=parseInt(raw,10);
+  el.value=raw?num.toLocaleString():'';
+  const preview=document.getElementById('goalPreview');
+  if(num>=1e8) preview.textContent=`= ${(num/1e8).toFixed(2)}억 원`;
+  else if(num>=1e4) preview.textContent=`= ${(num/1e4).toFixed(0)}만 원`;
+  else preview.textContent=num>0?`= ${num.toLocaleString()}원`:'';
+}
+function applyGoal(){
+  const raw=document.getElementById('goalInput').value.replace(/[^0-9]/g,'');
+  const val=parseFloat(raw)||0;
+  goalRevenue=val;
+  const d=getParsed();
+  updateProgressBar(d);
+  saveAdData();
+  toast('✅ 목표 매출이 설정되었습니다');
+}
+function updateProgressBar(d){
+  const now = new Date();
+  const yearSel = document.getElementById('progYearSelect');
+  const selYear = yearSel ? parseInt(yearSel.value)||now.getFullYear() : now.getFullYear();
+  let rev, periodLabel;
+
+  if(progMode === 'month'){
+    const m = parseInt(document.getElementById('progMonthSelect').value, 10);
+    const tM = `${selYear}-${String(m).padStart(2,'0')}`;
+    rev = d.filter(r=>r.date.startsWith(tM)).reduce((s,r)=>s+r.revenue,0);
+    periodLabel = `${selYear}년 ${m}월`;
+  } else {
+    rev = d.filter(r=>r.date.startsWith(String(selYear))).reduce((s,r)=>s+r.revenue,0);
+    periodLabel = `${selYear}년`;
+  }
+
+  if(rev === 0) rev = d.reduce((s,r)=>s+r.revenue,0);
+
+  const goal = goalRevenue||0;
+  document.getElementById('prog-current').textContent = fmtW(rev);
+  document.getElementById('prog-target').textContent = goal>0 ? fmtW(goal) : '미설정';
+  document.getElementById('prog-period-label').textContent = periodLabel;
+
+  if(!goal){
+    document.getElementById('prog-pct').innerHTML='—<span>%</span>';
+    document.getElementById('prog-fill').style.width='0%';
+    document.getElementById('prog-remain').textContent='목표 매출을 설정해주세요';
+    document.getElementById('prog-status').innerHTML='';
+    return;
+  }
+  const pct = Math.min((rev/goal)*100, 100);
+  const fill = document.getElementById('prog-fill');
+  fill.style.width = pct+'%';
+  fill.className = 'progress-fill'+(pct>=100?' done':pct>=75?' over75':pct>=50?' over50':'');
+  document.getElementById('prog-pct').innerHTML = pct.toFixed(1)+'<span>%</span>';
+
+  const remain = goal - rev;
+  document.getElementById('prog-remain').textContent = remain>0 ? `목표까지 ${fmtW(remain)} 남음` : '🎉 목표 달성!';
+  let st = '';
+  if(pct>=100) st='<span style="color:var(--green);font-weight:700;font-size:11px">✅ 초과 달성</span>';
+  else if(pct>=75) st='<span style="color:var(--blue);font-weight:700;font-size:11px">📈 75% 돌파</span>';
+  else if(pct>=50) st='<span style="color:var(--blue);font-size:11px">50% 달성</span>';
+  else st='<span style="color:var(--text3);font-size:11px">진행 중</span>';
+  document.getElementById('prog-status').innerHTML = st;
+}
+
+// ─── CHARTS ──────────────────────────────
+const CC={blue:'#3182f6',green:'#05c072',red:'#f04452',yellow:'#f5a623',orange:'#f5762a',grid:'rgba(232,236,244,1)',text:'#8b95a1'};
+let rankPage=1; const RANK_PER_PAGE=5;
+
+function baseOpts(){
+  return{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        backgroundColor:'#fff',borderColor:'#e8ecf4',borderWidth:1,
+        titleColor:'#191f28',bodyColor:'#4e5968',padding:12,
+        titleFont:{size:12,weight:'600'},bodyFont:{size:12},
+        callbacks:{
+          label:ctx=>{
+            const v=ctx.parsed.y;
+            if(v===null||v===undefined) return '';
+            const lbl=ctx.dataset.label||'';
+            if(lbl.includes('ROAS')||lbl.includes('목표')) return ` ${lbl}: ${typeof v==='number'?v.toFixed(2)+'x':v}`;
+            return ` ${lbl}: ${typeof v==='number'?Math.round(v).toLocaleString()+'원':v}`;
+          }
+        }
+      }
+    },
+    scales:{x:{grid:{color:CC.grid},ticks:{color:CC.text,maxRotation:45,font:{size:10}}},y:{grid:{color:CC.grid},ticks:{color:CC.text,font:{size:10}}}}
+  };
+}
+function mkChart(id,config){if(charts[id]){charts[id].destroy();delete charts[id];}const ctx=document.getElementById(id);if(!ctx)return;charts[id]=new Chart(ctx,config);}
+
+function renderCharts(d){
+  if(!d.length)return;
+  // 전체 데이터 저장 후 현재 선택된 기간으로 필터링해서 차트/랭킹 업데이트
+  applyDataPeriod();
+}
+
+function renderChartsFiltered(d){
+  if(!d.length)return;
+  const byDate={};
+  d.forEach(r=>{const k=r.date||'미분류';if(!byDate[k])byDate[k]={rev:0,cost:0};byDate[k].rev+=r.revenue;byDate[k].cost+=r.adcost;});
+  _chartDates=Object.keys(byDate).sort();
+  _chartRev=_chartDates.map(k=>byDate[k].rev);
+  _chartCost=_chartDates.map(k=>byDate[k].cost);
+  _chartRoas=_chartDates.map(k=>byDate[k].cost>0?+(byDate[k].rev/byDate[k].cost).toFixed(2):null);
+  if(mainTab==='rev')  buildMainChart('rev');
+  if(mainTab==='roas') buildMainChart('roas');
+}
+
+// ─── RANKING LIST ────────────────────────
+function renderRankingList(page){
+  if(page!==undefined) rankPage=page;
+  const all=window._rankingData||[];
+
+  // 데이터 없으면 빈 상태 표시
+  if(!all.length){
+    const el=document.getElementById('rankingList');
+    if(el) el.innerHTML='<div style="padding:32px;text-align:center;color:var(--text4);font-size:13px">데이터가 없습니다. 파일을 업로드하거나 샘플 데이터를 로드해주세요.</div>';
+    const pg=document.getElementById('rankingPagination'); if(pg) pg.innerHTML='';
+    const pi=document.getElementById('rankingPageInfo'); if(pi) pi.textContent='';
+    return;
+  }
+
+  const maxRev=all[0].rev;
+  const medals=['🥇','🥈','🥉'];
+  const roasCls=r=>r>=4?'great':r>=3?'mid':'low';
+  const roasColor=r=>r>=4?CC.green:r>=3?CC.orange:CC.red;
+  const roasLabel=r=>r>=4?`${fmtR(r)} ✦`:r>=3?`${fmtR(r)} ●`:`${fmtR(r)} ▼`;
+
+  // podium: top 3
+  const podiumHTML=all.slice(0,3).map((p,i)=>`
+    <div class="rank-podium-item rank${i+1}">
+      <div class="rank-medal">${medals[i]}</div>
+      <div class="rank-name">${p.name}</div>
+      <div class="rank-revenue">${fmt(p.rev)}원</div>
+      ${p.roas>0?`<span class="rank-roas-badge roas-badge ${roasCls(p.roas)}" style="background:${roasCls(p.roas)==='great'?'var(--green-bg)':roasCls(p.roas)==='mid'?'var(--orange-bg)':'var(--red-bg)'};color:${roasColor(p.roas)}">${roasLabel(p.roas)}</span>`:''}
+    </div>`).join('');
+
+  // list: 4위부터 페이지네이션
+  const rest=all.slice(3);
+  const totalPages=Math.max(1,Math.ceil(rest.length/RANK_PER_PAGE));
+  rankPage=Math.min(rankPage,totalPages);
+  const slice=rest.slice((rankPage-1)*RANK_PER_PAGE, rankPage*RANK_PER_PAGE);
+  const startRank=3+(rankPage-1)*RANK_PER_PAGE+1;
+
+  const listHTML=slice.map((p,i)=>{
+    const pct=Math.min(p.rev/maxRev*100,100);
+    return `<div class="rank-list-item">
+      <div class="rank-num">${startRank+i}</div>
+      <div class="rank-list-name">${p.name}</div>
+      <div class="rank-list-bar-wrap">
+        <div class="rank-list-bar-track"><div class="rank-list-bar-fill" style="width:${pct}%;background:${roasColor(p.roas)}"></div></div>
+      </div>
+      ${p.roas>0?`<span class="rank-roas-badge roas-badge ${roasCls(p.roas)}" style="background:${roasCls(p.roas)==='great'?'var(--green-bg)':roasCls(p.roas)==='mid'?'var(--orange-bg)':'var(--red-bg)'};color:${roasColor(p.roas)};font-size:11px">${roasLabel(p.roas)}</span>`:'<span></span>'}
+      <div class="rank-list-rev">${fmt(p.rev)}원</div>
+    </div>`;
+  }).join('');
+
+  // pagination: ‹ 슬라이딩 윈도우(최대5) › 무한
+  const WINDOW=5;
+  let winStart=Math.max(1, Math.min(rankPage-Math.floor(WINDOW/2), totalPages-WINDOW+1));
+  winStart=Math.max(1,winStart);
+  const winEnd=Math.min(winStart+WINDOW-1, totalPages);
+
+  let pgHTML='';
+  pgHTML+=`<button class="rank-page-btn" onclick="renderRankingList(${Math.max(1,rankPage-1)})" ${rankPage===1?'disabled style="opacity:.35;cursor:default"':''}>‹</button>`;
+  if(winStart>1){
+    pgHTML+=`<button class="rank-page-btn" onclick="renderRankingList(1)">1</button>`;
+    if(winStart>2) pgHTML+=`<span style="font-size:11px;color:var(--text3);padding:0 1px;align-self:center">…</span>`;
+  }
+  for(let i=winStart;i<=winEnd;i++){
+    pgHTML+=`<button class="rank-page-btn ${i===rankPage?'active':''}" onclick="renderRankingList(${i})">${i}</button>`;
+  }
+  if(winEnd<totalPages){
+    if(winEnd<totalPages-1) pgHTML+=`<span style="font-size:11px;color:var(--text3);padding:0 1px;align-self:center">…</span>`;
+    pgHTML+=`<button class="rank-page-btn" onclick="renderRankingList(${totalPages})">${totalPages}</button>`;
+  }
+  pgHTML+=`<button class="rank-page-btn" onclick="renderRankingList(${Math.min(totalPages,rankPage+1)})" ${rankPage===totalPages?'disabled style="opacity:.35;cursor:default"':''}>›</button>`;
+
+  const piEl=document.getElementById('rankingPageInfo');
+  if(piEl) piEl.textContent=rest.length>0?`${rankPage}/${totalPages}p`:'';
+  const pgEl=document.getElementById('rankingPagination');
+  if(pgEl) pgEl.innerHTML=pgHTML;
+  // ── 올해 베스트 상품 (전체 데이터 기준 연도 1위) ──
+  const now2 = new Date();
+  const rySel2 = document.getElementById('rankYearSelect');
+  const bestYear = rySel2 ? (rySel2.value||String(now2.getFullYear())) : String(now2.getFullYear());
+  const fullParsed = getParsed();
+  const yearData = fullParsed.filter(r=>r.date.startsWith(bestYear));
+  const yearByP = {};
+  yearData.forEach(r=>{if(!yearByP[r.product])yearByP[r.product]=0; yearByP[r.product]+=r.revenue;});
+  const bestEntries = Object.entries(yearByP).sort((a,b)=>b[1]-a[1]);
+  const bestName = bestEntries[0]?.[0] || '—';
+  const bestRev  = bestEntries[0]?.[1] || 0;
+
+  const bestCardHTML = `
+    <div style="background:linear-gradient(135deg,#ebf2ff 0%,#f0f6ff 100%);border:1.5px solid var(--blue-m);border-radius:var(--rl);padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:14px">
+      <div style="font-size:28px;flex-shrink:0">🏆</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;font-weight:700;color:var(--blue);letter-spacing:.6px;text-transform:uppercase;margin-bottom:3px">${bestYear}년 베스트 상품</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${bestName}</div>
+        <div style="font-size:12px;font-weight:600;color:var(--blue-dark);margin-top:2px">${fmt(bestRev)}원</div>
+      </div>
+      <span style="background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;white-space:nowrap;flex-shrink:0">연간 1위 🥇</span>
+    </div>`;
+
+  const listEl=document.getElementById('rankingList');
+  if(listEl) listEl.innerHTML=`
+    ${bestCardHTML}
+    <div class="rank-podium">${podiumHTML}</div>
+    <div class="rank-list">${listHTML||'<div style="padding:12px;color:var(--text4);font-size:13px;text-align:center">4위 이하 상품 없음</div>'}</div>`;
+}
+
+
+// ─── AD DETAIL PERIOD ────────────────────
+let adDetailPeriodMode = 'month';
+
+function switchAdDetailPeriod(mode){
+  adDetailPeriodMode = mode;
+  const mBtn = document.getElementById('ad-detail-tab-month');
+  const yBtn = document.getElementById('ad-detail-tab-year');
+  const mSel = document.getElementById('adDetailMonthSelect');
+  const on  = 'background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3);font-weight:700;';
+  const off = 'background:transparent;color:var(--text3);font-weight:600;';
+  if(mBtn) mBtn.style.cssText = mBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (mode==='month'?on:off);
+  if(yBtn) yBtn.style.cssText = yBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (mode==='year'?on:off);
+  // 년도는 항상 표시, 월은 월별 모드만
+  if(mSel) mSel.style.display = mode==='month' ? '' : 'none';
+  renderAdTable();
+}
+
+function filterAdDetailRows(daily){
+  const ySel = document.getElementById('adDetailYearSelect');
+  const mSel = document.getElementById('adDetailMonthSelect');
+  const entries = Object.entries(daily);
+  if(!entries.length) return [];
+  const selYear = ySel ? (ySel.value||'') : '';
+  const m = mSel ? parseInt(mSel.value,10)||1 : 1;
+  if(!selYear) return entries.sort((a,b)=>a[0]>b[0]?1:-1);
+  const prefix = `${selYear}-${String(m).padStart(2,'0')}`;
+  return entries.filter(([d])=>d.startsWith(prefix)).sort((a,b)=>a[0]>b[0]?1:-1);
+}
+
+
+function renderAdTable(){
+  const d = getParsed();
+  const search     = ((document.getElementById('adSearch')||{}).value||'').toLowerCase().trim();
+  const campSearch = ((document.getElementById('adCampSearch')||{}).value||'').toLowerCase().trim();
+  const sortK      = ((document.getElementById('adSort')||{}).value||'');
+  const marginInput = 0;
+
+  // 상품별 집계
+  const byProd = {};
+  d.forEach(r=>{
+    if(search && !r.product.toLowerCase().includes(search)) return;
+    if(!byProd[r.product]) byProd[r.product]={
+      product:r.product,
+      campaign: r.campaign || r.product.split(' ').slice(0,2).join(' '),
+      adcost:0,imp:0,clicks:0,conv:0,revenue:0,marginPerUnit:0,daily:{}
+    };
+    const p=byProd[r.product];
+    p.adcost+=r.adcost;p.imp+=r.imp;p.clicks+=r.clicks;p.conv+=r.conv;p.revenue+=r.revenue;
+    if(r.marginPerUnit>0) p.marginPerUnit=r.marginPerUnit; // 가장 최근 마진값 사용
+    if(r.date){
+      if(!p.daily[r.date])p.daily[r.date]={adcost:0,imp:0,clicks:0,conv:0,revenue:0};
+      const dd=p.daily[r.date];
+      dd.adcost+=r.adcost;dd.imp+=r.imp;dd.clicks+=r.clicks;dd.conv+=r.conv;dd.revenue+=r.revenue;
+    }
+  });
+
+  let rows=Object.values(byProd);
+  // 캠페인명 검색 필터
+  if(campSearch) rows=rows.filter(r=>r.campaign.toLowerCase().includes(campSearch));
+
+  rows.forEach(r=>{
+    r.ctr=r.imp>0?r.clicks/r.imp*100:0;
+    r.cvr=r.clicks>0?r.conv/r.clicks*100:0;
+    r.roas=r.adcost>0?r.revenue/r.adcost:0;
+    r.salesQty=r.conv;
+    r.netProfit=r.marginPerUnit>0?(r.marginPerUnit*r.salesQty):(r.revenue*0.30);
+    r.netMinusAd=r.netProfit-r.adcost;
+  });
+
+  if(sortK==='revenue')    rows.sort((a,b)=>b.revenue-a.revenue);
+  else if(sortK==='roas')  rows.sort((a,b)=>b.roas-a.roas);
+  else if(sortK==='adcost')rows.sort((a,b)=>b.adcost-a.adcost);
+  else if(sortK==='net')   rows.sort((a,b)=>b.netMinusAd-a.netMinusAd);
+  else rows.sort((a,b)=>b.revenue-a.revenue);
+
+  const total=Math.ceil(rows.length/PAGE),page=Math.min(adPage,total||1);
+  const slice=rows.slice((page-1)*PAGE,page*PAGE);
+
+  if(!slice.length){
+    document.getElementById('adTableBody').innerHTML='<tr class="empty-row"><td colspan="15">검색된 상품이 없습니다.</td></tr>';
+    renderPagination('adPagination',page,total,p=>{adPage=p;renderAdTable();});
+    return;
+  }
+
+  let html='';
+  slice.forEach((row,idx)=>{
+    const rowId=`ad-${page}-${idx}`;
+    const rc=row.roas>=TARGET_ROAS?'var(--green)':row.roas>=1?'var(--yellow)':'var(--red)';
+    const nc=row.netMinusAd>=0?'var(--green)':'var(--red)';
+
+    // 요약 행 — 이미지와 동일한 컬럼 순서·색상
+    html+=`<tr onclick="toggleCampaignRow('${rowId}')" style="cursor:pointer;background:var(--white)">
+      <td style="text-align:center;padding:11px 8px"><button class="expand-btn" id="btn-${rowId}">▼</button></td>
+      <td style="padding:11px 14px;font-weight:700;color:var(--blue);font-size:13px">${row.product}</td>
+      <td style="padding:11px 14px;color:var(--text2);font-size:13px">${row.campaign}</td>
+      <td class="mono" style="padding:11px 14px;font-weight:700">${row.adcost>0?fmtW(row.adcost):'—'}</td>
+      <td class="mono" style="padding:11px 14px;white-space:nowrap;font-weight:700">${fmt(row.imp)}</td>
+      <td class="mono" style="padding:11px 14px;font-weight:700">${fmt(row.clicks)}</td>
+      <td class="mono" style="padding:11px 14px;font-weight:700">${fmtP(row.ctr)}</td>
+      <td class="mono" style="padding:11px 14px;font-weight:700">${fmt(row.conv)}</td>
+      <td class="mono" style="padding:11px 14px;font-weight:700">${fmtP(row.cvr)}</td>
+      <td class="mono" style="padding:11px 14px;color:var(--blue);font-weight:700">${fmtW(row.revenue)}</td>
+      <td class="mono" style="padding:11px 14px;color:${rc};font-weight:700">${row.roas>0?fmtR(row.roas):'—'}</td>
+      <td class="mono" style="padding:11px 14px;font-weight:700">${row.marginPerUnit>0?fmtW(row.marginPerUnit):'—'}</td>
+      <td class="mono" style="padding:11px 14px;font-weight:700">${fmt(row.salesQty)}</td>
+      <td class="mono" style="padding:11px 14px;color:var(--green);font-weight:700">${fmtW(row.netProfit)}</td>
+      <td class="mono" style="padding:11px 14px;color:${nc};font-weight:700">${fmtW(row.netMinusAd)}</td>
+    </tr>`;
+
+    // 펼침 행들을 직접 tbody에 삽입
+    const filteredDaily = filterAdDetailRows(row.daily);
+    html+=`<tr class="campaign-products-row" id="row-${rowId}" style="display:none"><td colspan="15" style="padding:0;border:none"></td></tr>`;
+    if(filteredDaily.length){
+      filteredDaily.forEach(([date,dd])=>{
+        const dctr=dd.imp>0?dd.clicks/dd.imp*100:0;
+        const dcvr=dd.clicks>0?dd.conv/dd.clicks*100:0;
+        const droas=dd.adcost>0?dd.revenue/dd.adcost:0;
+        const dnet=row.marginPerUnit>0?(row.marginPerUnit*dd.conv):(dd.revenue*0.30);
+        const dnetMad=dnet-dd.adcost;
+        const drc=droas>=TARGET_ROAS?'var(--green)':droas>=1?'var(--yellow)':'var(--red)';
+        const dnc=dnetMad>=0?'var(--green)':'var(--red)';
+        html+=`<tr class="detail-row-${rowId}" style="display:none;background:var(--white);border-bottom:1px solid var(--border)">
+          <td style="padding:9px 8px"></td>
+          <td style="padding:9px 14px;white-space:nowrap;font-size:12px;color:var(--text2)">📅 ${date}</td>
+          <td style="padding:9px 14px"></td>
+          <td class="mono" style="padding:9px 14px;font-size:12px">${dd.adcost>0?fmtW(dd.adcost):'—'}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px;white-space:nowrap">${dd.imp.toLocaleString()}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px">${fmt(dd.clicks)}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px">${fmtP(dctr)}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px">${fmt(dd.conv)}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px">${fmtP(dcvr)}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px;color:var(--blue)">${fmtW(dd.revenue)}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px;color:${drc}">${droas>0?fmtR(droas):'—'}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px">${row.marginPerUnit>0?fmtW(row.marginPerUnit):'—'}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px">${fmt(dd.conv)}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px;color:var(--green)">${fmtW(dnet)}</td>
+          <td class="mono" style="padding:9px 14px;font-size:12px;color:${dnc}">${fmtW(dnetMad)}</td>
+        </tr>`;
+      });
+    } else {
+      html+=`<tr class="detail-row-${rowId}" style="display:none"><td colspan="15" style="padding:14px;color:var(--text4);text-align:center;font-size:12px">해당 기간 데이터 없음</td></tr>`;
+    }
+  });
+
+  document.getElementById('adTableBody').innerHTML=html;
+  renderPagination('adPagination',page,total,p=>{adPage=p;renderAdTable();});
+}
+
+function toggleCampaignRow(id){
+  const marker=document.getElementById('row-'+id);
+  const btn=document.getElementById('btn-'+id);
+  if(!marker)return;
+  const detailRows=document.querySelectorAll('.detail-row-'+id);
+  const isOpen=detailRows.length>0 && detailRows[0].style.display!=='none';
+  detailRows.forEach(r=>r.style.display=isOpen?'none':'table-row');
+  if(btn)btn.classList.toggle('open',!isOpen);
+}
+
+function clearAdFilter(){
+  const s=document.getElementById('adSearch');if(s)s.value='';
+  const c=document.getElementById('adCampSearch');if(c)c.value='';
+  const t=document.getElementById('adSort');if(t)t.value='';
+  adPage=1;renderAdTable();
+}
+
+function openAddAdRow(){
+  const form=document.getElementById('adAddForm');
+  form.style.display = form.style.display==='none' ? 'flex' : 'none';
+}
+
+function confirmAddAdRow(){
+  const prod    = (document.getElementById('addProd').value||'').trim();
+  const camp    = (document.getElementById('addCamp').value||'').trim();
+  const date    = document.getElementById('addDate').value||'';
+  const imp     = parseInt(document.getElementById('addImp').value)||0;
+  const clicks  = parseInt(document.getElementById('addClicks').value)||0;
+  const conv    = parseInt(document.getElementById('addConv').value)||0;
+  const revenue = parseFloat(document.getElementById('addRevenue').value)||0;
+  const adcost  = parseFloat(document.getElementById('addAdcost').value)||0;
+  const margin  = parseFloat(document.getElementById('addMargin').value)||0;
+  if(!prod){ toast('⚠️ 상품명을 입력해주세요'); return; }
+  if(!date){ toast('⚠️ 날짜를 입력해주세요'); return; }
+  const row={'날짜':date,'상품명':prod,'캠페인명':camp,'노출수':imp,'클릭수':clicks,'전환수':conv,'수익':revenue,'광고비':adcost,'개당마진':margin};
+  allData.push(row);
+  ['addProd','addCamp','addDate','addImp','addClicks','addConv','addRevenue','addAdcost','addMargin'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('adAddForm').style.display='none';
+  updateAll();
+  toast(`✅ "${prod}" 행이 추가됐습니다`);
+}
+
+function handleAdExcelUpload(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      let rows=[];
+      if(file.name.endsWith('.csv')) rows=parseCSV(ev.target.result);
+      else{ const wb=XLSX.read(ev.target.result,{type:'array'}); rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}); }
+      if(!rows.length){toast('⚠️ 데이터가 없습니다');return;}
+      allData=[...allData,...rows];
+      updateAll();
+      toast(`✅ ${file.name} — ${rows.length}행 추가 완료`);
+    }catch(err){toast('❌ 오류: '+err.message);}
+  };
+  if(file.name.endsWith('.csv')) reader.readAsText(file,'utf-8');
+  else reader.readAsArrayBuffer(file);
+  e.target.value='';
+}
+
+
+
+
+// ─── SALES ───────────────────────────────
+function renderSales(d){
+  const byM={};
+  d.forEach(r=>{const k=r.date.slice(0,7)||'미분류';if(!byM[k])byM[k]={orders:0,rev:0,cost:0};byM[k].orders+=r.conv;byM[k].rev+=r.revenue;byM[k].cost+=r.adcost;});
+  const months=Object.keys(byM).sort();
+  // monthly bar chart
+  mkChart('chartMonthly',{type:'bar',data:{labels:months,datasets:[{label:'매출',data:months.map(k=>byM[k].rev),backgroundColor:'rgba(49,130,246,0.8)',borderRadius:4},{label:'광고비',data:months.map(k=>byM[k].cost),backgroundColor:'rgba(240,68,82,0.5)',borderRadius:4}]},options:baseOpts()});
+  document.getElementById('salesTableBody').innerHTML=months.length?months.map((m,i)=>{
+    const c=byM[m],p=i>0?byM[months[i-1]]:null;
+    const chg=p&&p.rev>0?(c.rev-p.rev)/p.rev*100:null;
+    const roas=c.cost>0?c.rev/c.cost:0, net=c.rev-c.cost;
+    return `<tr><td class="mono">${m}</td><td class="mono">${fmt(c.orders)}</td><td class="mono primary">${fmtW(c.rev)}</td><td class="mono">${c.cost>0?fmtW(c.cost):'—'}</td><td class="mono" style="color:${net>=0?'var(--green)':'var(--red)'}">${fmtW(net)}</td><td class="mono">${roas>0?fmtR(roas):'—'}</td><td>${chg!==null?`<span class="${chg>=0?'t-up':'t-down'}">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(1)}%</span>`:'<span class="t-flat">—</span>'}</td></tr>`;
+  }).join(''):'<tr class="empty-row"><td colspan="7">데이터가 없습니다</td></tr>';
+}
+
+// ─── PRODUCT TABLE ───────────────────────
+function renderProductTable(){
+  const search=document.getElementById('prodSearch').value.toLowerCase();
+  const sortK=document.getElementById('prodSort').value||'revenue';
+  const d=getParsed();
+  const byP={};
+  d.forEach(r=>{if(!byP[r.product])byP[r.product]={imp:0,clicks:0,conv:0,rev:0,cost:0,dates:{}};const p=byP[r.product];p.imp+=r.imp;p.clicks+=r.clicks;p.conv+=r.conv;p.rev+=r.revenue;p.cost+=r.adcost;if(r.date)p.dates[r.date]=(p.dates[r.date]||0)+r.revenue;});
+  let prods=Object.entries(byP).map(([name,v])=>({name,imp:v.imp,clicks:v.clicks,conv:v.conv,rev:v.rev,cost:v.cost,cvr:v.clicks>0?v.conv/v.clicks*100:0,cpc:v.clicks>0&&v.cost>0?v.cost/v.clicks:0,roas:v.cost>0?v.rev/v.cost:0,dates:v.dates}));
+  if(search) prods=prods.filter(p=>p.name.toLowerCase().includes(search));
+  prods.sort((a,b)=>b[sortK==='revenue'?'rev':sortK]-a[sortK==='revenue'?'rev':sortK]);
+  const maxRoas=Math.max(...prods.map(p=>p.roas),1);
+
+  document.getElementById('prodTableBody').innerHTML=prods.length?prods.map((p,i)=>{
+    const pct=Math.min(p.roas/maxRoas*100,100);
+    const cls=p.roas>=4?'great':p.roas>=3?'mid':'low';
+    const badgeTxt=p.roas>=4?'✦ 4x↑':p.roas>=3?'● 3x대':'▼ 저효율';
+    const ds=JSON.stringify(p.dates).replace(/"/g,"'");
+    return `<tr onclick="selectProduct('${p.name.replace(/'/g,"\\'")}',${ds})" style="cursor:pointer">
+      <td class="mono" style="color:var(--text3)">${i+1}</td>
+      <td class="name">${p.name}</td>
+      <td class="mono">${fmt(p.imp)}</td>
+      <td class="mono">${fmt(p.conv)}</td>
+      <td class="mono">${fmtP(p.cvr)}</td>
+      <td class="mono primary">${fmtW(p.rev)}</td>
+      <td class="mono">${p.cost>0?fmtW(p.cost):'—'}</td>
+      <td class="mono">${p.cpc>0?fmtW(p.cpc):'—'}</td>
+      <td class="mono">${p.roas>0?fmtR(p.roas):'—'}</td>
+      <td><span class="roas-badge ${cls}">${badgeTxt}</span></td>
+      <td><div class="roas-bar"><div class="roas-track"><div class="roas-fill ${cls}" style="width:${pct}%"></div></div><span class="roas-val">${p.roas>0?fmtR(p.roas):''}</span></div></td>
+    </tr>`;
+  }).join(''):'<tr class="empty-row"><td colspan="11">데이터가 없습니다</td></tr>';
+  // ROAS bar chart
+  const pRoas=prods.filter(p=>p.cost>0).slice(0,10);
+  mkChart('chartProdRoas',{type:'bar',data:{labels:pRoas.map(x=>x.name.length>12?x.name.slice(0,12)+'…':x.name),datasets:[{label:'ROAS',data:pRoas.map(x=>x.roas),backgroundColor:pRoas.map(x=>x.roas>=4?CC.green:x.roas>=3?CC.orange:CC.red),borderRadius:4}]},options:baseOpts()});
+}
+function selectProduct(name,dates){
+  document.getElementById('selectedProdName').textContent=name;
+  document.querySelectorAll('#prodTableBody tr').forEach(tr=>tr.classList.toggle('selected',tr.querySelector('.name')?.textContent===name));
+  const sorted=Object.entries(dates).sort((a,b)=>a[0]>b[0]?1:-1).slice(-20);
+  mkChart('chartProdTrend',{type:'line',data:{labels:sorted.map(x=>x[0]),datasets:[{label:name,data:sorted.map(x=>x[1]),borderColor:CC.blue,backgroundColor:'rgba(49,130,246,0.08)',fill:true,tension:0.4,pointRadius:3,borderWidth:2}]},options:baseOpts()});
+}
+
+// ─── RAW TABLE ───────────────────────────
+function renderRawTable(){
+  if(!allData.length){document.getElementById('rawHead').innerHTML='';document.getElementById('rawBody').innerHTML='<tr class="empty-row"><td colspan="5">데이터가 없습니다</td></tr>';document.getElementById('rawCount').textContent='';return;}
+  const headers=Object.keys(allData[0]);
+  const search=document.getElementById('rawSearch').value.toLowerCase();
+  const from=document.getElementById('rawFrom').value, to=document.getElementById('rawTo').value;
+  let rows=allData.filter(r=>{
+    const dk=detectCol(Object.keys(r),COL.date),dv=dk?String(r[dk]):'';
+    if(from&&dv<from)return false;if(to&&dv>to)return false;
+    if(search&&!Object.values(r).some(v=>String(v).toLowerCase().includes(search)))return false;
+    return true;
+  });
+  document.getElementById('rawCount').textContent=`${rows.length.toLocaleString()}건`;
+  const total=Math.ceil(rows.length/PAGE), page=Math.min(rawPage,total||1);
+  const slice=rows.slice((page-1)*PAGE,page*PAGE);
+  document.getElementById('rawHead').innerHTML=headers.map(h=>`<th>${h}</th>`).join('');
+  document.getElementById('rawBody').innerHTML=slice.length?slice.map(r=>`<tr>${headers.map(h=>`<td>${r[h]??''}</td>`).join('')}</tr>`).join(''):'<tr class="empty-row"><td colspan="'+headers.length+'">검색 결과 없음</td></tr>';
+  renderPagination('rawPagination',page,total,p=>{rawPage=p;renderRawTable();});
+}
+function clearRawFilter(){document.getElementById('rawSearch').value='';document.getElementById('rawFrom').value='';document.getElementById('rawTo').value='';rawPage=1;renderRawTable();}
+
+// ─── PAGINATION ──────────────────────────
+function renderPagination(id,current,total,cb){
+  const el=document.getElementById(id);
+  if(total<=1){el.innerHTML='';return;}
+  let html=`<span class="pg-info">${current} / ${total}</span>`;
+  if(current>1) html+=`<button class="pg-btn" onclick="(${cb})(${current-1})">‹</button>`;
+  for(let i=Math.max(1,current-2);i<=Math.min(total,current+2);i++) html+=`<button class="pg-btn ${i===current?'active':''}" onclick="(${cb})(${i})">${i}</button>`;
+  if(current<total) html+=`<button class="pg-btn" onclick="(${cb})(${current+1})">›</button>`;
+  el.innerHTML=html;
+}
+
+// ─── EXPORT ──────────────────────────────
+function exportCSV(){if(!allData.length){toast('⚠️ 내보낼 데이터 없음');return;}const headers=Object.keys(allData[0]);const rows=[headers.join(','),...allData.map(r=>headers.map(h=>JSON.stringify(r[h]??'')).join(','))];const blob=new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`쿠팡광고_${new Date().toISOString().slice(0,10)}.csv`;a.click();toast('📥 CSV 다운로드 완료');}
+
+// ─── MISC ────────────────────────────────
+function showTab(id,el){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  // 연월차 탭 진입 시 데이터 렌더링
+  if(id==='leave'){
+    renderEmployeeList();
+    updateLeaveSelects();
+    renderLeaveTable();
+    updateMaskBtn();
+  }
+}
+function resetData(){if(!confirm('모든 데이터를 삭제합니다. 계속하시겠습니까?'))return;allData=[];uploadHistory=[];_isSampleData=false;updateAll();saveAdData();toast('🗑 초기화 완료');}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
+
+// ─── SAMPLE DATA ─────────────────────────
+function loadSampleData(){
+  // 28개 상품 → 포디움 3개 제외 25개 = 5페이지(5개씩)
+  const products=['4K모니터 27인치'];
+  const rows=[];
+  // 2023년 1월 1일부터 2026년 12월 31일까지 4년치
+  const startDate = new Date(2023,0,1);
+  const endDate   = new Date(2026,11,31);
+  const totalDays = Math.round((endDate-startDate)/(1000*60*60*24))+1;
+  for(let i=0;i<totalDays;i++){
+    const d2=new Date(startDate);d2.setDate(d2.getDate()+i);
+    const ds=d2.toISOString().slice(0,10);
+    products.forEach((p,pi)=>{
+      if(Math.random()<0.7){
+        const imp=Math.floor(Math.random()*5000+400);
+        const clicks=Math.floor(imp*(0.015+Math.random()*0.035));
+        const conv=Math.floor(clicks*(0.03+Math.random()*0.08));
+        const revenue=conv*(1200+Math.floor(Math.random()*10000));
+        let adcostMul=1;
+        if(i===totalDays-1&&(pi===0||pi===3)) adcostMul=1.6;
+        const adcost=Math.floor(clicks*(50+Math.random()*130)*adcostMul);
+        rows.push({날짜:ds,상품명:p,노출수:imp,클릭수:clicks,전환수:conv,수익:revenue,광고비:adcost,개당마진:3500});
+      }
+    });
+  }
+  allData=rows;
+  _isSampleData=true;   // 데모 샘플 — DB에 저장하지 않음
+  uploadHistory=[{name:'샘플데이터.xlsx',rows:rows.length,date:new Date().toLocaleString('ko-KR')}];
+  goalRevenue=120000000;
+  document.getElementById('goalInput').value=(120000000).toLocaleString();
+  document.getElementById('goalPreview').textContent='= 1.20억 원';
+  const curMonth = new Date().getMonth()+1;
+  document.getElementById('progMonthSelect').value = curMonth;
+  const dSel = document.getElementById('dataMonthSelect'); if(dSel) dSel.value = curMonth;
+  const kpiSel = document.getElementById('kpiMonthSelect'); if(kpiSel){ kpiSel.value = curMonth; kpiSel.style.display='none'; }
+  // 년도 드롭다운 동적 생성
+  const yearSet = [...new Set(rows.map(r=>String(r['날짜']).slice(0,4)).filter(y=>y.length===4))].sort();
+  const ySel = document.getElementById('progYearSelect');
+  if(ySel){
+    ySel.innerHTML = yearSet.map(y=>`<option value="${y}">${y}년</option>`).join('');
+    ySel.value = yearSet[yearSet.length-1]||String(new Date().getFullYear());
+  }
+  // 차트용 년도 드롭다운도 동일하게 채우기
+  const dySel = document.getElementById('dataYearSelect');
+  if(dySel){
+    dySel.innerHTML = yearSet.map(y=>`<option value="${y}">${y}년</option>`).join('');
+    dySel.value = yearSet[yearSet.length-1]||String(new Date().getFullYear());
+  }
+  // 광고 상세 년도 드롭다운
+  const adySel = document.getElementById('adDetailYearSelect');
+  if(adySel){
+    adySel.innerHTML = yearSet.map(y=>`<option value="${y}">${y}년</option>`).join('');
+    adySel.value = '2023';
+  }
+  const adMSel = document.getElementById('adDetailMonthSelect');
+  if(adMSel) adMSel.value = 1;
+  // 랭킹 년도 드롭다운
+  const rySel = document.getElementById('rankYearSelect');
+  if(rySel){
+    rySel.innerHTML = ['2023','2024','2025','2026'].map(y=>`<option value="${y}">${y}년</option>`).join('');
+    rySel.value = '2024';
+  }
+  const rkMSel = document.getElementById('rankMonthSelect');
+  if(rkMSel) rkMSel.value = curMonth;
+  updateAll();
+  toast('✅ 샘플 데이터 로드 완료');
+}
+
+
+// ─── 연월차 관리 ─────────────────────────
+const LEAVE_KEY = 'coupang_employees';
+const LEAVE_REC_KEY = 'coupang_leaveRecords';
+const LEAVE_SEQ_KEY = 'coupang_leaveSeq';
+const EMP_SEQ_KEY   = 'coupang_empSeq';
+
+// 날짜 정규화 — loadLeaveData보다 먼저 선언
+function normalizeToISO(dateStr){
+  if(!dateStr) return '';
+  const s = String(dateStr).trim();
+  // YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+  let m = s.match(/^(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
+  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  // MM/DD/YYYY
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  // M/D/YY or MM/DD/YY (두 자리 연도)
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if(m){
+    const yy = parseInt(m[3]);
+    const yyyy = yy >= 0 && yy <= 30 ? 2000+yy : 1900+yy;
+    return `${yyyy}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  }
+  // YYYYMMDD
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return s;
+}
+
+function fmtKorDate(dateStr){
+  if(!dateStr) return '—';
+  const iso = normalizeToISO(dateStr);
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return `${m[1]}년 ${m[2]}월 ${m[3]}일`;
+  return dateStr;
+}
+
+function saveLeaveData(){
+  try{
+    localStorage.setItem(LEAVE_KEY, JSON.stringify(employees));
+    localStorage.setItem(LEAVE_REC_KEY, JSON.stringify(leaveRecords));
+    localStorage.setItem(LEAVE_SEQ_KEY, String(leaveIdSeq));
+    localStorage.setItem(EMP_SEQ_KEY,   String(empIdSeq));
+  }catch(e){ console.warn('localStorage 저장 실패:', e); }
+  // 클라우드 저장(다른 PC와 공유)
+  cpCloudSave('coupang_leave',{employees,leaveRecords,leaveIdSeq,empIdSeq});
+}
+
+function loadLeaveData(){
+  try{
+    const e = localStorage.getItem(LEAVE_KEY);
+    const r = localStorage.getItem(LEAVE_REC_KEY);
+    const ls = localStorage.getItem(LEAVE_SEQ_KEY);
+    const es = localStorage.getItem(EMP_SEQ_KEY);
+    if(e){
+      employees = JSON.parse(e);
+      // 날짜 정규화: 저장된 날짜가 어떤 형식이든 YYYY-MM-DD로 통일
+      employees.forEach(emp=>{
+        if(emp.birth)    emp.birth    = normalizeToISO(emp.birth);
+        if(emp.joinDate) emp.joinDate = normalizeToISO(emp.joinDate);
+      });
+    }
+    if(r){
+      leaveRecords = JSON.parse(r);
+      leaveRecords.forEach(rec=>{
+        if(rec.date) rec.date = normalizeToISO(rec.date);
+      });
+    }
+    if(ls) leaveIdSeq = parseInt(ls)||1;
+    if(es) empIdSeq   = parseInt(es)||1;
+    // 정규화된 데이터 다시 저장
+    if(e||r) saveLeaveData();
+  }catch(e){ console.warn('localStorage 로드 실패:', e); }
+}
+
+let employees = [];
+let leaveRecords = [];
+let leaveIdSeq = 1;
+let empIdSeq = 1;
+let leaveUnit = 'day';
+const WORK_HOURS_PER_DAY = 8;
+
+// 페이지 로드 시 저장된 데이터 복원
+loadLeaveData();
+
+function downloadLeaveTemplate(){
+  // 시트1: 직원 정보
+  const empHeaders = ['이름','연락처','생년월일','입사일자','연차수량'];
+  const empSample = [
+    ['홍길동','010-1234-5678','1990-05-15','2020-03-02','15'],
+    ['김영희','010-9876-5432','1988-11-22','2018-07-01','17'],
+  ];
+
+  // 시트2: 연차 사용 내역
+  const recHeaders = ['이름','날짜','일수','시간','사유'];
+  const recSample = [
+    ['홍길동','2024-01-15','1','','개인 사유'],
+    ['홍길동','2024-03-20','','4','병원 방문'],
+    ['김영희','2024-02-05','0.5','','오전 반차'],
+  ];
+
+  const wb = XLSX.utils.book_new();
+
+  // 직원 정보 시트
+  const empWsData = [empHeaders, ...empSample];
+  const empWs = XLSX.utils.aoa_to_sheet(empWsData);
+  empWs['!cols'] = [{wch:12},{wch:16},{wch:14},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, empWs, '직원정보');
+
+  // 연차 사용 내역 시트
+  const recWsData = [recHeaders, ...recSample];
+  const recWs = XLSX.utils.aoa_to_sheet(recWsData);
+  recWs['!cols'] = [{wch:12},{wch:14},{wch:8},{wch:8},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, recWs, '연차사용내역');
+
+  XLSX.writeFile(wb, '연월차관리_양식.xlsx');
+  toast('📋 양식이 다운로드됐습니다');
+}
+
+function toggleLeaveGuide(){
+  const g=document.getElementById('leaveGuide');
+  g.style.display=g.style.display==='none'?'block':'none';
+}
+
+function handleLeaveExcelUpload(e){
+  const file=e.target.files[0]; if(!file)return;
+  e.target.value='';
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      let empRows=[], recRows=[];
+      if(file.name.endsWith('.csv')){
+        // CSV: 직원+연차 통합 시트로 처리
+        const rows=parseCSV(ev.target.result);
+        parseLeaveSheets([rows],[]);
+      } else {
+        const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+        const sheets=wb.SheetNames.map(n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:'',raw:false}));
+        parseLeaveSheets(sheets, wb.SheetNames);
+      }
+    }catch(err){ toast('❌ 파일 오류: '+err.message); }
+  };
+  if(file.name.endsWith('.csv')) reader.readAsText(file,'utf-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+// 컬럼명 유연 탐지
+function detectLeaveCol(headers, aliases){
+  for(const h of headers){
+    const low=String(h).toLowerCase().replace(/[\s_-]/g,'');
+    if(aliases.some(a=>low.includes(a.toLowerCase().replace(/[\s_-]/g,'')))) return h;
+  }
+  return null;
+}
+
+function normalizeDate(v){
+  if(!v) return '';
+  const s=String(v).trim();
+  // YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+  const m=s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  return s;
+}
+
+function parseLeaveSheets(sheets, sheetNames){
+  let addedEmp=0, addedRec=0;
+
+  const EMP_NAME_COLS   =['이름','성명','name','직원명','직원이름'];
+  const EMP_PHONE_COLS  =['연락처','전화','phone','핸드폰','휴대폰','tel'];
+  const EMP_BIRTH_COLS  =['생년월일','생일','birth','birthday','출생'];
+  const EMP_JOIN_COLS   =['입사일','입사일자','joindate','입사','joiningdate','입사날짜'];
+  const EMP_LEAVE_COLS  =['연차수량','연차','총연차','annualleave','totalleave','연차개수','연차총'];
+  const REC_DATE_COLS   =['날짜','사용날짜','연차날짜','date','사용일','사용일자'];
+  const REC_DAYS_COLS   =['일수','사용일수','days','연차일수','사용량','일'];
+  const REC_HOURS_COLS  =['시간','사용시간','hours','연차시간'];
+  const REC_REASON_COLS =['사유','이유','reason','내용','비고'];
+
+  sheets.forEach((rows, si)=>{
+    if(!rows.length) return;
+    const headers=Object.keys(rows[0]);
+
+    // 직원 시트 판별: 이름 + 입사일자 컬럼 있으면
+    const nameCol  = detectLeaveCol(headers, EMP_NAME_COLS);
+    const joinCol  = detectLeaveCol(headers, EMP_JOIN_COLS);
+    const phoneCol = detectLeaveCol(headers, EMP_PHONE_COLS);
+    const birthCol = detectLeaveCol(headers, EMP_BIRTH_COLS);
+    const leaveCol = detectLeaveCol(headers, EMP_LEAVE_COLS);
+
+    // 연차 사용 시트 판별: 이름 + 날짜 컬럼 있으면
+    const recNameCol  = detectLeaveCol(headers, EMP_NAME_COLS);
+    const recDateCol  = detectLeaveCol(headers, REC_DATE_COLS);
+    const recDaysCol  = detectLeaveCol(headers, REC_DAYS_COLS);
+    const recHoursCol = detectLeaveCol(headers, REC_HOURS_COLS);
+    const recReasonCol= detectLeaveCol(headers, REC_REASON_COLS);
+
+    if(nameCol && joinCol){
+      // 직원 정보 시트
+      rows.forEach(r=>{
+        const name=String(r[nameCol]||'').trim();
+        if(!name) return;
+        // 이미 등록된 직원이면 스킵
+        if(employees.find(e=>e.name===name)) return;
+        const phone=phoneCol?String(r[phoneCol]||'').trim():'';
+        const birth=birthCol?normalizeDate(r[birthCol]):'';
+        const joinDate=normalizeDate(r[joinCol]);
+        const totalLeave=leaveCol?(parseFloat(String(r[leaveCol]).replace(/[일,]/g,''))||calcDefaultLeave(joinDate)):calcDefaultLeave(joinDate);
+        employees.push({id:empIdSeq++,name,phone,birth,joinDate,totalLeave});
+        addedEmp++;
+      });
+    } else if(recNameCol && recDateCol){
+      // 연차 사용 시트
+      rows.forEach(r=>{
+        const name=String(r[recNameCol]||'').trim();
+        const date=normalizeDate(r[recDateCol]);
+        if(!name||!date) return;
+        // 직원 찾기
+        let emp=employees.find(e=>e.name===name);
+        if(!emp) return; // 직원 없으면 스킵
+        const hours=recHoursCol?(parseFloat(String(r[recHoursCol]).replace(/[시간h,]/g,''))||0):0;
+        const days=recDaysCol?(parseFloat(String(r[recDaysCol]).replace(/[일d,]/g,''))||0):0;
+        const reason=recReasonCol?String(r[recReasonCol]||'').trim():'';
+        let unit='day', usedDays=days, displayStr=fmtLeaveDisplay(days,0,'day');
+        if(hours>0 && days===0){
+          unit='hour'; usedDays=hours/WORK_HOURS_PER_DAY;
+          displayStr=fmtLeaveDisplay(0,hours,'hour');
+        }
+        leaveRecords.push({id:leaveIdSeq++,empId:emp.id,date,days,hours,unit,reason,displayStr});
+        addedRec++;
+      });
+    }
+  });
+
+  leaveRecords.sort((a,b)=>b.date.localeCompare(a.date));
+  saveLeaveData();
+  renderEmployeeList();
+  updateLeaveSelects();
+  renderLeaveTable();
+  document.getElementById('leaveGuide').style.display='none';
+  toast(`✅ 직원 ${addedEmp}명, 연차 내역 ${addedRec}건 업로드 완료`);
+}
+
+
+function switchLeaveUnit(unit){
+  leaveUnit = unit;
+  const hourBtn = document.getElementById('leaveUnitHour');
+  const dayField  = document.getElementById('leaveDayField');
+  const hourField = document.getElementById('leaveHourField');
+  const on  = 'background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(49,130,246,.3);font-weight:700;';
+  const off = 'background:transparent;color:var(--text3);font-weight:600;';
+  if(dayBtn)  dayBtn.style.cssText  = dayBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (unit==='day'?on:off);
+  if(hourBtn) hourBtn.style.cssText = hourBtn.style.cssText.replace(/background[^;]+;|color[^;]+;|box-shadow[^;]+;|font-weight[^;]+;/g,'') + (unit==='hour'?on:off);
+  if(dayField)  dayField.style.display  = unit==='day'  ? 'flex' : 'none';
+  if(hourField) hourField.style.display = unit==='hour' ? 'flex' : 'none';
+}
+
+// 시간 입력 시 일수 환산 실시간 표시
+document.addEventListener('input', e=>{
+  if(e.target.id==='leaveHours'){
+    const h = parseFloat(e.target.value)||0;
+    const conv = document.getElementById('leaveHourConvert');
+    if(conv && h>0) conv.textContent = `= ${(h/WORK_HOURS_PER_DAY).toFixed(2)}일`;
+    else if(conv) conv.textContent = '';
+  }
+});
+
+function openAddEmployee(){
+  const f=document.getElementById('leaveAddForm');
+  f.style.display=f.style.display==='none'?'flex':'none';
+  f.style.flexWrap='wrap';
+}
+
+function calcTenure(joinDate){
+  if(!joinDate) return 0;
+  const join=new Date(joinDate), now=new Date();
+  const years=now.getFullYear()-join.getFullYear();
+  const months=now.getMonth()-join.getMonth();
+  return Math.max(0, parseFloat((years+(months/12)).toFixed(1)));
+}
+
+function calcDefaultLeave(joinDate){
+  const tenure=Math.floor(calcTenure(joinDate));
+  if(tenure<1) return 11;
+  if(tenure<3) return 15;
+  if(tenure<5) return 16;
+  if(tenure<7) return 17;
+  if(tenure<9) return 18;
+  if(tenure<11) return 19;
+  return 20;
+}
+
+function confirmAddEmployee(){
+  const name=(document.getElementById('empName').value||'').trim();
+  const phone=(document.getElementById('empPhone').value||'').trim();
+  const birth=document.getElementById('empBirth').value||'';
+  const joinDate=document.getElementById('empJoinDate').value||'';
+  const totalInput=document.getElementById('empLeaveTotal').value;
+  if(!name){toast('⚠️ 이름을 입력해주세요');return;}
+  if(!joinDate){toast('⚠️ 입사일자를 입력해주세요');return;}
+  const totalLeave=totalInput?parseFloat(totalInput):calcDefaultLeave(joinDate);
+  employees.push({id:empIdSeq++,name,phone,birth,joinDate,totalLeave});
+  ['empName','empPhone','empBirth','empJoinDate','empLeaveTotal'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('leaveAddForm').style.display='none';
+  saveLeaveData();
+  renderEmployeeList();
+  updateLeaveSelects();
+  toast(`✅ ${name} 직원이 추가됐습니다`);
+}
+
+function deleteEmployee(id){
+  if(!confirm('직원 및 해당 연차 내역을 삭제합니다. 계속하시겠습니까?'))return;
+  employees=employees.filter(e=>e.id!==id);
+  leaveRecords=leaveRecords.filter(r=>r.empId!==id);
+  saveLeaveData();
+  renderEmployeeList();
+  updateLeaveSelects();
+  renderLeaveTable();
+}
+
+// 사용 연차 합산 (시간은 일수로 환산해서 합산)
+function getUsedLeave(empId){
+  // 모든 사용량을 시간으로 통일 후 일수로 반환 (1일=8시간, 정밀 계산)
+  const totalHours = leaveRecords.filter(r=>r.empId===empId).reduce((s,r)=>{
+    if(r.unit==='hour') return s + (r.hours||0);
+    return s + (r.days||0) * WORK_HOURS_PER_DAY;
+  },0);
+  return totalHours / WORK_HOURS_PER_DAY;
+}
+
+// 사용량/잔여량을 표시용 문자열로 변환 (1일=8시간)
+function fmtLeaveDisplay(days, hours, unit){
+  let totalH;
+  if(unit==='hour'){
+    // 시간 단위 입력
+    totalH = Math.round((hours||0) * 10) / 10;
+  } else {
+    // 일 단위 입력 또는 계산값(_calc)
+    totalH = Math.round((days||0) * WORK_HOURS_PER_DAY * 10) / 10;
+  }
+  const d = Math.floor(totalH / WORK_HOURS_PER_DAY);
+  const h = Math.round(totalH % WORK_HOURS_PER_DAY);
+  if(d > 0 && h > 0) return `${d}일 ${h}시간`;
+  if(d > 0) return `${d}일`;
+  if(h > 0) return `${h}시간`;
+  return '0일';
+}
+// 날짜를 YYYY년 MM월 DD일로 변환
+
+function renderEmployeeList(){
+  const el=document.getElementById('employeeList');
+  if(!employees.length){
+    el.innerHTML='<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--text4);font-size:14px">등록된 직원이 없습니다.<br>+ 직원 추가 버튼을 눌러 등록하세요.</div>';
+    return;
+  }
+  el.innerHTML=employees.map(emp=>{
+    const used=getUsedLeave(emp.id);
+    const remain=Math.max(0,emp.totalLeave-used);
+    const pct=emp.totalLeave>0?Math.min(100,(used/emp.totalLeave)*100):0;
+    const tenure=calcTenure(emp.joinDate);
+    const barColor=remain>5?'var(--green)':remain>2?'var(--yellow)':'var(--red)';
+    return `<div class="card" style="padding:16px 18px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--blue-l);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--blue)">${emp.name[0]}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text)">${emp.name}</div>
+            <div style="font-size:11.5px;color:var(--text3)">${maskPhone(emp.phone)}</div>
+          </div>
+        </div>
+        <button onclick="deleteEmployee(${emp.id})" style="border:none;background:transparent;cursor:pointer;color:var(--text4);font-size:16px;padding:4px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;font-size:11.5px">
+        <div style="color:var(--text3)">생년월일 <span style="color:var(--text);font-weight:600">${maskBirth(emp.birth)}</span></div>
+        <div style="color:var(--text3)">입사일 <span style="color:var(--text);font-weight:600">${normalizeToISO(emp.joinDate)}</span></div>
+        <div style="color:var(--text3)">근속연수 <span style="color:var(--blue);font-weight:700">${tenure}년</span></div>
+        <div style="color:var(--text3)">총 연차 <span style="color:var(--text);font-weight:600">${emp.totalLeave}일</span></div>
+      </div>
+      <div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:5px">
+          <span style="color:var(--text3)">사용 <strong style="color:var(--text)">${fmtLeaveDisplay(used,0,'_calc')}</strong></span>
+          <span style="color:var(--text3)">잔여 <strong style="color:${barColor}">${fmtLeaveDisplay(remain,0,'_calc')}</strong></span>
+        </div>
+        <div style="height:8px;background:var(--bg);border-radius:100px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:100px;transition:width .4s"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <div style="flex:1;text-align:center;background:var(--blue-l);border-radius:8px;padding:8px 0">
+          <div style="font-size:11px;color:var(--blue);font-weight:600">사용</div>
+          <div style="font-size:18px;font-weight:800;color:var(--blue)">${fmtLeaveDisplay(used,0,'_calc')}</div>
+        </div>
+        <div style="flex:1;text-align:center;background:${remain>2?'var(--green-bg)':'var(--red-bg)'};border-radius:8px;padding:8px 0">
+          <div style="font-size:11px;color:${remain>2?'var(--green)':'var(--red)'};font-weight:600">잔여</div>
+          <div style="font-size:18px;font-weight:800;color:${remain>2?'var(--green)':'var(--red)'}">${fmtLeaveDisplay(remain,0,'_calc')}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateLeaveSelects(){
+  const opts=`<option value="">-- 선택 --</option>`+employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  const f=document.getElementById('leaveFilterEmp');
+  const s=document.getElementById('leaveEmpSelect');
+  if(s) s.innerHTML=opts;
+  if(f) f.innerHTML=`<option value="">전체 직원</option>`+employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+}
+
+function addLeaveRecord(){
+  const empId=parseInt(document.getElementById('leaveEmpSelect').value)||0;
+  const rawDate=document.getElementById('leaveDate').value||'';
+  const date=normalizeToISO(rawDate);
+  const reason=(document.getElementById('leaveReason').value||'').trim();
+  if(!empId){toast('⚠️ 직원을 선택해주세요');return;}
+  if(!date){toast('⚠️ 날짜를 입력해주세요');return;}
+
+  const emp=employees.find(e=>e.id===empId);
+  if(!emp){toast('⚠️ 직원을 찾을 수 없습니다');return;}
+
+  let days=0, hours=0, usedDays=0, displayStr='';
+
+  if(leaveUnit==='hour'){
+    hours=parseFloat(document.getElementById('leaveHours').value)||0;
+    if(!hours||hours<=0){toast('⚠️ 사용 시간을 입력해주세요');return;}
+    usedDays=hours/WORK_HOURS_PER_DAY;
+    displayStr=fmtLeaveDisplay(0,hours,'hour');
+  } else {
+    days=parseFloat(document.getElementById('leaveDays').value)||0;
+    if(!days||days<=0){toast('⚠️ 사용 일수를 입력해주세요');return;}
+    usedDays=days;
+    displayStr=fmtLeaveDisplay(days,0,'day');
+  }
+
+  const currentUsed=getUsedLeave(empId);
+  if(currentUsed+usedDays>emp.totalLeave){
+    toast(`⚠️ 잔여 연차(${(emp.totalLeave-currentUsed).toFixed(2)}일)를 초과합니다`);return;
+  }
+
+  leaveRecords.push({id:leaveIdSeq++,empId,date,days,hours,unit:leaveUnit,reason,displayStr});
+  leaveRecords.sort((a,b)=>b.date.localeCompare(a.date));
+  ['leaveDate','leaveDays','leaveHours','leaveReason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const conv=document.getElementById('leaveHourConvert');if(conv)conv.textContent='';
+  saveLeaveData();
+  renderEmployeeList();
+  renderLeaveTable();
+  toast(`✅ ${emp.name} — ${displayStr} 연차 등록 완료`);
+}
+
+function deleteLeaveRecord(id){
+  leaveRecords=leaveRecords.filter(r=>r.id!==id);
+  saveLeaveData();
+  renderEmployeeList();
+  renderLeaveTable();
+  toast('🗑 연차 내역이 삭제됐습니다');
+}
+
+function renderLeaveTable(){
+  const filterEmpId=parseInt(document.getElementById('leaveFilterEmp')?.value)||0;
+  let records=filterEmpId?leaveRecords.filter(r=>r.empId===filterEmpId):leaveRecords;
+  const tbody=document.getElementById('leaveTableBody');
+  if(!records.length){
+    tbody.innerHTML='<tr class="empty-row"><td colspan="6">연차 사용 내역이 없습니다</td></tr>';
+    return;
+  }
+  tbody.innerHTML=records.map(r=>{
+    const emp=employees.find(e=>e.id===r.empId);
+    if(!emp)return'';
+    const used=getUsedLeave(emp.id);
+    const remain=Math.max(0,emp.totalLeave-used);
+    // 잔여를 시간 총합으로 계산 후 일+시간으로 표기
+    const remainTotalH = Math.round(remain * WORK_HOURS_PER_DAY * 10) / 10;
+    const remainD = Math.floor(remainTotalH / WORK_HOURS_PER_DAY);
+    const remainRH = Math.round(remainTotalH % WORK_HOURS_PER_DAY);
+    const remainStr = remainD>0&&remainRH>0 ? remainD+'일 '+remainRH+'시간' : remainD>0 ? remainD+'일' : remainRH>0 ? remainRH+'시간' : '0일';
+    return `<tr>
+      <td class="name">${emp.name}</td>
+      <td class="mono">${normalizeToISO(r.date)}</td>
+      <td class="mono">${fmtLeaveDisplay(r.days,r.hours,r.unit)}</td>
+      <td>${r.reason||'—'}</td>
+      <td class="mono" style="color:${remain>5?'var(--green)':remain>2?'var(--yellow)':'var(--red)'};font-weight:700">${remainStr}</td>
+      <td style="text-align:center"><button onclick="deleteLeaveRecord(${r.id})" style="border:none;background:transparent;cursor:pointer;color:var(--text4);font-size:14px;padding:2px 6px" title="삭제">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+// ─── 초기화: 클라우드(Supabase)에서 저장된 데이터 복원, 없으면 샘플 1회 ───
+(async function cpInit(){
+  const [ad, lv] = await Promise.all([ cpCloudLoad('coupang_ad_data'), cpCloudLoad('coupang_leave') ]);
+  if(lv && typeof lv==='object'){
+    if(Array.isArray(lv.employees))    employees    = lv.employees;
+    if(Array.isArray(lv.leaveRecords)) leaveRecords = lv.leaveRecords;
+    if(lv.leaveIdSeq) leaveIdSeq = lv.leaveIdSeq;
+    if(lv.empIdSeq)   empIdSeq   = lv.empIdSeq;
+    employees.forEach(emp=>{ if(emp.birth)emp.birth=normalizeToISO(emp.birth); if(emp.joinDate)emp.joinDate=normalizeToISO(emp.joinDate); });
+    leaveRecords.forEach(rec=>{ if(rec.date)rec.date=normalizeToISO(rec.date); });
+  }
+  if(ad && Array.isArray(ad.allData) && ad.allData.length){
+    allData      = ad.allData;
+    uploadHistory= Array.isArray(ad.uploadHistory)?ad.uploadHistory:[];
+    goalRevenue  = ad.goalRevenue||0;
+    applyLoadedAdData();
+  } else {
+    loadSampleData();   // 저장된 실데이터가 없을 때만 데모 표시
+  }
+})();
+</script>
+</body>
+</html>

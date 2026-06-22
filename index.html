@@ -1206,7 +1206,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-logistock" onclick="goMenu('logistock')" style="display:none;">📦 소장재고 확인</div>
   <div class="ni" id="nav-logibox" onclick="goMenu('logibox')" style="display:none;">📮 택배박스</div>
   <div class="ni" id="nav-logistatus" onclick="goMenu('logistatus')" style="display:none;">📊 박스 현황</div>
+  <div class="ni" id="nav-coupangad" onclick="goMenu('coupangad')" style="display:none;">📊 쿠팡광고</div>
 </nav>
+</div>
+
+<!-- ═══ 쿠팡 광고 관리 (운영관리 — 독립 대시보드 iframe) ═══ -->
+<div class="page" id="page-coupangad">
+  <iframe id="coupangAdFrame" src="" title="쿠팡 광고 관리" style="width:100%;height:calc(100vh - 94px);border:none;display:block;"></iframe>
 </div>
 
 <!-- ═══ 협업업무 (디자인팀) ═══ -->
@@ -3051,7 +3057,7 @@ const TEAM_PRESETS = {
   cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit', logistatus:'edit' } },
-  ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit' } },
+  ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit', coupangad:'edit' } },
 };
 
 // ══════════════════════════════════════════════
@@ -3132,7 +3138,8 @@ const MENUS = [
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
-  {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 소장재고 확인'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'}
+  {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 소장재고 확인'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'},
+  {id:'coupangad',label:'📊 쿠팡광고'}
 ];
 // 매출관리 하위탭 — 각각 개별 권한 부여 가능
 const REV_SUBS = [
@@ -3147,7 +3154,7 @@ const DEPTS = [
   { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family'] },
   { id:'design', label:'디자인팀',  menus:['collab','calendar'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
-  { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales'] },
+  { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
 ];
 let _activeDept = null;
 function _menuLabel(id){ const m=MENUS.find(x=>x.id===id); return m?m.label:id; }
@@ -4732,10 +4739,12 @@ function goPage(p){
   // 권한 없는 메뉴 접근 차단
   if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   currentPage=p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar','logihome','logistock','logibox','logistatus'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===p);
   });
+  // 쿠팡광고: 처음 열 때만 iframe 로드(지연 로딩)
+  if(p==='coupangad'){ const f=document.getElementById('coupangAdFrame'); if(f && !f.getAttribute('src')) f.setAttribute('src','coupang-ad-dashboard.html'); }
   if(p==='calendar') loadCalPage();
   if(p==='collab') loadCollabPage();
   if(p==='logihome') loadLogiHome();
@@ -4743,7 +4752,7 @@ function goPage(p){
   if(p==='logistatus') loadLogiStatus();
   // 디자인팀 메뉴에서는 채팅 버튼 숨김 (UI 겹침 방지)
   const _chatFab = document.getElementById('chatFab');
-  if(_chatFab) _chatFab.style.display = ['collab','calendar','logihome','logistock','logibox','logistatus'].includes(p) ? 'none' : '';
+  if(_chatFab) _chatFab.style.display = ['collab','calendar','logihome','logistock','logibox','logistatus','coupangad'].includes(p) ? 'none' : '';
   document.getElementById('addTopBtn').style.display=p==='inv'?'':'none';
   document.getElementById('addTopBtn').onclick=()=>openAddProd();
   document.getElementById('uploadTopBtn').onclick=()=>openUpload(p);
@@ -4765,11 +4774,11 @@ function goPage(p){
   if(p==='family') initFamilyPage();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
-  if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote'||p==='collab'||p==='calendar'||p==='logihome'||p==='logistock'||p==='logibox'||p==='logistatus') ? 'hidden' : '';
+  if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote'||p==='collab'||p==='calendar'||p==='logihome'||p==='logistock'||p==='logibox'||p==='logistatus'||p==='coupangad') ? 'hidden' : '';
   if(window.__CURRENT_USER) updateNavVisibility();
   _applyWriteLockUI();
   // 캘린더 페이지에서는 상단 엑셀 업로드 버튼 숨김 (해당 없음) — _applyWriteLockUI 이후 적용
-  if(p==='calendar'||p==='collab'||p==='logihome'||p==='logistock'||p==='logibox'||p==='logistatus'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
+  if(p==='calendar'||p==='collab'||p==='logihome'||p==='logistock'||p==='logibox'||p==='logistatus'||p==='coupangad'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
 }
 
 // ══════════════════════════════════════════════
