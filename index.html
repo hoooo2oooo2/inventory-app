@@ -2775,6 +2775,7 @@ function _revealApp(sess){
   const who = document.getElementById('whoami');
   if(who) who.innerHTML = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원') + ' <span style="opacity:.5;">▾</span>';
   applyPermissions();
+  logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
 }
 
 async function doLogin(e){
@@ -3251,15 +3252,21 @@ async function logiNoticeAdd(){
     author: u ? (u.name||u.username) : '',
     date: `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`
   });
+  const newId = _logiNotices[0].id;
   logiRenderNotices();
   await cloudKvSave('logi_notices', _logiNotices);
-  toast('공지가 등록되었습니다.');
-  logiNotifyStart('공지사항이 등록되었습니다.');
+  // 등록한 본인 PC는 알림 기준선만 올려 두어 자기 공지로 알람이 다시 울리지 않게 함
+  _logiSeenNoticeId = Math.max(_logiSeenNoticeId, newId);
+  toast('공지가 등록되었습니다. 다른 PC에 알림이 전송됩니다.');
 }
 
 // ── 공지 등록 알림 (컴퓨터 알림창 + 30대 여성 음성, 미확인 시 3분마다 반복) ──
 let _logiNotifyTimer = null;
 let _logiNotifyHandle = null;
+let _logiSeenNoticeId = 0;       // 이미 본 공지 중 가장 최근 id (이 값보다 큰 새 공지 → 알람)
+let _logiWatchPoll = null;
+let _logiWatchCh = null;
+let _logiWatchStarted = false;
 
 // 한국어 여성 음성 선택 (브라우저별 가용 음성 중 우선순위)
 function _logiPickKoFemaleVoice(){
@@ -3318,6 +3325,40 @@ function logiNotifyStop(){
 }
 // 음성 목록 비동기 로드 대비
 if('speechSynthesis' in window){ try{ speechSynthesis.onvoiceschanged = ()=>{ speechSynthesis.getVoices(); }; }catch{} }
+
+// ── 새 공지 감시 (다른 PC에서 등록한 공지를 실시간/폴링으로 감지 → 알림+음성) ──
+function _logiLatestId(arr){ return (arr && arr.length) ? Math.max(...arr.map(n=>n.id||0)) : 0; }
+async function _logiCheckNewNotice(){
+  let arr;
+  try{ arr = (await cloudKvLoad('logi_notices')) || []; }catch{ return; }
+  const latest = _logiLatestId(arr);
+  if(latest > _logiSeenNoticeId){
+    _logiSeenNoticeId = latest;
+    _logiNotices = arr;
+    if(document.getElementById('page-logihome')?.classList.contains('active')) logiRenderNotices();
+    logiNotifyStart('공지사항이 등록되었습니다.');
+  }
+}
+async function logiStartNoticeWatch(){
+  if(_logiWatchStarted) return;
+  const u = window.__CURRENT_USER; if(!u) return;
+  // 물류팀 홈 권한이 있는 사용자에게만 알림 (다른 부서 사용자 방해 방지)
+  if(u.role!=='master' && _menuPerm('logihome')==='none') return;
+  _logiWatchStarted = true;
+  // 기준선: 로그인 시점의 가장 최근 공지 id (기존 공지로는 알람 X)
+  try{ const cur=(await cloudKvLoad('logi_notices'))||[]; _logiNotices=cur; _logiSeenNoticeId=_logiLatestId(cur); }catch{}
+  // 폴링 폴백 (30초) — realtime 미설정 환경에서도 동작
+  if(!_logiWatchPoll) _logiWatchPoll = setInterval(_logiCheckNewNotice, 30000);
+  // Supabase realtime (즉시 반영)
+  if(_logiWatchCh) return;
+  try{
+    _logiWatchCh = sb.channel('logi-notice-rt')
+      .on('postgres_changes',
+        { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.logi_notices' },
+        _logiCheckNewNotice)
+      .subscribe();
+  }catch(e){ console.warn('logi notice realtime 구독 실패(폴링으로 대체)', e); }
+}
 async function logiNoticeDel(id){
   if(!confirm('이 공지를 삭제할까요?')) return;
   _logiNotices = (_logiNotices||[]).filter(n=>n.id!==id);
