@@ -806,41 +806,52 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 </style>
 <style>
 /* ═══ 물류팀 홈 ═══ */
-.logi-home{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr;gap:14px;padding:16px;height:calc(100vh - 110px);box-sizing:border-box;}
-.logi-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;flex-direction:column;min-height:0;}
-.logi-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.logi-card-title{font-size:15px;font-weight:800;color:var(--tx);}
-.logi-add-btn{padding:5px 12px;border:none;border-radius:8px;background:var(--pr);color:#fff;font-size:12px;font-weight:700;cursor:pointer;}
-.logi-add-btn:hover{filter:brightness(1.05);}
-/* 현재시각 */
-.logi-clock-card{align-items:center;justify-content:center;background:linear-gradient(135deg,#1E3A8A,#3182F6);border:none;color:#fff;}
-.logi-clock-time{font-size:54px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;line-height:1;}
-.logi-clock-date{font-size:16px;font-weight:600;margin-top:12px;opacity:.92;}
-/* 달력 */
-.logi-cal-head{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:10px;}
-.logi-cal-title{font-size:16px;font-weight:800;color:var(--tx);min-width:130px;text-align:center;}
-.logi-cal-nav{width:30px;height:30px;border:1px solid var(--bd);border-radius:8px;background:var(--bg2);color:var(--tx);font-size:16px;cursor:pointer;}
-.logi-cal-nav:hover{background:var(--prl);}
-.logi-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;flex:1;}
-.logi-cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--tx2);padding:4px 0;}
-.logi-cal-cell{display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--tx);border-radius:8px;min-height:30px;}
-.logi-cal-cell.sun{color:#EF4444;}
-.logi-cal-cell.sat{color:#3182F6;}
-.logi-cal-cell.today{background:var(--pr);color:#fff;font-weight:800;}
-.logi-cal-cell.empty{visibility:hidden;}
-/* 공지사항 */
-.logi-notice-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
-.logi-notice-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--bg2);border-radius:10px;border:1px solid var(--bd);}
+/* ═══ 물류팀 홈 — 세로 레이아웃 리디자인 ═══ */
+.lh2-wrap{height:calc(100vh - 110px);overflow:auto;background:var(--bg2);box-sizing:border-box;}
+.lh2-inner{max-width:920px;margin:0 auto;padding:28px 24px 64px;display:flex;flex-direction:column;gap:18px;}
+.lh2-alertbar{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#FEF3E2;border:1px solid #F6C77A;border-radius:12px;padding:13px 16px;font-size:13px;color:#92560A;font-weight:600;flex-wrap:wrap;}
+.lh2-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.04);padding:18px 20px;}
+.lh2-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;}
+.lh2-title{font-size:17px;font-weight:800;color:var(--tx);letter-spacing:-0.01em;}
+.lh2-add{padding:7px 14px;border:none;border-radius:9px;background:var(--pr);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;}
+.lh2-add:hover{filter:brightness(1.05);}
+/* 공지사항 / 전달사항 리스트 */
+.lh2-notice-list,.lh2-handover-list{display:flex;flex-direction:column;gap:10px;}
+.logi-empty{color:var(--tx2);font-size:13px;text-align:center;padding:26px 0;}
+.logi-notice-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--bg2);border-radius:12px;border:1px solid var(--bd);}
 .logi-notice-body{flex:1;min-width:0;}
-.logi-notice-text{font-size:19px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
-.logi-notice-meta{font-size:12px;color:var(--tx2);margin-top:6px;}
-.logi-notice-del{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:6px;flex-shrink:0;}
+.logi-notice-text{font-size:18px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.logi-notice-meta{font-size:12px;color:var(--tx2);margin-top:7px;}
+.logi-notice-del{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:3px 6px;border-radius:6px;flex-shrink:0;}
 .logi-notice-del:hover{background:#FEE2E2;color:#EF4444;}
-.logi-empty{color:var(--tx2);font-size:13px;text-align:center;padding:24px 0;}
-/* 메모장 */
-.logi-memo-status{font-size:11px;color:var(--tx2);}
-.logi-memo-area{flex:1;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;}
-.logi-memo-area:focus{outline:none;border-color:var(--pr);background:var(--bg);}
+/* 전달사항 */
+.lh2-handover-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--bg2);border-radius:12px;border:1px solid var(--bd);}
+.lh2-handover-item.done{background:#F0FDF4;border-color:#BBE9C9;}
+.lh2-handover-item input[type=checkbox]{width:21px;height:21px;margin-top:2px;flex-shrink:0;cursor:pointer;}
+.lh2-handover-body{flex:1;min-width:0;}
+.lh2-handover-text{font-size:17px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.lh2-handover-item.done .lh2-handover-text{text-decoration:line-through;color:var(--tx2);}
+.lh2-handover-meta{font-size:12px;color:var(--tx2);margin-top:7px;}
+.lh2-confirm{display:inline-block;color:#15803D;font-weight:700;margin-left:2px;}
+/* 소장재고 체크리스트 */
+.lh2-chk-add{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.lh2-chk-add input{padding:9px 12px;border:1px solid var(--bd);border-radius:9px;font-size:14px;color:var(--tx);background:var(--bg);}
+.lh2-chk-add #lhChkName{flex:1;min-width:160px;}
+.lh2-chk-add #lhChkQty{width:120px;text-align:right;}
+.lh2-chk-table-wrap{border:1px solid var(--bd);border-radius:12px;overflow:hidden;}
+.lh2-chk-table{width:100%;border-collapse:collapse;font-size:14px;}
+.lh2-chk-table th{font-size:12px;font-weight:700;color:var(--tx2);background:var(--bg2);padding:11px 14px;border-bottom:1px solid var(--bd);text-align:center;}
+.lh2-chk-table td{padding:11px 14px;border-bottom:1px solid var(--bd);text-align:center;}
+.lh2-chk-table tr:last-child td{border-bottom:none;}
+.lh2-chk-table tr.chk-done{background:#F0FDF4;}
+.lh2-chk-table tr.chk-done .lh2-chk-name{text-decoration:line-through;color:var(--tx2);}
+.lh2-chk-name{text-align:left!important;font-weight:600;color:var(--tx);}
+.lh2-chkbox{width:21px;height:21px;cursor:pointer;}
+.lh2-chk-qty{width:100px;padding:7px 9px;border:1px solid var(--bd);border-radius:8px;font-size:14px;text-align:right;color:var(--tx);background:var(--bg);}
+/* 메모장 (글씨 크게) */
+.lh2-memo-status{font-size:11px;color:var(--tx2);font-weight:600;}
+.lh2-memo{width:100%;box-sizing:border-box;min-height:220px;border:1px solid var(--bd);border-radius:12px;padding:16px;font-size:18px;line-height:1.75;color:var(--tx);background:var(--bg2);resize:vertical;font-family:inherit;}
+.lh2-memo:focus{outline:none;border-color:var(--pr);background:var(--bg);}
 /* ═══ 택배박스 ═══ */
 .lbx-wrap{padding:16px;height:calc(100vh - 110px);box-sizing:border-box;display:flex;flex-direction:column;}
 .lbx-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap;}
@@ -1257,34 +1268,60 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 <!-- ═══ 물류팀 홈 ═══ -->
 <div class="page" id="page-logihome">
-  <div class="logi-home">
-    <!-- 상단 행: 현재시각 + 달력 -->
-    <div class="logi-card logi-clock-card">
-      <div class="logi-clock-time" id="logiClockTime">00:00:00</div>
-      <div class="logi-clock-date" id="logiClockDate">—</div>
-    </div>
-    <div class="logi-card logi-cal-card">
-      <div class="logi-cal-head">
-        <button class="logi-cal-nav" onclick="logiCalMove(-1)">‹</button>
-        <span class="logi-cal-title" id="logiCalTitle">—</span>
-        <button class="logi-cal-nav" onclick="logiCalMove(1)">›</button>
+  <div class="lh2-wrap">
+    <div class="lh2-inner">
+
+      <!-- 실시간 알림 권한 배너 -->
+      <div class="lh2-alertbar" id="lhAlertBar" style="display:none;">
+        <span>🔔 실시간 알림이 꺼져 있어요. 새 공지·전달사항을 알림창과 음성으로 받으려면 켜주세요.</span>
+        <button class="btn btn-pr btn-sm" onclick="logiEnableAlerts()">알림 켜기</button>
       </div>
-      <div class="logi-cal-grid" id="logiCalGrid"></div>
-    </div>
-    <!-- 하단 행: 공지사항 + 메모장 -->
-    <div class="logi-card logi-notice-card">
-      <div class="logi-card-head">
-        <span class="logi-card-title">📢 공지사항</span>
-        <button class="logi-add-btn" onclick="logiNoticeAdd()">＋ 등록</button>
-      </div>
-      <div class="logi-notice-list" id="logiNoticeList"></div>
-    </div>
-    <div class="logi-card logi-memo-card">
-      <div class="logi-card-head">
-        <span class="logi-card-title">📝 메모장</span>
-        <span class="logi-memo-status" id="logiMemoStatus"></span>
-      </div>
-      <textarea class="logi-memo-area" id="logiMemoArea" placeholder="자유롭게 메모하세요. 입력 시 자동 저장됩니다."></textarea>
+
+      <!-- 공지사항 -->
+      <section class="lh2-card">
+        <div class="lh2-head">
+          <span class="lh2-title">📢 공지사항</span>
+          <button class="lh2-add" onclick="logiNoticeAdd()">＋ 공지 등록</button>
+        </div>
+        <div class="lh2-notice-list" id="logiNoticeList"></div>
+      </section>
+
+      <!-- 전달사항 -->
+      <section class="lh2-card">
+        <div class="lh2-head">
+          <span class="lh2-title">📋 전달사항</span>
+          <button class="lh2-add" onclick="logiHandoverAdd()">＋ 전달사항 등록</button>
+        </div>
+        <div class="lh2-handover-list" id="logiHandoverList"></div>
+      </section>
+
+      <!-- 소장재고 체크리스트 -->
+      <section class="lh2-card">
+        <div class="lh2-head">
+          <span class="lh2-title">✅ 소장재고 체크리스트</span>
+        </div>
+        <div class="lh2-chk-add">
+          <input id="lhChkName" placeholder="제품명" onkeydown="if(event.key==='Enter')logiChkAdd()">
+          <input id="lhChkQty" type="number" min="0" placeholder="수량" onkeydown="if(event.key==='Enter')logiChkAdd()">
+          <button class="lh2-add" onclick="logiChkAdd()">＋ 추가</button>
+        </div>
+        <div class="lh2-chk-table-wrap">
+          <table class="lh2-chk-table">
+            <thead><tr><th style="width:50px;">확인</th><th style="text-align:left;">제품명</th><th style="width:130px;">수량</th><th style="width:56px;">삭제</th></tr></thead>
+            <tbody id="logiChkBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 메모장 -->
+      <section class="lh2-card">
+        <div class="lh2-head">
+          <span class="lh2-title">📝 메모장</span>
+          <span class="lh2-memo-status" id="logiMemoStatus"></span>
+        </div>
+        <textarea class="lh2-memo" id="logiMemoArea" placeholder="자유롭게 메모하세요. 입력 시 자동 저장됩니다."></textarea>
+      </section>
+
     </div>
   </div>
 </div>
@@ -3537,6 +3574,7 @@ async function logiNoticeAdd(){
 let _logiNotifyTimer = null;
 let _logiNotifyHandle = null;
 let _logiSeenNoticeId = 0;       // 이미 본 공지 중 가장 최근 id (이 값보다 큰 새 공지 → 알람)
+let _logiSeenHandoverId = 0;     // 이미 본 전달사항 중 가장 최근 id
 let _logiWatchPoll = null;
 let _logiWatchCh = null;
 let _logiWatchStarted = false;
@@ -3656,6 +3694,40 @@ async function _logiCheckNewNotice(){
     logiNotifyStart('공지사항이 등록되었습니다.');
   }
 }
+async function _logiCheckNewHandover(){
+  let arr;
+  try{ arr = (await cloudKvLoad('logi_handovers')) || []; }catch{ return; }
+  const latest = _logiLatestId(arr);
+  if(latest > _logiSeenHandoverId){
+    _logiSeenHandoverId = latest;
+    _logiHandovers = arr;
+    if(document.getElementById('page-logihome')?.classList.contains('active')) logiRenderHandovers();
+    logiNotifyStart('전달사항이 등록되었습니다.');
+  } else {
+    // 알람 대상은 아니지만(이미 본 것/확인체크 변경 등) 화면이 켜져 있으면 최신 내용 반영
+    _logiHandovers = arr;
+    if(document.getElementById('page-logihome')?.classList.contains('active')) logiRenderHandovers();
+  }
+}
+async function _logiCheckNew(){ await _logiCheckNewNotice(); await _logiCheckNewHandover(); }
+// 알림 권한 배너 표시/숨김
+function logiUpdateAlertBar(){
+  const bar = document.getElementById('lhAlertBar'); if(!bar) return;
+  const need = !('Notification' in window) || Notification.permission !== 'granted';
+  bar.style.display = need ? 'flex' : 'none';
+}
+// 사용자 클릭으로 알림 권한 요청 + 오디오 잠금 해제(브라우저 정책상 제스처 필요)
+function logiEnableAlerts(){
+  _logiGetCtx();
+  try{ logiChime(); }catch{}
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().then(()=>{ logiUpdateAlertBar(); toast(Notification.permission==='granted'?'✅ 알림이 켜졌습니다.':'브라우저에서 알림이 차단되어 있습니다. 주소창 자물쇠 → 알림 허용으로 바꿔주세요.'); });
+  } else if('Notification' in window && Notification.permission === 'denied'){
+    toast('브라우저에서 이 사이트 알림이 차단돼 있어요. 주소창 자물쇠 → 알림 허용으로 바꿔주세요.');
+  } else {
+    logiUpdateAlertBar(); toast('알림이 이미 켜져 있습니다.');
+  }
+}
 async function logiStartNoticeWatch(){
   if(_logiWatchStarted) return;
   const u = window.__CURRENT_USER; if(!u) return;
@@ -3663,19 +3735,25 @@ async function logiStartNoticeWatch(){
   if(u.role!=='master' && _menuPerm('logihome')==='none') return;
   _logiWatchStarted = true;
   _logiGetCtx();   // 로그인(사용자 클릭) 시점에 오디오 컨텍스트 활성화 → 백그라운드 알림음 허용
-  // 기준선: 로그인 시점의 가장 최근 공지 id (기존 공지로는 알람 X)
+  // 알림 권한은 로그인 제스처 직후(=여기) 요청해야 브라우저가 팝업을 띄움 (타이머/콜백에서 요청하면 차단됨)
+  if('Notification' in window && Notification.permission === 'default'){ try{ Notification.requestPermission(); }catch{} }
+  // 기준선: 로그인 시점의 가장 최근 공지/전달사항 id (기존 항목으로는 알람 X)
   try{ const cur=(await cloudKvLoad('logi_notices'))||[]; _logiNotices=cur; _logiSeenNoticeId=_logiLatestId(cur); }catch{}
-  // 폴링 폴백 (30초) — realtime 미설정 환경에서도 동작
-  if(!_logiWatchPoll) _logiWatchPoll = setInterval(_logiCheckNewNotice, 30000);
-  // Supabase realtime (즉시 반영)
+  try{ const h=(await cloudKvLoad('logi_handovers'))||[]; _logiHandovers=h; _logiSeenHandoverId=_logiLatestId(h); }catch{}
+  // 폴링 폴백 (8초) — realtime 미설정 환경에서도 다른 PC 등록을 빠르게 감지
+  if(!_logiWatchPoll) _logiWatchPoll = setInterval(_logiCheckNew, 8000);
+  // Supabase realtime (즉시 반영) — 공지 + 전달사항 동시 구독
   if(_logiWatchCh) return;
   try{
-    _logiWatchCh = sb.channel('logi-notice-rt')
+    _logiWatchCh = sb.channel('logi-home-rt')
       .on('postgres_changes',
         { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.logi_notices' },
         _logiCheckNewNotice)
+      .on('postgres_changes',
+        { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.logi_handovers' },
+        _logiCheckNewHandover)
       .subscribe();
-  }catch(e){ console.warn('logi notice realtime 구독 실패(폴링으로 대체)', e); }
+  }catch(e){ console.warn('logi realtime 구독 실패(폴링으로 대체)', e); }
 }
 
 // ══════════════════════════════════════════════
@@ -4211,6 +4289,114 @@ async function logiNoticeDel(id){
   await cloudKvSave('logi_notices', _logiNotices);
 }
 
+// ── 전달사항 (등록 → 다른 PC 실시간 알림 + 음성, 물류팀 확인 체크 시 확인자/확인시간 기록) ──
+let _logiHandovers = null;
+async function logiLoadHandovers(){
+  if(_logiHandovers===null){ _logiHandovers = (await cloudKvLoad('logi_handovers')) || []; }
+  logiRenderHandovers();
+}
+function logiRenderHandovers(){
+  const box = document.getElementById('logiHandoverList');
+  if(!box) return;
+  const list = _logiHandovers || [];
+  if(!list.length){ box.innerHTML = `<div class="logi-empty">등록된 전달사항이 없습니다.</div>`; return; }
+  box.innerHTML = list.map(h=>{
+    const done = h.done===true;
+    const confirm = done ? ` <span class="lh2-confirm">✓ 확인자: ${_logiEsc(h.doneBy||'-')} · 확인시간: ${_logiEsc(h.doneAt||'-')}</span>` : '';
+    return `<div class="lh2-handover-item${done?' done':''}">
+      <input type="checkbox" ${done?'checked':''} title="확인 체크" onchange="logiHandoverToggle(${h.id})">
+      <div class="lh2-handover-body">
+        <div class="lh2-handover-text">${_logiEsc(h.text)}</div>
+        <div class="lh2-handover-meta">${_logiEsc(h.author||'')} · ${_logiEsc(h.date||'')}${confirm}</div>
+      </div>
+      <button class="logi-notice-del" title="삭제" onclick="logiHandoverDel(${h.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+async function logiHandoverAdd(){
+  const txt = prompt('전달사항 내용을 입력하세요.');
+  if(!txt || !txt.trim()) return;
+  const u = window.__CURRENT_USER;
+  const d = new Date();
+  _logiHandovers = _logiHandovers || [];
+  _logiHandovers.unshift({
+    id: Date.now(),
+    text: txt.trim(),
+    author: u ? (u.name||u.username) : '',
+    date: `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`,
+    done: false
+  });
+  const newId = _logiHandovers[0].id;
+  logiRenderHandovers();
+  await cloudKvSave('logi_handovers', _logiHandovers);
+  _logiSeenHandoverId = Math.max(_logiSeenHandoverId, newId);   // 본인 PC는 자기 등록으로 알람 X
+  toast('전달사항이 등록되었습니다. 다른 PC에 알림이 전송됩니다.');
+}
+async function logiHandoverToggle(id){
+  const h = (_logiHandovers||[]).find(x=>x.id===id); if(!h) return;
+  if(h.done){ h.done=false; h.doneBy=''; h.doneAt=''; }
+  else{
+    const u = window.__CURRENT_USER; const d = new Date();
+    h.done = true;
+    h.doneBy = u ? (u.name||u.username) : '';
+    h.doneAt = `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  logiRenderHandovers();
+  await cloudKvSave('logi_handovers', _logiHandovers);
+}
+async function logiHandoverDel(id){
+  if(!confirm('이 전달사항을 삭제할까요?')) return;
+  _logiHandovers = (_logiHandovers||[]).filter(x=>x.id!==id);
+  logiRenderHandovers();
+  await cloudKvSave('logi_handovers', _logiHandovers);
+}
+
+// ── 소장재고 체크리스트 (제품명 + 수량, 체크 / 모든 PC 공유) ──
+let _logiChk = null;
+async function logiLoadChk(){
+  if(_logiChk===null){ _logiChk = (await cloudKvLoad('logi_checklist')) || []; }
+  logiRenderChk();
+}
+function logiRenderChk(){
+  const tb = document.getElementById('logiChkBody');
+  if(!tb) return;
+  const list = _logiChk || [];
+  if(!list.length){ tb.innerHTML = `<tr><td colspan="4" class="logi-empty" style="padding:20px 0;">등록된 품목이 없습니다. 제품명과 수량을 입력해 추가하세요.</td></tr>`; return; }
+  tb.innerHTML = list.map(c=>`<tr class="${c.checked?'chk-done':''}">
+    <td><input type="checkbox" class="lh2-chkbox" ${c.checked?'checked':''} onchange="logiChkToggle(${c.id})"></td>
+    <td class="lh2-chk-name">${_logiEsc(c.name)}</td>
+    <td><input type="number" class="lh2-chk-qty" min="0" value="${c.qty==null?'':c.qty}" onchange="logiChkQty(${c.id}, this.value)"></td>
+    <td><button class="logi-notice-del" title="삭제" onclick="logiChkDel(${c.id})">✕</button></td>
+  </tr>`).join('');
+}
+async function logiChkAdd(){
+  const nameEl = document.getElementById('lhChkName');
+  const qtyEl = document.getElementById('lhChkQty');
+  const name = (nameEl.value||'').trim();
+  if(!name){ toast('제품명을 입력하세요.'); nameEl.focus(); return; }
+  _logiChk = _logiChk || [];
+  _logiChk.push({ id: Date.now(), name, qty: _lbxNum(qtyEl.value), checked: false });
+  nameEl.value=''; qtyEl.value=''; nameEl.focus();
+  logiRenderChk();
+  await cloudKvSave('logi_checklist', _logiChk);
+}
+async function logiChkToggle(id){
+  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
+  c.checked = !c.checked;
+  logiRenderChk();
+  await cloudKvSave('logi_checklist', _logiChk);
+}
+async function logiChkQty(id, val){
+  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
+  c.qty = _lbxNum(val);
+  await cloudKvSave('logi_checklist', _logiChk);
+}
+async function logiChkDel(id){
+  _logiChk = (_logiChk||[]).filter(x=>x.id!==id);
+  logiRenderChk();
+  await cloudKvSave('logi_checklist', _logiChk);
+}
+
 // ── 메모장 ──
 async function logiLoadMemo(){
   const area = document.getElementById('logiMemoArea');
@@ -4233,13 +4419,11 @@ async function logiLoadMemo(){
 }
 
 function loadLogiHome(){
-  logiClockTick();
-  if(_logiClockTimer) clearInterval(_logiClockTimer);
-  _logiClockTimer = setInterval(logiClockTick, 1000);
-  _logiCalRef = new Date();
-  logiRenderCal();
   logiLoadNotices();
+  logiLoadHandovers();
+  logiLoadChk();
   logiLoadMemo();
+  logiUpdateAlertBar();
 }
 
 // ══════════════════════════════════════════════
