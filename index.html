@@ -140,6 +140,10 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-bp-input::placeholder{color:var(--tx2);font-size:11px;}
 .rp-bp-input+.rp-bp-input{border-left:0.5px solid var(--bd);padding-left:7px;flex:0.7;}
 .rp-bp-cat{font-size:11px;border:1px solid var(--bd);border-radius:5px;padding:2px 5px;background:var(--bg);color:var(--tx);cursor:pointer;flex-shrink:0;}
+/* 프로젝트/업무 선택·소요시간 드롭다운은 좁게 — 내용 입력칸(.rp-bp-input)을 더 넓게 */
+#rpBpWipSel,#rpBpEWipSel{flex:0 0 92px;width:92px;max-width:92px;}
+#rpBpTime,#rpBpETime{flex:0 0 auto;max-width:82px;}
+.rp-bp-input{flex:1 1 auto;}
 .rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .rp-bp-cancel{background:none;border:none;font-size:12px;cursor:pointer;color:var(--tx2);padding:2px 4px;}
 /* 카테고리 필터 뷰 날짜 구분선 */
@@ -9562,7 +9566,7 @@ function toggleRpAssigneePop(e){
   e.stopPropagation();
   const pop=document.getElementById('rpAssigneePop'); if(!pop) return;
   if(pop.style.display==='none'){
-    const people=[null,...COLLAB_PEOPLE];
+    const people=['유현','보라','연정'];
     pop.innerHTML=people.map(p=>{
       const label=p||'전체'; const c=p?COLLAB_PERSON_COLOR[p]||'#888':'#888';
       const on=(p===_reportPerson||(p===null&&!_reportPerson));
