@@ -3493,6 +3493,15 @@ async function cloudKvLoad(kind){
     return data ? data.data : null;
   }catch(e){ console.warn('cloudKvLoad 실패', kind, e); return null; }
 }
+// egress 절약: 전체 data 대신 updated_at(타임스탬프)만 조회. 폴링은 이 값이 바뀔 때만 전체를 받는다.
+// 반환: 타임스탬프 문자열 | null(미존재) | undefined(조회 실패 → 변경판정 제외)
+async function cloudKvVersion(kind){
+  try{
+    const { data, error } = await sb.from('work_calendar').select('updated_at').eq('person','__app__').eq('kind',kind).maybeSingle();
+    if(error) return undefined;
+    return data ? data.updated_at : null;
+  }catch{ return undefined; }
+}
 
 // ══════════════════════════════════════════════
 // 물류팀 홈 — 현재시각 / 달력 / 공지사항 / 메모장
@@ -3724,6 +3733,14 @@ async function _logiCheckNewHandover(){
   }
 }
 async function _logiCheckNew(){ await _logiCheckNewNotice(); await _logiCheckNewHandover(); }
+// egress 절약형 폴링: 백그라운드 탭은 건너뛰고, updated_at이 바뀐 종류만 전체 로드
+let _logiVer = { notices:undefined, handovers:undefined };
+async function _logiPollTick(){
+  if(document.hidden) return;   // 보이지 않는 탭은 폴링 정지(돌아오면 visibilitychange로 1회 점검)
+  const [vn, vh] = await Promise.all([cloudKvVersion('logi_notices'), cloudKvVersion('logi_handovers')]);
+  if(vn!==undefined && vn!==_logiVer.notices){ _logiVer.notices = vn; await _logiCheckNewNotice(); }
+  if(vh!==undefined && vh!==_logiVer.handovers){ _logiVer.handovers = vh; await _logiCheckNewHandover(); }
+}
 // 다른 PC에 "방금 변경됨" 신호 전송 (Supabase Broadcast — DB realtime publication 불필요)
 function _logiBroadcast(){
   try{
@@ -3765,8 +3782,12 @@ async function logiStartNoticeWatch(){
   // 기준선: 로그인 시점의 가장 최근 공지/전달사항 id (기존 항목으로는 알람 X)
   try{ const cur=(await cloudKvLoad('logi_notices'))||[]; _logiNotices=cur; _logiSeenNoticeId=_logiLatestId(cur); }catch{}
   try{ const h=(await cloudKvLoad('logi_handovers'))||[]; _logiHandovers=h; _logiSeenHandoverId=_logiLatestId(h); }catch{}
-  // 폴링 폴백 (4초) — realtime 미설정 환경에서도 다른 PC 등록을 빠르게 감지
-  if(!_logiWatchPoll) _logiWatchPoll = setInterval(_logiCheckNew, 4000);
+  // 폴링 폴백 (12초, updated_at만 확인 → 변경 시에만 전체 로드) — broadcast가 즉시성 담당, 폴링은 안전망
+  if(!_logiWatchPoll){
+    _logiWatchPoll = setInterval(_logiPollTick, 12000);
+    // 백그라운드였다 돌아오면 즉시 1회 점검(놓친 변경 따라잡기)
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _logiPollTick(); });
+  }
   // Supabase realtime (즉시 반영) — Broadcast(publication 불필요) + postgres_changes 동시 구독
   if(_logiWatchCh) return;
   try{
@@ -10512,8 +10533,13 @@ return `<div class="plan-card${isExp?' expanded':''}${isWip?' wip-card':''}"
 function collabStartRealtime(){
   // 폴링 폴백 (4초) — realtime publication 미설정 환경에서도 동작
   if(!_collabPoll){
+    let _cv = { collab:undefined, plan:undefined };
     _collabPoll = setInterval(async ()=>{
-      if(currentPage!=='collab' || _collabBusy) return;
+      if(currentPage!=='collab' || _collabBusy || document.hidden) return;
+      // 먼저 updated_at만 확인 → 변경 없으면 전체 로드 생략(egress 절약)
+      const [vc, vp] = await Promise.all([cloudKvVersion(COLLAB_KIND), cloudKvVersion(PLAN_KIND)]);
+      if(vc===_cv.collab && vp===_cv.plan) return;
+      _cv.collab = vc; _cv.plan = vp;
       const [d, pd] = await Promise.all([cloudKvLoad(COLLAB_KIND), cloudKvLoad(PLAN_KIND)]);
       const arr = Array.isArray(d) ? d : [];
       const planArr = Array.isArray(pd) ? pd : [];
@@ -10521,7 +10547,7 @@ function collabStartRealtime(){
       if(JSON.stringify(arr) !== JSON.stringify(_collabTasks)){ _collabTasks = arr; changed = true; }
       if(JSON.stringify(planArr) !== JSON.stringify(_planProjects)){ _planProjects = planArr; renderPlanProjects(); }
       if(changed){ renderCollab(); _collabSyncMark(); }
-    }, 4000);
+    }, 8000);
   }
   // Supabase realtime (즉시 반영) — 실패해도 폴링이 커버
   if(_collabChannel) return;
