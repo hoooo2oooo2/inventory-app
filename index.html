@@ -3538,6 +3538,10 @@ function logiRenderCal(){
   grid.innerHTML = html;
 }
 
+// ── 카드 배경: 검은 글씨 가시성 좋은 연한 파스텔(눈 피로 적음). id 기반 고정색 → 깜빡임/PC간 불일치 없음 ──
+const LOGI_CARD_COLORS = ['#FFF7ED','#FEF9C3','#ECFDF5','#EFF6FF','#F5F3FF','#FFF1F2','#F0FDF4','#E0F2FE','#FDF4FF','#FEF2F2','#F0F9FF','#FAF5FF'];
+function _logiCardColor(id){ const k = Math.abs(Number(id)||0) % LOGI_CARD_COLORS.length; return LOGI_CARD_COLORS[k]; }
+
 // ── 공지사항 ──
 async function logiLoadNotices(){
   if(_logiNotices===null){ _logiNotices = (await cloudKvLoad('logi_notices')) || []; }
@@ -3549,7 +3553,7 @@ function logiRenderNotices(){
   const list = _logiNotices || [];
   if(!list.length){ box.innerHTML = `<div class="logi-empty">등록된 공지가 없습니다.</div>`; return; }
   box.innerHTML = list.map(n=>`
-    <div class="logi-notice-item">
+    <div class="logi-notice-item" style="background:${_logiCardColor(n.id)};">
       <div class="logi-notice-body">
         <div class="logi-notice-text">${_logiEsc(n.text)}</div>
         <div class="logi-notice-meta">${_logiEsc(n.author||'')} · ${_logiEsc(n.date||'')}</div>
@@ -4326,7 +4330,7 @@ function logiRenderHandovers(){
   box.innerHTML = list.map(h=>{
     const done = h.done===true;
     const confirm = done ? ` <span class="lh2-confirm">✓ 확인자: ${_logiEsc(h.doneBy||'-')} · 확인시간: ${_logiEsc(h.doneAt||'-')}</span>` : '';
-    return `<div class="lh2-handover-item${done?' done':''}">
+    return `<div class="lh2-handover-item${done?' done':''}"${done?'':` style="background:${_logiCardColor(h.id)};"`}>
       <input type="checkbox" ${done?'checked':''} title="확인 체크" onchange="logiHandoverToggle(${h.id})">
       <div class="lh2-handover-body">
         <div class="lh2-handover-text">${_logiEsc(h.text)}</div>
@@ -4388,7 +4392,7 @@ function logiRenderChk(){
   if(!tb) return;
   const list = _logiChk || [];
   if(!list.length){ tb.innerHTML = `<tr><td colspan="4" class="logi-empty" style="padding:20px 0;">등록된 품목이 없습니다. 제품명과 수량을 입력해 추가하세요.</td></tr>`; return; }
-  tb.innerHTML = list.map(c=>`<tr class="${c.checked?'chk-done':''}">
+  tb.innerHTML = list.map(c=>`<tr class="${c.checked?'chk-done':''}"${c.checked?'':` style="background:${_logiCardColor(c.id)};"`}>
     <td><input type="checkbox" class="lh2-chkbox" ${c.checked?'checked':''} onchange="logiChkToggle(${c.id})"></td>
     <td class="lh2-chk-name">${_logiEsc(c.name)}</td>
     <td><input type="number" class="lh2-chk-qty" min="0" value="${c.qty==null?'':c.qty}" onchange="logiChkQty(${c.id}, this.value)"></td>
