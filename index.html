@@ -6470,7 +6470,7 @@ async function recalcShippingForKey(channel,item_no,feeObj){
     if(newFee!==r.shipping_fee || newMargin!==r.margin || newRate!==r.margin_rate) upd.push({id:r.id,shipping_fee:newFee,margin:newMargin,margin_rate:newRate});
   }
   for(let i=0;i<upd.length;i+=500){ await sb.from('revenue').upsert(upd.slice(i,i+500)); }
-  if(upd.length){ _revLoaded=false; await loadRevenueData(); }  // 메모리 갱신
+  if(upd.length){ await reloadRevLoadedYears(); }  // 메모리 갱신(적재된 연도만)
   return upd.length;
 }
 
@@ -6603,42 +6603,98 @@ async function deleteBdFromSupabase(id){
   if(error) throw error;
 }
 
-// ── revenue 데이터 Supabase 로드 ──
+// ── revenue 데이터 Supabase 로드 (연도별 지연 로딩으로 egress 절감) ──
+//    기본은 최신 연도 1개만 로드, 나머지 연도는 탭에서 그 연도를 선택할 때 로드.
+const REV_COLS = 'id,year,sale_date,channel,order_no,buyer,receiver,phone1,phone2,zip,address,item_no,item_type,item_code,model_name,order_qty,ship_qty,shipping_fee,sale_price,settlement,cost_price,margin,margin_rate,unit_cost';
+let _revYearsLoaded = new Set();   // 현재 _revData에 적재된 연도
+let _revYearRange = [];            // 사용 가능한 전체 연도(내림차순) — 가벼운 min/max 쿼리로 파악
+
+function _revMapRow(r){
+  return {
+    id:r.id, year:r.year, date:r.sale_date,
+    month:r.sale_date?parseInt(r.sale_date.split('-')[0]):null,
+    ch:r.channel, orderNo:r.order_no, buyer:r.buyer, receiver:r.receiver,
+    phone1:r.phone1, phone2:r.phone2, zip:r.zip, addr:r.address,
+    itemNo:r.item_no, itemType:r.item_type, itemCode:r.item_code, modelName:r.model_name,
+    orderQty:r.order_qty, shipQty:r.ship_qty, shipping:r.shipping_fee, salePrice:r.sale_price,
+    settlement:r.settlement, costPrice:r.cost_price, margin:r.margin, marginRate:r.margin_rate, unitCost:r.unit_cost
+  };
+}
+// 버튼 등에 쓸 연도 목록(내림차순)
+function _revYears(){ return _revYearRange.length ? _revYearRange.slice() : [...new Set(_revData.map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a); }
+
+// 사용 가능한 연도 범위 파악(각 1행 쿼리 → egress 거의 0)
+async function loadRevYearRange(){
+  try{
+    const [{data:minR},{data:maxR}] = await Promise.all([
+      sb.from('revenue').select('year').order('year',{ascending:true}).limit(1).maybeSingle(),
+      sb.from('revenue').select('year').order('year',{ascending:false}).limit(1).maybeSingle()
+    ]);
+    const lo=minR&&minR.year, hi=maxR&&maxR.year;
+    _revYearRange=[];
+    if(lo&&hi){ for(let y=hi;y>=lo;y--) _revYearRange.push(y); }
+  }catch(e){ console.warn('revYearRange 실패',e); }
+  const cy=new Date().getFullYear();
+  if(!_revYearRange.includes(cy)) _revYearRange.unshift(cy);   // 올해 첫 데이터 전이어도 올해 버튼 노출
+}
+
+// 특정 연도만 로드해 _revData에 병합(이미 있으면 교체)
+async function loadRevenueYear(year){
+  if(year==null) return;
+  year=Number(year);
+  const PAGE=1000; let all=[], from=0;
+  while(true){
+    const {data,error}=await sb.from('revenue').select(REV_COLS).eq('year',year)
+      .order('sale_date',{ascending:true}).range(from,from+PAGE-1);
+    if(error){ console.warn('revenue 연도 로드 오류',year,error.message); break; }
+    if(!data||data.length===0) break;
+    all=all.concat(data);
+    if(data.length<PAGE) break;
+    from+=PAGE;
+  }
+  _revData=_revData.filter(r=>r.year!==year).concat(all.map(_revMapRow));
+  _revYearsLoaded.add(year);
+}
+
+// 연도 데이터 보장(없으면 로드)
+async function ensureRevYear(year){
+  if(year==null||year==='ALL') return ensureRevAllYears();
+  year=Number(year);
+  if(_revYearsLoaded.has(year)) return;
+  showRevLoading(true);
+  try{ await loadRevenueYear(year); } finally{ showRevLoading(false); }
+}
+// 전 연도 보장(내보내기·통합 '전체' 등에서 사용)
+async function ensureRevAllYears(){
+  const missing=_revYearRange.filter(y=>!_revYearsLoaded.has(y));
+  if(!missing.length) return;
+  showRevLoading(true);
+  try{ for(const y of missing) await loadRevenueYear(y); } finally{ showRevLoading(false); }
+}
+// 업로드/일괄수정 후: 현재 적재된 연도들을 최신값으로 재로드 + 범위 갱신
+async function reloadRevLoadedYears(){
+  await loadRevYearRange();
+  const yrs=[..._revYearsLoaded];
+  _revData=[]; _revYearsLoaded=new Set();
+  showRevLoading(true);
+  try{
+    if(!yrs.length) await loadRevenueYear(_revYearRange[0]);
+    else for(const y of yrs) await loadRevenueYear(y);
+  } finally{ showRevLoading(false); }
+  _renderRevCurrentPage();
+}
+
+// 기본 로드: 범위 파악 후 최신 연도 1개만
 async function loadRevenueData(){
   try{
+    await loadRevYearRange();
+    const latest=_revYearRange[0] || new Date().getFullYear();
     showRevLoading(true);
-    const COLS = 'id,year,sale_date,channel,order_no,buyer,receiver,phone1,phone2,zip,address,item_no,item_type,item_code,model_name,order_qty,ship_qty,shipping_fee,sale_price,settlement,cost_price,margin,margin_rate,unit_cost';
-    const PAGE = 1000;
-    let all = [], from = 0;
-    while(true){
-      const {data,error} = await sb.from('revenue').select(COLS)
-        .order('year',{ascending:true}).order('sale_date',{ascending:true})
-        .range(from, from+PAGE-1);
-      if(error){ console.warn('revenue 오류:',error.message); break; }
-      if(!data||data.length===0) break;
-      all = all.concat(data);
-      if(data.length < PAGE) break;
-      from += PAGE;
-    }
-    _revData = all.map(r=>({
-      id: r.id,
-      year: r.year, date: r.sale_date,
-      month: r.sale_date?parseInt(r.sale_date.split('-')[0]):null,
-      ch: r.channel, orderNo: r.order_no,
-      buyer: r.buyer, receiver: r.receiver,
-      phone1: r.phone1, phone2: r.phone2,
-      zip: r.zip, addr: r.address,
-      itemNo: r.item_no, itemType: r.item_type,
-      itemCode: r.item_code, modelName: r.model_name,
-      orderQty: r.order_qty, shipQty: r.ship_qty,
-      shipping: r.shipping_fee, salePrice: r.sale_price,
-      settlement: r.settlement, costPrice: r.cost_price,
-      margin: r.margin, marginRate: r.margin_rate, unitCost: r.unit_cost
-    }));
-    _revLoaded = true;
-    showRevLoading(false);
+    try{ if(!_revYearsLoaded.has(latest)) await loadRevenueYear(latest); }
+    finally{ showRevLoading(false); }
+    _revLoaded=true;
     _renderRevCurrentPage();
-  } catch(e){ console.warn('revenue 로드 실패:',e); showRevLoading(false); }
+  }catch(e){ console.warn('revenue 로드 실패:',e); showRevLoading(false); }
 }
 
 function showRevLoading(on){
@@ -6961,11 +7017,11 @@ function renderRevSummary(){
 let _revSelYear = null; // 선택된 년도
 
 function renderRevMonthly(){
-  if(!_revData.length) return;
-
-  // 년도 목록
-  const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a);
+  // 년도 목록(전체 범위) — 선택 연도가 미적재면 그 연도만 로드 후 재렌더
+  const years=_revYears();
+  if(!years.length) return;
   if(!_revSelYear||!years.includes(_revSelYear)) _revSelYear=years[0]; // 최신년도 기본
+  if(!_revYearsLoaded.has(_revSelYear)){ ensureRevYear(_revSelYear).then(renderRevMonthly); return; }
 
   // 선택년도에 있는 월 목록
   const monthsInYear=[...new Set(
@@ -7092,7 +7148,7 @@ function setRevMonthNum(btn, m){
 }
 
 // ── 통합 탭 ──
-let _uniFilter = {year:'ALL', months: new Set(), chs: new Set()};
+let _uniFilter = {year:null, months: new Set(), chs: new Set()};  // year:null → 최신 연도로 자동 설정(전체는 '전체' 버튼)
 let _uniSort = {key:null, dir:-1}; // 헤더 정렬: dir -1=내림차순, 1=오름차순
 let _revMaskOn = true; // 기본: 마스킹 ON
 
@@ -7162,9 +7218,10 @@ let _revDlyDnut=null;
 const CH_COLORS_DLY=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
 
 function renderDailyReport(){
-  if(!_revData.length) return;
-  const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a);
+  const years=_revYears();
+  if(!years.length) return;
   if(!_dlyFilter.year||!years.includes(_dlyFilter.year)) _dlyFilter.year=years[0];
+  if(!_revYearsLoaded.has(_dlyFilter.year)){ ensureRevYear(_dlyFilter.year).then(renderDailyReport); return; }
   const monthsInYear=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date).map(r=>parseInt(r.date.substring(0,2))))].sort((a,b)=>b-a);
   if(!_dlyFilter.month||!monthsInYear.includes(_dlyFilter.month)) _dlyFilter.month=monthsInYear[0];
   const daysInMonth=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(String(_dlyFilter.month).padStart(2,'0'))).map(r=>parseInt(r.date.split('-')[1]))).values()].sort((a,b)=>b-a);
@@ -7550,6 +7607,7 @@ async function downloadDailyExcel(){
   // ── 월별 핵심지표 시트 ──
   //    '월별 누적 포함' 체크 시: 데이터 있는 모든 년-월(최신순) / 미체크 시: 선택한 월만
   const cumChk=document.getElementById('dlyCumChk')?.checked;
+  if(cumChk) await ensureRevAllYears();   // 누적 시트는 전 연도 데이터 필요
   let ymList;
   if(cumChk){
     const ymSet=new Set();
@@ -7744,7 +7802,7 @@ function setUniFilter(type, btn, val){
 }
 
 function buildUniFilterBtns(){
-  const years=[...new Set(_revData.map(r=>r.year).filter(Boolean))].sort();
+  const years=_revYears().slice().sort((a,b)=>a-b);
   const allMonths=[1,2,3,4,5,6,7,8,9,10,11,12];
   const chs=sortCh([...new Set(_revData.map(r=>r.ch).filter(Boolean))]);
 
@@ -7827,7 +7885,7 @@ async function _doDeleteSelectedUni(){
       if(error) throw error;
     }
     _uniSel.clear();
-    _revLoaded=false; await loadRevenueData();
+    await reloadRevLoadedYears();
     addHistory({menu:'매출관리',type:'edit',code:'MULTI',name:`통합 ${ids.length}건`,desc:'통합 데이터 선택 삭제',before:`${ids.length}건`,after:'삭제',user:'수동'});
     goRevPage('unified');
     alert(`${ids.length}건 삭제 완료`);
@@ -7836,6 +7894,13 @@ async function _doDeleteSelectedUni(){
 }
 
 function renderUnifiedTable(){
+  // 연도 기본값/적재 보장 — 기본은 최신 연도, '전체' 선택 시에만 전 연도 로드
+  if(_uniFilter.year===null||_uniFilter.year===undefined) _uniFilter.year=_revYears()[0]||new Date().getFullYear();
+  if(_uniFilter.year==='ALL'){
+    if(_revYearRange.some(y=>!_revYearsLoaded.has(y))){ ensureRevAllYears().then(renderUnifiedTable); return; }
+  } else if(!_revYearsLoaded.has(Number(_uniFilter.year))){
+    ensureRevYear(_uniFilter.year).then(renderUnifiedTable); return;
+  }
   buildUniFilterBtns();
   document.getElementById('revUniTable')?.classList.toggle('uni-locked', !_uniEditMode);
   const srch=(document.getElementById('revUniSrch')?.value||'').toLowerCase();
@@ -8806,8 +8871,7 @@ async function submitRevUpload(){
 
     _revUpFiles = {};
     renderRevUpSlots();
-    _revLoaded = false;
-    if(totalRows > 0) await loadRevenueData(); // 새 행 포함한 통합 데이터 캐시 즉시 갱신
+    if(totalRows > 0) await reloadRevLoadedYears(); // 업로드 반영(적재된 연도 + 범위 갱신). 업로드가 새 연도면 범위에 잡힘
 
     let msg = `✅ ${totalRows}건 업로드 완료`;
     if(errors.length) msg += `\n\n${errors.join('\n')}`;
