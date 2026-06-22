@@ -3574,6 +3574,7 @@ async function logiNoticeAdd(){
   await cloudKvSave('logi_notices', _logiNotices);
   // 등록한 본인 PC는 알림 기준선만 올려 두어 자기 공지로 알람이 다시 울리지 않게 함
   _logiSeenNoticeId = Math.max(_logiSeenNoticeId, newId);
+  _logiBroadcast();   // 다른 PC 즉시 알림
   toast('공지가 등록되었습니다. 다른 PC에 알림이 전송됩니다.');
 }
 
@@ -3694,10 +3695,12 @@ async function _logiCheckNewNotice(){
   let arr;
   try{ arr = (await cloudKvLoad('logi_notices')) || []; }catch{ return; }
   const latest = _logiLatestId(arr);
-  if(latest > _logiSeenNoticeId){
+  const isNew = latest > _logiSeenNoticeId;
+  // 항상 최신 내용 반영(삭제·수정 포함) → 다른 PC 화면 즉시 동기화
+  _logiNotices = arr;
+  if(document.getElementById('page-logihome')?.classList.contains('active')) logiRenderNotices();
+  if(isNew){
     _logiSeenNoticeId = latest;
-    _logiNotices = arr;
-    if(document.getElementById('page-logihome')?.classList.contains('active')) logiRenderNotices();
     logiNotifyStart('공지사항이 등록되었습니다.');
   }
 }
@@ -3717,6 +3720,17 @@ async function _logiCheckNewHandover(){
   }
 }
 async function _logiCheckNew(){ await _logiCheckNewNotice(); await _logiCheckNewHandover(); }
+// 다른 PC에 "방금 변경됨" 신호 전송 (Supabase Broadcast — DB realtime publication 불필요)
+function _logiBroadcast(){
+  try{
+    if(_logiWatchCh){ _logiWatchCh.send({ type:'broadcast', event:'logi_ping', payload:{ t:Date.now() } }); return; }
+  }catch{}
+  // 감시 채널이 아직 없으면(권한상 미시작 등) 임시 채널로 1회 전송
+  try{
+    const tx = sb.channel('logi-home-rt');
+    tx.subscribe(st=>{ if(st==='SUBSCRIBED'){ tx.send({ type:'broadcast', event:'logi_ping', payload:{ t:Date.now() } }); setTimeout(()=>{ try{ sb.removeChannel(tx); }catch{} }, 1500); } });
+  }catch{}
+}
 // 알림 권한 배너 표시/숨김
 function logiUpdateAlertBar(){
   const bar = document.getElementById('lhAlertBar'); if(!bar) return;
@@ -3747,12 +3761,13 @@ async function logiStartNoticeWatch(){
   // 기준선: 로그인 시점의 가장 최근 공지/전달사항 id (기존 항목으로는 알람 X)
   try{ const cur=(await cloudKvLoad('logi_notices'))||[]; _logiNotices=cur; _logiSeenNoticeId=_logiLatestId(cur); }catch{}
   try{ const h=(await cloudKvLoad('logi_handovers'))||[]; _logiHandovers=h; _logiSeenHandoverId=_logiLatestId(h); }catch{}
-  // 폴링 폴백 (8초) — realtime 미설정 환경에서도 다른 PC 등록을 빠르게 감지
-  if(!_logiWatchPoll) _logiWatchPoll = setInterval(_logiCheckNew, 8000);
-  // Supabase realtime (즉시 반영) — 공지 + 전달사항 동시 구독
+  // 폴링 폴백 (4초) — realtime 미설정 환경에서도 다른 PC 등록을 빠르게 감지
+  if(!_logiWatchPoll) _logiWatchPoll = setInterval(_logiCheckNew, 4000);
+  // Supabase realtime (즉시 반영) — Broadcast(publication 불필요) + postgres_changes 동시 구독
   if(_logiWatchCh) return;
   try{
     _logiWatchCh = sb.channel('logi-home-rt')
+      .on('broadcast', { event:'logi_ping' }, _logiCheckNew)
       .on('postgres_changes',
         { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.logi_notices' },
         _logiCheckNewNotice)
@@ -4294,6 +4309,7 @@ async function logiNoticeDel(id){
   _logiNotices = (_logiNotices||[]).filter(n=>n.id!==id);
   logiRenderNotices();
   await cloudKvSave('logi_notices', _logiNotices);
+  _logiBroadcast();
 }
 
 // ── 전달사항 (등록 → 다른 PC 실시간 알림 + 음성, 물류팀 확인 체크 시 확인자/확인시간 기록) ──
@@ -4337,6 +4353,7 @@ async function logiHandoverAdd(){
   logiRenderHandovers();
   await cloudKvSave('logi_handovers', _logiHandovers);
   _logiSeenHandoverId = Math.max(_logiSeenHandoverId, newId);   // 본인 PC는 자기 등록으로 알람 X
+  _logiBroadcast();   // 다른 PC 즉시 알림
   toast('전달사항이 등록되었습니다. 다른 PC에 알림이 전송됩니다.');
 }
 async function logiHandoverToggle(id){
@@ -4350,12 +4367,14 @@ async function logiHandoverToggle(id){
   }
   logiRenderHandovers();
   await cloudKvSave('logi_handovers', _logiHandovers);
+  _logiBroadcast();
 }
 async function logiHandoverDel(id){
   if(!confirm('이 전달사항을 삭제할까요?')) return;
   _logiHandovers = (_logiHandovers||[]).filter(x=>x.id!==id);
   logiRenderHandovers();
   await cloudKvSave('logi_handovers', _logiHandovers);
+  _logiBroadcast();
 }
 
 // ── 소장재고 체크리스트 (제품명 + 수량, 체크 / 모든 PC 공유) ──
@@ -10277,12 +10296,13 @@ const COLLAB_STATUS = {
   doing: { label:'진행중',   color:'#F59E0B' },
   done:  { label:'완료',     color:'#3182F6' },
 };
-// 상태별 카드 파스텔 배경 (사용자 지정색이 없을 때 기본 적용)
-const COLLAB_STATUS_BG = {
-  plan:  '#ECFDF3',   // 연한 초록
-  doing: '#FFF7E8',   // 연한 주황
-  done:  '#EEF4FF',   // 연한 파랑
-};
+// 카드 랜덤 파스텔 배경 (글씨 간섭 없는 아주 연한 톤) — id 해시로 고정되어 새로고침/다른 PC에서도 동일
+const COLLAB_PASTELS = ['#FFF1F2','#FFF7ED','#FEFCE8','#ECFDF5','#ECFEFF','#EFF6FF','#F5F3FF','#FDF2F8','#F7FEE7','#FCE7F3','#F0F9FF','#FEF2F2'];
+function _collabPastel(id){
+  const s=String(id); let h=0;
+  for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return COLLAB_PASTELS[h % COLLAB_PASTELS.length];
+}
 const COLLAB_KIND = 'collab_tasks';
 const PLAN_KIND = 'collab_projects';
 let _collabTasks = [];
@@ -10332,6 +10352,10 @@ async function collabReload(){
   const [d, pd] = await Promise.all([cloudKvLoad(COLLAB_KIND), cloudKvLoad(PLAN_KIND)]);
   _collabTasks = Array.isArray(d) ? d : [];
   _planProjects = Array.isArray(pd) ? pd : [];
+  // 기존 프로젝트에 색상이 없으면 랜덤 파스텔 색상 backfill 후 1회 저장
+  let _colorBackfilled = false;
+  _planProjects.forEach(p=>{ if(!p.color){ p.color = _planRandomColor(); _colorBackfilled = true; } });
+  if(_colorBackfilled){ try{ await planProjSaveCloud(); }catch(e){} }
   _collabLoaded = true;
 }
 
@@ -10618,8 +10642,8 @@ function _collabCardHTML(t, canEdit){
   const doneBox = (t.status==='done' && t.completed_at)
     ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabDur(t.created_at, t.completed_at)}</b></div>`
     : '';
-  const stBg = COLLAB_STATUS_BG[t.status] || COLLAB_STATUS_BG.plan;
-  return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};background:${t.color||stBg};" draggable="${canEdit&&!isExp}"
+  const cardBg = t.color || _collabPastel(t.id);
+  return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};background:${cardBg};" draggable="${canEdit&&!isExp}"
       ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
       ondragover="collabCardOver(event)" ondragleave="collabCardLeave(event)" ondrop="collabCardDrop(event,'${t.id}')"
       ondblclick="collabToggleExpand(event,'${t.id}')">
