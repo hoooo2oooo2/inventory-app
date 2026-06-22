@@ -832,8 +832,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .logi-notice-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
 .logi-notice-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--bg2);border-radius:10px;border:1px solid var(--bd);}
 .logi-notice-body{flex:1;min-width:0;}
-.logi-notice-text{font-size:13px;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
-.logi-notice-meta{font-size:11px;color:var(--tx2);margin-top:4px;}
+.logi-notice-text{font-size:19px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.logi-notice-meta{font-size:12px;color:var(--tx2);margin-top:6px;}
 .logi-notice-del{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:6px;flex-shrink:0;}
 .logi-notice-del:hover{background:#FEE2E2;color:#EF4444;}
 .logi-empty{color:var(--tx2);font-size:13px;text-align:center;padding:24px 0;}
@@ -3254,7 +3254,70 @@ async function logiNoticeAdd(){
   logiRenderNotices();
   await cloudKvSave('logi_notices', _logiNotices);
   toast('공지가 등록되었습니다.');
+  logiNotifyStart('공지사항이 등록되었습니다.');
 }
+
+// ── 공지 등록 알림 (컴퓨터 알림창 + 30대 여성 음성, 미확인 시 3분마다 반복) ──
+let _logiNotifyTimer = null;
+let _logiNotifyHandle = null;
+
+// 한국어 여성 음성 선택 (브라우저별 가용 음성 중 우선순위)
+function _logiPickKoFemaleVoice(){
+  const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  if(!vs.length) return null;
+  const ko = vs.filter(v=>/ko(-KR)?/i.test(v.lang));
+  const prefer = ['heami','yuna','sora','female','여성','선희','google 한국'];
+  for(const p of prefer){ const hit = ko.find(v=>v.name.toLowerCase().includes(p)); if(hit) return hit; }
+  return ko[0] || null;
+}
+function logiSpeak(text){
+  try{
+    if(!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    const v = _logiPickKoFemaleVoice();
+    if(v) u.voice = v;
+    u.rate = 1.0;
+    u.pitch = 1.25;   // 약간 높은 톤 → 30대 여성 느낌
+    u.volume = 1.0;
+    speechSynthesis.speak(u);
+  }catch(e){ console.warn('logiSpeak 실패', e); }
+}
+function _logiFireNotice(text){
+  logiSpeak(text);
+  if(!('Notification' in window) || Notification.permission!=='granted'){
+    toast('📢 ' + text);
+    return;
+  }
+  try{
+    if(_logiNotifyHandle){ try{ _logiNotifyHandle.close(); }catch{} }
+    const n = new Notification('📢 물류팀 공지사항', {
+      body: text + '\n(이 알림을 클릭하면 반복 안내가 종료됩니다)',
+      requireInteraction: true,
+      tag: 'logi-notice'
+    });
+    n.onclick = ()=>{ window.focus(); logiNotifyStop(); n.close(); };
+    _logiNotifyHandle = n;
+  }catch(e){ toast('📢 ' + text); }
+}
+function logiNotifyStart(text){
+  logiNotifyStop();
+  const fire = ()=> _logiFireNotice(text);
+  if('Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission().then(()=>{ fire(); });
+  }else{
+    fire();
+  }
+  // 미확인 시 3분마다 반복 (알림 클릭 시 logiNotifyStop으로 해제)
+  _logiNotifyTimer = setInterval(fire, 3*60*1000);
+}
+function logiNotifyStop(){
+  if(_logiNotifyTimer){ clearInterval(_logiNotifyTimer); _logiNotifyTimer = null; }
+  if(_logiNotifyHandle){ try{ _logiNotifyHandle.close(); }catch{} _logiNotifyHandle = null; }
+}
+// 음성 목록 비동기 로드 대비
+if('speechSynthesis' in window){ try{ speechSynthesis.onvoiceschanged = ()=>{ speechSynthesis.getVoices(); }; }catch{} }
 async function logiNoticeDel(id){
   if(!confirm('이 공지를 삭제할까요?')) return;
   _logiNotices = (_logiNotices||[]).filter(n=>n.id!==id);
