@@ -10389,10 +10389,21 @@ async function collabSaveCloud(){
   _collabBusy = true;
   try { await cloudKvSave(COLLAB_KIND, _collabTasks); }
   finally { setTimeout(()=>{ _collabBusy = false; }, 600); }
+  _collabBroadcast();
 }
 
 async function planProjSaveCloud(){
   await cloudKvSave(PLAN_KIND, _planProjects);
+  _collabBroadcast();
+}
+
+// 협업 변경 즉시 다른 PC에 알림 (Broadcast — 물류팀과 동일 방식, DB realtime publication 불필요)
+function _collabBroadcast(){
+  try{ if(_collabChannel){ _collabChannel.send({ type:'broadcast', event:'collab_ping', payload:{ t:Date.now() } }); return; } }catch{}
+  try{
+    const tx = sb.channel('collab-rt');
+    tx.subscribe(st=>{ if(st==='SUBSCRIBED'){ tx.send({ type:'broadcast', event:'collab_ping', payload:{ t:Date.now() } }); setTimeout(()=>{ try{ sb.removeChannel(tx); }catch{} }, 1500); } });
+  }catch{}
 }
 
 // ── 진행예정 프로젝트 모달 ──
@@ -10547,15 +10558,17 @@ function collabStartRealtime(){
       if(JSON.stringify(arr) !== JSON.stringify(_collabTasks)){ _collabTasks = arr; changed = true; }
       if(JSON.stringify(planArr) !== JSON.stringify(_planProjects)){ _planProjects = planArr; renderPlanProjects(); }
       if(changed){ renderCollab(); _collabSyncMark(); }
-    }, 8000);
+    }, 20000);
   }
-  // Supabase realtime (즉시 반영) — 실패해도 폴링이 커버
+  // Supabase realtime (즉시 반영) — Broadcast(publication 불필요) + postgres_changes 동시. 폴링은 안전망(20s)
   if(_collabChannel) return;
   try{
+    const _collabApply = async ()=>{ if(_collabBusy) return; await collabReload(); renderCollab(); renderPlanProjects(); _collabSyncMark(); };
     _collabChannel = sb.channel('collab-rt')
+      .on('broadcast', { event:'collab_ping' }, _collabApply)
       .on('postgres_changes',
         { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.'+COLLAB_KIND },
-        async ()=>{ if(_collabBusy) return; await collabReload(); renderCollab(); _collabSyncMark(); })
+        _collabApply)
       .subscribe(st=>{ if(st==='SUBSCRIBED') _collabSyncMark(); });
   }catch(e){ console.warn('collab realtime 구독 실패(폴링으로 대체)', e); }
 }
