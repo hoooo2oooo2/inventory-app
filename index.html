@@ -804,6 +804,44 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .fo-obtn-addrow{background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;}
 .fo-obtn-addrow:hover{background:#D1FAE5;}
 </style>
+<style>
+/* ═══ 물류팀 홈 ═══ */
+.logi-home{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr;gap:14px;padding:16px;height:calc(100vh - 110px);box-sizing:border-box;}
+.logi-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;flex-direction:column;min-height:0;}
+.logi-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.logi-card-title{font-size:15px;font-weight:800;color:var(--tx);}
+.logi-add-btn{padding:5px 12px;border:none;border-radius:8px;background:var(--pr);color:#fff;font-size:12px;font-weight:700;cursor:pointer;}
+.logi-add-btn:hover{filter:brightness(1.05);}
+/* 현재시각 */
+.logi-clock-card{align-items:center;justify-content:center;background:linear-gradient(135deg,#1E3A8A,#3182F6);border:none;color:#fff;}
+.logi-clock-time{font-size:54px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;line-height:1;}
+.logi-clock-date{font-size:16px;font-weight:600;margin-top:12px;opacity:.92;}
+/* 달력 */
+.logi-cal-head{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:10px;}
+.logi-cal-title{font-size:16px;font-weight:800;color:var(--tx);min-width:130px;text-align:center;}
+.logi-cal-nav{width:30px;height:30px;border:1px solid var(--bd);border-radius:8px;background:var(--bg2);color:var(--tx);font-size:16px;cursor:pointer;}
+.logi-cal-nav:hover{background:var(--prl);}
+.logi-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;flex:1;}
+.logi-cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--tx2);padding:4px 0;}
+.logi-cal-cell{display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--tx);border-radius:8px;min-height:30px;}
+.logi-cal-cell.sun{color:#EF4444;}
+.logi-cal-cell.sat{color:#3182F6;}
+.logi-cal-cell.today{background:var(--pr);color:#fff;font-weight:800;}
+.logi-cal-cell.empty{visibility:hidden;}
+/* 공지사항 */
+.logi-notice-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+.logi-notice-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--bg2);border-radius:10px;border:1px solid var(--bd);}
+.logi-notice-body{flex:1;min-width:0;}
+.logi-notice-text{font-size:13px;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.logi-notice-meta{font-size:11px;color:var(--tx2);margin-top:4px;}
+.logi-notice-del{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:6px;flex-shrink:0;}
+.logi-notice-del:hover{background:#FEE2E2;color:#EF4444;}
+.logi-empty{color:var(--tx2);font-size:13px;text-align:center;padding:24px 0;}
+/* 메모장 */
+.logi-memo-status{font-size:11px;color:var(--tx2);}
+.logi-memo-area{flex:1;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;}
+.logi-memo-area:focus{outline:none;border-color:var(--pr);background:var(--bg);}
+</style>
 </head>
 <body>
 
@@ -1019,6 +1057,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
+  <div class="ni" id="nav-logihome" onclick="goMenu('logihome')" style="display:none;">🏠 홈</div>
+  <div class="ni" id="nav-logistock" onclick="goMenu('logistock')" style="display:none;">📦 소장재고 확인</div>
 </nav>
 </div>
 
@@ -1082,6 +1122,51 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div class="page" id="page-calendar">
   <iframe id="calPageFrame" src="" title="업무 캘린더"
     style="width:100%;border:none;height:calc(100vh - 110px);min-height:560px;display:block;"></iframe>
+</div>
+
+<!-- ═══ 물류팀 홈 ═══ -->
+<div class="page" id="page-logihome">
+  <div class="logi-home">
+    <!-- 상단 행: 현재시각 + 달력 -->
+    <div class="logi-card logi-clock-card">
+      <div class="logi-clock-time" id="logiClockTime">00:00:00</div>
+      <div class="logi-clock-date" id="logiClockDate">—</div>
+    </div>
+    <div class="logi-card logi-cal-card">
+      <div class="logi-cal-head">
+        <button class="logi-cal-nav" onclick="logiCalMove(-1)">‹</button>
+        <span class="logi-cal-title" id="logiCalTitle">—</span>
+        <button class="logi-cal-nav" onclick="logiCalMove(1)">›</button>
+      </div>
+      <div class="logi-cal-grid" id="logiCalGrid"></div>
+    </div>
+    <!-- 하단 행: 공지사항 + 메모장 -->
+    <div class="logi-card logi-notice-card">
+      <div class="logi-card-head">
+        <span class="logi-card-title">📢 공지사항</span>
+        <button class="logi-add-btn" onclick="logiNoticeAdd()">＋ 등록</button>
+      </div>
+      <div class="logi-notice-list" id="logiNoticeList"></div>
+    </div>
+    <div class="logi-card logi-memo-card">
+      <div class="logi-card-head">
+        <span class="logi-card-title">📝 메모장</span>
+        <span class="logi-memo-status" id="logiMemoStatus"></span>
+      </div>
+      <textarea class="logi-memo-area" id="logiMemoArea" placeholder="자유롭게 메모하세요. 입력 시 자동 저장됩니다."></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 물류팀 소장재고 확인 (보류 — 자리만) ═══ -->
+<div class="page" id="page-logistock">
+  <div style="display:flex;align-items:center;justify-content:center;height:calc(100vh - 160px);">
+    <div style="text-align:center;color:var(--tx2);">
+      <div style="font-size:48px;margin-bottom:12px;">📦</div>
+      <div style="font-size:18px;font-weight:800;color:var(--tx);margin-bottom:6px;">소장재고 확인</div>
+      <div style="font-size:13px;">준비 중입니다.</div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ 재고관리 ═══ -->
@@ -2652,6 +2737,7 @@ const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', 
 const TEAM_PRESETS = {
   cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit' } },
+  logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit' } },
 };
 
@@ -2731,7 +2817,8 @@ const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'},
-  {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'}
+  {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
+  {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 소장재고 확인'}
 ];
 // 매출관리 하위탭 — 각각 개별 권한 부여 가능
 const REV_SUBS = [
@@ -2745,6 +2832,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 const DEPTS = [
   { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family'] },
   { id:'design', label:'디자인팀',  menus:['collab','calendar'] },
+  { id:'logi',   label:'물류팀',    menus:['logihome','logistock'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales'] },
 ];
 let _activeDept = null;
@@ -2813,6 +2901,11 @@ function permKeyRows(){
       rows.push({ key:'collab', label:'협업업무' });
     } else if(m.id==='calendar'){
       rows.push({ key:'calendar', label:'업무보고' });
+    } else if(m.id==='logihome'){
+      rows.push({ header:'물류팀' });
+      rows.push({ key:'logihome', label:'홈' });
+    } else if(m.id==='logistock'){
+      rows.push({ key:'logistock', label:'소장재고 확인' });
     } else if(m.id==='revenue'){
       rows.push({ header:'매출관리' });
       REV_SUBS.forEach(s=> rows.push({ key:'revenue.'+s.id, label:'└ '+s.label }));
@@ -2992,6 +3085,7 @@ function mpOpenForm(username){
        <button class="btn btn-sm" onclick="mpApplyPreset('cx')">CX팀</button>
        <button class="btn btn-sm" onclick="mpApplyPreset('ops')">운영관리</button>
        <button class="btn btn-sm" onclick="mpApplyPreset('design')">디자인팀</button>
+       <button class="btn btn-sm" onclick="mpApplyPreset('logi')">물류팀</button>
        <button class="btn btn-sm" onclick="mpApplyPreset('all')">전체 수정</button>
        <button class="btn btn-sm" onclick="mpApplyPreset('none')">전체 없음</button>
      </div>
@@ -3080,6 +3174,123 @@ async function cloudKvLoad(kind){
     if(error){ console.warn('cloudKvLoad 오류', kind, error.message); return null; }
     return data ? data.data : null;
   }catch(e){ console.warn('cloudKvLoad 실패', kind, e); return null; }
+}
+
+// ══════════════════════════════════════════════
+// 물류팀 홈 — 현재시각 / 달력 / 공지사항 / 메모장
+// ══════════════════════════════════════════════
+let _logiClockTimer = null;
+let _logiCalRef = new Date();            // 달력에 표시 중인 기준 달
+let _logiNotices = null;                 // 공지 배열 (cloud KV: 'logi_notices')
+let _logiMemoTimer = null;
+let _logiLoaded = false;
+
+function _logiEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function logiClockTick(){
+  const d = new Date();
+  const t = document.getElementById('logiClockTime');
+  const dt = document.getElementById('logiClockDate');
+  if(!t || !dt) return;
+  t.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  dt.textContent = `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${DNAMES[d.getDay()]})`;
+}
+
+function logiCalMove(delta){
+  _logiCalRef = new Date(_logiCalRef.getFullYear(), _logiCalRef.getMonth()+delta, 1);
+  logiRenderCal();
+}
+function logiRenderCal(){
+  const grid = document.getElementById('logiCalGrid');
+  const title = document.getElementById('logiCalTitle');
+  if(!grid || !title) return;
+  const y = _logiCalRef.getFullYear(), m = _logiCalRef.getMonth();
+  title.textContent = `${y}년 ${m+1}월`;
+  const today = new Date();
+  const firstDow = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  let html = DNAMES.map((d,i)=>`<div class="logi-cal-dow" style="${i===0?'color:#EF4444':i===6?'color:#3182F6':''}">${d}</div>`).join('');
+  for(let i=0;i<firstDow;i++) html += `<div class="logi-cal-cell empty"></div>`;
+  for(let day=1;day<=daysInMonth;day++){
+    const dow = new Date(y,m,day).getDay();
+    const isToday = y===today.getFullYear() && m===today.getMonth() && day===today.getDate();
+    const cls = ['logi-cal-cell', dow===0?'sun':dow===6?'sat':'', isToday?'today':''].filter(Boolean).join(' ');
+    html += `<div class="${cls}">${day}</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+// ── 공지사항 ──
+async function logiLoadNotices(){
+  if(_logiNotices===null){ _logiNotices = (await cloudKvLoad('logi_notices')) || []; }
+  logiRenderNotices();
+}
+function logiRenderNotices(){
+  const box = document.getElementById('logiNoticeList');
+  if(!box) return;
+  const list = _logiNotices || [];
+  if(!list.length){ box.innerHTML = `<div class="logi-empty">등록된 공지가 없습니다.</div>`; return; }
+  box.innerHTML = list.map(n=>`
+    <div class="logi-notice-item">
+      <div class="logi-notice-body">
+        <div class="logi-notice-text">${_logiEsc(n.text)}</div>
+        <div class="logi-notice-meta">${_logiEsc(n.author||'')} · ${_logiEsc(n.date||'')}</div>
+      </div>
+      <button class="logi-notice-del" title="삭제" onclick="logiNoticeDel(${n.id})">✕</button>
+    </div>`).join('');
+}
+async function logiNoticeAdd(){
+  const txt = prompt('공지 내용을 입력하세요.');
+  if(!txt || !txt.trim()) return;
+  const u = window.__CURRENT_USER;
+  const d = new Date();
+  _logiNotices = _logiNotices || [];
+  _logiNotices.unshift({
+    id: Date.now(),
+    text: txt.trim(),
+    author: u ? (u.name||u.username) : '',
+    date: `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`
+  });
+  logiRenderNotices();
+  await cloudKvSave('logi_notices', _logiNotices);
+  toast('공지가 등록되었습니다.');
+}
+async function logiNoticeDel(id){
+  if(!confirm('이 공지를 삭제할까요?')) return;
+  _logiNotices = (_logiNotices||[]).filter(n=>n.id!==id);
+  logiRenderNotices();
+  await cloudKvSave('logi_notices', _logiNotices);
+}
+
+// ── 메모장 ──
+async function logiLoadMemo(){
+  const area = document.getElementById('logiMemoArea');
+  if(!area) return;
+  if(!area.dataset.loaded){
+    const saved = await cloudKvLoad('logi_memo');
+    area.value = (saved && saved.text) ? saved.text : '';
+    area.dataset.loaded = '1';
+    area.oninput = ()=>{
+      const st = document.getElementById('logiMemoStatus');
+      if(st) st.textContent = '입력 중…';
+      clearTimeout(_logiMemoTimer);
+      _logiMemoTimer = setTimeout(async()=>{
+        await cloudKvSave('logi_memo', { text: area.value, ts: Date.now() });
+        if(st) st.textContent = '저장됨 ✓';
+        setTimeout(()=>{ if(st) st.textContent=''; }, 2000);
+      }, 800);
+    };
+  }
+}
+
+function loadLogiHome(){
+  logiClockTick();
+  if(_logiClockTimer) clearInterval(_logiClockTimer);
+  _logiClockTimer = setInterval(logiClockTick, 1000);
+  _logiCalRef = new Date();
+  logiRenderCal();
+  logiLoadNotices();
+  logiLoadMemo();
 }
 
 // ══════════════════════════════════════════════
@@ -3336,15 +3547,16 @@ function goPage(p){
   // 권한 없는 메뉴 접근 차단
   if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   currentPage=p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar','logihome','logistock'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===p);
   });
   if(p==='calendar') loadCalPage();
   if(p==='collab') loadCollabPage();
+  if(p==='logihome') loadLogiHome();
   // 디자인팀 메뉴에서는 채팅 버튼 숨김 (UI 겹침 방지)
   const _chatFab = document.getElementById('chatFab');
-  if(_chatFab) _chatFab.style.display = ['collab','calendar'].includes(p) ? 'none' : '';
+  if(_chatFab) _chatFab.style.display = ['collab','calendar','logihome','logistock'].includes(p) ? 'none' : '';
   document.getElementById('addTopBtn').style.display=p==='inv'?'':'none';
   document.getElementById('addTopBtn').onclick=()=>openAddProd();
   document.getElementById('uploadTopBtn').onclick=()=>openUpload(p);
@@ -3366,11 +3578,11 @@ function goPage(p){
   if(p==='family') initFamilyPage();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
-  if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote'||p==='collab'||p==='calendar') ? 'hidden' : '';
+  if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote'||p==='collab'||p==='calendar'||p==='logihome'||p==='logistock') ? 'hidden' : '';
   if(window.__CURRENT_USER) updateNavVisibility();
   _applyWriteLockUI();
   // 캘린더 페이지에서는 상단 엑셀 업로드 버튼 숨김 (해당 없음) — _applyWriteLockUI 이후 적용
-  if(p==='calendar'||p==='collab'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
+  if(p==='calendar'||p==='collab'||p==='logihome'||p==='logistock'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
 }
 
 // ══════════════════════════════════════════════
