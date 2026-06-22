@@ -810,7 +810,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* ═══ 물류팀 홈 ═══ */
 /* ═══ 물류팀 홈 — 세로 레이아웃 리디자인 ═══ */
 .lh2-wrap{height:calc(100vh - 110px);overflow:hidden;background:var(--bg2);box-sizing:border-box;}
-.lh2-inner{height:100%;max-width:1180px;margin:0 auto;padding:13px 18px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;}
+.lh2-inner{height:100%;margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;}
+.lh2-cols{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:12px;}
+@media(max-width:1080px){.lh2-cols{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:620px){.lh2-wrap{overflow:auto;}.lh2-cols{grid-template-columns:1fr;}}
 .lh2-alertbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:14px;background:#FEF3E2;border:1px solid #F6C77A;border-radius:12px;padding:10px 16px;font-size:13px;color:#92560A;font-weight:600;flex-wrap:wrap;}
 .lh2-card{background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);padding:12px 18px;display:flex;flex-direction:column;min-height:0;flex:1;}
 .lh2-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;gap:10px;}
@@ -1279,6 +1282,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <button class="btn btn-pr btn-sm" onclick="logiEnableAlerts()">알림 켜기</button>
       </div>
 
+      <div class="lh2-cols">
       <!-- 공지사항 -->
       <section class="lh2-card">
         <div class="lh2-head">
@@ -1323,6 +1327,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
         <textarea class="lh2-memo" id="logiMemoArea" placeholder="자유롭게 메모하세요. 입력 시 자동 저장됩니다."></textarea>
       </section>
+      </div>
 
     </div>
   </div>
@@ -10272,6 +10277,12 @@ const COLLAB_STATUS = {
   doing: { label:'진행중',   color:'#F59E0B' },
   done:  { label:'완료',     color:'#3182F6' },
 };
+// 상태별 카드 파스텔 배경 (사용자 지정색이 없을 때 기본 적용)
+const COLLAB_STATUS_BG = {
+  plan:  '#ECFDF3',   // 연한 초록
+  doing: '#FFF7E8',   // 연한 주황
+  done:  '#EEF4FF',   // 연한 파랑
+};
 const COLLAB_KIND = 'collab_tasks';
 const PLAN_KIND = 'collab_projects';
 let _collabTasks = [];
@@ -10607,7 +10618,8 @@ function _collabCardHTML(t, canEdit){
   const doneBox = (t.status==='done' && t.completed_at)
     ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabDur(t.created_at, t.completed_at)}</b></div>`
     : '';
-  return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};${t.color?`background:${t.color};`:''}" draggable="${canEdit&&!isExp}"
+  const stBg = COLLAB_STATUS_BG[t.status] || COLLAB_STATUS_BG.plan;
+  return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};background:${t.color||stBg};" draggable="${canEdit&&!isExp}"
       ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
       ondragover="collabCardOver(event)" ondragleave="collabCardLeave(event)" ondrop="collabCardDrop(event,'${t.id}')"
       ondblclick="collabToggleExpand(event,'${t.id}')">
