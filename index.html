@@ -28,6 +28,9 @@ body{background:var(--bg2);min-height:100vh;}
 .tbr{display:flex;gap:6px;align-items:center;}
 
 /* NAV */
+/* 부서탭 + 메뉴탭을 하나의 스택으로 묶어 함께 상단 고정 (스크롤 시 부서탭이 메뉴탭에 가려지지 않도록) */
+.nav-stack{position:sticky;top:50px;z-index:99;background:var(--bg);}
+.nav-stack .nav{position:static;top:auto;z-index:auto;}
 .nav{background:var(--bg);border-bottom:0.5px solid var(--bd);padding:0 14px;display:flex;overflow-x:auto;position:sticky;top:50px;z-index:99;}
 .nav::-webkit-scrollbar{height:0;}
 .ni{padding:11px 13px;font-size:13px;cursor:pointer;color:var(--tx2);border-bottom:2px solid transparent;white-space:nowrap;user-select:none;transition:color .15s;}
@@ -108,13 +111,13 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);border-radius:0 0 12px 12px;}
 /* 에디터 — 텍스트 라인 + 블럭 혼합 */
 .rp-editor{min-height:80px;padding:6px 10px 10px;outline:none;}
-.rp-line{outline:none;min-height:22px;font-size:12.5px;line-height:1.75;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
+.rp-line{display:inline-block;box-sizing:border-box;width:calc(100% - 22px);vertical-align:top;outline:none;min-height:18px;font-size:12.5px;line-height:1.5;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
 .rp-line[data-empty-ph]:empty::before{content:attr(data-empty-ph);color:var(--tx2);opacity:.4;pointer-events:none;font-style:italic;}
 /* 블럭 카드 */
-.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:3px 8px 3px 9px;font-size:12px;line-height:1.6;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;user-select:none;-webkit-user-select:none;cursor:default;}
+.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:none;-webkit-user-select:none;cursor:default;}
 .rp-block.pinned{border-color:#FDE68A;border-left-color:#F59E0B;background:#FFFEF5;}
 .rp-block-text{flex:1;min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden;}
-.rp-block-main{font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rp-block-main{font-weight:700;font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.35;word-break:break-word;}
 .rp-block-sub{font-size:11px;color:var(--tx2);white-space:nowrap;flex-shrink:0;}
 .rp-block-cat{font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;color:#fff;flex-shrink:0;white-space:nowrap;}
 .rp-block-btns{display:flex;gap:2px;flex-shrink:0;align-items:center;opacity:0;pointer-events:none;transition:opacity .15s;}
@@ -129,8 +132,8 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-section-pinned:empty{display:none;}
 .rp-editor-wrap{flex:1;display:flex;flex-direction:column;overflow-y:auto;}
 /* 텍스트 라인 핀 버튼 */
-.rp-line-pin-btn{display:inline-block;opacity:0;font-size:10px;padding:1px 3px;cursor:pointer;border:none;background:none;vertical-align:middle;transition:opacity .1s;color:#B45309;line-height:1.6;}
-.rp-line:hover + .rp-line-pin-btn,.rp-line-pin-btn:hover{opacity:.35;}
+.rp-line-pin-btn{display:inline-block;width:20px;text-align:right;opacity:0;font-size:11px;padding:0;cursor:pointer;border:none;background:none;vertical-align:top;transition:opacity .1s;color:#B45309;line-height:1.5;}
+.rp-line:hover + .rp-line-pin-btn,.rp-line-pin-btn:hover{opacity:.55;}
 /* 블럭 인라인 폼 */
 .rp-bp-form{display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--bg);border:1.5px solid var(--pr);border-radius:7px;margin:3px 0;}
 .rp-bp-input{flex:1;min-width:0;border:none;outline:none;font-size:12px;font-family:inherit;padding:2px 4px;background:transparent;color:var(--tx);}
@@ -995,6 +998,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 </div>
 
 <!-- NAV -->
+<div class="nav-stack">
 <!-- 부서 탭 -->
 <div class="nav" id="deptNav" style="border-bottom:none;padding-bottom:0;"></div>
 <!-- 부서별 메뉴 -->
@@ -1012,6 +1016,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
 </nav>
+</div>
 
 <!-- ═══ 협업업무 (디자인팀) ═══ -->
 <div class="page" id="page-collab">
@@ -8951,6 +8956,7 @@ function loadCollabPage(){
   _renderCatSidebar();
   loadReport().then(async ()=>{
     await _reportMigrateFromCalendar();
+    _rpMigratePins();
     renderReportPanel();
     renderCatPanel();
     // 키보드 설정은 _rpBuildEditor에서 섹션별로 자동 등록됨
@@ -9448,10 +9454,26 @@ function _reportKey(p,d){ return `${p||_reportPerson}|${d||_reportDate}`; }
 // ── 섹션 헬퍼 ──
 function _rpContentOf(entry, section){ return section==='pm' ? (entry.content_pm||[]) : (entry.content_am||[]); }
 function _rpSectionOf(el){ return el?.closest('#rpEditorPm') ? 'pm' : 'am'; }
+// 고정핀은 담당자별 개별 저장 (공유 X) — 각자 자기 고정 내용만 보임
 function _rpGlobalPins(){
-  const k='__global_pins__';
+  const k='__pins__'+(_reportPerson||'전체');
   if(!_reportAllData[k]) _reportAllData[k]={pinned_am:[],pinned_pm:[]};
   return _reportAllData[k];
+}
+// 구버전 공유 고정핀(__global_pins__) → 담당자별로 1회 복제 (기존 내용 유실 방지)
+function _rpMigratePins(){
+  if(_reportAllData['__pins_migrated_v1__']) return;
+  _reportAllData['__pins_migrated_v1__']=true;
+  const old=_reportAllData['__global_pins__'];
+  if(old && ((old.pinned_am&&old.pinned_am.length)||(old.pinned_pm&&old.pinned_pm.length))){
+    COLLAB_PEOPLE.forEach(person=>{
+      const k='__pins__'+person;
+      if(!_reportAllData[k]) _reportAllData[k]={pinned_am:[],pinned_pm:[]};
+      _reportAllData[k].pinned_am=JSON.parse(JSON.stringify(old.pinned_am||[]));
+      _reportAllData[k].pinned_pm=JSON.parse(JSON.stringify(old.pinned_pm||[]));
+    });
+  }
+  _reportAutoSave();
 }
 function _rpCreateLinePinBtn(id, section){
   const btn=document.createElement('button');
@@ -10483,6 +10505,7 @@ async function collabSendToPlan(id){
     id:'pp'+Date.now()+Math.random().toString(36).slice(2,5),
     title:t.title, detail:t.detail||'',
     assignees:[t.assignee], priority:'mid', deadline:'', status:'active',
+    color:t.color||_planRandomColor(),
     created_at:new Date().toISOString(), updated_at:new Date().toISOString()
   });
   _collabTasks = _collabTasks.filter(x=>x.id!==id);
@@ -10502,13 +10525,14 @@ async function collabDrop(ev, person){
     const pid = raw.slice(5);
     const proj = _planProjects.find(x=>x.id===pid);
     if(!proj) return;
-    // 프로젝트를 해당 담당자의 업무(진행중)로 등록
+    // 프로젝트를 해당 담당자의 업무로 등록 — 드래그로 가져가도 진행예정 상태 유지
+    // (진행중 자동변경은 ① 업무보고 단축키 블록 선택, ② 업무 수정에서 진행중 지정 — 이 두 경우만)
     const newTask = {
       id: 'ct'+Date.now()+Math.random().toString(36).slice(2,5),
       assignee: person,
       title: proj.title,
       detail: proj.detail || '',
-      status: 'doing',
+      status: 'plan',
       color: proj.color || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
