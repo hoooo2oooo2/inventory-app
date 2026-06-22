@@ -3277,22 +3277,66 @@ function _logiPickKoFemaleVoice(){
   for(const p of prefer){ const hit = ko.find(v=>v.name.toLowerCase().includes(p)); if(hit) return hit; }
   return ko[0] || null;
 }
+// ── 알림음(딩동) — Web Audio로 생성, 볼륨 직접 제어 가능 ──
+let _logiAudioCtx = null;
+function _logiGetCtx(){
+  try{
+    if(!_logiAudioCtx) _logiAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(_logiAudioCtx.state==='suspended') _logiAudioCtx.resume();
+    return _logiAudioCtx;
+  }catch{ return null; }
+}
+// 두 음(딩-동) 차임 재생, 반환값 = 차임 길이(초) → 음성 시작 지연용
+function logiChime(){
+  const ctx = _logiGetCtx(); if(!ctx) return 0;
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.gain.value = 1.0;            // 크게 (음악 위로 들리도록)
+  master.connect(ctx.destination);
+  [[880,0],[660,0.20]].forEach(([f,t])=>{
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type='sine'; o.frequency.value=f;
+    o.connect(g); g.connect(master);
+    const st = now+t;
+    g.gain.setValueAtTime(0.0001, st);
+    g.gain.exponentialRampToValueAtTime(0.9, st+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, st+0.38);
+    o.start(st); o.stop(st+0.42);
+  });
+  return 0.6;
+}
 function logiSpeak(text){
   try{
-    if(!('speechSynthesis' in window)) return;
+    if(!('speechSynthesis' in window)) return 0;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ko-KR';
     const v = _logiPickKoFemaleVoice();
     if(v) u.voice = v;
-    u.rate = 1.0;
+    u.rate = 0.98;
     u.pitch = 1.25;   // 약간 높은 톤 → 30대 여성 느낌
-    u.volume = 1.0;
+    u.volume = 1.0;   // 브라우저 음성 최대치(0~1)
+    // 들리는 음량 보강: 같은 발화를 미세 시차로 2번 겹쳐 재생(음압↑)
     speechSynthesis.speak(u);
-  }catch(e){ console.warn('logiSpeak 실패', e); }
+    const u2 = new SpeechSynthesisUtterance(text);
+    u2.lang='ko-KR'; if(v) u2.voice=v; u2.rate=0.98; u2.pitch=1.27; u2.volume=1.0;
+    setTimeout(()=>{ try{ speechSynthesis.speak(u2); }catch{} }, 40);
+    return 2.2; // 대략적인 발화 길이(초)
+  }catch(e){ console.warn('logiSpeak 실패', e); return 0; }
+}
+// ── 오디오 더킹: 이 페이지 안의 음악/영상 볼륨을 음성 동안 잠시 낮춤 ──
+function logiDuck(durationMs){
+  // 같은 페이지 내 <audio>/<video> 요소만 제어 가능(브라우저 보안상 타 사이트는 불가)
+  const els = [...document.querySelectorAll('audio,video')].filter(e=>!e.paused && e.volume>0.15);
+  if(!els.length) return;
+  els.forEach(e=>{ e._logiPrevVol = e.volume; e.volume = Math.max(0.12, e.volume*0.2); });
+  setTimeout(()=>{ els.forEach(e=>{ if(e._logiPrevVol!=null){ e.volume=e._logiPrevVol; delete e._logiPrevVol; } }); }, durationMs);
 }
 function _logiFireNotice(text){
-  logiSpeak(text);
+  const chimeLen = logiChime();                 // 1) 딩동 먼저
+  const speakLen = 2.4;
+  logiDuck((chimeLen + speakLen)*1000 + 300);    // 차임+음성 동안 더킹
+  setTimeout(()=> logiSpeak(text), chimeLen*1000); // 2) 차임 후 음성
   if(!('Notification' in window) || Notification.permission!=='granted'){
     toast('📢 ' + text);
     return;
@@ -3345,6 +3389,7 @@ async function logiStartNoticeWatch(){
   // 물류팀 홈 권한이 있는 사용자에게만 알림 (다른 부서 사용자 방해 방지)
   if(u.role!=='master' && _menuPerm('logihome')==='none') return;
   _logiWatchStarted = true;
+  _logiGetCtx();   // 로그인(사용자 클릭) 시점에 오디오 컨텍스트 활성화 → 백그라운드 알림음 허용
   // 기준선: 로그인 시점의 가장 최근 공지 id (기존 공지로는 알람 X)
   try{ const cur=(await cloudKvLoad('logi_notices'))||[]; _logiNotices=cur; _logiSeenNoticeId=_logiLatestId(cur); }catch{}
   // 폴링 폴백 (30초) — realtime 미설정 환경에서도 동작
