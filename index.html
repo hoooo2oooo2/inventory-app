@@ -218,6 +218,8 @@ body{background:var(--bg2);min-height:100vh;}
 .postit.expanded{height:auto;overflow:visible;}
 .postit:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);}
 .postit.dragging{opacity:.45;}
+.postit.drop-above{box-shadow:inset 0 3px 0 0 var(--pr),0 1px 3px rgba(0,0,0,.06);}
+.postit.drop-below{box-shadow:inset 0 -3px 0 0 var(--pr),0 1px 3px rgba(0,0,0,.06);}
 .postit-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;}
 .postit-badge{font-size:9.5px;font-weight:800;color:#fff;border-radius:20px;padding:1px 7px;white-space:nowrap;}
 .postit-title{font-size:12px;font-weight:700;color:var(--tx);word-break:break-word;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
@@ -807,16 +809,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <style>
 /* ═══ 물류팀 홈 ═══ */
 /* ═══ 물류팀 홈 — 세로 레이아웃 리디자인 ═══ */
-.lh2-wrap{height:calc(100vh - 110px);overflow:auto;background:var(--bg2);box-sizing:border-box;}
-.lh2-inner{max-width:920px;margin:0 auto;padding:28px 24px 64px;display:flex;flex-direction:column;gap:18px;}
-.lh2-alertbar{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#FEF3E2;border:1px solid #F6C77A;border-radius:12px;padding:13px 16px;font-size:13px;color:#92560A;font-weight:600;flex-wrap:wrap;}
-.lh2-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.04);padding:18px 20px;}
-.lh2-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;}
+.lh2-wrap{height:calc(100vh - 110px);overflow:hidden;background:var(--bg2);box-sizing:border-box;}
+.lh2-inner{height:100%;max-width:1180px;margin:0 auto;padding:13px 18px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;}
+.lh2-alertbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:14px;background:#FEF3E2;border:1px solid #F6C77A;border-radius:12px;padding:10px 16px;font-size:13px;color:#92560A;font-weight:600;flex-wrap:wrap;}
+.lh2-card{background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);padding:12px 18px;display:flex;flex-direction:column;min-height:0;flex:1;}
+.lh2-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;gap:10px;}
 .lh2-title{font-size:17px;font-weight:800;color:var(--tx);letter-spacing:-0.01em;}
 .lh2-add{padding:7px 14px;border:none;border-radius:9px;background:var(--pr);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;}
 .lh2-add:hover{filter:brightness(1.05);}
 /* 공지사항 / 전달사항 리스트 */
-.lh2-notice-list,.lh2-handover-list{display:flex;flex-direction:column;gap:10px;}
+.lh2-notice-list,.lh2-handover-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:9px;padding-right:2px;}
 .logi-empty{color:var(--tx2);font-size:13px;text-align:center;padding:26px 0;}
 .logi-notice-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--bg2);border-radius:12px;border:1px solid var(--bd);}
 .logi-notice-body{flex:1;min-width:0;}
@@ -834,13 +836,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lh2-handover-meta{font-size:12px;color:var(--tx2);margin-top:7px;}
 .lh2-confirm{display:inline-block;color:#15803D;font-weight:700;margin-left:2px;}
 /* 소장재고 체크리스트 */
-.lh2-chk-add{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.lh2-chk-add{flex:0 0 auto;display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
 .lh2-chk-add input{padding:9px 12px;border:1px solid var(--bd);border-radius:9px;font-size:14px;color:var(--tx);background:var(--bg);}
 .lh2-chk-add #lhChkName{flex:1;min-width:160px;}
 .lh2-chk-add #lhChkQty{width:120px;text-align:right;}
-.lh2-chk-table-wrap{border:1px solid var(--bd);border-radius:12px;overflow:hidden;}
+.lh2-chk-table-wrap{flex:1;min-height:0;overflow:auto;border:1px solid var(--bd);border-radius:12px;}
 .lh2-chk-table{width:100%;border-collapse:collapse;font-size:14px;}
-.lh2-chk-table th{font-size:12px;font-weight:700;color:var(--tx2);background:var(--bg2);padding:11px 14px;border-bottom:1px solid var(--bd);text-align:center;}
+.lh2-chk-table th{position:sticky;top:0;z-index:1;font-size:12px;font-weight:700;color:var(--tx2);background:var(--bg2);padding:11px 14px;border-bottom:1px solid var(--bd);text-align:center;}
 .lh2-chk-table td{padding:11px 14px;border-bottom:1px solid var(--bd);text-align:center;}
 .lh2-chk-table tr:last-child td{border-bottom:none;}
 .lh2-chk-table tr.chk-done{background:#F0FDF4;}
@@ -850,7 +852,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lh2-chk-qty{width:100px;padding:7px 9px;border:1px solid var(--bd);border-radius:8px;font-size:14px;text-align:right;color:var(--tx);background:var(--bg);}
 /* 메모장 (글씨 크게) */
 .lh2-memo-status{font-size:11px;color:var(--tx2);font-weight:600;}
-.lh2-memo{width:100%;box-sizing:border-box;min-height:220px;border:1px solid var(--bd);border-radius:12px;padding:16px;font-size:18px;line-height:1.75;color:var(--tx);background:var(--bg2);resize:vertical;font-family:inherit;}
+.lh2-memo{flex:1;min-height:60px;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:18px;line-height:1.7;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;}
 .lh2-memo:focus{outline:none;border-color:var(--pr);background:var(--bg);}
 /* ═══ 택배박스 ═══ */
 .lbx-wrap{padding:16px;height:calc(100vh - 110px);box-sizing:border-box;display:flex;flex-direction:column;}
@@ -10607,6 +10609,7 @@ function _collabCardHTML(t, canEdit){
     : '';
   return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};${t.color?`background:${t.color};`:''}" draggable="${canEdit&&!isExp}"
       ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
+      ondragover="collabCardOver(event)" ondragleave="collabCardLeave(event)" ondrop="collabCardDrop(event,'${t.id}')"
       ondblclick="collabToggleExpand(event,'${t.id}')">
     <div class="postit-top">
       <span class="postit-badge" style="background:${st.color};">${st.label}</span>
@@ -10625,17 +10628,33 @@ function _collabCardHTML(t, canEdit){
   </div>`;
 }
 
+// 담당자별 카드 정렬: 수동 순서(order)가 있으면 그 순서, 없으면 상태→최신 기본정렬
+const _COLLAB_ST_ORD={doing:0,done:1,plan:2};
+function _collabOrderedTasks(person){
+  const list = _collabTasks.filter(t=>!t.weekly && !_collabArchived(t) && t.assignee===person);
+  const anyOrder = list.some(t=>typeof t.order==='number');
+  list.sort((a,b)=>{
+    if(anyOrder){
+      const ao=(typeof a.order==='number')?a.order:1e9;
+      const bo=(typeof b.order==='number')?b.order:1e9;
+      if(ao!==bo) return ao-bo;
+    }
+    const so=(_COLLAB_ST_ORD[a.status??'plan']??2)-(_COLLAB_ST_ORD[b.status??'plan']??2);
+    return so||new Date(b.created_at)-new Date(a.created_at);
+  });
+  return list;
+}
+function _collabMaxOrder(person){
+  return _collabTasks.filter(t=>t.assignee===person && !t.weekly)
+    .reduce((m,t)=>Math.max(m, typeof t.order==='number'?t.order:-1), -1);
+}
+
 function renderCollab(){
   const wrap = document.getElementById('collabCols');
   if(!wrap) return;
   _collabPaths = [];
   const canEdit = _collabCanEdit();
-  const visible = _collabTasks.filter(t=>!t.weekly && !_collabArchived(t));
-  const _ST_ORD={doing:0,done:1,plan:2};
-  const baseOf = p => visible.filter(t=>t.assignee===p).sort((a,b)=>{
-    const so=(_ST_ORD[a.status??'plan']??2)-(_ST_ORD[b.status??'plan']??2);
-    return so||new Date(b.created_at)-new Date(a.created_at);
-  });
+  const baseOf = p => _collabOrderedTasks(p);
   const shownOf = (p, base) => { const f=_collabFilter[p]; return (f && f!=='all') ? base.filter(t=>t.status===f) : base; };
 
   // ── 진행 예정 프로젝트 존 ──
@@ -11828,6 +11847,43 @@ function collabDragOver(ev){
   ev.currentTarget.classList.add('drop-on');
 }
 function collabDragLeave(ev){ ev.currentTarget.classList.remove('drop-on'); }
+// ── 카드끼리 드래그하여 같은(또는 다른) 담당자 컬럼 안에서 순서 변경 ──
+function collabCardOver(ev){
+  if(!_collabDragId || String(_collabDragId).startsWith('plan:')) return;  // 진행예정 카드는 컬럼이 처리
+  ev.preventDefault(); ev.stopPropagation(); ev.dataTransfer.dropEffect='move';
+  const card=ev.currentTarget;
+  const rect=card.getBoundingClientRect();
+  const after=(ev.clientY-rect.top)>rect.height/2;
+  card.classList.toggle('drop-below', after);
+  card.classList.toggle('drop-above', !after);
+}
+function collabCardLeave(ev){ ev.currentTarget.classList.remove('drop-above','drop-below'); }
+async function collabCardDrop(ev, targetId){
+  const raw=_collabDragId;
+  if(!raw || String(raw).startsWith('plan:')) return;   // 진행예정 카드/빈 드래그는 컬럼 핸들러가 처리
+  ev.preventDefault(); ev.stopPropagation();
+  const rect=ev.currentTarget.getBoundingClientRect();
+  const after=(ev.clientY-rect.top)>rect.height/2;
+  ev.currentTarget.classList.remove('drop-above','drop-below');
+  const dragId=raw; _collabDragId=null;
+  const drag=_collabTasks.find(t=>t.id===dragId);
+  const target=_collabTasks.find(t=>t.id===targetId);
+  if(!drag || !target || dragId===targetId){ renderCollab(); return; }
+  if(!_collabCanEdit()){ toast('수정 권한이 없습니다.'); renderCollab(); return; }
+  const person=target.assignee;
+  const moved=drag.assignee!==person;
+  drag.assignee=person;
+  // 대상 담당자의 현재 정렬 순서에서 드래그 카드를 빼고, 대상 카드 위/아래로 삽입
+  let list=_collabOrderedTasks(person).filter(t=>t.id!==dragId);
+  let ti=list.findIndex(t=>t.id===targetId);
+  if(ti<0) ti=list.length-1;
+  list.splice(after?ti+1:ti, 0, drag);
+  list.forEach((t,i)=>{ t.order=i; });   // 순서 고정
+  drag.updated_at=new Date().toISOString();
+  renderCollab();
+  await collabSaveCloud();
+  if(moved) toast(`${drag.title} → ${person} 으로 이동`);
+}
 // ── 진행예정 패널로 드래그앤드롭 (task → plan project) ──
 function planDropOver(ev){
   // plan 카드 자체나 드래그 없을 때 무시
@@ -11885,6 +11941,7 @@ async function collabDrop(ev, person){
       detail: proj.detail || '',
       status: 'plan',
       color: proj.color || null,
+      order: _collabMaxOrder(person)+1,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -11897,10 +11954,11 @@ async function collabDrop(ev, person){
     return;
   }
 
-  // ── 기존 업무 카드 담당자 변경 ──
+  // ── 기존 업무 카드 담당자 변경 (빈 영역에 드롭 → 맨 아래로) ──
   const t = _collabTasks.find(x=>x.id===raw);
   if(!t || t.assignee===person) return;
   t.assignee = person;
+  t.order = _collabMaxOrder(person)+1;
   t.updated_at = new Date().toISOString();
   renderCollab();
   await collabSaveCloud();
