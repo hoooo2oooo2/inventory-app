@@ -131,6 +131,7 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-block-main{font-weight:700;font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.35;word-break:break-word;}
 .rp-block-sub{font-size:11px;color:var(--tx2);white-space:nowrap;flex-shrink:0;}
 .rp-block-cat{font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;color:#fff;flex-shrink:0;white-space:nowrap;}
+.rp-block-proj{font-weight:800;font-size:14px;line-height:1.35;flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;word-break:break-word;}
 .rp-block-btns{display:flex;gap:2px;flex-shrink:0;align-items:center;opacity:0;pointer-events:none;transition:opacity .15s;}
 .rp-block:hover .rp-block-btns{opacity:1;pointer-events:auto;}
 .rp-block-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--tx2);padding:2px 4px;border-radius:3px;line-height:1;}
@@ -12590,12 +12591,18 @@ function _rpBuildEditorFiltered(){
 function _rpBlockHTML(item, section){
   const sec=section||'am';
   const timePart = item.time ? ` — ${_esc(item.time)}` : '';
-  const linkedBadge = item.linked_title
-    ? `<span class="rp-block-cat" style="background:${item.linked_type==='plan'?'#05C072':'#6B7280'};">🔗 ${_esc(item.linked_title)}</span>`
-    : (item.category ? `<span class="rp-block-cat" style="background:${REPORT_CAT_COLOR[item.category]||'#888'};">${_esc(item.category)}</span>` : '');
+  let textInner;
+  if(item.linked_title){
+    // 협업업무 연동 블럭: 프로젝트명을 크게 표시하고 별도 업무내용칸은 두지 않음
+    const lc = item.linked_type==='plan' ? '#05C072' : '#7C3AED';
+    textInner = `<span class="rp-block-proj" style="color:${lc};">🔗 ${_esc(item.linked_title)}</span>${timePart?`<span class="rp-block-sub">${timePart}</span>`:''}`;
+  } else {
+    const catBadge = item.category ? `<span class="rp-block-cat" style="background:${REPORT_CAT_COLOR[item.category]||'#888'};">${_esc(item.category)}</span>` : '';
+    textInner = `${catBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${timePart?`<span class="rp-block-sub">${timePart}</span>`:''}`;
+  }
   return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" data-section="${sec}" contenteditable="false" tabindex="0" draggable="true" ondragstart="_rpBlockDragStart(event,'${item.id}','${sec}')" ondragend="_rpBlockDragEnd(event)" title="드래그하여 위·아래로 이동">
     <div class="rp-block-text">
-      ${linkedBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${timePart?`<span class="rp-block-sub">${timePart}</span>`:''}
+      ${textInner}
     </div>
     <div class="rp-block-btns">
       <button class="rp-block-btn" title="수정" onclick="reportEditBlock('${item.id}')">✏️</button>
@@ -12966,13 +12973,10 @@ function reportLinkApply(taskId,title){
   item.linked_task_id=taskId; item.linked_title=title;
   const el=document.getElementById('rpEditor')?.querySelector(`[data-id="${_rpLinkDropId}"]`);
   if(el){
-    let sub=el.querySelector('.rp-block-sub');
-    const newSub=` — ${[item.time,title?'🔗'+title:''].filter(Boolean).join(' ')}`;
-    if(sub) sub.textContent=newSub;
-    else{
-      sub=document.createElement('span'); sub.className='rp-block-sub'; sub.textContent=newSub;
-      el.querySelector('.rp-block-main')?.after(sub);
-    }
+    const sec=el.dataset.section||'am';
+    const tpl=document.createElement('template');
+    tpl.innerHTML=_rpBlockHTML(item, sec);
+    el.replaceWith(tpl.content.firstElementChild);
   }
   document.querySelectorAll('.rp-link-drop').forEach(d=>d.remove());
   _reportAutoSave();
