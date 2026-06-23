@@ -104,7 +104,8 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-ptab.on{border-bottom-width:2.5px;}
 .rp-pinned{background:#FFFBEB;border-bottom:0.5px solid #FDE68A;padding:6px 10px;flex-shrink:0;max-height:110px;overflow-y:auto;}
 .rp-pinned-title{font-size:10px;font-weight:800;color:#B45309;margin-bottom:3px;}
-.rp-pinned-item{font-size:11.5px;color:var(--tx);background:#FEF3C7;border:0.5px solid #FCD34D;border-radius:6px;padding:4px 8px;margin-bottom:3px;display:flex;align-items:center;gap:6px;line-height:1.4;}
+.rp-pinned-item{font-size:11.5px;color:var(--tx);background:#FEF3C7;border:0.5px solid #FCD34D;border-radius:6px;padding:4px 8px;margin-bottom:7px;display:flex;align-items:center;gap:6px;line-height:1.4;}
+.rp-pinned-item:last-child{margin-bottom:2px;}
 .rp-pin-editable{border-radius:3px;outline:none;min-width:10px;}
 .rp-pin-editable:hover{background:rgba(0,0,0,.06);}
 .rp-pin-editable:focus{background:#fff8dc;box-shadow:0 0 0 1.5px #FCD34D;}
@@ -124,13 +125,16 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-block:hover .rp-block-btns{opacity:1;pointer-events:auto;}
 .rp-block-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--tx2);padding:2px 4px;border-radius:3px;line-height:1;}
 .rp-block-btn:hover{background:var(--bd);}
+.rp-pin-move{font-size:9px;color:#B45309;padding:2px 3px;}
+.rp-block-btn:disabled{opacity:.25;cursor:default;}
+.rp-block-btn:disabled:hover{background:none;}
 /* 오전/오후 섹션 */
 .rp-section{display:flex;flex-direction:column;flex-shrink:0;}
 .rp-section-header{font-size:17px;font-weight:900;color:var(--tx);padding:7px 10px 3px;border-top:1.5px solid var(--bd);flex-shrink:0;letter-spacing:-.3px;}
 .rp-section:first-child .rp-section-header{border-top:none;padding-top:4px;}
 .rp-section-pinned{background:#FFFBEB;border-bottom:0.5px solid #FDE68A;padding:4px 10px;flex-shrink:0;}
 .rp-section-pinned:empty{display:none;}
-.rp-editor-wrap{flex:1;display:flex;flex-direction:column;overflow-y:auto;}
+.rp-editor-wrap{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding-bottom:45vh;}
 /* 텍스트 라인 핀 버튼 */
 .rp-line-pin-btn{display:inline-block;width:20px;text-align:right;opacity:0;font-size:11px;padding:0;cursor:pointer;border:none;background:none;vertical-align:top;transition:opacity .1s;color:#B45309;line-height:1.5;}
 .rp-line:hover + .rp-line-pin-btn,.rp-line-pin-btn:hover{opacity:.55;}
@@ -1206,7 +1210,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-logistock" onclick="goMenu('logistock')" style="display:none;">📦 소장재고 확인</div>
   <div class="ni" id="nav-logibox" onclick="goMenu('logibox')" style="display:none;">📮 택배박스</div>
   <div class="ni" id="nav-logistatus" onclick="goMenu('logistatus')" style="display:none;">📊 박스 현황</div>
-  <div class="ni" id="nav-coupangad" onclick="goMenu('coupangad')" style="display:none;">📊 쿠팡광고</div>
+  <div class="ni" id="nav-coupangad" onclick="goMenu('coupangad')" style="display:none;">👥 인사관리</div>
 </nav>
 </div>
 
@@ -3260,7 +3264,7 @@ const MENUS = [
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 소장재고 확인'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'},
-  {id:'coupangad',label:'📊 쿠팡광고'}
+  {id:'coupangad',label:'👥 인사관리'}
 ];
 // 매출관리 하위탭 — 각각 개별 권한 부여 가능
 const REV_SUBS = [
@@ -11818,16 +11822,19 @@ function _rpRenderPinned(){
     const curDate=_reportDate||_reportTodayStr();
     const visible=pArr.filter(p=>!p.deleted_at||p.deleted_at>curDate);
     if(!visible.length){ div.innerHTML=''; return; }
-    div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+visible.map(p=>{
+    div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+visible.map((p,i)=>{
+      // 위/아래 순서 변경 버튼 (첫/마지막은 비활성)
+      const mv=`<button class="rp-block-btn rp-pin-move" title="위로 이동" onclick="reportMovePin('${p.id}','${section}',-1)"${i===0?' disabled':''}>▲</button>`
+             +`<button class="rp-block-btn rp-pin-move" title="아래로 이동" onclick="reportMovePin('${p.id}','${section}',1)"${i===visible.length-1?' disabled':''}>▼</button>`;
       if(p.type==='text'){
         const txt=_esc(_rpPinFieldAt(p,'text',curDate));
         return `<div class="rp-pinned-item"><span class="rp-pin-editable" style="flex:1;" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span>
-          <button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
+          ${mv}<button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
       }
       const task=_esc(_rpPinFieldAt(p,'task',curDate));
       const time=_rpPinFieldAt(p,'time',curDate);
       return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b>${time?` — <span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','time',this)">${_esc(time)}</span>`:''}${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
-        <button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
+        ${mv}<button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
     }).join('');
   });
 }
@@ -12131,6 +12138,20 @@ function reportDelPinById(pinId, section){
   const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
   // 오늘 이후부터만 삭제 — 이전 날짜는 고정 내용 그대로 유지
   pin.deleted_at=_reportDate||_reportTodayStr();
+  _rpRenderPinned(); _reportAutoSave();
+}
+// 고정 블록 위/아래 순서 변경 (dir: -1=위, 1=아래) — 화면에 보이는 항목 기준으로 교환
+function reportMovePin(pinId, section, dir){
+  const gp=_rpGlobalPins();
+  const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
+  const curDate=_reportDate||_reportTodayStr();
+  const visible=pArr.filter(p=>!p.deleted_at||p.deleted_at>curDate);
+  const vIdx=visible.findIndex(p=>p.id===pinId);
+  if(vIdx<0) return;
+  const target=visible[vIdx+dir];
+  if(!target) return;                       // 첫/마지막 → 이동 없음
+  const a=pArr.indexOf(visible[vIdx]), b=pArr.indexOf(target);
+  [pArr[a],pArr[b]]=[pArr[b],pArr[a]];
   _rpRenderPinned(); _reportAutoSave();
 }
 function reportDelBlock(id){
