@@ -1369,6 +1369,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lod-drop-t{font-size:15px;font-weight:800;color:var(--tx);margin:6px 0 4px;}
 .lod-drop-s{font-size:13px;color:var(--tx2);}
 .lod-drop-hint{font-size:11.5px;color:var(--tx2);margin-top:8px;opacity:.85;}
+.lod-drop-ctl{margin-top:10px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;}
+.lod-ctl-chk{font-size:12px;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.lod-manual{display:inline-flex;gap:10px;align-items:center;font-size:12px;color:var(--tx2);}
+.lod-manual input{border:1px solid var(--bd);border-radius:7px;padding:4px 7px;background:var(--bg);color:var(--tx);font-size:12px;}
+.lod-manual input[type=number]{width:54px;}
 .lod-body{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}
 .lod-card{background:var(--bg);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
 .lod-cal{width:340px;flex-shrink:0;}
@@ -1382,7 +1387,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lod-cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--tx2);padding:3px 0;}
 .lod-cal-cell{position:relative;aspect-ratio:1/1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;color:var(--tx);cursor:default;}
 .lod-cal-cell.empty{cursor:default;}
-.lod-cal-cell.has{cursor:pointer;background:rgba(49,130,246,.08);font-weight:700;}
+.lod-cal-cell.day{cursor:pointer;}
+.lod-cal-cell.day:hover{background:rgba(49,130,246,.12);}
+.lod-cal-cell.has{background:rgba(49,130,246,.08);font-weight:700;}
 .lod-cal-cell.has:hover{background:rgba(49,130,246,.18);}
 .lod-cal-cell.sel{outline:2px solid #3182F6;}
 .lod-cal-cell.today{box-shadow:inset 0 0 0 1px var(--bd);}
@@ -1434,6 +1441,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="lod-drop-t">발주서 엑셀을 여기에 끌어다 놓으세요</div>
           <div class="lod-drop-s">또는 <button class="btn btn-pr btn-sm" onclick="document.getElementById('lodFile').click()">파일 선택</button> · 여러 파일·차수 동시 업로드 가능</div>
           <div class="lod-drop-hint">파일명에서 날짜(MM-DD)와 차수(-N)를 자동 인식합니다. 예: <b>06-23 발주서 -1.xlsx</b></div>
+          <div class="lod-drop-ctl">
+            <label class="lod-ctl-chk"><input type="checkbox" id="lodUseManual" onchange="lodToggleManual()"> 📅 날짜·차수 직접 지정 (전날 등 과거 발주서 등록)</label>
+            <span id="lodManualFields" class="lod-manual" style="display:none;">
+              <label>날짜 <input type="date" id="lodDateIn"></label>
+              <label>차수 <input type="number" id="lodRoundIn" min="1" value="1"></label>
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -5109,6 +5123,11 @@ function _lodInitDrop(){
 async function lodPickFiles(fileList){
   const files = [...fileList].filter(f=>/\.xlsx?$/i.test(f.name));
   if(!files.length){ toast('엑셀(.xlsx) 파일만 업로드할 수 있습니다.'); return; }
+  // 직접 지정 모드: 클릭/입력한 날짜·차수로 등록 (파일명 무시)
+  const useManual = !!document.getElementById('lodUseManual')?.checked;
+  const manDate = document.getElementById('lodDateIn')?.value || '';
+  let manRound = parseInt(document.getElementById('lodRoundIn')?.value,10) || 1;
+  if(useManual && !manDate){ toast('등록 날짜를 선택하세요.'); return; }
   let ok=0, lastDate='';
   for(const file of files){
     try{
@@ -5117,7 +5136,7 @@ async function lodPickFiles(fileList){
       const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
       const items = _lodParseSheet(aoa);
       if(!items.length){ toast(`❌ ${file.name}: 발주서 형식을 인식하지 못했습니다`); continue; }
-      const meta = _lodMetaFromName(file.name);
+      const meta = useManual ? { date: manDate, round: manRound++ } : _lodMetaFromName(file.name);
       const st = _lodStats(items);
       // 같은 날짜+차수 중복 → 덮어쓰기 확인
       const dup = _lodIdx.find(e=>e.date===meta.date && e.round===meta.round);
@@ -5165,9 +5184,9 @@ function lodRenderCal(){
   for(let day=1;day<=days;day++){
     const ds=`${y}-${pad(m+1)}-${pad(day)}`;
     const cnt=dayCnt[ds];
-    const cls=['lod-cal-cell'];
+    const cls=['lod-cal-cell','day'];
     if(cnt) cls.push('has'); if(ds===_lodSelDate) cls.push('sel'); if(ds===tStr) cls.push('today');
-    html+=`<div class="${cls.join(' ')}" ${cnt?`onclick="lodSelectDate('${ds}')"`:''}>`
+    html+=`<div class="${cls.join(' ')}" onclick="lodSelectDate('${ds}')">`
         + `<span>${day}</span>${cnt?`<span class="lod-cal-cnt">${cnt}</span>`:''}</div>`;
   }
   grid.innerHTML=html;
@@ -5175,8 +5194,24 @@ function lodRenderCal(){
 
 async function lodSelectDate(ds){
   _lodSelDate=ds;
+  // 직접 지정 모드면 클릭한 날짜를 등록 날짜로 동기화 + 다음 차수 자동 제안
+  const di=document.getElementById('lodDateIn');
+  if(di){ di.value=ds; }
+  const ri=document.getElementById('lodRoundIn');
+  if(ri){ const exist=(_lodIdx||[]).filter(e=>e.date===ds); ri.value=exist.length?Math.max(...exist.map(e=>e.round))+1:1; }
   lodRenderCal();
   await lodRenderDetail();
+}
+
+function lodToggleManual(){
+  const on=document.getElementById('lodUseManual')?.checked;
+  const f=document.getElementById('lodManualFields'); if(f) f.style.display=on?'inline-flex':'none';
+  if(on){
+    const di=document.getElementById('lodDateIn');
+    if(di && !di.value) di.value=_lodSelDate || new Date().toISOString().slice(0,10);
+    const ri=document.getElementById('lodRoundIn');
+    if(ri){ const d=di?di.value:''; const exist=(_lodIdx||[]).filter(e=>e.date===d); ri.value=exist.length?Math.max(...exist.map(e=>e.round))+1:1; }
+  }
 }
 
 async function lodRenderDetail(){
