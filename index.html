@@ -2756,6 +2756,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <div class="rfbtn" data-ch="__ALL__" onclick="rgnSetCh('__ALL__')">통합</div>
             </div>
           </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="rev-filter-lbl">기간</span>
+            <select id="rgnMonthSel" class="sel" style="font-size:12px;height:30px;" onchange="rgnSetMonth(this.value)"></select>
+          </div>
           <div style="font-size:12px;color:var(--tx2);font-weight:500;" id="rgnPeriod">기간: —</div>
           <span style="font-size:11px;color:var(--pr);background:var(--prl);padding:3px 9px;border-radius:12px;font-weight:600;">👆 그래프·항목 클릭 시 상세보기</span>
         </div>
@@ -2786,6 +2790,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">🧾 총 결제수</div><div class="rev-kpi-val" id="rgnK1">—</div><div class="rev-kpi-sub" id="rgnK1s" style="color:var(--tx2);"></div></div>
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 결제상품수량</div><div class="rev-kpi-val" id="rgnK2">—</div><div class="rev-kpi-sub" id="rgnK2s" style="color:var(--tx2);"></div></div>
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">↩️ 환불율</div><div class="rev-kpi-val" id="rgnK3" style="color:#D97706;">—</div><div class="rev-kpi-sub" id="rgnK3s" style="color:var(--tx2);"></div></div>
+        </div>
+        <!-- 월별 매출 추이 -->
+        <div class="rev-card" id="rgnTrendCard">
+          <div class="rev-card-title"><span>📈 월별 매출 추이 (누적)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">막대 클릭 → 해당 월 보기</span></div>
+          <div class="rev-chart-wrap" style="height:200px;"><canvas id="rgnTrendChart"></canvas></div>
+          <div class="rev-empty" id="rgnTrendEmpty" style="display:none;padding:55px 0;">월별 데이터가 쌓이면 표시됩니다</div>
         </div>
         <!-- 차트 3열: 성별 / 연령 / 지역 -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start;">
@@ -6897,12 +6907,17 @@ function setRevCh(btn, ch){
 }
 
 // ══════════════ 지역·연령별 현황 ══════════════
-// 저장 스키마(채널별): { demoRows:[[id,성별,나이,금액,결제수,수량,환불액,환불건]],
-//                       regionRows:[[id,시도,시군구,금액,결제수,수량]], prodMeta:{id:{name,cat}}, period, uploadedAt }
-const RGN_CLOUD_KEY = 'region_demo_data';
-let _rgnData = null;
+// 누적 저장(월별 분할):
+//  · 인덱스 키 'rgn_idx' = { months:['YYYY-MM'...], summary:{ch:{month:{amt,cnt,qty,rAmt}}}, meta:{id:{name,cat}} }
+//  · 월별 키 'rgn_m_YYYY-MM' = { ch:{ 'YYYY-MM-DD':{ d:[demoRows], r:[regionRows] } } }
+//  매일 하루치 파일을 날짜별로 누적 저장 → 월 단위 통계
+const RGN_IDX_KEY = 'rgn_idx';
+const rgnMKey = m => 'rgn_m_'+m;
+let _rgnIdx = null;        // 인덱스(월목록·월별합계·상품메타)
+let _rgnMonths = {};       // 로드된 월별 shard 캐시
 let _rgnLoaded = false;
 let _rgnCh = '스마트스토어';
+let _rgnMonth = 'ALL';     // 'ALL'(전체 누적) | 'YYYY-MM'
 let _rgnCharts = {};
 let _rgnCur = null;        // 현재 표시 중 {R, agg} (드릴다운 상세에서 사용)
 let _rgnProdIds = [];      // 상품 차트 막대 index → 상품ID
@@ -6915,19 +6930,63 @@ const rgnAgeKey = a => { const m=String(a).match(/\d+/); return m?parseInt(m[0])
 const rgnNum = v => { const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
 const rgnEsc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
-async function loadRegionData(){
+async function loadRegionIndex(){
   if(_rgnLoaded) return;
-  try{ _rgnData = (await cloudKvLoad(RGN_CLOUD_KEY)) || {}; }catch{ _rgnData = {}; }
+  try{ _rgnIdx = await cloudKvLoad(RGN_IDX_KEY); }catch{ _rgnIdx = null; }
+  if(!_rgnIdx || !Array.isArray(_rgnIdx.months)){
+    _rgnIdx = {months:[], summary:{}, meta:{}};
+    try{ await rgnMigrateOld(); }catch(e){ console.warn('지역데이터 마이그레이션 건너뜀', e); }
+  }
+  _rgnIdx.summary ||= {}; _rgnIdx.meta ||= {};
   _rgnLoaded = true;
 }
-async function saveRegionData(){
-  try{ await cloudKvSave(RGN_CLOUD_KEY, _rgnData); }catch(e){ console.warn('지역데이터 저장 실패', e); }
+async function rgnLoadMonth(m){
+  if(_rgnMonths[m]) return _rgnMonths[m];
+  let obj=null; try{ obj = await cloudKvLoad(rgnMKey(m)); }catch{ obj=null; }
+  _rgnMonths[m] = obj || {};
+  return _rgnMonths[m];
+}
+function rgnRecalcSummary(ch,m){
+  const chObj = (_rgnMonths[m]||{})[ch] || {};
+  const t={amt:0,cnt:0,qty:0,rAmt:0};
+  Object.values(chObj).forEach(s=>{ (s.d||[]).forEach(r=>{ t.amt+=r[3]; t.cnt+=r[4]; t.qty+=r[5]; t.rAmt+=r[6]||0; }); });
+  if(t.amt===0){ Object.values(chObj).forEach(s=>{ (s.r||[]).forEach(r=>{ t.amt+=r[3]; t.cnt+=r[4]; t.qty+=r[5]; }); }); }
+  _rgnIdx.summary[ch] ||= {}; _rgnIdx.summary[ch][m] = t;
+}
+// 옛 단일키(region_demo_data) → 신규 누적 스키마 이관 (1회)
+async function rgnMigrateOld(){
+  let old=null; try{ old = await cloudKvLoad('region_demo_data'); }catch{ old=null; }
+  if(!old || typeof old!=='object') return;
+  const touched=new Set();
+  for(const ch of Object.keys(old)){
+    const d=old[ch]; if(!d || (!d.demoRows && !d.regionRows)) continue;
+    const pm=(d.period||'').match(/(\d{4}-\d{2}-\d{2})/);
+    const key = pm ? pm[1] : new Date().toISOString().slice(0,10);
+    const m = key.slice(0,7);
+    await rgnLoadMonth(m);
+    _rgnMonths[m][ch] ||= {}; _rgnMonths[m][ch][key] = {d:d.demoRows||[], r:d.regionRows||[]};
+    Object.assign(_rgnIdx.meta, d.prodMeta||{});
+    if(!_rgnIdx.months.includes(m)) _rgnIdx.months.push(m);
+    rgnRecalcSummary(ch,m); touched.add(m);
+  }
+  if(touched.size){
+    _rgnIdx.months.sort();
+    for(const m of touched) await cloudKvSave(rgnMKey(m), _rgnMonths[m]);
+    await cloudKvSave(RGN_IDX_KEY, _rgnIdx);
+  }
 }
 
 function rgnSetCh(ch){
   _rgnCh = ch;
   document.querySelectorAll('#rgnChBtns .rfbtn').forEach(b=>b.classList.toggle('active', b.dataset.ch===ch));
   renderRegionPage();
+}
+function rgnSetMonth(v){ _rgnMonth = v; renderRegionPage(); }
+function rgnFillMonthSelect(){
+  const sel=document.getElementById('rgnMonthSel'); if(!sel) return;
+  const months=_rgnIdx.months.slice().sort();
+  sel.innerHTML = `<option value="ALL">전체 누적</option>` + months.map(m=>{ const [y,mo]=m.split('-'); return `<option value="${m}">${y}년 ${mo}월</option>`; }).join('');
+  sel.value = (_rgnMonth==='ALL' || months.includes(_rgnMonth)) ? _rgnMonth : 'ALL';
 }
 
 // ── 업로드: 시트 → 형식 감지 → 압축 행 추출 ──
@@ -6963,54 +7022,60 @@ function rgnParseSheet(ws){
   }
   return {type:null};
 }
-function rgnPeriodFromName(name){
-  const m = String(name).match(/(\d{4}-\d{2}-\d{2})[_~\s]+(\d{4}-\d{2}-\d{2})/);
-  return m ? `${m[1]} ~ ${m[2]}` : '';
+// 파일명에서 날짜키 추출 (하루치=YYYY-MM-DD, 기간=시작~끝)
+function rgnDateKey(name){
+  const r=String(name).match(/(\d{4}-\d{2}-\d{2})[_~\s]+(\d{4}-\d{2}-\d{2})/);
+  if(r) return r[1]===r[2] ? r[1] : `${r[1]}~${r[2]}`;
+  const s=String(name).match(/(\d{4}-\d{2}-\d{2})/);
+  return s ? s[1] : new Date().toISOString().slice(0,10);
 }
 async function rgnHandleFiles(files){
-  await loadRegionData();
+  await loadRegionIndex();
   const ch = document.getElementById('rgnUpCh').value;
-  let ok=0, period='', types=[];
-  _rgnData[ch] ||= {};
+  let ok=0, types=[], lastKey='';
+  const touched=new Set();
   for(const file of files){
     try{
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, {type:'array'});
       const parsed = rgnParseSheet(wb.Sheets[wb.SheetNames[0]]);
       if(!parsed.type){ toast(`❌ ${file.name}: 인구통계/지역 형식이 아닙니다`); continue; }
-      if(parsed.type==='demo') _rgnData[ch].demoRows = parsed.rows;
-      else _rgnData[ch].regionRows = parsed.rows;
-      _rgnData[ch].prodMeta = Object.assign(_rgnData[ch].prodMeta||{}, parsed.prodMeta);
-      const p = rgnPeriodFromName(file.name); if(p) period=p;
-      ok++; types.push(parsed.type==='demo'?'인구통계':'지역');
+      const key = rgnDateKey(file.name); lastKey=key;
+      const m = key.slice(0,7);
+      await rgnLoadMonth(m);
+      _rgnMonths[m][ch] ||= {}; _rgnMonths[m][ch][key] ||= {d:[], r:[]};
+      if(parsed.type==='demo') _rgnMonths[m][ch][key].d = parsed.rows;
+      else _rgnMonths[m][ch][key].r = parsed.rows;
+      Object.assign(_rgnIdx.meta, parsed.prodMeta);
+      if(!_rgnIdx.months.includes(m)) _rgnIdx.months.push(m);
+      touched.add(m); ok++; types.push(parsed.type==='demo'?'인구통계':'지역');
     }catch(e){ toast(`❌ ${file.name}: ${e.message}`); }
   }
   if(ok){
-    if(period) _rgnData[ch].period = period;
-    _rgnData[ch].uploadedAt = Date.now();
-    await saveRegionData();
-    toast(`✅ ${ch} ${types.join('·')} 등록 완료`);
-    addHistory({menu:'매출관리',type:'edit',code:'REGION',name:'지역·연령 데이터',desc:`${ch} ${types.join('·')} 업로드`,before:'-',after:'등록',user:'수동'});
+    _rgnIdx.months.sort();
+    for(const m of touched){ rgnRecalcSummary(ch, m); await cloudKvSave(rgnMKey(m), _rgnMonths[m]); }
+    await cloudKvSave(RGN_IDX_KEY, _rgnIdx);
+    toast(`✅ ${ch} ${lastKey} ${[...new Set(types)].join('·')} 저장 완료`);
+    addHistory({menu:'매출관리',type:'edit',code:'REGION',name:'지역·연령 데이터',desc:`${ch} ${lastKey} ${[...new Set(types)].join('·')} 누적저장`,before:'-',after:'등록',user:'수동'});
+    _rgnMonth = lastKey.slice(0,7);   // 방금 올린 달로 이동
     rgnSetCh(ch);
   }
 }
 function rgnDropFiles(e){ e.preventDefault(); e.currentTarget.classList.remove('drag-over'); const fs=[...e.dataTransfer.files].filter(f=>/\.xlsx?$/i.test(f.name)); if(fs.length) rgnHandleFiles(fs); }
 function rgnPickFiles(e){ const fs=[...e.target.files]; if(fs.length) rgnHandleFiles(fs); e.target.value=''; }
 
-// ── 행 수집 (통합 시 채널 결합) ──
-function rgnGetRows(ch){
-  if(!_rgnData) return null;
-  const has = c => _rgnData[c] && ((_rgnData[c].demoRows&&_rgnData[c].demoRows.length) || (_rgnData[c].regionRows&&_rgnData[c].regionRows.length));
-  const chans = ch==='__ALL__' ? ['스마트스토어','쿠팡'].filter(has) : (has(ch)?[ch]:[]);
-  if(!chans.length) return null;
-  const demoRows=[], regionRows=[], prodMeta={}; let period='';
-  chans.forEach(c=>{ const d=_rgnData[c];
-    if(d.demoRows) demoRows.push(...d.demoRows);
-    if(d.regionRows) regionRows.push(...d.regionRows);
-    Object.assign(prodMeta, d.prodMeta||{});
-    if(d.period) period=d.period;
-  });
-  return {demoRows, regionRows, prodMeta, channels:chans, period};
+// ── 행 수집 (선택 월·채널 누적) ──
+async function rgnCollect(){
+  const months = _rgnMonth==='ALL' ? _rgnIdx.months.slice() : (_rgnIdx.months.includes(_rgnMonth)?[_rgnMonth]:[]);
+  for(const m of months) await rgnLoadMonth(m);
+  const chans = _rgnCh==='__ALL__' ? ['스마트스토어','쿠팡'] : [_rgnCh];
+  const demoRows=[], regionRows=[], usedCh=new Set(); const dates=[];
+  months.forEach(m=>{ const shard=_rgnMonths[m]||{}; chans.forEach(c=>{ const o=shard[c]; if(!o) return; usedCh.add(c);
+    Object.entries(o).forEach(([k,s])=>{ dates.push(k); if(s.d) demoRows.push(...s.d); if(s.r) regionRows.push(...s.r); }); }); });
+  if(!demoRows.length && !regionRows.length) return null;
+  const ds=dates.map(d=>d.slice(0,10)).sort();
+  return {demoRows, regionRows, prodMeta:_rgnIdx.meta, channels:[...usedCh], months,
+    dateRange: ds.length ? (ds[0]===ds[ds.length-1] ? ds[0] : `${ds[0]} ~ ${ds[ds.length-1]}`) : ''};
 }
 // ── 집계 ──
 function rgnBuild(R){
@@ -7041,19 +7106,24 @@ function _rgnHover(e,els){ if(e.native&&e.native.target) e.native.target.style.c
 function _rgnName(id){ const m=_rgnCur&&_rgnCur.agg.prodMeta[id]; return (m&&m.name)||id; }
 
 async function renderRegionPage(){
-  await loadRegionData();
+  await loadRegionIndex();
+  rgnFillMonthSelect();
   const upSel=document.getElementById('rgnUpCh');
   if(upSel && _rgnCh!=='__ALL__') upSel.value=_rgnCh;
-  const R = rgnGetRows(_rgnCh);
   const empty=document.getElementById('rgnEmpty'), body=document.getElementById('rgnBody');
-  if(!R){ _rgnCur=null; if(empty)empty.style.display='block'; if(body)body.style.display='none';
+  if(!_rgnIdx.months.length){ _rgnCur=null; if(empty)empty.style.display='block'; if(body)body.style.display='none';
     document.getElementById('rgnPeriod').textContent='기간: —'; return; }
+  const R = await rgnCollect();
+  if(!R){ _rgnCur=null;
+    if(empty){ empty.style.display='block'; empty.innerHTML='선택한 조건(판매처·월)에 데이터가 없습니다. 다른 월/판매처를 선택하거나 업로드하세요.'; }
+    if(body)body.style.display='none'; rgnRenderTrend(); return; }
   if(empty)empty.style.display='none'; if(body)body.style.display='flex';
   const agg = rgnBuild(R);
   _rgnCur = {R, agg};
 
-  const chTxt = agg.channels.length>1 ? ` · 통합(${agg.channels.join('+')})` : '';
-  document.getElementById('rgnPeriod').textContent = '기간: '+(agg.period||'—')+chTxt;
+  const chTxt = agg.channels.length>1 ? ` · 통합(${agg.channels.join('+')})` : (agg.channels[0]?` · ${agg.channels[0]}`:'');
+  const monthTxt = _rgnMonth==='ALL' ? '전체 누적' : _rgnMonth.replace('-','년 ')+'월';
+  document.getElementById('rgnPeriod').textContent = `${monthTxt}${R.dateRange?` (${R.dateRange})`:''}${chTxt}`;
 
   // KPI (인구통계 우선, 없으면 지역)
   const tot = agg.hasDemo ? agg.totals : {...agg.rTotals, rAmt:0, rCnt:0};
@@ -7067,7 +7137,27 @@ async function renderRegionPage(){
   document.getElementById('rgnK3').textContent = rRate.toFixed(1)+'%';
   document.getElementById('rgnK3s').textContent = '환불 '+rgnWon(tot.rAmt||0)+'원';
 
+  rgnRenderTrend();
   rgnRenderGender(agg); rgnRenderAge(agg); rgnRenderRegion(agg); rgnRenderProducts(agg); rgnRenderCross(agg); rgnRenderSigungu(agg);
+}
+
+// 월별 매출 추이 (인덱스 summary 기반 → 가벼움)
+function rgnRenderTrend(){
+  const ctx=document.getElementById('rgnTrendChart'); if(!ctx) return; _rgnKill('trend');
+  const months=(_rgnIdx&&_rgnIdx.months?_rgnIdx.months:[]).slice().sort();
+  _rgnToggleEmpty('rgnTrendEmpty', !months.length);
+  if(!months.length){ ctx.style.display='none'; return; } ctx.style.display='';
+  const chans = _rgnCh==='__ALL__' ? ['스마트스토어','쿠팡'] : [_rgnCh];
+  const data = months.map(m=> chans.reduce((s,c)=> s + (((_rgnIdx.summary[c]||{})[m]||{}).amt||0), 0));
+  const colors = months.map(m=> m===_rgnMonth ? '#3182F6' : '#AECBFA');
+  _rgnCharts.trend=new Chart(ctx,{type:'bar',
+    data:{labels:months.map(m=>{const[y,mo]=m.split('-');return `${y.slice(2)}.${mo}`;}),
+      datasets:[{data:data.map(Math.round),backgroundColor:colors,borderRadius:6,maxBarThickness:54}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover, onClick:(e,els)=>{ if(els.length) rgnSetMonth(months[els[0].index]); },
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{title:items=>{const[y,mo]=months[items[0].dataIndex].split('-');return `${y}년 ${mo}월`;},label:c=>rgnWonFull(c.parsed.y)}}},
+      scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},x:{ticks:{font:{size:11}}}}}});
 }
 
 function rgnRenderGender(agg){
