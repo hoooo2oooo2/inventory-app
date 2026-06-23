@@ -155,10 +155,9 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-bp-input::placeholder{color:var(--tx2);font-size:11px;}
 .rp-bp-input+.rp-bp-input{border-left:0.5px solid var(--bd);padding-left:7px;flex:0.7;}
 .rp-bp-cat{font-size:11px;border:1px solid var(--bd);border-radius:5px;padding:2px 5px;background:var(--bg);color:var(--tx);cursor:pointer;flex-shrink:0;}
-/* 프로젝트/업무 선택·소요시간 드롭다운은 좁게 — 내용 입력칸(.rp-bp-input)을 더 넓게 */
-#rpBpWipSel,#rpBpEWipSel{flex:0 0 92px;width:92px;max-width:92px;}
+/* 프로젝트/업무 선택 드롭다운을 메인(넓게) — 별도 내용 입력칸 없음 */
+#rpBpWipSel,#rpBpEWipSel{flex:1 1 auto;min-width:0;}
 #rpBpTime,#rpBpETime{flex:0 0 auto;max-width:82px;}
-.rp-bp-input{flex:1 1 auto;}
 .rp-bp-save{background:var(--pr);color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .rp-bp-cancel{background:none;border:none;font-size:12px;cursor:pointer;color:var(--tx2);padding:2px 4px;}
 /* 카테고리 필터 뷰 날짜 구분선 */
@@ -12643,24 +12642,22 @@ function reportEditBlock(id){
     selOpts=selOpts.replace(`value="${selVal}"`,`value="${selVal}" selected`);
   }
   form.innerHTML=`<select id="rpBpEWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this,true)">${selOpts}</select>
-    <input id="rpBpETask" class="rp-bp-input" value="${(item.task||'').replace(/"/g,'&quot;')}">
     <select class="rp-bp-cat" id="rpBpETime">${timeOpts}</select>
     <button class="rp-bp-save" onclick="reportEditBlockSave('${id}','${sec}')">저장</button>
     <button class="rp-bp-cancel" onclick="reportEditBlockCancel('${id}','${sec}')">✕</button>`;
   el.replaceWith(form);
-  setTimeout(()=>{ document.getElementById('rpBpETask')?.focus(); document.getElementById('rpBpETask')?.select(); },20);
+  setTimeout(()=>{ document.getElementById('rpBpEWipSel')?.focus(); },20);
 }
 function reportEditBlockSave(id, section){
-  const task=(document.getElementById('rpBpETask')?.value||'').trim();
   const time=(document.getElementById('rpBpETime')?.value||'').trim();
-  if(!task){ toast('업무 내용을 입력하세요.'); return; }
   const key=_reportFindBlockKey(id); if(!key) return;
   const entry=_reportAllData[key];
   let item, sec=section||'am';
   for(const s of ['am','pm']){ item=_rpContentOf(entry,s).find(i=>i.id===id); if(item){sec=s;break;} }
   if(!item) return;
-  item.task=task; item.time=time;
-  if(_rpLinkedSel){ item.linked_task_id=_rpLinkedSel.id; item.linked_title=_rpLinkedSel.title; item.linked_type=_rpLinkedSel.type; }
+  item.time=time;
+  // 프로젝트/업무를 새로 선택하면 그 제목이 내용이 됨. 미선택이면 기존 내용 보존(데이터 손실 방지)
+  if(_rpLinkedSel){ item.task=_rpLinkedSel.title||item.task; item.linked_task_id=_rpLinkedSel.id; item.linked_title=_rpLinkedSel.title; item.linked_type=_rpLinkedSel.type; }
   _rpLinkedSel=null;
   const form=document.querySelector(`[data-edit-id="${id}"]`);
   if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item,sec); form.replaceWith(tpl.content.firstElementChild); }
@@ -12810,7 +12807,6 @@ function rpShowInlinePopup(afterLineId){
   form.className='rp-bp-form';
   const timeOpts=`<option value="">소요시간</option>`+RP_TIME_OPTS.map(o=>`<option>${o}</option>`).join('');
   form.innerHTML=`<select id="rpBpWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this,false)">${_rpBuildSelOpts()}</select>
-    <input id="rpBpTask" class="rp-bp-input" placeholder="업무 내용 입력">
     <select id="rpBpTime" class="rp-bp-cat">${timeOpts}</select>
     <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
     <button class="rp-bp-cancel" onclick="rpHideInlinePopup()">✕</button>`;
@@ -12844,10 +12840,10 @@ function rpBlockPopupOpen(){ /* compat — no-op, replaced by rpShowInlinePopup 
 function rpBlockPopupClose(){ rpHideInlinePopup(); }
 
 async function rpBlockSave(){
-  const task=(document.getElementById('rpBpTask')?.value||'').trim();
-  const time=(document.getElementById('rpBpTime')?.value||'').trim();
-  if(!task){ toast('업무 내용을 입력하세요.'); return; }
   const linked = _rpLinkedSel;
+  const task=(linked && linked.title ? linked.title : '').trim();
+  const time=(document.getElementById('rpBpTime')?.value||'').trim();
+  if(!task){ toast('프로젝트/업무를 선택하세요.'); return; }
   const afterId=_rpInsertAfterId;
   rpHideInlinePopup();
   const newBlock={id:'b'+Date.now()+Math.random().toString(36).slice(2,4),type:'block',
