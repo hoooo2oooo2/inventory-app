@@ -2293,6 +2293,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="rsni" id="rsni-unified" onclick="goRevPage('unified')">📋 통합</div>
     <div class="rsni" id="rsni-daily" onclick="goRevPage('daily')">📄 일일보고</div>
     <div class="rsni" id="rsni-adcenter" onclick="goRevPage('adcenter')">📢 광고센터</div>
+    <div class="rsni" id="rsni-region" onclick="goRevPage('region')">📍 지역·연령별 현황</div>
   </div>
   <div class="rmain">
 
@@ -2742,6 +2743,87 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
     </div>
 
+    <!-- ── 지역·연령별 현황 탭 ── -->
+    <div class="rpage" id="rpage-region">
+      <!-- 컨트롤 바: 판매처 토글 + 기간 + 작은 업로드 -->
+      <div class="rev-filter" style="justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="rev-filter-lbl">판매처</span>
+            <div class="rev-filter-group" id="rgnChBtns">
+              <div class="rfbtn active" data-ch="스마트스토어" onclick="rgnSetCh('스마트스토어')">스마트스토어</div>
+              <div class="rfbtn" data-ch="쿠팡" onclick="rgnSetCh('쿠팡')">쿠팡</div>
+              <div class="rfbtn" data-ch="__ALL__" onclick="rgnSetCh('__ALL__')">통합</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--tx2);font-weight:500;" id="rgnPeriod">기간: —</div>
+        </div>
+        <!-- 작은 드롭존 업로드 -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <select id="rgnUpCh" class="sel" style="font-size:12px;height:34px;"><option value="스마트스토어">스마트스토어</option><option value="쿠팡">쿠팡</option></select>
+          <div id="rgnDrop" class="rev-up-slot" onclick="document.getElementById('rgnFile').click()"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="rgnDropFiles(event)"
+            style="border:1.5px dashed var(--bd);border-radius:9px;padding:7px 14px;font-size:11.5px;color:var(--tx2);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:all .15s;">
+            <span style="font-size:14px;">⬆</span> 엑셀 드래그·클릭 <span style="color:var(--tx3,#aaa);">(인구통계·지역)</span>
+          </div>
+          <input type="file" id="rgnFile" accept=".xlsx,.xls" multiple style="display:none" onchange="rgnPickFiles(event)">
+        </div>
+      </div>
+
+      <!-- 데이터 없음 -->
+      <div class="rev-empty" id="rgnEmpty" style="padding:48px 20px;text-align:center;">
+        아직 등록된 데이터가 없습니다.<br>우측 상단에서 판매처를 선택하고 <b>인구통계</b>·<b>지역</b> 엑셀을 업로드하세요.
+      </div>
+
+      <!-- 본문 -->
+      <div id="rgnBody" style="display:none;flex-direction:column;gap:14px;">
+        <!-- KPI -->
+        <div class="rev-kpi">
+          <div class="rev-kpi-card"><div class="rev-kpi-lbl">💳 총 결제금액</div><div class="rev-kpi-val" id="rgnK0">—</div><div class="rev-kpi-sub" id="rgnK0s" style="color:var(--tx2);"></div></div>
+          <div class="rev-kpi-card"><div class="rev-kpi-lbl">🧾 총 결제수</div><div class="rev-kpi-val" id="rgnK1">—</div><div class="rev-kpi-sub" id="rgnK1s" style="color:var(--tx2);"></div></div>
+          <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 결제상품수량</div><div class="rev-kpi-val" id="rgnK2">—</div><div class="rev-kpi-sub" id="rgnK2s" style="color:var(--tx2);"></div></div>
+          <div class="rev-kpi-card"><div class="rev-kpi-lbl">↩️ 환불율</div><div class="rev-kpi-val" id="rgnK3" style="color:#D97706;">—</div><div class="rev-kpi-sub" id="rgnK3s" style="color:var(--tx2);"></div></div>
+        </div>
+        <!-- 차트 3열: 성별 / 연령 / 지역 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start;">
+          <div class="rev-card">
+            <div class="rev-card-title"><span>👥 성별 분포</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">결제금액</span></div>
+            <div class="rev-chart-wrap" style="height:210px;"><canvas id="rgnGenderChart"></canvas></div>
+            <div class="rev-empty" id="rgnGenderEmpty" style="display:none;padding:60px 0;">인구통계 데이터 없음</div>
+          </div>
+          <div class="rev-card">
+            <div class="rev-card-title"><span>🎂 연령대별</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">결제금액</span></div>
+            <div class="rev-chart-wrap" style="height:210px;"><canvas id="rgnAgeChart"></canvas></div>
+            <div class="rev-empty" id="rgnAgeEmpty" style="display:none;padding:60px 0;">인구통계 데이터 없음</div>
+          </div>
+          <div class="rev-card">
+            <div class="rev-card-title"><span>📍 지역별 (시·도)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">결제금액</span></div>
+            <div class="rev-chart-wrap" style="height:210px;"><canvas id="rgnRegionChart"></canvas></div>
+            <div class="rev-empty" id="rgnRegionEmpty" style="display:none;padding:60px 0;">지역 데이터 없음</div>
+          </div>
+        </div>
+        <!-- 상세 2열: 성별×연령 / 지역 TOP10 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+          <div class="rev-card">
+            <div class="rev-card-title"><span>🎯 성별 × 연령대</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">결제금액 기준</span></div>
+            <div class="rev-chart-wrap" style="height:250px;"><canvas id="rgnCrossChart"></canvas></div>
+            <div class="rev-empty" id="rgnCrossEmpty" style="display:none;padding:80px 0;">인구통계 데이터 없음</div>
+          </div>
+          <div class="rev-tbl-card">
+            <div class="rev-tbl-head"><span class="rev-tbl-title">🏙 지역 TOP 10 (시·군·구)</span></div>
+            <div class="tw" style="max-height:270px;overflow-y:auto;">
+              <table class="dt">
+                <thead><tr><th style="width:44px;text-align:center;">순위</th><th>지역</th><th style="text-align:right;">결제금액</th><th style="text-align:right;">결제수</th><th style="text-align:right;">비중</th></tr></thead>
+                <tbody id="rgnSigunguBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -3144,7 +3226,7 @@ const MENUS = [
 // 매출관리 하위탭 — 각각 개별 권한 부여 가능
 const REV_SUBS = [
   {id:'summary',label:'요약'}, {id:'monthly',label:'월별'}, {id:'backdata',label:'백데이터'},
-  {id:'upload',label:'데이터업로드'}, {id:'unified',label:'통합'}, {id:'daily',label:'일일보고'}, {id:'adcenter',label:'광고센터'}
+  {id:'upload',label:'데이터업로드'}, {id:'unified',label:'통합'}, {id:'daily',label:'일일보고'}, {id:'adcenter',label:'광고센터'}, {id:'region',label:'지역·연령별'}
 ];
 const PERM_LEVELS = [['none','없음'],['view','열람'],['edit','수정']];
 const _PERM_RANK = { none:0, view:1, edit:2 };
@@ -6321,6 +6403,7 @@ function _renderRevCurrentPage(){
   if(_revPage==='adcenter') renderAdCenter();
   if(_revPage==='unified')  renderUnifiedTable();
   if(_revPage==='daily')    renderDailyReport();
+  if(_revPage==='region')   renderRegionPage();
 }
 
 // ── 택배비 CRUD (Supabase cloud 저장 + localStorage 백업) ──
@@ -6775,7 +6858,7 @@ function goRevPage(p){
     p = f.id;
   }
   _revPage = p;
-  ['summary','monthly','backdata','upload','unified','daily','adcenter'].forEach(x=>{
+  ['summary','monthly','backdata','upload','unified','daily','adcenter','region'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
@@ -6792,6 +6875,255 @@ function setRevCh(btn, ch){
   document.querySelectorAll('#revChBtns .rfbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderRevMonthly();
+}
+
+// ══════════════ 지역·연령별 현황 ══════════════
+const RGN_CLOUD_KEY = 'region_demo_data';
+let _rgnData = null;       // { '스마트스토어':{demo,region,period,uploadedAt}, '쿠팡':{...} }
+let _rgnLoaded = false;
+let _rgnCh = '스마트스토어';
+let _rgnCharts = {};
+
+// 금액 포맷 (억/만/원)
+const rgnWon = n => { n=Math.round(n||0); return n>=1e8?`${(n/1e8).toFixed(n%1e8?1:0)}억`:n>=1e4?`${Math.round(n/1e4).toLocaleString()}만`:n.toLocaleString(); };
+const rgnWonFull = n => `${Math.round(n||0).toLocaleString('ko-KR')}원`;
+const rgnAxis = v => { v=Math.round(v); return v>=1e8?`${(v/1e8).toFixed(1)}억`:v>=1e4?`${Math.round(v/1e4).toLocaleString()}만`:v.toLocaleString(); };
+const rgnAgeKey = a => { const m=String(a).match(/\d+/); return m?parseInt(m[0]):999; };
+const rgnNum = v => { const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
+
+async function loadRegionData(){
+  if(_rgnLoaded) return;
+  try{ _rgnData = (await cloudKvLoad(RGN_CLOUD_KEY)) || {}; }catch{ _rgnData = {}; }
+  _rgnLoaded = true;
+}
+async function saveRegionData(){
+  try{ await cloudKvSave(RGN_CLOUD_KEY, _rgnData); }catch(e){ console.warn('지역데이터 저장 실패', e); }
+}
+
+function rgnSetCh(ch){
+  _rgnCh = ch;
+  document.querySelectorAll('#rgnChBtns .rfbtn').forEach(b=>b.classList.toggle('active', b.dataset.ch===ch));
+  renderRegionPage();
+}
+
+// ── 업로드: 시트 → 형식 감지 → 집계 ──
+function rgnAggDemo(rows){
+  const byGender={}, byAge={}, cross={}, totals={amt:0,cnt:0,qty:0,rAmt:0,rCnt:0};
+  rows.forEach(r=>{
+    const g=r.gender||'기타', a=r.age||'기타';
+    (byGender[g] ||= {amt:0,cnt:0,qty:0}); byGender[g].amt+=r.amt; byGender[g].cnt+=r.cnt; byGender[g].qty+=r.qty;
+    (byAge[a]   ||= {amt:0,cnt:0,qty:0}); byAge[a].amt+=r.amt;   byAge[a].cnt+=r.cnt;   byAge[a].qty+=r.qty;
+    (cross[g]   ||= {}); cross[g][a]=(cross[g][a]||0)+r.amt;
+    totals.amt+=r.amt; totals.cnt+=r.cnt; totals.qty+=r.qty; totals.rAmt+=r.rAmt; totals.rCnt+=r.rCnt;
+  });
+  return {byGender,byAge,cross,totals};
+}
+function rgnAggRegion(rows){
+  const bySido={}, bySigungu={}, totals={amt:0,cnt:0,qty:0};
+  rows.forEach(r=>{
+    const sido=r.sido||'기타', sgg=(r.sido||'기타')+(r.sigungu?' '+r.sigungu:'');
+    (bySido[sido]    ||= {amt:0,cnt:0,qty:0}); bySido[sido].amt+=r.amt; bySido[sido].cnt+=r.cnt; bySido[sido].qty+=r.qty;
+    (bySigungu[sgg]  ||= {amt:0,cnt:0,qty:0}); bySigungu[sgg].amt+=r.amt; bySigungu[sgg].cnt+=r.cnt; bySigungu[sgg].qty+=r.qty;
+    totals.amt+=r.amt; totals.cnt+=r.cnt; totals.qty+=r.qty;
+  });
+  return {bySido,bySigungu,totals};
+}
+function rgnParseSheet(ws){
+  const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  if(!json.length) return {type:null};
+  const head = json[0].map(h=>String(h).trim());
+  const idx = name => head.indexOf(name);
+  const body = json.slice(1).filter(r=>r && r.length);
+  if(head.includes('성별') && head.includes('나이')){
+    const gi=idx('성별'),ai=idx('나이'),pi=idx('결제금액'),ci=idx('결제수'),qi=idx('결제상품수량'),rai=idx('환불금액'),rci=idx('환불건수');
+    const rows = body.map(r=>({gender:String(r[gi]||'').trim(),age:String(r[ai]||'').trim(),amt:rgnNum(r[pi]),cnt:rgnNum(r[ci]),qty:rgnNum(r[qi]),rAmt:rgnNum(r[rai]),rCnt:rgnNum(r[rci])})).filter(x=>x.gender||x.age);
+    return {type:'demo', agg:rgnAggDemo(rows)};
+  }
+  if(head.includes('지역(대)')){
+    const si=idx('지역(대)'),gi=idx('지역(소)'),pi=idx('결제금액'),ci=idx('결제수'),qi=idx('결제상품수량');
+    const rows = body.map(r=>({sido:String(r[si]||'').trim(),sigungu:String(r[gi]||'').trim(),amt:rgnNum(r[pi]),cnt:rgnNum(r[ci]),qty:rgnNum(r[qi])})).filter(x=>x.sido);
+    return {type:'region', agg:rgnAggRegion(rows)};
+  }
+  return {type:null};
+}
+function rgnPeriodFromName(name){
+  const m = String(name).match(/(\d{4}-\d{2}-\d{2})[_~\s]+(\d{4}-\d{2}-\d{2})/);
+  return m ? `${m[1]} ~ ${m[2]}` : '';
+}
+async function rgnHandleFiles(files){
+  await loadRegionData();
+  const ch = document.getElementById('rgnUpCh').value;
+  let ok=0, period='', types=[];
+  for(const file of files){
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const parsed = rgnParseSheet(wb.Sheets[wb.SheetNames[0]]);
+      if(!parsed.type){ toast(`❌ ${file.name}: 인구통계/지역 형식이 아닙니다`); continue; }
+      _rgnData[ch] ||= {};
+      _rgnData[ch][parsed.type] = parsed.agg;
+      const p = rgnPeriodFromName(file.name); if(p) period=p;
+      ok++; types.push(parsed.type==='demo'?'인구통계':'지역');
+    }catch(e){ toast(`❌ ${file.name}: ${e.message}`); }
+  }
+  if(ok){
+    if(period) _rgnData[ch].period = period;
+    _rgnData[ch].uploadedAt = Date.now();
+    await saveRegionData();
+    toast(`✅ ${ch} ${types.join('·')} 등록 완료`);
+    addHistory({menu:'매출관리',type:'edit',code:'REGION',name:'지역·연령 데이터',desc:`${ch} ${types.join('·')} 업로드`,before:'-',after:'등록',user:'수동'});
+    rgnSetCh(ch);
+  }
+}
+function rgnDropFiles(e){ e.preventDefault(); e.currentTarget.classList.remove('drag-over'); const fs=[...e.dataTransfer.files].filter(f=>/\.xlsx?$/i.test(f.name)); if(fs.length) rgnHandleFiles(fs); }
+function rgnPickFiles(e){ const fs=[...e.target.files]; if(fs.length) rgnHandleFiles(fs); e.target.value=''; }
+
+// ── 표시용 집계 (통합 시 채널 병합) ──
+function _rgnAddMap(dst,src,keys){ for(const k in src){ dst[k]||={}; keys.forEach(f=>dst[k][f]=(dst[k][f]||0)+(src[k][f]||0)); } }
+function _rgnMergeDemo(a,b){
+  if(!a) return JSON.parse(JSON.stringify(b));
+  _rgnAddMap(a.byGender,b.byGender,['amt','cnt','qty']);
+  _rgnAddMap(a.byAge,b.byAge,['amt','cnt','qty']);
+  for(const g in b.cross){ a.cross[g]||={}; for(const ag in b.cross[g]) a.cross[g][ag]=(a.cross[g][ag]||0)+b.cross[g][ag]; }
+  ['amt','cnt','qty','rAmt','rCnt'].forEach(f=>a.totals[f]=(a.totals[f]||0)+(b.totals[f]||0));
+  return a;
+}
+function _rgnMergeRegion(a,b){
+  if(!a) return JSON.parse(JSON.stringify(b));
+  _rgnAddMap(a.bySido,b.bySido,['amt','cnt','qty']);
+  _rgnAddMap(a.bySigungu,b.bySigungu,['amt','cnt','qty']);
+  ['amt','cnt','qty'].forEach(f=>a.totals[f]=(a.totals[f]||0)+(b.totals[f]||0));
+  return a;
+}
+function rgnAggregate(ch){
+  if(!_rgnData) return null;
+  if(ch==='__ALL__'){
+    const chans=['스마트스토어','쿠팡'].filter(c=>_rgnData[c]&&(_rgnData[c].demo||_rgnData[c].region));
+    if(!chans.length) return null;
+    const out={demo:null,region:null,period:'',channels:chans};
+    chans.forEach(c=>{ const d=_rgnData[c];
+      if(d.demo) out.demo=_rgnMergeDemo(out.demo,d.demo);
+      if(d.region) out.region=_rgnMergeRegion(out.region,d.region);
+      if(d.period) out.period=d.period;
+    });
+    return out;
+  }
+  const d=_rgnData[ch];
+  if(!d || (!d.demo && !d.region)) return null;
+  return {demo:d.demo||null, region:d.region||null, period:d.period||'', channels:[ch]};
+}
+
+// ── 렌더링 ──
+function _rgnKill(k){ if(_rgnCharts[k]){ _rgnCharts[k].destroy(); _rgnCharts[k]=null; } }
+function _rgnToggleEmpty(id,show){ const e=document.getElementById(id); if(e) e.style.display=show?'block':'none'; }
+
+async function renderRegionPage(){
+  await loadRegionData();
+  // 업로드 채널 기본값을 현재 보고 채널로 (통합 제외)
+  const upSel=document.getElementById('rgnUpCh');
+  if(upSel && _rgnCh!=='__ALL__') upSel.value=_rgnCh;
+  const agg = rgnAggregate(_rgnCh);
+  const empty=document.getElementById('rgnEmpty'), body=document.getElementById('rgnBody');
+  if(!agg){ if(empty)empty.style.display='block'; if(body)body.style.display='none';
+    document.getElementById('rgnPeriod').textContent='기간: —'; return; }
+  if(empty)empty.style.display='none'; if(body)body.style.display='flex';
+
+  // 기간
+  const chTxt = agg.channels.length>1 ? ` · 통합(${agg.channels.join('+')})` : '';
+  document.getElementById('rgnPeriod').textContent = '기간: '+(agg.period||'—')+chTxt;
+
+  // KPI (인구통계 totals 우선, 없으면 지역 totals)
+  const tot = agg.demo ? agg.demo.totals : (agg.region ? {...agg.region.totals,rAmt:0,rCnt:0} : {amt:0,cnt:0,qty:0,rAmt:0,rCnt:0});
+  document.getElementById('rgnK0').textContent = rgnWon(tot.amt);
+  document.getElementById('rgnK0s').textContent = rgnWonFull(tot.amt);
+  document.getElementById('rgnK1').textContent = (tot.cnt||0).toLocaleString()+'건';
+  document.getElementById('rgnK2').textContent = (tot.qty||0).toLocaleString()+'개';
+  const avg = tot.cnt ? tot.amt/tot.cnt : 0;
+  document.getElementById('rgnK1s').textContent = '객단가 '+rgnWonFull(avg);
+  document.getElementById('rgnK2s').textContent = tot.cnt?`주문당 ${(tot.qty/tot.cnt).toFixed(1)}개`:'';
+  const rRate = tot.amt ? tot.rAmt/tot.amt*100 : 0;
+  document.getElementById('rgnK3').textContent = rRate.toFixed(1)+'%';
+  document.getElementById('rgnK3s').textContent = '환불 '+rgnWon(tot.rAmt||0)+'원';
+
+  rgnRenderGender(agg); rgnRenderAge(agg); rgnRenderRegion(agg); rgnRenderCross(agg); rgnRenderSigungu(agg);
+}
+
+function rgnRenderGender(agg){
+  const ctx=document.getElementById('rgnGenderChart'); _rgnKill('gender');
+  const bg = agg.demo ? agg.demo.byGender : {};
+  const keys = Object.keys(bg);
+  _rgnToggleEmpty('rgnGenderEmpty', !keys.length);
+  if(!keys.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
+  const cmap={'남성':'#3182F6','여성':'#EC4899'};
+  const order=['남성','여성',...keys.filter(k=>k!=='남성'&&k!=='여성')];
+  const labels=[],data=[],colors=[];
+  order.forEach((g,i)=>{ if(bg[g]){ labels.push(g); data.push(Math.round(bg[g].amt)); colors.push(cmap[g]||'#94A3B8'); } });
+  const t=data.reduce((s,x)=>s+x,0)||1;
+  _rgnCharts.gender=new Chart(ctx,{type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:10}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${rgnWonFull(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`}}}}});
+}
+function rgnRenderAge(agg){
+  const ctx=document.getElementById('rgnAgeChart'); _rgnKill('age');
+  const ba = agg.demo ? agg.demo.byAge : {};
+  const ages = Object.keys(ba).sort((a,b)=>rgnAgeKey(a)-rgnAgeKey(b));
+  _rgnToggleEmpty('rgnAgeEmpty', !ages.length);
+  if(!ages.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
+  _rgnCharts.age=new Chart(ctx,{type:'bar',
+    data:{labels:ages,datasets:[{data:ages.map(a=>Math.round(ba[a].amt)),backgroundColor:'#3182F6',borderRadius:5,maxBarThickness:34}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>rgnWonFull(c.parsed)}}},
+      scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},x:{ticks:{font:{size:9.5},autoSkip:false,maxRotation:60,minRotation:0}}}}});
+}
+function rgnRenderRegion(agg){
+  const ctx=document.getElementById('rgnRegionChart'); _rgnKill('region');
+  const bs = agg.region ? agg.region.bySido : {};
+  let entries = Object.entries(bs).map(([k,v])=>[k,v.amt]).sort((a,b)=>b[1]-a[1]);
+  _rgnToggleEmpty('rgnRegionEmpty', !entries.length);
+  if(!entries.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
+  const top=entries.slice(0,8); const rest=entries.slice(8);
+  if(rest.length) top.push(['기타',rest.reduce((s,[,v])=>s+v,0)]);
+  const labels=top.map(([k])=>k), data=top.map(([,v])=>Math.round(v));
+  const palette=['#3182F6','#059669','#F59E0B','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#94A3B8'];
+  const t=data.reduce((s,x)=>s+x,0)||1;
+  _rgnCharts.region=new Chart(ctx,{type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:palette.slice(0,labels.length),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'56%',
+      plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:7}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${rgnWonFull(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`}}}}});
+}
+function rgnRenderCross(agg){
+  const ctx=document.getElementById('rgnCrossChart'); _rgnKill('cross');
+  const cross = agg.demo ? agg.demo.cross : {};
+  const genders = Object.keys(cross);
+  _rgnToggleEmpty('rgnCrossEmpty', !genders.length);
+  if(!genders.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
+  const ageSet=new Set(); genders.forEach(g=>Object.keys(cross[g]).forEach(a=>ageSet.add(a)));
+  const ages=[...ageSet].sort((a,b)=>rgnAgeKey(a)-rgnAgeKey(b));
+  const cmap={'남성':'#3182F6','여성':'#EC4899'}; const fallback=['#94A3B8','#F59E0B','#14B8A6'];
+  const datasets=genders.map((g,i)=>({label:g,data:ages.map(a=>Math.round(cross[g][a]||0)),backgroundColor:cmap[g]||fallback[i%fallback.length],borderRadius:4,maxBarThickness:30}));
+  _rgnCharts.cross=new Chart(ctx,{type:'bar',
+    data:{labels:ages,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:10}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label} ${c.label}: ${rgnWonFull(c.parsed)}`}}},
+      scales:{x:{stacked:true,ticks:{font:{size:9.5},autoSkip:false,maxRotation:60}},y:{stacked:true,ticks:{callback:rgnAxis,font:{size:10}}}}}});
+}
+function rgnRenderSigungu(agg){
+  const tb=document.getElementById('rgnSigunguBody'); if(!tb) return;
+  const bs = agg.region ? agg.region.bySigungu : {};
+  const entries = Object.entries(bs).map(([k,v])=>({name:k,...v})).sort((a,b)=>b.amt-a.amt);
+  if(!entries.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--tx2);padding:18px;">지역 데이터가 없습니다</td></tr>'; return; }
+  const tot=entries.reduce((s,e)=>s+e.amt,0)||1;
+  tb.innerHTML=entries.slice(0,10).map((e,i)=>`<tr>
+    <td style="text-align:center;font-weight:700;color:${i<3?'#DC2626':'var(--tx2)'};">${i+1}</td>
+    <td style="font-weight:500;">${e.name}</td>
+    <td style="text-align:right;font-weight:600;">${rgnWonFull(e.amt)}</td>
+    <td style="text-align:right;color:var(--tx2);">${(e.cnt||0).toLocaleString()}</td>
+    <td style="text-align:right;color:var(--pr);font-weight:600;">${(e.amt/tot*100).toFixed(1)}%</td>
+  </tr>`).join('');
 }
 
 // 만 단위 값 → 1억(=10000만) 이상이면 억 표기
