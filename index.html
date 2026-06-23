@@ -67,6 +67,14 @@ body{background:var(--bg2);min-height:100vh;}
 /* 담당자 선택 팝업 (업무보고서 헤더) */
 .rp-assignee-pick{position:relative;display:inline-block;}
 .rp-assignee-btn{font-size:10.5px;background:#EEF4FF;border:0.5px solid #93C5FD;border-radius:5px;padding:2px 7px;cursor:pointer;color:#1D4ED8;font-weight:700;}
+.rp-search-wrap{position:relative;display:inline-flex;align-items:center;}
+.rp-search-input{font-size:10.5px;border:0.5px solid var(--bd);border-radius:5px;padding:2px 18px 2px 7px;width:150px;outline:none;background:var(--bg);color:var(--tx);}
+.rp-search-input:focus{border-color:#93C5FD;}
+.rp-search-clear{position:absolute;right:3px;border:none;background:none;cursor:pointer;color:var(--tx2);font-size:11px;padding:0 2px;line-height:1;}
+.rp-search-head{font-size:11px;font-weight:800;color:#1D4ED8;padding:8px 10px;border-bottom:0.5px solid var(--bd);position:sticky;top:0;background:var(--bg);}
+.rp-search-date{font-size:11.5px;font-weight:700;color:var(--tx);padding:7px 10px 3px;cursor:pointer;border-top:0.5px solid var(--bd);}
+.rp-search-date:hover{background:#EEF4FF;}
+.rp-search-snip{font-size:11px;color:var(--tx2);padding:1px 10px 1px 16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rp-assignee-btn:hover{background:#DBEAFE;}
 .rp-assignee-pop{position:absolute;top:calc(100% + 4px);left:0;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:9999;min-width:90px;overflow:hidden;}
 .rp-ap-item{display:block;width:100%;text-align:left;padding:7px 12px;border:none;background:transparent;cursor:pointer;font-size:12px;font-family:inherit;color:var(--tx);border-bottom:0.5px solid var(--bd);}
@@ -115,8 +123,10 @@ body{background:var(--bg2);min-height:100vh;}
 .rp-line{display:inline-block;box-sizing:border-box;width:calc(100% - 22px);vertical-align:top;outline:none;min-height:18px;font-size:12.5px;line-height:1.5;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
 .rp-line[data-empty-ph]:empty::before{content:attr(data-empty-ph);color:var(--tx2);opacity:.4;pointer-events:none;font-style:italic;}
 /* 블럭 카드 */
-.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:none;-webkit-user-select:none;cursor:default;}
+.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:none;-webkit-user-select:none;cursor:grab;}
+.rp-block:active{cursor:grabbing;}
 .rp-block.pinned{border-color:#FDE68A;border-left-color:#F59E0B;background:#FFFEF5;}
+.rp-drop-mark{box-shadow:0 -3px 0 -1px #3182F6;}
 .rp-block-text{flex:1;min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden;}
 .rp-block-main{font-weight:700;font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.35;word-break:break-word;}
 .rp-block-sub{font-size:11px;color:var(--tx2);white-space:nowrap;flex-shrink:0;}
@@ -1257,6 +1267,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rp-assignee-pick">
             <button class="rp-assignee-btn" id="rpAssigneeBtn" onclick="toggleRpAssigneePop(event)">전체 ▾</button>
             <div class="rp-assignee-pop" id="rpAssigneePop" style="display:none;"></div>
+          </div>
+          <!-- 담당자 범위 검색 -->
+          <div class="rp-search-wrap">
+            <input id="rpSearchInput" class="rp-search-input" placeholder="🔍 선택 담당자 내용 검색"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();reportRunSearch();}">
+            <button class="rp-search-clear" id="rpSearchClear" style="display:none;" onclick="reportClearSearch()" title="검색 해제">✕</button>
           </div>
           <span id="rpCatActiveBadge" style="display:none;"></span>
         </div>
@@ -11607,6 +11623,8 @@ let _reportKbSetup   = false;
 let _rpLinkDropId    = null;
 let _rpInsertAfterId = null;  // Alt+Enter: 이 라인 id 다음에 블럭 삽입
 let _reportCategoryFilter = null;
+let _reportSearchQuery = '';        // 업무보고서 검색어 (선택 담당자 범위)
+let _rpDragBlockId = null, _rpDragBlockSec = null;   // 인라인 블럭 드래그 이동
 let _todaySumCat = '디자인';
 let _catPanelPerson = null; // null = 전체
 
@@ -11744,7 +11762,60 @@ function toggleRpAssigneePop(e){
     setTimeout(()=>{ document.addEventListener('click',function h(){ pop.style.display='none'; document.removeEventListener('click',h); }); }, 0);
   } else { pop.style.display='none'; }
 }
-function rpPickAssignee(p){ _reportPerson=p||null; renderReportPanel(); }
+function rpPickAssignee(p){ _reportPerson=p||null; if(_reportSearchQuery) reportRunSearch(); else renderReportPanel(); }
+
+// ── 업무보고서 검색 (선택 담당자 범위) ──
+function reportRunSearch(){
+  const inp=document.getElementById('rpSearchInput');
+  _reportSearchQuery=(inp?.value||'').trim();
+  const clr=document.getElementById('rpSearchClear'); if(clr) clr.style.display=_reportSearchQuery?'':'none';
+  renderReportPanel();
+}
+function reportClearSearch(){
+  _reportSearchQuery='';
+  const inp=document.getElementById('rpSearchInput'); if(inp) inp.value='';
+  const clr=document.getElementById('rpSearchClear'); if(clr) clr.style.display='none';
+  renderReportPanel();
+}
+function reportOpenSearchHit(person, date){
+  _reportPerson=person||null; _reportDate=date;
+  reportClearSearch();
+}
+function _rpBuildSearchResults(){
+  const wrap=document.getElementById('rpEditorWrap'); if(!wrap) return;
+  const q=_reportSearchQuery.toLowerCase();
+  const scope=_reportPerson;   // null = 전체
+  const results=[];
+  for(const key of Object.keys(_reportAllData)){
+    const parts=key.split('|'); if(parts.length!==2 || !parts[1]) continue;
+    const [person,date]=parts;
+    if(scope && person!==scope) continue;
+    const e=_reportAllData[key];
+    const items=[..._rpContentOf(e,'am'),..._rpContentOf(e,'pm')];
+    const matches=[];
+    items.forEach(it=>{
+      const text=it.type==='block' ? `${it.task||''} ${it.time||''} ${it.linked_title||''}` : (it.text||'');
+      if(text.toLowerCase().includes(q)) matches.push(text.trim());
+    });
+    if(matches.length) results.push({person,date,matches});
+  }
+  results.sort((a,b)=> b.date.localeCompare(a.date) || a.person.localeCompare(b.person));
+  if(!results.length){
+    wrap.innerHTML=`<div class="ts-empty" style="padding:24px 12px;">"${_esc(_reportSearchQuery)}"<br>검색 결과가 없습니다.<br><span style="font-size:11px;color:var(--tx2);">범위: ${_esc(scope||'전체 담당자')}</span></div>`;
+    return;
+  }
+  const daysKr=['일','월','화','수','목','금','토'];
+  const totalHits=results.reduce((n,r)=>n+r.matches.length,0);
+  wrap.innerHTML=`<div class="rp-search-head">🔍 "${_esc(_reportSearchQuery)}" · ${results.length}일 ${totalHits}건 <span style="color:var(--tx2);font-weight:600;">(${_esc(scope||'전체')})</span></div>`+
+    results.map(r=>{
+      const dd=new Date(r.date+'T00:00:00');
+      const pc=COLLAB_PERSON_COLOR[r.person]||'#888';
+      return `<div class="rp-search-date" onclick="reportOpenSearchHit('${r.person}','${r.date}')">
+          <span style="color:${pc};font-weight:800;">${_esc(r.person)}</span> · ${r.date} (${daysKr[dd.getDay()]}) ›
+        </div>`+
+        r.matches.slice(0,8).map(m=>`<div class="rp-search-snip">${_esc(m.slice(0,90))}</div>`).join('');
+    }).join('');
+}
 function reportSetCategory(cat){
   _reportCategoryFilter = (_reportCategoryFilter===cat) ? null : cat;
   renderReportPanel();
@@ -11846,6 +11917,7 @@ function _rpRenderPinned(){
 function _rpBuildEditor(){
   const wrap=document.getElementById('rpEditorWrap');
   if(!wrap) return;
+  if(_reportSearchQuery){ _rpBuildSearchResults(); return; }
   if(_reportCategoryFilter){ _rpBuildEditorFiltered(); return; }
   wrap.innerHTML=`
     <div class="rp-section">
@@ -11868,6 +11940,9 @@ function _rpBuildEditorSection(section){
   const editor=document.getElementById(edId);
   if(!editor) return;
   editor.onclick=null;
+  editor.ondragover=(e)=>_rpEditorDragOver(e,section);
+  editor.ondrop=(e)=>_rpEditorDrop(e,section);
+  editor.ondragleave=(e)=>{ if(!editor.contains(e.relatedTarget)) editor.querySelectorAll('.rp-drop-mark').forEach(el=>el.classList.remove('rp-drop-mark')); };
   const entry=_reportGetEntry();
   const content=_rpContentOf(entry,section);
   if(!content.some(i=>i.type==='line')) content.push({id:'l_s'+Date.now()+section,type:'line',text:''});
@@ -11888,6 +11963,60 @@ function _rpBuildEditorSection(section){
       editor.appendChild(tpl.content.firstElementChild);
     }
   });
+}
+
+// ── 인라인 블럭 드래그 이동 (같은 섹션 내 위·아래 위치 변경) ──
+function _rpBlockDragStart(ev, id, sec){
+  _rpDragBlockId=id; _rpDragBlockSec=sec;
+  try{ ev.dataTransfer.effectAllowed='move'; ev.dataTransfer.setData('text/plain', id); }catch{}
+}
+function _rpBlockDragEnd(){
+  _rpDragBlockId=null; _rpDragBlockSec=null;
+  document.querySelectorAll('.rp-drop-mark').forEach(el=>el.classList.remove('rp-drop-mark'));
+}
+function _rpDropTargetEl(editor, clientY){
+  // 드롭 지점(Y) 바로 아래에 올 항목(line/block) 반환 (없으면 맨 끝)
+  const items=[...editor.children].filter(el=>el.classList.contains('rp-block')||el.classList.contains('rp-line'));
+  for(const el of items){
+    if(el.dataset.id===_rpDragBlockId) continue;
+    const r=el.getBoundingClientRect();
+    if(clientY < r.top + r.height/2) return el;
+  }
+  return null;
+}
+function _rpEditorDragOver(ev, sec){
+  if(!_rpDragBlockId || _rpDragBlockSec!==sec) return;
+  ev.preventDefault();
+  try{ ev.dataTransfer.dropEffect='move'; }catch{}
+  const editor=ev.currentTarget;
+  editor.querySelectorAll('.rp-drop-mark').forEach(el=>el.classList.remove('rp-drop-mark'));
+  const t=_rpDropTargetEl(editor, ev.clientY);
+  if(t) t.classList.add('rp-drop-mark');
+}
+function _rpEditorDrop(ev, sec){
+  if(!_rpDragBlockId || _rpDragBlockSec!==sec){ _rpBlockDragEnd(); return; }
+  ev.preventDefault();
+  const editor=ev.currentTarget;
+  const targetEl=_rpDropTargetEl(editor, ev.clientY);
+  const targetId=targetEl?targetEl.dataset.id:null;
+  const dragId=_rpDragBlockId;
+  _rpBlockDragEnd();
+  if(_rpReorderBlock(sec, dragId, targetId)){
+    _rpBuildEditorSection(sec);
+    _reportSetupKeyboard();
+    _reportAutoSave();
+  }
+}
+// content 배열에서 dragId 블럭을 targetId 항목 '앞'으로 이동(targetId=null → 맨 끝). 변경 시 true.
+function _rpReorderBlock(sec, dragId, targetId){
+  const entry=_reportGetEntry();
+  const content=_rpContentOf(entry, sec);
+  const fromIdx=content.findIndex(i=>i.id===dragId);
+  if(fromIdx<0) return false;
+  const [moved]=content.splice(fromIdx,1);
+  let toIdx = targetId ? content.findIndex(i=>i.id===targetId) : -1;
+  if(toIdx<0) content.push(moved); else content.splice(toIdx,0,moved);
+  return true;
 }
 
 // ── 카테고리 패널 (캘린더 옆, 전체 담당자×전체 날짜) ──
@@ -11996,7 +12125,7 @@ function _rpBlockHTML(item, section){
   const linkedBadge = item.linked_title
     ? `<span class="rp-block-cat" style="background:${item.linked_type==='plan'?'#05C072':'#6B7280'};">🔗 ${_esc(item.linked_title)}</span>`
     : (item.category ? `<span class="rp-block-cat" style="background:${REPORT_CAT_COLOR[item.category]||'#888'};">${_esc(item.category)}</span>` : '');
-  return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" data-section="${sec}" contenteditable="false" tabindex="0" title="클릭 후 Enter: 텍스트 줄 추가">
+  return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" data-section="${sec}" contenteditable="false" tabindex="0" draggable="true" ondragstart="_rpBlockDragStart(event,'${item.id}','${sec}')" ondragend="_rpBlockDragEnd(event)" title="드래그하여 위·아래로 이동">
     <div class="rp-block-text">
       ${linkedBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${timePart?`<span class="rp-block-sub">${timePart}</span>`:''}
     </div>
