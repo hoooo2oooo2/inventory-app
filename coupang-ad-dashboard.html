@@ -2438,6 +2438,40 @@ function deleteLeaveRecord(id){
   toast('🗑 연차 내역이 삭제됐습니다');
 }
 
+// 연차 내역 수정 모드
+let leaveEditId = null;
+function editLeaveRecord(id){ leaveEditId=id; renderLeaveTable(); }
+function cancelLeaveEdit(){ leaveEditId=null; renderLeaveTable(); }
+function saveLeaveEdit(id){
+  const r=leaveRecords.find(x=>x.id===id);
+  if(!r){toast('⚠️ 내역을 찾을 수 없습니다');return;}
+  const emp=employees.find(e=>e.id===r.empId);
+  if(!emp){toast('⚠️ 직원을 찾을 수 없습니다');return;}
+  const date=normalizeToISO(document.getElementById('editDate_'+id).value||'');
+  const unit=document.getElementById('editUnit_'+id).value;
+  const amt=parseFloat(document.getElementById('editAmt_'+id).value)||0;
+  const reason=(document.getElementById('editReason_'+id).value||'').trim();
+  if(!date){toast('⚠️ 날짜를 입력해주세요');return;}
+  if(!amt||amt<=0){toast(unit==='hour'?'⚠️ 사용 시간을 입력해주세요':'⚠️ 사용 일수를 입력해주세요');return;}
+  // 새 사용량(일 환산)과, 이 내역을 제외한 기존 사용량으로 잔여 초과 검증
+  const newUsedDays = unit==='hour' ? amt/WORK_HOURS_PER_DAY : amt;
+  const oldUsedDays = r.unit==='hour' ? (r.hours||0)/WORK_HOURS_PER_DAY : (r.days||0);
+  const usedExcl = getUsedLeave(r.empId) - oldUsedDays;
+  if(usedExcl + newUsedDays > emp.totalLeave){
+    toast(`⚠️ 잔여 연차(${(emp.totalLeave-usedExcl).toFixed(2)}일)를 초과합니다`);return;
+  }
+  // 적용
+  if(unit==='hour'){ r.unit='hour'; r.days=0; r.hours=amt; r.displayStr=fmtLeaveDisplay(0,amt,'hour'); }
+  else            { r.unit='day';  r.days=amt; r.hours=0; r.displayStr=fmtLeaveDisplay(amt,0,'day'); }
+  r.date=date; r.reason=reason;
+  leaveRecords.sort((a,b)=>b.date.localeCompare(a.date));
+  leaveEditId=null;
+  saveLeaveData();
+  renderEmployeeList();
+  renderLeaveTable();
+  toast(`✅ ${emp.name} — ${r.displayStr} (으)로 수정 완료`);
+}
+
 // 연월차 테이블 정렬 상태 (기본: 사용 날짜 내림차순)
 let leaveSort = { key:'date', dir:'desc' };
 function sortLeaveBy(key){
@@ -2483,14 +2517,36 @@ function renderLeaveTable(){
     if(cmp===0) cmp = b.date.localeCompare(a.date); // 동률이면 최신 날짜 우선
     return cmp*dir;
   });
+  const inpCss="height:28px;font-size:12px;padding:0 6px;border:1px solid var(--border2);border-radius:6px;outline:none;font-family:'Pretendard',sans-serif;background:var(--white)";
   tbody.innerHTML=rows.map(({r,emp,remain,remainStr})=>{
+    if(r.id===leaveEditId){
+      // ── 수정 모드 행 ──
+      const amt = r.unit==='hour' ? (r.hours||0) : (r.days||0);
+      return `<tr style="background:#f5f8ff">
+        <td class="name">${emp.name}</td>
+        <td><input type="date" id="editDate_${r.id}" value="${normalizeToISO(r.date)}" style="${inpCss};width:140px"></td>
+        <td><div style="display:flex;gap:5px;align-items:center">
+          <select id="editUnit_${r.id}" style="${inpCss};width:62px"><option value="day"${r.unit!=='hour'?' selected':''}>일</option><option value="hour"${r.unit==='hour'?' selected':''}>시간</option></select>
+          <input type="number" id="editAmt_${r.id}" value="${amt}" min="0.5" step="0.5" style="${inpCss};width:64px">
+        </div></td>
+        <td><input type="text" id="editReason_${r.id}" value="${(r.reason||'').replace(/"/g,'&quot;')}" placeholder="사유" style="${inpCss};width:130px"></td>
+        <td class="mono" style="color:var(--text4);font-weight:700">${remainStr}</td>
+        <td style="text-align:center;white-space:nowrap">
+          <button onclick="saveLeaveEdit(${r.id})" style="border:none;background:var(--blue);cursor:pointer;color:#fff;font-size:11px;font-weight:700;padding:5px 9px;border-radius:6px" title="저장">저장</button>
+          <button onclick="cancelLeaveEdit()" style="border:none;background:transparent;cursor:pointer;color:var(--text3);font-size:11px;font-weight:600;padding:5px 6px" title="취소">취소</button>
+        </td>
+      </tr>`;
+    }
     return `<tr>
       <td class="name">${emp.name}</td>
       <td class="mono">${normalizeToISO(r.date)}</td>
       <td class="mono">${fmtLeaveDisplay(r.days,r.hours,r.unit)}</td>
       <td>${r.reason||'—'}</td>
       <td class="mono" style="color:${remain>5?'var(--green)':remain>2?'var(--yellow)':'var(--red)'};font-weight:700">${remainStr}</td>
-      <td style="text-align:center"><button onclick="deleteLeaveRecord(${r.id})" style="border:none;background:transparent;cursor:pointer;color:var(--text4);font-size:14px;padding:2px 6px" title="삭제">✕</button></td>
+      <td style="text-align:center;white-space:nowrap">
+        <button onclick="editLeaveRecord(${r.id})" style="border:none;background:transparent;cursor:pointer;color:var(--text4);font-size:14px;padding:2px 5px" title="수정">✎</button>
+        <button onclick="deleteLeaveRecord(${r.id})" style="border:none;background:transparent;cursor:pointer;color:var(--text4);font-size:14px;padding:2px 5px" title="삭제">✕</button>
+      </td>
     </tr>`;
   }).join('');
 }
