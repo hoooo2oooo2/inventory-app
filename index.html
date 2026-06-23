@@ -2757,6 +2757,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             </div>
           </div>
           <div style="font-size:12px;color:var(--tx2);font-weight:500;" id="rgnPeriod">기간: —</div>
+          <span style="font-size:11px;color:var(--pr);background:var(--prl);padding:3px 9px;border-radius:12px;font-weight:600;">👆 그래프·항목 클릭 시 상세보기</span>
         </div>
         <!-- 작은 드롭존 업로드 -->
         <div style="display:flex;align-items:center;gap:8px;">
@@ -2804,6 +2805,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <div class="rev-empty" id="rgnRegionEmpty" style="display:none;padding:60px 0;">지역 데이터 없음</div>
           </div>
         </div>
+        <!-- 상품별 비중 TOP10 (가로 막대) -->
+        <div class="rev-card">
+          <div class="rev-card-title"><span>🏆 상품별 비중 TOP 10</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">막대 클릭 → 상세보기</span></div>
+          <div class="rev-chart-wrap" style="height:300px;"><canvas id="rgnProductChart"></canvas></div>
+          <div class="rev-empty" id="rgnProductEmpty" style="display:none;padding:80px 0;">인구통계 데이터 없음</div>
+        </div>
         <!-- 상세 2열: 성별×연령 / 지역 TOP10 -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
           <div class="rev-card">
@@ -2820,6 +2827,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               </table>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 상세보기 모달 -->
+      <div id="rgnModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)rgnCloseDetail()">
+        <div style="background:var(--bg);border-radius:14px;max-width:560px;width:100%;max-height:84vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+          <div style="padding:15px 20px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="font-size:15px;font-weight:700;line-height:1.35;" id="rgnModalTitle">상세</div>
+            <button onclick="rgnCloseDetail()" style="border:none;background:transparent;font-size:18px;cursor:pointer;color:var(--tx2);flex-shrink:0;">✕</button>
+          </div>
+          <div style="padding:14px 20px 20px;overflow-y:auto;" id="rgnModalBody"></div>
         </div>
       </div>
     </div>
@@ -6878,11 +6896,15 @@ function setRevCh(btn, ch){
 }
 
 // ══════════════ 지역·연령별 현황 ══════════════
+// 저장 스키마(채널별): { demoRows:[[id,성별,나이,금액,결제수,수량,환불액,환불건]],
+//                       regionRows:[[id,시도,시군구,금액,결제수,수량]], prodMeta:{id:{name,cat}}, period, uploadedAt }
 const RGN_CLOUD_KEY = 'region_demo_data';
-let _rgnData = null;       // { '스마트스토어':{demo,region,period,uploadedAt}, '쿠팡':{...} }
+let _rgnData = null;
 let _rgnLoaded = false;
 let _rgnCh = '스마트스토어';
 let _rgnCharts = {};
+let _rgnCur = null;        // 현재 표시 중 {R, agg} (드릴다운 상세에서 사용)
+let _rgnProdIds = [];      // 상품 차트 막대 index → 상품ID
 
 // 금액 포맷 (억/만/원)
 const rgnWon = n => { n=Math.round(n||0); return n>=1e8?`${(n/1e8).toFixed(n%1e8?1:0)}억`:n>=1e4?`${Math.round(n/1e4).toLocaleString()}만`:n.toLocaleString(); };
@@ -6890,6 +6912,7 @@ const rgnWonFull = n => `${Math.round(n||0).toLocaleString('ko-KR')}원`;
 const rgnAxis = v => { v=Math.round(v); return v>=1e8?`${(v/1e8).toFixed(1)}억`:v>=1e4?`${Math.round(v/1e4).toLocaleString()}만`:v.toLocaleString(); };
 const rgnAgeKey = a => { const m=String(a).match(/\d+/); return m?parseInt(m[0]):999; };
 const rgnNum = v => { const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
+const rgnEsc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
 async function loadRegionData(){
   if(_rgnLoaded) return;
@@ -6906,43 +6929,36 @@ function rgnSetCh(ch){
   renderRegionPage();
 }
 
-// ── 업로드: 시트 → 형식 감지 → 집계 ──
-function rgnAggDemo(rows){
-  const byGender={}, byAge={}, cross={}, totals={amt:0,cnt:0,qty:0,rAmt:0,rCnt:0};
-  rows.forEach(r=>{
-    const g=r.gender||'기타', a=r.age||'기타';
-    (byGender[g] ||= {amt:0,cnt:0,qty:0}); byGender[g].amt+=r.amt; byGender[g].cnt+=r.cnt; byGender[g].qty+=r.qty;
-    (byAge[a]   ||= {amt:0,cnt:0,qty:0}); byAge[a].amt+=r.amt;   byAge[a].cnt+=r.cnt;   byAge[a].qty+=r.qty;
-    (cross[g]   ||= {}); cross[g][a]=(cross[g][a]||0)+r.amt;
-    totals.amt+=r.amt; totals.cnt+=r.cnt; totals.qty+=r.qty; totals.rAmt+=r.rAmt; totals.rCnt+=r.rCnt;
-  });
-  return {byGender,byAge,cross,totals};
-}
-function rgnAggRegion(rows){
-  const bySido={}, bySigungu={}, totals={amt:0,cnt:0,qty:0};
-  rows.forEach(r=>{
-    const sido=r.sido||'기타', sgg=(r.sido||'기타')+(r.sigungu?' '+r.sigungu:'');
-    (bySido[sido]    ||= {amt:0,cnt:0,qty:0}); bySido[sido].amt+=r.amt; bySido[sido].cnt+=r.cnt; bySido[sido].qty+=r.qty;
-    (bySigungu[sgg]  ||= {amt:0,cnt:0,qty:0}); bySigungu[sgg].amt+=r.amt; bySigungu[sgg].cnt+=r.cnt; bySigungu[sgg].qty+=r.qty;
-    totals.amt+=r.amt; totals.cnt+=r.cnt; totals.qty+=r.qty;
-  });
-  return {bySido,bySigungu,totals};
-}
+// ── 업로드: 시트 → 형식 감지 → 압축 행 추출 ──
 function rgnParseSheet(ws){
   const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
   if(!json.length) return {type:null};
   const head = json[0].map(h=>String(h).trim());
-  const idx = name => head.indexOf(name);
+  const ix = name => head.indexOf(name);
   const body = json.slice(1).filter(r=>r && r.length);
+  const prodMeta = {};
+  const meta = (id,nmI,catI,r)=>{ if(id && !prodMeta[id]) prodMeta[id]={name:String(r[nmI]||'').trim(), cat:String(r[catI]||'').trim()}; };
   if(head.includes('성별') && head.includes('나이')){
-    const gi=idx('성별'),ai=idx('나이'),pi=idx('결제금액'),ci=idx('결제수'),qi=idx('결제상품수량'),rai=idx('환불금액'),rci=idx('환불건수');
-    const rows = body.map(r=>({gender:String(r[gi]||'').trim(),age:String(r[ai]||'').trim(),amt:rgnNum(r[pi]),cnt:rgnNum(r[ci]),qty:rgnNum(r[qi]),rAmt:rgnNum(r[rai]),rCnt:rgnNum(r[rci])})).filter(x=>x.gender||x.age);
-    return {type:'demo', agg:rgnAggDemo(rows)};
+    const nmI=ix('상품명'),idI=ix('상품ID'),catI=ix('상품카테고리(대)'),gI=ix('성별'),aI=ix('나이'),pI=ix('결제금액'),cI=ix('결제수'),qI=ix('결제상품수량'),raI=ix('환불금액'),rcI=ix('환불건수');
+    const rows=[];
+    body.forEach(r=>{
+      const id=String(r[idI]||'').trim(); const g=String(r[gI]||'기타').trim(); const a=String(r[aI]||'기타').trim();
+      if(!id && g==='기타' && a==='기타') return;
+      rows.push([id, g, a, rgnNum(r[pI]), rgnNum(r[cI]), rgnNum(r[qI]), rgnNum(r[raI]), rgnNum(r[rcI])]);
+      meta(id,nmI,catI,r);
+    });
+    return {type:'demo', rows, prodMeta};
   }
   if(head.includes('지역(대)')){
-    const si=idx('지역(대)'),gi=idx('지역(소)'),pi=idx('결제금액'),ci=idx('결제수'),qi=idx('결제상품수량');
-    const rows = body.map(r=>({sido:String(r[si]||'').trim(),sigungu:String(r[gi]||'').trim(),amt:rgnNum(r[pi]),cnt:rgnNum(r[ci]),qty:rgnNum(r[qi])})).filter(x=>x.sido);
-    return {type:'region', agg:rgnAggRegion(rows)};
+    const nmI=ix('상품명'),idI=ix('상품ID'),catI=ix('상품카테고리(대)'),sI=ix('지역(대)'),gI=ix('지역(소)'),pI=ix('결제금액'),cI=ix('결제수'),qI=ix('결제상품수량');
+    const rows=[];
+    body.forEach(r=>{
+      const sido=String(r[sI]||'').trim(); if(!sido) return;
+      const id=String(r[idI]||'').trim();
+      rows.push([id, sido, String(r[gI]||'').trim(), rgnNum(r[pI]), rgnNum(r[cI]), rgnNum(r[qI])]);
+      meta(id,nmI,catI,r);
+    });
+    return {type:'region', rows, prodMeta};
   }
   return {type:null};
 }
@@ -6954,14 +6970,16 @@ async function rgnHandleFiles(files){
   await loadRegionData();
   const ch = document.getElementById('rgnUpCh').value;
   let ok=0, period='', types=[];
+  _rgnData[ch] ||= {};
   for(const file of files){
     try{
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, {type:'array'});
       const parsed = rgnParseSheet(wb.Sheets[wb.SheetNames[0]]);
       if(!parsed.type){ toast(`❌ ${file.name}: 인구통계/지역 형식이 아닙니다`); continue; }
-      _rgnData[ch] ||= {};
-      _rgnData[ch][parsed.type] = parsed.agg;
+      if(parsed.type==='demo') _rgnData[ch].demoRows = parsed.rows;
+      else _rgnData[ch].regionRows = parsed.rows;
+      _rgnData[ch].prodMeta = Object.assign(_rgnData[ch].prodMeta||{}, parsed.prodMeta);
       const p = rgnPeriodFromName(file.name); if(p) period=p;
       ok++; types.push(parsed.type==='demo'?'인구통계':'지역');
     }catch(e){ toast(`❌ ${file.name}: ${e.message}`); }
@@ -6978,109 +6996,111 @@ async function rgnHandleFiles(files){
 function rgnDropFiles(e){ e.preventDefault(); e.currentTarget.classList.remove('drag-over'); const fs=[...e.dataTransfer.files].filter(f=>/\.xlsx?$/i.test(f.name)); if(fs.length) rgnHandleFiles(fs); }
 function rgnPickFiles(e){ const fs=[...e.target.files]; if(fs.length) rgnHandleFiles(fs); e.target.value=''; }
 
-// ── 표시용 집계 (통합 시 채널 병합) ──
-function _rgnAddMap(dst,src,keys){ for(const k in src){ dst[k]||={}; keys.forEach(f=>dst[k][f]=(dst[k][f]||0)+(src[k][f]||0)); } }
-function _rgnMergeDemo(a,b){
-  if(!a) return JSON.parse(JSON.stringify(b));
-  _rgnAddMap(a.byGender,b.byGender,['amt','cnt','qty']);
-  _rgnAddMap(a.byAge,b.byAge,['amt','cnt','qty']);
-  for(const g in b.cross){ a.cross[g]||={}; for(const ag in b.cross[g]) a.cross[g][ag]=(a.cross[g][ag]||0)+b.cross[g][ag]; }
-  ['amt','cnt','qty','rAmt','rCnt'].forEach(f=>a.totals[f]=(a.totals[f]||0)+(b.totals[f]||0));
-  return a;
-}
-function _rgnMergeRegion(a,b){
-  if(!a) return JSON.parse(JSON.stringify(b));
-  _rgnAddMap(a.bySido,b.bySido,['amt','cnt','qty']);
-  _rgnAddMap(a.bySigungu,b.bySigungu,['amt','cnt','qty']);
-  ['amt','cnt','qty'].forEach(f=>a.totals[f]=(a.totals[f]||0)+(b.totals[f]||0));
-  return a;
-}
-function rgnAggregate(ch){
+// ── 행 수집 (통합 시 채널 결합) ──
+function rgnGetRows(ch){
   if(!_rgnData) return null;
-  if(ch==='__ALL__'){
-    const chans=['스마트스토어','쿠팡'].filter(c=>_rgnData[c]&&(_rgnData[c].demo||_rgnData[c].region));
-    if(!chans.length) return null;
-    const out={demo:null,region:null,period:'',channels:chans};
-    chans.forEach(c=>{ const d=_rgnData[c];
-      if(d.demo) out.demo=_rgnMergeDemo(out.demo,d.demo);
-      if(d.region) out.region=_rgnMergeRegion(out.region,d.region);
-      if(d.period) out.period=d.period;
-    });
-    return out;
-  }
-  const d=_rgnData[ch];
-  if(!d || (!d.demo && !d.region)) return null;
-  return {demo:d.demo||null, region:d.region||null, period:d.period||'', channels:[ch]};
+  const has = c => _rgnData[c] && ((_rgnData[c].demoRows&&_rgnData[c].demoRows.length) || (_rgnData[c].regionRows&&_rgnData[c].regionRows.length));
+  const chans = ch==='__ALL__' ? ['스마트스토어','쿠팡'].filter(has) : (has(ch)?[ch]:[]);
+  if(!chans.length) return null;
+  const demoRows=[], regionRows=[], prodMeta={}; let period='';
+  chans.forEach(c=>{ const d=_rgnData[c];
+    if(d.demoRows) demoRows.push(...d.demoRows);
+    if(d.regionRows) regionRows.push(...d.regionRows);
+    Object.assign(prodMeta, d.prodMeta||{});
+    if(d.period) period=d.period;
+  });
+  return {demoRows, regionRows, prodMeta, channels:chans, period};
+}
+// ── 집계 ──
+function rgnBuild(R){
+  const byGender={}, byAge={}, cross={}, products={}, totals={amt:0,cnt:0,qty:0,rAmt:0,rCnt:0};
+  R.demoRows.forEach(([id,g,a,amt,cnt,qty,rAmt,rCnt])=>{
+    (byGender[g] ||= {amt:0,cnt:0,qty:0}); byGender[g].amt+=amt; byGender[g].cnt+=cnt; byGender[g].qty+=qty;
+    (byAge[a]   ||= {amt:0,cnt:0,qty:0}); byAge[a].amt+=amt;   byAge[a].cnt+=cnt;   byAge[a].qty+=qty;
+    (cross[g]   ||= {}); cross[g][a]=(cross[g][a]||0)+amt;
+    if(id){ (products[id] ||= {amt:0,cnt:0,qty:0,rAmt:0}); products[id].amt+=amt; products[id].cnt+=cnt; products[id].qty+=qty; products[id].rAmt+=rAmt; }
+    totals.amt+=amt; totals.cnt+=cnt; totals.qty+=qty; totals.rAmt+=rAmt; totals.rCnt+=rCnt;
+  });
+  const bySido={}, bySigungu={}, rTotals={amt:0,cnt:0,qty:0};
+  R.regionRows.forEach(([id,sido,sgg,amt,cnt,qty])=>{
+    const full = sido+(sgg?' '+sgg:'');
+    (bySido[sido]   ||= {amt:0,cnt:0,qty:0}); bySido[sido].amt+=amt; bySido[sido].cnt+=cnt; bySido[sido].qty+=qty;
+    (bySigungu[full]||= {amt:0,cnt:0,qty:0}); bySigungu[full].amt+=amt; bySigungu[full].cnt+=cnt; bySigungu[full].qty+=qty;
+    rTotals.amt+=amt; rTotals.cnt+=cnt; rTotals.qty+=qty;
+  });
+  return {byGender,byAge,cross,products,totals,bySido,bySigungu,rTotals,
+    hasDemo:R.demoRows.length>0, hasRegion:R.regionRows.length>0,
+    prodMeta:R.prodMeta, period:R.period, channels:R.channels};
 }
 
 // ── 렌더링 ──
 function _rgnKill(k){ if(_rgnCharts[k]){ _rgnCharts[k].destroy(); _rgnCharts[k]=null; } }
 function _rgnToggleEmpty(id,show){ const e=document.getElementById(id); if(e) e.style.display=show?'block':'none'; }
+function _rgnHover(e,els){ if(e.native&&e.native.target) e.native.target.style.cursor = els.length?'pointer':'default'; }
+function _rgnName(id){ const m=_rgnCur&&_rgnCur.agg.prodMeta[id]; return (m&&m.name)||id; }
 
 async function renderRegionPage(){
   await loadRegionData();
-  // 업로드 채널 기본값을 현재 보고 채널로 (통합 제외)
   const upSel=document.getElementById('rgnUpCh');
   if(upSel && _rgnCh!=='__ALL__') upSel.value=_rgnCh;
-  const agg = rgnAggregate(_rgnCh);
+  const R = rgnGetRows(_rgnCh);
   const empty=document.getElementById('rgnEmpty'), body=document.getElementById('rgnBody');
-  if(!agg){ if(empty)empty.style.display='block'; if(body)body.style.display='none';
+  if(!R){ _rgnCur=null; if(empty)empty.style.display='block'; if(body)body.style.display='none';
     document.getElementById('rgnPeriod').textContent='기간: —'; return; }
   if(empty)empty.style.display='none'; if(body)body.style.display='flex';
+  const agg = rgnBuild(R);
+  _rgnCur = {R, agg};
 
-  // 기간
   const chTxt = agg.channels.length>1 ? ` · 통합(${agg.channels.join('+')})` : '';
   document.getElementById('rgnPeriod').textContent = '기간: '+(agg.period||'—')+chTxt;
 
-  // KPI (인구통계 totals 우선, 없으면 지역 totals)
-  const tot = agg.demo ? agg.demo.totals : (agg.region ? {...agg.region.totals,rAmt:0,rCnt:0} : {amt:0,cnt:0,qty:0,rAmt:0,rCnt:0});
+  // KPI (인구통계 우선, 없으면 지역)
+  const tot = agg.hasDemo ? agg.totals : {...agg.rTotals, rAmt:0, rCnt:0};
   document.getElementById('rgnK0').textContent = rgnWon(tot.amt);
   document.getElementById('rgnK0s').textContent = rgnWonFull(tot.amt);
   document.getElementById('rgnK1').textContent = (tot.cnt||0).toLocaleString()+'건';
   document.getElementById('rgnK2').textContent = (tot.qty||0).toLocaleString()+'개';
-  const avg = tot.cnt ? tot.amt/tot.cnt : 0;
-  document.getElementById('rgnK1s').textContent = '객단가 '+rgnWonFull(avg);
+  document.getElementById('rgnK1s').textContent = '객단가 '+rgnWonFull(tot.cnt?tot.amt/tot.cnt:0);
   document.getElementById('rgnK2s').textContent = tot.cnt?`주문당 ${(tot.qty/tot.cnt).toFixed(1)}개`:'';
   const rRate = tot.amt ? tot.rAmt/tot.amt*100 : 0;
   document.getElementById('rgnK3').textContent = rRate.toFixed(1)+'%';
   document.getElementById('rgnK3s').textContent = '환불 '+rgnWon(tot.rAmt||0)+'원';
 
-  rgnRenderGender(agg); rgnRenderAge(agg); rgnRenderRegion(agg); rgnRenderCross(agg); rgnRenderSigungu(agg);
+  rgnRenderGender(agg); rgnRenderAge(agg); rgnRenderRegion(agg); rgnRenderProducts(agg); rgnRenderCross(agg); rgnRenderSigungu(agg);
 }
 
 function rgnRenderGender(agg){
   const ctx=document.getElementById('rgnGenderChart'); _rgnKill('gender');
-  const bg = agg.demo ? agg.demo.byGender : {};
-  const keys = Object.keys(bg);
+  const bg = agg.byGender, keys = Object.keys(bg);
   _rgnToggleEmpty('rgnGenderEmpty', !keys.length);
   if(!keys.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
   const cmap={'남성':'#3182F6','여성':'#EC4899'};
   const order=['남성','여성',...keys.filter(k=>k!=='남성'&&k!=='여성')];
   const labels=[],data=[],colors=[];
-  order.forEach((g,i)=>{ if(bg[g]){ labels.push(g); data.push(Math.round(bg[g].amt)); colors.push(cmap[g]||'#94A3B8'); } });
+  order.forEach(g=>{ if(bg[g]){ labels.push(g); data.push(Math.round(bg[g].amt)); colors.push(cmap[g]||'#94A3B8'); } });
   const t=data.reduce((s,x)=>s+x,0)||1;
   _rgnCharts.gender=new Chart(ctx,{type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      onHover:_rgnHover, onClick:(e,els)=>{ if(els.length) rgnOpenDetail('gender', labels[els[0].index]); },
       plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:10}},
         tooltip:{callbacks:{label:c=>`${c.label}: ${rgnWonFull(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`}}}}});
 }
 function rgnRenderAge(agg){
   const ctx=document.getElementById('rgnAgeChart'); _rgnKill('age');
-  const ba = agg.demo ? agg.demo.byAge : {};
-  const ages = Object.keys(ba).sort((a,b)=>rgnAgeKey(a)-rgnAgeKey(b));
+  const ba = agg.byAge, ages = Object.keys(ba).sort((a,b)=>rgnAgeKey(a)-rgnAgeKey(b));
   _rgnToggleEmpty('rgnAgeEmpty', !ages.length);
   if(!ages.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
   _rgnCharts.age=new Chart(ctx,{type:'bar',
     data:{labels:ages,datasets:[{data:ages.map(a=>Math.round(ba[a].amt)),backgroundColor:'#3182F6',borderRadius:5,maxBarThickness:34}]},
     options:{responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover, onClick:(e,els)=>{ if(els.length) rgnOpenDetail('age', ages[els[0].index]); },
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>rgnWonFull(c.parsed)}}},
       scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},x:{ticks:{font:{size:9.5},autoSkip:false,maxRotation:60,minRotation:0}}}}});
 }
 function rgnRenderRegion(agg){
   const ctx=document.getElementById('rgnRegionChart'); _rgnKill('region');
-  const bs = agg.region ? agg.region.bySido : {};
-  let entries = Object.entries(bs).map(([k,v])=>[k,v.amt]).sort((a,b)=>b[1]-a[1]);
+  let entries = Object.entries(agg.bySido).map(([k,v])=>[k,v.amt]).sort((a,b)=>b[1]-a[1]);
   _rgnToggleEmpty('rgnRegionEmpty', !entries.length);
   if(!entries.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
   const top=entries.slice(0,8); const rest=entries.slice(8);
@@ -7091,13 +7111,31 @@ function rgnRenderRegion(agg){
   _rgnCharts.region=new Chart(ctx,{type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:palette.slice(0,labels.length),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'56%',
+      onHover:_rgnHover, onClick:(e,els)=>{ if(els.length){ const l=labels[els[0].index]; if(l!=='기타') rgnOpenDetail('sido', l); } },
       plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:7}},
         tooltip:{callbacks:{label:c=>`${c.label}: ${rgnWonFull(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`}}}}});
 }
+function rgnRenderProducts(agg){
+  const ctx=document.getElementById('rgnProductChart'); _rgnKill('product');
+  const entries = Object.entries(agg.products).map(([id,v])=>({id,amt:v.amt})).sort((a,b)=>b.amt-a.amt);
+  _rgnToggleEmpty('rgnProductEmpty', !entries.length);
+  if(!entries.length){ if(ctx)ctx.style.display='none'; _rgnProdIds=[]; return; } ctx.style.display='';
+  const top=entries.slice(0,10);
+  _rgnProdIds = top.map(e=>e.id);
+  const grand = agg.totals.amt || entries.reduce((s,e)=>s+e.amt,0) || 1;
+  const fullNames = top.map(e=>_rgnName(e.id));
+  const labels = fullNames.map(n=>n.length>26?n.slice(0,26)+'…':n);
+  _rgnCharts.product=new Chart(ctx,{type:'bar',
+    data:{labels,datasets:[{data:top.map(e=>Math.round(e.amt)),backgroundColor:'#059669',borderRadius:5,maxBarThickness:22}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover, onClick:(e,els)=>{ if(els.length) rgnOpenDetail('product', _rgnProdIds[els[0].index]); },
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{title:items=>fullNames[items[0].dataIndex],label:c=>`${rgnWonFull(c.parsed.x)} (${(c.parsed.x/grand*100).toFixed(1)}%)`}}},
+      scales:{x:{ticks:{callback:rgnAxis,font:{size:10}}},y:{ticks:{font:{size:10},autoSkip:false}}}}});
+}
 function rgnRenderCross(agg){
   const ctx=document.getElementById('rgnCrossChart'); _rgnKill('cross');
-  const cross = agg.demo ? agg.demo.cross : {};
-  const genders = Object.keys(cross);
+  const cross = agg.cross, genders = Object.keys(cross);
   _rgnToggleEmpty('rgnCrossEmpty', !genders.length);
   if(!genders.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
   const ageSet=new Set(); genders.forEach(g=>Object.keys(cross[g]).forEach(a=>ageSet.add(a)));
@@ -7107,23 +7145,95 @@ function rgnRenderCross(agg){
   _rgnCharts.cross=new Chart(ctx,{type:'bar',
     data:{labels:ages,datasets},
     options:{responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover, onClick:(e,els)=>{ if(els.length) rgnOpenDetail('age', ages[els[0].index]); },
       plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:10}},
         tooltip:{callbacks:{label:c=>`${c.dataset.label} ${c.label}: ${rgnWonFull(c.parsed)}`}}},
       scales:{x:{stacked:true,ticks:{font:{size:9.5},autoSkip:false,maxRotation:60}},y:{stacked:true,ticks:{callback:rgnAxis,font:{size:10}}}}}});
 }
 function rgnRenderSigungu(agg){
   const tb=document.getElementById('rgnSigunguBody'); if(!tb) return;
-  const bs = agg.region ? agg.region.bySigungu : {};
-  const entries = Object.entries(bs).map(([k,v])=>({name:k,...v})).sort((a,b)=>b.amt-a.amt);
+  const entries = Object.entries(agg.bySigungu).map(([k,v])=>({name:k,...v})).sort((a,b)=>b.amt-a.amt);
   if(!entries.length){ tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--tx2);padding:18px;">지역 데이터가 없습니다</td></tr>'; return; }
   const tot=entries.reduce((s,e)=>s+e.amt,0)||1;
-  tb.innerHTML=entries.slice(0,10).map((e,i)=>`<tr>
+  tb.innerHTML=entries.slice(0,10).map((e,i)=>`<tr style="cursor:pointer;" onclick="rgnOpenDetail('sigungu','${rgnEsc(e.name).replace(/'/g,"\\'")}')" title="클릭 시 상세보기">
     <td style="text-align:center;font-weight:700;color:${i<3?'#DC2626':'var(--tx2)'};">${i+1}</td>
-    <td style="font-weight:500;">${e.name}</td>
+    <td style="font-weight:500;">${rgnEsc(e.name)}</td>
     <td style="text-align:right;font-weight:600;">${rgnWonFull(e.amt)}</td>
     <td style="text-align:right;color:var(--tx2);">${(e.cnt||0).toLocaleString()}</td>
     <td style="text-align:right;color:var(--pr);font-weight:600;">${(e.amt/tot*100).toFixed(1)}%</td>
   </tr>`).join('');
+}
+
+// ── 드릴다운 상세 모달 ──
+function rgnCloseDetail(){ const m=document.getElementById('rgnModal'); if(m) m.style.display='none'; }
+function _rgnKpiRow(amt,cnt,qty,grand){
+  const cell=(l,v,c)=>`<div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">${l}</div><div style="font-size:13.5px;font-weight:700;${c?`color:${c};`:''}">${v}</div></div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">${cell('결제금액',rgnWonFull(amt))}${cell('결제수',cnt.toLocaleString()+'건')}${cell('수량',qty.toLocaleString()+'개')}${cell('전체 비중',(amt/grand*100).toFixed(1)+'%','var(--pr)')}</div>`;
+}
+function _rgnMini(title, headHtml, rowsHtml){
+  return `<div style="font-size:12px;font-weight:700;margin:15px 0 3px;color:var(--tx);">${title}</div>`
+    + `<table class="dt" style="width:100%;"><thead><tr>${headHtml}</tr></thead><tbody>${rowsHtml||'<tr><td style="color:var(--tx2);padding:8px;">데이터 없음</td></tr>'}</tbody></table>`;
+}
+function _rgnRankRows(pairs, total, withRank){
+  return pairs.map(([k,v],i)=>`<tr>${withRank?`<td style="text-align:center;color:var(--tx2);">${i+1}</td>`:''}<td>${rgnEsc(k)}</td><td style="text-align:right;font-weight:600;">${rgnWonFull(v)}</td><td style="text-align:right;color:var(--pr);">${(v/(total||1)*100).toFixed(1)}%</td></tr>`).join('');
+}
+function rgnOpenDetail(type, key){
+  if(!_rgnCur) return;
+  const {R, agg} = _rgnCur;
+  const grand = (agg.hasDemo?agg.totals.amt:agg.rTotals.amt) || 1;
+  let title='', html='';
+
+  if(type==='gender' || type==='age'){
+    const isG = type==='gender';
+    const sub = R.demoRows.filter(r=> isG ? r[1]===key : r[2]===key);
+    const amt=sub.reduce((s,r)=>s+r[3],0), cnt=sub.reduce((s,r)=>s+r[4],0), qty=sub.reduce((s,r)=>s+r[5],0);
+    title = `${isG?'성별':'연령'} · ${key}`;
+    const other={}; sub.forEach(r=>{ const k=isG?r[2]:r[1]; other[k]=(other[k]||0)+r[3]; });
+    const otherPairs = Object.entries(other).sort((a,b)=> isG ? rgnAgeKey(a[0])-rgnAgeKey(b[0]) : b[1]-a[1]);
+    const byP={}; sub.forEach(r=>{ if(r[0]) byP[r[0]]=(byP[r[0]]||0)+r[3]; });
+    const pPairs = Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,v])=>[_rgnName(id),v]);
+    html = _rgnKpiRow(amt,cnt,qty,grand)
+      + _rgnMini(isG?'연령대별 분포':'성별 분포', `<th>${isG?'연령대':'성별'}</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(otherPairs, amt, false))
+      + _rgnMini('상품 TOP', `<th style="width:30px;text-align:center;">#</th><th>상품</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(pPairs, amt, true));
+  }
+  else if(type==='sido' || type==='sigungu'){
+    const sub = type==='sido' ? R.regionRows.filter(r=>r[1]===key) : R.regionRows.filter(r=> (r[1]+(r[2]?' '+r[2]:''))===key);
+    const amt=sub.reduce((s,r)=>s+r[3],0), cnt=sub.reduce((s,r)=>s+r[4],0), qty=sub.reduce((s,r)=>s+r[5],0);
+    title = `지역 · ${key}`;
+    let extra='';
+    if(type==='sido'){
+      const bySgg={}; sub.forEach(r=>{ const k=r[2]||'기타'; bySgg[k]=(bySgg[k]||0)+r[3]; });
+      const pairs=Object.entries(bySgg).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      extra=_rgnMini('시·군·구 분포', `<th>시군구</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(pairs, amt, false));
+    }
+    const byP={}; sub.forEach(r=>{ if(r[0]) byP[r[0]]=(byP[r[0]]||0)+r[3]; });
+    const pPairs=Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,v])=>[_rgnName(id),v]);
+    html = _rgnKpiRow(amt,cnt,qty,grand) + extra
+      + _rgnMini('상품 TOP', `<th style="width:30px;text-align:center;">#</th><th>상품</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(pPairs, amt, true));
+  }
+  else if(type==='product'){
+    const id=key;
+    const dsub=R.demoRows.filter(r=>r[0]===id), rsub=R.regionRows.filter(r=>r[0]===id);
+    const amt = dsub.reduce((s,r)=>s+r[3],0) || rsub.reduce((s,r)=>s+r[3],0);
+    const cnt = dsub.reduce((s,r)=>s+r[4],0) || rsub.reduce((s,r)=>s+r[4],0);
+    const qty = dsub.reduce((s,r)=>s+r[5],0) || rsub.reduce((s,r)=>s+r[5],0);
+    const meta = agg.prodMeta[id]||{};
+    title = _rgnName(id);
+    const byG={}; dsub.forEach(r=>byG[r[1]]=(byG[r[1]]||0)+r[3]);
+    const byA={}; dsub.forEach(r=>byA[r[2]]=(byA[r[2]]||0)+r[3]);
+    const byS={}; rsub.forEach(r=>byS[r[1]]=(byS[r[1]]||0)+r[3]);
+    const gP=Object.entries(byG).sort((a,b)=>b[1]-a[1]);
+    const aP=Object.entries(byA).sort((a,b)=>rgnAgeKey(a[0])-rgnAgeKey(b[0]));
+    const sP=Object.entries(byS).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    html = `<div style="font-size:11px;color:var(--tx2);margin-bottom:8px;">상품ID ${rgnEsc(id)}${meta.cat?' · '+rgnEsc(meta.cat):''}</div>`
+      + _rgnKpiRow(amt,cnt,qty,grand)
+      + (gP.length?_rgnMini('성별', `<th>성별</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(gP, amt, false)):'')
+      + (aP.length?_rgnMini('연령대', `<th>연령대</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(aP, amt, false)):'')
+      + (sP.length?_rgnMini('지역(시·도)', `<th>지역</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(sP, sP.reduce((s,[,v])=>s+v,0), false)):'');
+  }
+  document.getElementById('rgnModalTitle').textContent = title;
+  document.getElementById('rgnModalBody').innerHTML = html;
+  document.getElementById('rgnModal').style.display = 'flex';
 }
 
 // 만 단위 값 → 1억(=10000만) 이상이면 억 표기
