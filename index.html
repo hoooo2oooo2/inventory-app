@@ -4869,7 +4869,7 @@ function goPage(p){
     document.getElementById('page-'+x)?.classList.toggle('active',x===p);
   });
   // 쿠팡광고: 처음 열 때만 iframe 로드(지연 로딩)
-  if(p==='coupangad'){ const f=document.getElementById('coupangAdFrame'); if(f && !f.getAttribute('src')) f.setAttribute('src','coupang-ad-dashboard.html?v=20260623d'); }
+  if(p==='coupangad'){ const f=document.getElementById('coupangAdFrame'); if(f && !f.getAttribute('src')) f.setAttribute('src','coupang-ad-dashboard.html?v=20260623e'); }
   if(p==='calendar') loadCalPage();
   if(p==='collab') loadCollabPage();
   if(p==='logihome') loadLogiHome();
@@ -12390,10 +12390,35 @@ function reportBlockCopy(task,time,category){
   _reportAutoSave();
 }
 
-// calendar.html 구 업무보고서 데이터 → work_report_v1 1회 마이그레이션
+// calendar.html(kind='reports')가 원본 — work_report_v1 의 빈 날짜를 reports 에서 복구.
+//   v2: 오전/오후 자동 분리 + '내용이 비어있는' 항목만 채워(기존 입력 보존) 재실행 안전.
+//   reports 행은 calendar.html 이 계속 저장하는 원본이므로 항상 신뢰 가능.
+function _reportSplitAmPm(text){
+  const t=(text||'').replace(/\r/g,'');
+  const m=t.match(/\n\s*\*?\s*오후\s*\*?\s*\n?/);   // '오후' 구분자(별표/공백 무관)
+  if(m) return [ t.slice(0,m.index), t.slice(m.index+m[0].length) ];
+  return [t,''];
+}
+function _reportTextToLines(txt, key, sec){
+  let arr=(txt||'').split('\n');
+  // 선두 공백 및 '오전/오후' 단독 머리글 제거(섹션 헤더와 중복되므로), 말미 공백 제거
+  while(arr.length && (!arr[0].trim() || /^\*?\s*오[전후]\s*\*?$/.test(arr[0].trim()))) arr.shift();
+  while(arr.length && !arr[arr.length-1].trim()) arr.pop();
+  if(!arr.length) arr.push('');
+  return arr.map((line,i)=>({ id:`mig2_${key}_${sec}_${i}`, type:'line', text:line }));
+}
+function _reportEntryIsEmpty(e){
+  if(!e) return true;
+  const has=a=>(a||[]).some(i=>i.type==='block'||(i.type==='line'&&(i.text||'').trim()));
+  if(e.content_am!==undefined || e.content_pm!==undefined) return !has(e.content_am) && !has(e.content_pm);
+  if(e.content!==undefined) return !has(e.content);
+  return true;
+}
 async function _reportMigrateFromCalendar(){
-  if(localStorage.getItem('report_cal_migrated_v1')) return;
+  if(localStorage.getItem('report_cal_migrated_v2')) return;
   const PEOPLE = ['유현','보라','연정'];
+  // 날짜 없는 잔여 키(예: '유현|') 정리
+  Object.keys(_reportAllData).forEach(k=>{ if(/\|$/.test(k)) delete _reportAllData[k]; });
   let count = 0;
   for(const person of PEOPLE){
     try{
@@ -12403,23 +12428,24 @@ async function _reportMigrateFromCalendar(){
       const reports = data.data; // { 'YYYY-MM-DD': { workDone, issues } }
       for(const [date, report] of Object.entries(reports)){
         const key = `${person}|${date}`;
-        // 이미 새 포맷 데이터가 있으면 건너뜀
-        if(_reportAllData[key]?.content?.length) continue;
+        if(!_reportEntryIsEmpty(_reportAllData[key])) continue;  // 내용 있으면 보존
         const combined = [report.workDone, report.issues].filter(Boolean).join('\n');
         if(!combined.trim()) continue;
-        const content = combined.split('\n').map((line, i) => ({
-          id: `cal_${date}_${i}`, type: 'line', text: line
-        }));
-        _reportAllData[key] = { content, notes: [] };
+        const [am,pm] = _reportSplitAmPm(combined);
+        _reportAllData[key] = {
+          content_am: _reportTextToLines(am, key, 'am'),
+          content_pm: _reportTextToLines(pm, key, 'pm'),
+          pinned_am: [], pinned_pm: []
+        };
         count++;
       }
     }catch(e){ console.warn('calendar migration error', person, e); }
   }
   if(count > 0){
     await _reportFlushSave();
-    toast(`📋 이전 업무보고서 ${count}일치 데이터를 가져왔습니다.`);
+    toast(`📋 업무보고서 ${count}일치 복구 완료`);
   }
-  localStorage.setItem('report_cal_migrated_v1', '1');
+  localStorage.setItem('report_cal_migrated_v2', '1');
 }
 
 // 에디터별 키보드 이벤트 등록 (섹션 인식)
