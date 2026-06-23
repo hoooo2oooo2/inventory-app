@@ -301,13 +301,13 @@ select{cursor:pointer;}
     <span class="logo-text">쿠팡 <em>광고</em> 관리</span>
   </div>
   <nav class="h-nav">
-    <div class="nav-tab active" onclick="showTab('overview',this)"><span>🏠</span> 대시보드</div>
-    <div class="nav-tab" onclick="showTab('ad',this)"><span>📣</span> 광고 성과</div>
-    <div class="nav-tab" onclick="showTab('sales',this)"><span>💰</span> 매출 정산</div>
-    <div class="nav-tab" onclick="showTab('products',this)"><span>📦</span> 상품별 분석</div>
-    <div class="nav-tab" onclick="showTab('raw',this)"><span>🗂</span> 전체 데이터</div>
-    <div class="nav-tab" onclick="showTab('upload',this)"><span>📤</span> 업로드</div>
-    <div class="nav-tab" onclick="showTab('leave',this)"><span>🗓</span> 연월차 관리</div>
+    <div class="nav-tab" style="display:none" onclick="showTab('overview',this)"><span>🏠</span> 대시보드</div>
+    <div class="nav-tab" style="display:none" onclick="showTab('ad',this)"><span>📣</span> 광고 성과</div>
+    <div class="nav-tab" style="display:none" onclick="showTab('sales',this)"><span>💰</span> 매출 정산</div>
+    <div class="nav-tab" style="display:none" onclick="showTab('products',this)"><span>📦</span> 상품별 분석</div>
+    <div class="nav-tab" style="display:none" onclick="showTab('raw',this)"><span>🗂</span> 전체 데이터</div>
+    <div class="nav-tab" style="display:none" onclick="showTab('upload',this)"><span>📤</span> 업로드</div>
+    <div class="nav-tab active" onclick="showTab('leave',this)"><span>🗓</span> 연월차 관리</div>
   </nav>
   <div class="h-right">
     <span class="chip chip-blue" id="dataChip">샘플 데이터</span>
@@ -320,7 +320,7 @@ select{cursor:pointer;}
 <div class="content">
 
 <!-- ══ 대시보드 ══ -->
-<div class="panel active" id="panel-overview">
+<div class="panel" id="panel-overview">
 
   <!-- Row 1: 헤더 -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -772,7 +772,7 @@ select{cursor:pointer;}
 </div>
 
 <!-- ══ 연월차 관리 ══ -->
-<div class="panel" id="panel-leave">
+<div class="panel active" id="panel-leave">
   <div class="page-hd">
     <div class="page-title">연월차 관리 <span>직원 연차 현황 및 사용 내역</span></div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -902,7 +902,12 @@ select{cursor:pointer;}
     <div class="scroll-x">
       <table>
         <thead><tr>
-          <th>직원명</th><th>사용 날짜</th><th>사용량</th><th>사유</th><th>잔여 연차</th><th style="width:60px"></th>
+          <th onclick="sortLeaveBy('name')"   style="cursor:pointer;user-select:none">직원명 <span class="sort-ind" data-k="name"></span></th>
+          <th onclick="sortLeaveBy('date')"   style="cursor:pointer;user-select:none">사용 날짜 <span class="sort-ind" data-k="date"></span></th>
+          <th onclick="sortLeaveBy('used')"   style="cursor:pointer;user-select:none">사용량 <span class="sort-ind" data-k="used"></span></th>
+          <th onclick="sortLeaveBy('reason')" style="cursor:pointer;user-select:none">사유 <span class="sort-ind" data-k="reason"></span></th>
+          <th onclick="sortLeaveBy('remain')" style="cursor:pointer;user-select:none">잔여 연차 <span class="sort-ind" data-k="remain"></span></th>
+          <th style="width:60px"></th>
         </tr></thead>
         <tbody id="leaveTableBody"></tbody>
       </table>
@@ -2433,24 +2438,52 @@ function deleteLeaveRecord(id){
   toast('🗑 연차 내역이 삭제됐습니다');
 }
 
+// 연월차 테이블 정렬 상태 (기본: 사용 날짜 내림차순)
+let leaveSort = { key:'date', dir:'desc' };
+function sortLeaveBy(key){
+  if(leaveSort.key===key){ leaveSort.dir = leaveSort.dir==='asc' ? 'desc' : 'asc'; }
+  else { leaveSort.key = key; leaveSort.dir = (key==='name'||key==='reason') ? 'asc' : 'desc'; }
+  renderLeaveTable();
+}
+
 function renderLeaveTable(){
   const filterEmpId=parseInt(document.getElementById('leaveFilterEmp')?.value)||0;
   let records=filterEmpId?leaveRecords.filter(r=>r.empId===filterEmpId):leaveRecords;
   const tbody=document.getElementById('leaveTableBody');
+  // 헤더 정렬 표시 갱신
+  document.querySelectorAll('.sort-ind').forEach(s=>{
+    s.textContent = s.dataset.k===leaveSort.key ? (leaveSort.dir==='asc'?'▲':'▼') : '';
+    s.style.color = 'var(--blue)'; s.style.fontSize='9px';
+  });
   if(!records.length){
     tbody.innerHTML='<tr class="empty-row"><td colspan="6">연차 사용 내역이 없습니다</td></tr>';
     return;
   }
-  tbody.innerHTML=records.map(r=>{
+  // 각 행의 표시/정렬용 값 계산
+  const rows=records.map(r=>{
     const emp=employees.find(e=>e.id===r.empId);
-    if(!emp)return'';
+    if(!emp)return null;
     const used=getUsedLeave(emp.id);
     const remain=Math.max(0,emp.totalLeave-used);
-    // 잔여를 시간 총합으로 계산 후 일+시간으로 표기
     const remainTotalH = Math.round(remain * WORK_HOURS_PER_DAY * 10) / 10;
     const remainD = Math.floor(remainTotalH / WORK_HOURS_PER_DAY);
     const remainRH = Math.round(remainTotalH % WORK_HOURS_PER_DAY);
     const remainStr = remainD>0&&remainRH>0 ? remainD+'일 '+remainRH+'시간' : remainD>0 ? remainD+'일' : remainRH>0 ? remainRH+'시간' : '0일';
+    // 사용량(일 환산): 시간 단위는 8시간=1일로 환산
+    const usedDays = r.unit==='hour' ? (r.hours||0)/WORK_HOURS_PER_DAY : (r.days||0);
+    return { r, emp, name:emp.name, date:normalizeToISO(r.date), used:usedDays, reason:r.reason||'', remain, remainStr };
+  }).filter(Boolean);
+  // 정렬 적용
+  const dir = leaveSort.dir==='asc' ? 1 : -1;
+  rows.sort((a,b)=>{
+    let av=a[leaveSort.key], bv=b[leaveSort.key];
+    let cmp;
+    if(typeof av==='number' && typeof bv==='number') cmp = av-bv;
+    else cmp = String(av).localeCompare(String(bv),'ko');
+    if(cmp===0) cmp = b.date.localeCompare(a.date); // 동률이면 최신 날짜 우선
+    return cmp*dir;
+  });
+  tbody.innerHTML=rows.map(({r,emp,remain,remainStr})=>{
     return `<tr>
       <td class="name">${emp.name}</td>
       <td class="mono">${normalizeToISO(r.date)}</td>
@@ -2480,6 +2513,8 @@ function renderLeaveTable(){
   } else {
     loadSampleData();   // 저장된 실데이터가 없을 때만 데모 표시
   }
+  // 연월차 관리만 노출 → 시작 화면을 연월차 탭으로 고정
+  showTab('leave', document.querySelector('.nav-tab.active'));
 })();
 </script>
 </body>
