@@ -2800,8 +2800,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <div class="rev-empty" id="rgnAgeEmpty" style="display:none;padding:60px 0;">인구통계 데이터 없음</div>
           </div>
           <div class="rev-card">
-            <div class="rev-card-title"><span>📍 지역별 (시·도)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">결제금액</span></div>
-            <div class="rev-chart-wrap" style="height:210px;"><canvas id="rgnRegionChart"></canvas></div>
+            <div class="rev-card-title"><span>📍 지역별 (시·도)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">전체 · 클릭 상세</span></div>
+            <div class="rev-chart-wrap" style="height:185px;"><canvas id="rgnRegionChart"></canvas></div>
+            <div id="rgnSidoList" style="margin-top:8px;max-height:172px;overflow-y:auto;"></div>
             <div class="rev-empty" id="rgnRegionEmpty" style="display:none;padding:60px 0;">지역 데이터 없음</div>
           </div>
         </div>
@@ -7100,20 +7101,34 @@ function rgnRenderAge(agg){
 }
 function rgnRenderRegion(agg){
   const ctx=document.getElementById('rgnRegionChart'); _rgnKill('region');
+  const listEl=document.getElementById('rgnSidoList');
   let entries = Object.entries(agg.bySido).map(([k,v])=>[k,v.amt]).sort((a,b)=>b[1]-a[1]);
   _rgnToggleEmpty('rgnRegionEmpty', !entries.length);
-  if(!entries.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
+  if(!entries.length){ if(ctx)ctx.style.display='none'; if(listEl)listEl.innerHTML=''; return; } ctx.style.display='';
+  const grandAll = entries.reduce((s,[,v])=>s+v,0)||1;
+  // 도넛: 상위 8개 + 기타 (시각 요약)
   const top=entries.slice(0,8); const rest=entries.slice(8);
   if(rest.length) top.push(['기타',rest.reduce((s,[,v])=>s+v,0)]);
   const labels=top.map(([k])=>k), data=top.map(([,v])=>Math.round(v));
   const palette=['#3182F6','#059669','#F59E0B','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#94A3B8'];
-  const t=data.reduce((s,x)=>s+x,0)||1;
   _rgnCharts.region=new Chart(ctx,{type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:palette.slice(0,labels.length),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'56%',
       onHover:_rgnHover, onClick:(e,els)=>{ if(els.length){ const l=labels[els[0].index]; if(l!=='기타') rgnOpenDetail('sido', l); } },
-      plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:7}},
-        tooltip:{callbacks:{label:c=>`${c.label}: ${rgnWonFull(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`}}}}});
+      plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:6}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${rgnWonFull(c.parsed)} (${(c.parsed/grandAll*100).toFixed(1)}%)`}}}}});
+  // 전체 시·도 순위 리스트 (부산·대구 등 모두 표시, 클릭 시 상세)
+  if(listEl){
+    const maxAmt = entries[0][1]||1;
+    listEl.innerHTML = entries.map(([k,v],i)=>`<div onclick="rgnOpenDetail('sido','${rgnEsc(k).replace(/'/g,"\\'")}')" title="클릭 시 상세보기"
+      style="display:flex;align-items:center;gap:7px;padding:4px 3px;cursor:pointer;border-bottom:0.5px solid var(--bd);">
+      <span style="width:15px;font-size:10px;color:var(--tx2);text-align:right;flex-shrink:0;">${i+1}</span>
+      <span style="width:88px;font-size:11.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;">${rgnEsc(k)}</span>
+      <span style="flex:1;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;min-width:24px;"><span style="display:block;height:100%;width:${(v/maxAmt*100).toFixed(1)}%;background:${palette[i%palette.length]};border-radius:3px;"></span></span>
+      <span style="width:48px;text-align:right;font-size:11px;color:var(--tx2);flex-shrink:0;">${rgnWon(v)}</span>
+      <span style="width:40px;text-align:right;font-size:11px;font-weight:700;color:var(--pr);flex-shrink:0;">${(v/grandAll*100).toFixed(1)}%</span>
+    </div>`).join('');
+  }
 }
 function rgnRenderProducts(agg){
   const ctx=document.getElementById('rgnProductChart'); _rgnKill('product');
