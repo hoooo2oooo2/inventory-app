@@ -11706,8 +11706,11 @@ function _reportInjectCalDots(){
   for(const key of Object.keys(_reportAllData)){
     const [person, ds] = key.split('|');
     if(person !== _reportPerson) continue;
+    if(!ds) continue;   // 날짜 없는 키(__pins__ 등) 제외
     const entry = _reportAllData[key];
-    const hasContent = (entry.content||[]).some(i=> i.type==='block' || (i.type==='line' && (i.text||'').trim()));
+    const _has = arr => (arr||[]).some(i=> i.type==='block' || (i.type==='line' && (i.text||'').trim()));
+    // 신 포맷(content_am/pm) + 구 포맷(content) 모두 검사
+    const hasContent = _has(entry.content_am) || _has(entry.content_pm) || _has(entry.content);
     if(hasContent) dots[ds] = true;
   }
   f.contentWindow.__injectNewReportDots(dots);
@@ -12414,18 +12417,36 @@ function _reportEntryIsEmpty(e){
   if(e.content!==undefined) return !has(e.content);
   return true;
 }
+// 📌 표시 줄 → 고정핀(task/time) 파싱. 'task(10분)📌' / '📌task : 5분' 등 다양한 표기 처리.
+function _reportParsePin(line){
+  let t=line.replace(/📌/g,'').trim(); let time='';
+  let m=t.match(/\(([^)]*?(?:분|시간)[^)]*)\)\s*$/);            // 끝의 (10분)
+  if(m){ time=m[1].trim(); t=t.slice(0,m.index).trim(); }
+  else { m=t.match(/[:：\-]\s*(\d+\s*시간(?:\s*\d+\s*분)?|\d+\s*분)\s*$/); if(m){ time=m[1].replace(/\s+/g,''); t=t.slice(0,m.index).trim(); } }
+  t=t.replace(/[\s:：\-]+$/,'').trim();                          // 꼬리 콜론/대시 정리
+  return { task:t, time };
+}
+function _reportPinsFromText(workDone){
+  const [am,pm]=_reportSplitAmPm(workDone||'');
+  const mk=seg=>seg.split('\n').filter(l=>l.includes('📌')).map(l=>{
+    const {task,time}=_reportParsePin(l);
+    return { id:'gpm_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), type:'block', task, time, pinned_at:new Date().toISOString() };
+  }).filter(p=>p.task);
+  return { pinned_am:mk(am), pinned_pm:mk(pm) };
+}
 async function _reportMigrateFromCalendar(){
-  if(localStorage.getItem('report_cal_migrated_v2')) return;
+  if(localStorage.getItem('report_cal_migrated_v3')) return;
   const PEOPLE = ['유현','보라','연정'];
   // 날짜 없는 잔여 키(예: '유현|') 정리
   Object.keys(_reportAllData).forEach(k=>{ if(/\|$/.test(k)) delete _reportAllData[k]; });
-  let count = 0;
+  let count = 0, pinCount = 0;
   for(const person of PEOPLE){
     try{
       const { data, error } = await sb.from('work_calendar')
         .select('data').eq('person', person).eq('kind','reports').maybeSingle();
       if(error || !data?.data) continue;
       const reports = data.data; // { 'YYYY-MM-DD': { workDone, issues } }
+      // ① 일별 내용 복구 (비어있는 날짜만)
       for(const [date, report] of Object.entries(reports)){
         const key = `${person}|${date}`;
         if(!_reportEntryIsEmpty(_reportAllData[key])) continue;  // 내용 있으면 보존
@@ -12439,13 +12460,29 @@ async function _reportMigrateFromCalendar(){
         };
         count++;
       }
+      // ② 전역 고정핀(고정됨) 복구 — 기존 핀이 없을 때만, 가장 최근 📌 있는 날 기준
+      const pk='__pins__'+person;
+      const ex=_reportAllData[pk];
+      const hasPins = ex && ((ex.pinned_am||[]).length || (ex.pinned_pm||[]).length);
+      if(!hasPins){
+        const dates=Object.keys(reports).sort();
+        let chosen=null;
+        for(let i=dates.length-1;i>=0;i--){ if((reports[dates[i]].workDone||'').includes('📌')){ chosen=reports[dates[i]].workDone; break; } }
+        if(chosen){
+          const pins=_reportPinsFromText(chosen);
+          if(pins.pinned_am.length || pins.pinned_pm.length){
+            _reportAllData[pk]={ pinned_am:pins.pinned_am, pinned_pm:pins.pinned_pm };
+            pinCount += pins.pinned_am.length + pins.pinned_pm.length;
+          }
+        }
+      }
     }catch(e){ console.warn('calendar migration error', person, e); }
   }
-  if(count > 0){
+  if(count > 0 || pinCount > 0){
     await _reportFlushSave();
-    toast(`📋 업무보고서 ${count}일치 복구 완료`);
+    toast(`📋 업무보고서 복구: 내용 ${count}일 · 고정블록 ${pinCount}개`);
   }
-  localStorage.setItem('report_cal_migrated_v2', '1');
+  localStorage.setItem('report_cal_migrated_v3', '1');
 }
 
 // 에디터별 키보드 이벤트 등록 (섹션 인식)
