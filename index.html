@@ -1406,6 +1406,23 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lod-type-tbl tr.tot td{font-weight:800;background:rgba(49,130,246,.06);border-top:2px solid var(--bd);}
 .lod-unmatched{font-size:11.5px;color:#B45309;margin-top:10px;line-height:1.5;}
 .lod-empty{color:var(--tx2);font-size:13px;text-align:center;padding:30px 0;}
+/* 직원별 택배건수 (보고용) */
+.lod-staff-wrap{margin-top:18px;padding-top:14px;border-top:1px dashed var(--bd);}
+.lod-staff-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;}
+.lod-staff-total{font-size:12px;color:var(--tx2);font-weight:600;}
+.lod-staff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+.lod-staff-card{border:1px solid var(--bd);border-radius:12px;padding:13px 13px 12px;background:var(--bg2,rgba(127,127,127,.03));display:flex;flex-direction:column;}
+.lod-staff-name{font-size:13.5px;font-weight:800;color:var(--tx);margin-bottom:6px;}
+.lod-staff-cnt{font-size:26px;font-weight:800;color:#2563EB;line-height:1.1;margin-bottom:2px;}
+.lod-staff-cnt .u{font-size:13px;font-weight:700;color:#2563EB;}
+.lod-staff-sub{font-size:11px;color:var(--tx2);margin-bottom:10px;}
+.lod-staff-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.lod-chip{font-size:11.5px;padding:4px 9px;border-radius:999px;border:1px solid var(--bd);background:var(--bg);color:var(--tx2);cursor:pointer;user-select:none;transition:.1s;white-space:nowrap;}
+.lod-chip:hover{border-color:#3182F6;}
+.lod-chip.on{background:#2563EB;border-color:#2563EB;color:#fff;font-weight:700;}
+.lod-chip.taken{opacity:.38;}
+.lod-chip.taken.on{opacity:1;}
+.lod-staff-empty{font-size:11.5px;color:var(--tx2);}
 </style>
 <div class="page" id="page-logistock">
   <div class="lod-wrap">
@@ -1442,6 +1459,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="lod-sec-t">📦 구분별 택배건수 (성함·연락처·주소 동일 시 1건)</div>
           <table class="lod-type-tbl"><thead><tr><th>구분</th><th>택배건수</th><th>품목수</th><th>수량합</th></tr></thead><tbody id="lodTypeBody"></tbody></table>
         </div>
+        <div id="lodStaffWrap" class="lod-staff-wrap"></div>
         <div id="lodUnmatched" class="lod-unmatched"></div>
       </section>
     </div>
@@ -4971,6 +4989,9 @@ let _lodSelDate = null;        // 선택된 날짜(YYYY-MM-DD)
 let _lodItemsCache = {};       // id → items
 let _lodChart = null;
 let _lodLoaded = false;
+const LOD_STAFF = ['방팀장님','가영씨','지민씨'];   // 보고용 직원
+let _lodStaffAssign = null;     // {직원: [구분,...]} — 구분→직원 배정(전역, 중복 불가)
+let _lodLastStats = null;       // 마지막 렌더된 선택일 통계(재렌더용)
 
 function _lodEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function _lodNorm(s){ return String(s||'').replace(/\s+/g,'').trim(); }
@@ -5054,6 +5075,11 @@ async function loadLogiStock(){
   if(!_bdLoaded) { try{ await loadBackdata(); }catch{} }
   if(_lodIdx===null){
     _lodIdx = (await cloudKvLoad('logi_order_idx')) || [];
+  }
+  if(_lodStaffAssign===null){
+    const a = await cloudKvLoad('logi_staff_assign');
+    _lodStaffAssign = (a && typeof a==='object') ? a : {};
+    LOD_STAFF.forEach(s=>{ if(!Array.isArray(_lodStaffAssign[s])) _lodStaffAssign[s]=[]; });
   }
   if(!_lodLoaded){
     // 등록된 가장 최근 날짜로 달력/선택 초기화
@@ -5161,7 +5187,7 @@ async function lodRenderDetail(){
   if(!_lodSelDate){
     dEl.textContent='날짜를 선택하세요'; tEl.textContent='';
     rEl.innerHTML=''; bEl.innerHTML=`<tr><td colspan="4" class="lod-empty">달력에서 발주 등록된 날을 클릭하세요.</td></tr>`; uEl.innerHTML='';
-    return;
+    _lodLastStats=null; lodRenderStaff(); return;
   }
   const entries=(_lodIdx||[]).filter(e=>e.date===_lodSelDate).sort((a,b)=>a.round-b.round);
   const wd=DNAMES[new Date(_lodSelDate+'T00:00:00').getDay()];
@@ -5198,6 +5224,57 @@ async function lodRenderDetail(){
   uEl.innerHTML = st.unmatched.length
     ? `⚠️ 백데이터 미매칭 ${st.unmatched.length}건 (구분 없음): ${st.unmatched.slice(0,15).map(_lodEsc).join(', ')}${st.unmatched.length>15?' …':''}<br><span style="opacity:.8;">매출관리 › 백데이터에 코드를 등록하면 구분이 자동 분류됩니다.</span>`
     : '';
+  _lodLastStats = st;
+  lodRenderStaff();
+}
+
+// 직원별 택배건수(보고용): 구분을 직원에게 배정(중복 불가)하고 합계 표시
+function lodRenderStaff(){
+  const wrap=document.getElementById('lodStaffWrap'); if(!wrap) return;
+  const st=_lodLastStats;
+  if(!st || !Object.keys(st.byType).length){
+    wrap.innerHTML=`<div class="lod-staff-head"><span class="lod-sec-t" style="margin:0;">👥 직원별 택배건수 (보고용)</span></div><div class="lod-staff-empty">선택한 날짜에 집계할 구분이 없습니다.</div>`;
+    return;
+  }
+  const types=Object.keys(st.byType);                       // 현재 선택일의 구분들
+  const owner={};                                           // 구분 → 배정된 직원
+  LOD_STAFF.forEach(s=> (_lodStaffAssign[s]||[]).forEach(t=> owner[t]=s));
+  // 직원별 택배건수 = 배정 구분 품목을 포함한 고유 택배 합집합
+  const cnt={}, items={};
+  let assignedUnion=new Set();
+  LOD_STAFF.forEach(s=>{
+    const set=new Set(); let ic=0;
+    (_lodStaffAssign[s]||[]).forEach(t=>{
+      if(st.byType[t]){ st.byType[t].parcels.forEach(p=>{set.add(p);assignedUnion.add(p);}); ic+=st.byType[t].itemCount; }
+    });
+    cnt[s]=set.size; items[s]=ic;
+  });
+  const cards=LOD_STAFF.map(s=>{
+    const chips=types.map(t=>{
+      const mine=owner[t]===s, taken=owner[t]&&!mine;
+      return `<span class="lod-chip ${mine?'on':''} ${taken?'taken':''}" onclick="lodToggleType('${_lodEsc(s)}','${_lodEsc(t).replace(/'/g,"\\'")}')" title="${taken?owner[t]+' 배정됨 — 클릭 시 가져오기':'클릭하여 배정/해제'}">${_lodEsc(t)}</span>`;
+    }).join('');
+    return `<div class="lod-staff-card">
+      <div class="lod-staff-name">${_lodEsc(s)}</div>
+      <div class="lod-staff-cnt">${cnt[s]}<span class="u">건</span></div>
+      <div class="lod-staff-sub">품목 ${items[s]} · 배정 구분 ${(_lodStaffAssign[s]||[]).filter(t=>types.includes(t)).length}개</div>
+      <div class="lod-staff-chips">${chips}</div>
+    </div>`;
+  }).join('');
+  wrap.innerHTML=`<div class="lod-staff-head"><span class="lod-sec-t" style="margin:0;">👥 직원별 택배건수 (보고용)</span>`
+    +`<span class="lod-staff-total">배정 ${assignedUnion.size} / 전체 ${st.parcelCount}건</span></div>`
+    +`<div class="lod-staff-grid">${cards}</div>`;
+}
+
+async function lodToggleType(staff, type){
+  if(!_lodStaffAssign) return;
+  LOD_STAFF.forEach(s=>{ if(!Array.isArray(_lodStaffAssign[s])) _lodStaffAssign[s]=[]; });
+  const had=(_lodStaffAssign[staff]||[]).includes(type);
+  // 중복 불가: 모든 직원에서 제거 후, 원래 이 직원 것이 아니었으면 추가(=가져오기/배정)
+  LOD_STAFF.forEach(s=>{ _lodStaffAssign[s]=_lodStaffAssign[s].filter(t=>t!==type); });
+  if(!had) _lodStaffAssign[staff].push(type);
+  lodRenderStaff();
+  await cloudKvSave('logi_staff_assign', _lodStaffAssign);
 }
 
 function lodRenderChart(){
