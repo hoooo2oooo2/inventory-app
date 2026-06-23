@@ -2789,13 +2789,23 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">💳 총 결제금액</div><div class="rev-kpi-val" id="rgnK0">—</div><div class="rev-kpi-sub" id="rgnK0s" style="color:var(--tx2);"></div></div>
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">🧾 총 결제수</div><div class="rev-kpi-val" id="rgnK1">—</div><div class="rev-kpi-sub" id="rgnK1s" style="color:var(--tx2);"></div></div>
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 결제상품수량</div><div class="rev-kpi-val" id="rgnK2">—</div><div class="rev-kpi-sub" id="rgnK2s" style="color:var(--tx2);"></div></div>
-          <div class="rev-kpi-card"><div class="rev-kpi-lbl">↩️ 환불율</div><div class="rev-kpi-val" id="rgnK3" style="color:#D97706;">—</div><div class="rev-kpi-sub" id="rgnK3s" style="color:var(--tx2);"></div></div>
+          <div class="rev-kpi-card" id="rgnK3card" onclick="rgnOpenDetail('refund')" style="cursor:pointer;" title="클릭 시 제품별 환불 비중 보기"><div class="rev-kpi-lbl">↩️ 환불율 <span style="font-size:10px;color:var(--pr);font-weight:600;">👆</span></div><div class="rev-kpi-val" id="rgnK3" style="color:#D97706;">—</div><div class="rev-kpi-sub" id="rgnK3s" style="color:var(--tx2);"></div></div>
         </div>
-        <!-- 월별 매출 추이 -->
+        <!-- 매출 추이 (일/주/월) -->
         <div class="rev-card" id="rgnTrendCard">
-          <div class="rev-card-title"><span>📈 월별 매출 추이 (누적)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">막대 클릭 → 해당 월 보기</span></div>
-          <div class="rev-chart-wrap" style="height:200px;"><canvas id="rgnTrendChart"></canvas></div>
-          <div class="rev-empty" id="rgnTrendEmpty" style="display:none;padding:55px 0;">월별 데이터가 쌓이면 표시됩니다</div>
+          <div class="rev-card-title" style="flex-wrap:wrap;gap:8px;">
+            <span>📈 매출 추이</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span id="rgnTrendTotal" style="font-size:12px;font-weight:700;color:var(--pr);"></span>
+              <div class="rev-filter-group" id="rgnTrendModeBtns">
+                <div class="rfbtn" data-mode="day" onclick="rgnSetTrendMode('day')" style="padding:3px 11px;font-size:11.5px;">일별</div>
+                <div class="rfbtn active" data-mode="week" onclick="rgnSetTrendMode('week')" style="padding:3px 11px;font-size:11.5px;">주별</div>
+                <div class="rfbtn" data-mode="month" onclick="rgnSetTrendMode('month')" style="padding:3px 11px;font-size:11.5px;">월별</div>
+              </div>
+            </div>
+          </div>
+          <div class="rev-chart-wrap" style="height:210px;"><canvas id="rgnTrendChart"></canvas></div>
+          <div class="rev-empty" id="rgnTrendEmpty" style="display:none;padding:55px 0;">데이터가 쌓이면 추이가 표시됩니다</div>
         </div>
         <!-- 차트 3열: 성별 / 연령 / 지역 -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start;">
@@ -2843,7 +2853,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
       <!-- 상세보기 모달 -->
       <div id="rgnModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)rgnCloseDetail()">
-        <div style="background:var(--bg);border-radius:14px;max-width:560px;width:100%;max-height:84vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+        <div style="background:var(--bg);border-radius:14px;max-width:880px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);">
           <div style="padding:15px 20px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;">
             <div style="font-size:15px;font-weight:700;line-height:1.35;" id="rgnModalTitle">상세</div>
             <button onclick="rgnCloseDetail()" style="border:none;background:transparent;font-size:18px;cursor:pointer;color:var(--tx2);flex-shrink:0;">✕</button>
@@ -6918,6 +6928,7 @@ let _rgnMonths = {};       // 로드된 월별 shard 캐시
 let _rgnLoaded = false;
 let _rgnCh = '스마트스토어';
 let _rgnMonth = 'ALL';     // 'ALL'(전체 누적) | 'YYYY-MM'
+let _rgnTrendMode = 'week';// 'day' | 'week' | 'month'
 let _rgnCharts = {};
 let _rgnCur = null;        // 현재 표시 중 {R, agg} (드릴다운 상세에서 사용)
 let _rgnProdIds = [];      // 상품 차트 막대 index → 상품ID
@@ -7141,23 +7152,76 @@ async function renderRegionPage(){
   rgnRenderGender(agg); rgnRenderAge(agg); rgnRenderRegion(agg); rgnRenderProducts(agg); rgnRenderCross(agg); rgnRenderSigungu(agg);
 }
 
-// 월별 매출 추이 (인덱스 summary 기반 → 가벼움)
-function rgnRenderTrend(){
+function rgnSetTrendMode(m){
+  _rgnTrendMode=m;
+  document.querySelectorAll('#rgnTrendModeBtns .rfbtn').forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
+  rgnRenderTrend();
+}
+// 로드된 월 shard에서 날짜별 결제금액 합 추출 ({ 'YYYY-MM-DD': amt })
+function rgnDailyTotals(months, chans){
+  const map={};
+  months.forEach(m=>{ const shard=_rgnMonths[m]||{}; chans.forEach(c=>{ const o=shard[c]; if(!o)return;
+    Object.entries(o).forEach(([key,s])=>{ const day=key.slice(0,10);
+      let amt=0; if(s.d&&s.d.length) s.d.forEach(r=>amt+=r[3]); else if(s.r) s.r.forEach(r=>amt+=r[3]);
+      map[day]=(map[day]||0)+amt; }); }); });
+  return map;
+}
+// 로컬 기준 YYYY-MM-DD (toISOString의 UTC 보정 오차 방지)
+const _ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// 날짜 → 그 주 월요일(주 시작) 'YYYY-MM-DD'
+function rgnWeekStart(dStr){
+  const d=new Date(dStr+'T00:00:00'); const wd=(d.getDay()+6)%7; d.setDate(d.getDate()-wd);
+  return _ymd(d);
+}
+const _mdLabel = s => { const [,mo,da]=s.split('-'); return `${+mo}/${+da}`; };
+
+// 매출 추이 (일/주/월) + 합계
+async function rgnRenderTrend(){
   const ctx=document.getElementById('rgnTrendChart'); if(!ctx) return; _rgnKill('trend');
+  const totalEl=document.getElementById('rgnTrendTotal');
   const months=(_rgnIdx&&_rgnIdx.months?_rgnIdx.months:[]).slice().sort();
   _rgnToggleEmpty('rgnTrendEmpty', !months.length);
-  if(!months.length){ ctx.style.display='none'; return; } ctx.style.display='';
+  if(!months.length){ ctx.style.display='none'; if(totalEl)totalEl.textContent=''; return; } ctx.style.display='';
   const chans = _rgnCh==='__ALL__' ? ['스마트스토어','쿠팡'] : [_rgnCh];
-  const data = months.map(m=> chans.reduce((s,c)=> s + (((_rgnIdx.summary[c]||{})[m]||{}).amt||0), 0));
-  const colors = months.map(m=> m===_rgnMonth ? '#3182F6' : '#AECBFA');
+  let labels=[], data=[], colors=[], tips=[], onClick=null;
+  const mode=_rgnTrendMode;
+
+  if(mode==='month'){
+    labels = months.map(m=>{const[y,mo]=m.split('-');return `${y.slice(2)}.${mo}`;});
+    data = months.map(m=> chans.reduce((s,c)=> s+(((_rgnIdx.summary[c]||{})[m]||{}).amt||0),0));
+    colors = months.map(m=> m===_rgnMonth?'#3182F6':'#AECBFA');
+    tips = months.map(m=>{const[y,mo]=m.split('-');return `${y}년 ${mo}월`;});
+    onClick=(e,els)=>{ if(els.length) rgnSetMonth(months[els[0].index]); };
+  } else {
+    // 일/주: 일별 데이터 필요 → 해당 월 shard 로드
+    const scope = _rgnMonth==='ALL' ? months : (months.includes(_rgnMonth)?[_rgnMonth]:[]);
+    for(const m of scope) await rgnLoadMonth(m);
+    const daily = rgnDailyTotals(scope, chans);
+    const days = Object.keys(daily).sort();
+    if(mode==='day'){
+      labels = days.map(_mdLabel);
+      data = days.map(d=>daily[d]);
+      colors = days.map(()=> '#3182F6');
+      tips = days.slice();
+    } else { // week
+      const wk={};
+      days.forEach(d=>{ const ws=rgnWeekStart(d); wk[ws]=(wk[ws]||0)+daily[d]; });
+      const wkeys=Object.keys(wk).sort();
+      labels = wkeys.map(ws=>{ const e=new Date(ws+'T00:00:00'); e.setDate(e.getDate()+6); return `${_mdLabel(ws)}~${_mdLabel(_ymd(e))}`; });
+      data = wkeys.map(w=>wk[w]);
+      colors = wkeys.map(()=> '#3182F6');
+      tips = wkeys.map((ws,i)=>`${labels[i]} (주)`);
+    }
+  }
+  const total=data.reduce((s,x)=>s+x,0);
+  if(totalEl) totalEl.textContent = data.length ? `합계 ${rgnWonFull(total)}` : '';
   _rgnCharts.trend=new Chart(ctx,{type:'bar',
-    data:{labels:months.map(m=>{const[y,mo]=m.split('-');return `${y.slice(2)}.${mo}`;}),
-      datasets:[{data:data.map(Math.round),backgroundColor:colors,borderRadius:6,maxBarThickness:54}]},
+    data:{labels,datasets:[{data:data.map(Math.round),backgroundColor:colors,borderRadius:5,maxBarThickness:mode==='month'?54:30}]},
     options:{responsive:true,maintainAspectRatio:false,
-      onHover:_rgnHover, onClick:(e,els)=>{ if(els.length) rgnSetMonth(months[els[0].index]); },
+      onHover:_rgnHover, onClick,
       plugins:{legend:{display:false},
-        tooltip:{callbacks:{title:items=>{const[y,mo]=months[items[0].dataIndex].split('-');return `${y}년 ${mo}월`;},label:c=>rgnWonFull(c.parsed.y)}}},
-      scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},x:{ticks:{font:{size:11}}}}}});
+        tooltip:{callbacks:{title:items=>tips[items[0].dataIndex]||'',label:c=>rgnWonFull(c.parsed.y)}}},
+      scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},x:{ticks:{font:{size:10},autoSkip:labels.length>14,maxRotation:labels.length>8?50:0}}}}});
 }
 
 function rgnRenderGender(agg){
@@ -7275,12 +7339,17 @@ function _rgnKpiRow(amt,cnt,qty,grand){
   const cell=(l,v,c)=>`<div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">${l}</div><div style="font-size:13.5px;font-weight:700;${c?`color:${c};`:''}">${v}</div></div>`;
   return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">${cell('결제금액',rgnWonFull(amt))}${cell('결제수',cnt.toLocaleString()+'건')}${cell('수량',qty.toLocaleString()+'개')}${cell('전체 비중',(amt/grand*100).toFixed(1)+'%','var(--pr)')}</div>`;
 }
+// 값 컬럼 헤드(금액/비중) — 표 폭 고정용
+const _RGN_VH = `<th style="width:96px;text-align:right;">금액</th><th style="width:56px;text-align:right;">비중</th>`;
+const _RGN_PH = `<th style="width:26px;text-align:center;">#</th><th>상품</th>` + _RGN_VH;
 function _rgnMini(title, headHtml, rowsHtml){
-  return `<div style="font-size:12px;font-weight:700;margin:15px 0 3px;color:var(--tx);">${title}</div>`
-    + `<table class="dt" style="width:100%;"><thead><tr>${headHtml}</tr></thead><tbody>${rowsHtml||'<tr><td style="color:var(--tx2);padding:8px;">데이터 없음</td></tr>'}</tbody></table>`;
+  return `<div style="min-width:0;"><div style="font-size:12px;font-weight:700;margin:4px 0 3px;color:var(--tx);">${title}</div>`
+    + `<table class="dt" style="width:100%;table-layout:fixed;"><thead><tr>${headHtml}</tr></thead><tbody>${rowsHtml||'<tr><td style="color:var(--tx2);padding:8px;">데이터 없음</td></tr>'}</tbody></table></div>`;
 }
+// 그리드로 섹션 나란히 배치 (와이드 모달 활용 → 세로 스크롤 최소화)
+const _rgnGrid = (...secs)=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 18px;align-items:start;margin-top:8px;">${secs.filter(Boolean).join('')}</div>`;
 function _rgnRankRows(pairs, total, withRank){
-  return pairs.map(([k,v],i)=>`<tr>${withRank?`<td style="text-align:center;color:var(--tx2);">${i+1}</td>`:''}<td>${rgnEsc(k)}</td><td style="text-align:right;font-weight:600;">${rgnWonFull(v)}</td><td style="text-align:right;color:var(--pr);">${(v/(total||1)*100).toFixed(1)}%</td></tr>`).join('');
+  return pairs.map(([k,v],i)=>`<tr>${withRank?`<td style="text-align:center;color:var(--tx2);">${i+1}</td>`:''}<td style="white-space:normal;word-break:break-all;line-height:1.3;">${rgnEsc(k)}</td><td style="text-align:right;font-weight:600;">${rgnWonFull(v)}</td><td style="text-align:right;color:var(--pr);">${(v/(total||1)*100).toFixed(1)}%</td></tr>`).join('');
 }
 function rgnOpenDetail(type, key){
   if(!_rgnCur) return;
@@ -7296,10 +7365,11 @@ function rgnOpenDetail(type, key){
     const other={}; sub.forEach(r=>{ const k=isG?r[2]:r[1]; other[k]=(other[k]||0)+r[3]; });
     const otherPairs = Object.entries(other).sort((a,b)=> isG ? rgnAgeKey(a[0])-rgnAgeKey(b[0]) : b[1]-a[1]);
     const byP={}; sub.forEach(r=>{ if(r[0]) byP[r[0]]=(byP[r[0]]||0)+r[3]; });
-    const pPairs = Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,v])=>[_rgnName(id),v]);
+    const pPairs = Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([id,v])=>[_rgnName(id),v]);
     html = _rgnKpiRow(amt,cnt,qty,grand)
-      + _rgnMini(isG?'연령대별 분포':'성별 분포', `<th>${isG?'연령대':'성별'}</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(otherPairs, amt, false))
-      + _rgnMini('상품 TOP', `<th style="width:30px;text-align:center;">#</th><th>상품</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(pPairs, amt, true));
+      + _rgnGrid(
+          _rgnMini(isG?'연령대별 분포':'성별 분포', `<th>${isG?'연령대':'성별'}</th>`+_RGN_VH, _rgnRankRows(otherPairs, amt, false)),
+          _rgnMini('상품 TOP', _RGN_PH, _rgnRankRows(pPairs, amt, true)));
   }
   else if(type==='sido' || type==='sigungu'){
     const sub = type==='sido' ? R.regionRows.filter(r=>r[1]===key) : R.regionRows.filter(r=> (r[1]+(r[2]?' '+r[2]:''))===key);
@@ -7308,13 +7378,13 @@ function rgnOpenDetail(type, key){
     let extra='';
     if(type==='sido'){
       const bySgg={}; sub.forEach(r=>{ const k=r[2]||'기타'; bySgg[k]=(bySgg[k]||0)+r[3]; });
-      const pairs=Object.entries(bySgg).sort((a,b)=>b[1]-a[1]).slice(0,10);
-      extra=_rgnMini('시·군·구 분포', `<th>시군구</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(pairs, amt, false));
+      const pairs=Object.entries(bySgg).sort((a,b)=>b[1]-a[1]).slice(0,12);
+      extra=_rgnMini('시·군·구 분포', `<th>시군구</th>`+_RGN_VH, _rgnRankRows(pairs, amt, false));
     }
     const byP={}; sub.forEach(r=>{ if(r[0]) byP[r[0]]=(byP[r[0]]||0)+r[3]; });
-    const pPairs=Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,v])=>[_rgnName(id),v]);
-    html = _rgnKpiRow(amt,cnt,qty,grand) + extra
-      + _rgnMini('상품 TOP', `<th style="width:30px;text-align:center;">#</th><th>상품</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(pPairs, amt, true));
+    const pPairs=Object.entries(byP).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([id,v])=>[_rgnName(id),v]);
+    html = _rgnKpiRow(amt,cnt,qty,grand)
+      + _rgnGrid(extra, _rgnMini('상품 TOP', _RGN_PH, _rgnRankRows(pPairs, amt, true)));
   }
   else if(type==='product'){
     const id=key;
@@ -7329,12 +7399,36 @@ function rgnOpenDetail(type, key){
     const byS={}; rsub.forEach(r=>byS[r[1]]=(byS[r[1]]||0)+r[3]);
     const gP=Object.entries(byG).sort((a,b)=>b[1]-a[1]);
     const aP=Object.entries(byA).sort((a,b)=>rgnAgeKey(a[0])-rgnAgeKey(b[0]));
-    const sP=Object.entries(byS).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const sP=Object.entries(byS).sort((a,b)=>b[1]-a[1]).slice(0,12);
     html = `<div style="font-size:11px;color:var(--tx2);margin-bottom:8px;">상품ID ${rgnEsc(id)}${meta.cat?' · '+rgnEsc(meta.cat):''}</div>`
       + _rgnKpiRow(amt,cnt,qty,grand)
-      + (gP.length?_rgnMini('성별', `<th>성별</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(gP, amt, false)):'')
-      + (aP.length?_rgnMini('연령대', `<th>연령대</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(aP, amt, false)):'')
-      + (sP.length?_rgnMini('지역(시·도)', `<th>지역</th><th style="text-align:right;">금액</th><th style="text-align:right;">비중</th>`, _rgnRankRows(sP, sP.reduce((s,[,v])=>s+v,0), false)):'');
+      + _rgnGrid(
+          gP.length?_rgnMini('성별', `<th>성별</th>`+_RGN_VH, _rgnRankRows(gP, amt, false)):'',
+          aP.length?_rgnMini('연령대', `<th>연령대</th>`+_RGN_VH, _rgnRankRows(aP, amt, false)):'',
+          sP.length?_rgnMini('지역(시·도)', `<th>지역</th>`+_RGN_VH, _rgnRankRows(sP, sP.reduce((s,[,v])=>s+v,0), false)):'');
+  }
+  else if(type==='refund'){
+    title = '제품별 환불 비중 (금액)';
+    const totR = agg.totals.rAmt||0, totA = agg.totals.amt||0;
+    const rRate = totA ? totR/totA*100 : 0;
+    const prods = Object.entries(agg.products).map(([id,v])=>({id,r:v.rAmt||0,amt:v.amt})).filter(p=>p.r>0).sort((a,b)=>b.r-a.r);
+    const head = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px;">
+        <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);">총 환불금액</div><div style="font-size:13.5px;font-weight:700;color:#DC2626;">${rgnWonFull(totR)}</div></div>
+        <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);">환불율</div><div style="font-size:13.5px;font-weight:700;color:#D97706;">${rRate.toFixed(1)}%</div></div>
+        <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);">환불 상품 수</div><div style="font-size:13.5px;font-weight:700;">${prods.length.toLocaleString()}개</div></div>
+      </div>`;
+    if(!prods.length){ html = head + '<div style="padding:18px;color:var(--tx2);text-align:center;">환불 데이터가 없습니다.</div>'; }
+    else {
+      const rows = prods.slice(0,20).map((p,i)=>`<tr>
+        <td style="text-align:center;color:var(--tx2);">${i+1}</td>
+        <td style="white-space:normal;word-break:break-all;line-height:1.3;">${rgnEsc(_rgnName(p.id))}</td>
+        <td style="text-align:right;font-weight:600;color:#DC2626;">${rgnWonFull(p.r)}</td>
+        <td style="text-align:right;color:var(--pr);font-weight:600;">${(p.r/(totR||1)*100).toFixed(1)}%</td>
+        <td style="text-align:right;color:var(--tx2);">${p.amt?(p.r/p.amt*100).toFixed(1)+'%':'-'}</td>
+      </tr>`).join('');
+      html = head + `<div style="font-size:12px;font-weight:700;margin:10px 0 3px;color:var(--tx);">상품별 환불 순위 (환불금액 기준)</div>`
+        + `<table class="dt" style="width:100%;table-layout:fixed;"><thead><tr><th style="width:26px;text-align:center;">#</th><th>상품</th><th style="width:96px;text-align:right;">환불금액</th><th style="width:64px;text-align:right;">환불비중</th><th style="width:72px;text-align:right;">상품환불율</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
   }
   document.getElementById('rgnModalTitle').textContent = title;
   document.getElementById('rgnModalBody').innerHTML = html;
