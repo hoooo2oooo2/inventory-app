@@ -1217,7 +1217,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
   <div class="ni" id="nav-logihome" onclick="goMenu('logihome')" style="display:none;">🏠 홈</div>
-  <div class="ni" id="nav-logistock" onclick="goMenu('logistock')" style="display:none;">📦 소장재고 확인</div>
+  <div class="ni" id="nav-logistock" onclick="goMenu('logistock')" style="display:none;">📦 발주건 정리</div>
   <div class="ni" id="nav-logibox" onclick="goMenu('logibox')" style="display:none;">📮 택배박스</div>
   <div class="ni" id="nav-logistatus" onclick="goMenu('logistatus')" style="display:none;">📊 박스 현황</div>
   <div class="ni" id="nav-coupangad" onclick="goMenu('coupangad')" style="display:none;">👥 인사관리</div>
@@ -1359,14 +1359,97 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- ═══ 물류팀 소장재고 확인 (보류 — 자리만) ═══ -->
+<!-- ═══ 물류팀 발주건 정리 ═══ -->
+<style>
+.lod-wrap{padding:14px 18px 40px;max-width:1280px;margin:0 auto;}
+.lod-top{margin-bottom:14px;}
+.lod-drop{border:2px dashed var(--bd);border-radius:14px;background:var(--bg2,rgba(127,127,127,.04));transition:.15s;}
+.lod-drop.drag{border-color:#3182F6;background:rgba(49,130,246,.08);}
+.lod-drop-inner{padding:20px 16px;text-align:center;}
+.lod-drop-t{font-size:15px;font-weight:800;color:var(--tx);margin:6px 0 4px;}
+.lod-drop-s{font-size:13px;color:var(--tx2);}
+.lod-drop-hint{font-size:11.5px;color:var(--tx2);margin-top:8px;opacity:.85;}
+.lod-body{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}
+.lod-card{background:var(--bg);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.lod-cal{width:340px;flex-shrink:0;}
+.lod-detail{flex:1;min-width:380px;}
+.lod-chart{width:100%;margin-top:16px;}
+.lod-cal-head{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+.lod-cal-title{font-size:15px;font-weight:800;color:var(--tx);min-width:110px;text-align:center;}
+.lod-navbtn{border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;width:30px;height:30px;font-size:16px;cursor:pointer;}
+.lod-navbtn:hover{background:rgba(127,127,127,.08);}
+.lod-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.lod-cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--tx2);padding:3px 0;}
+.lod-cal-cell{position:relative;aspect-ratio:1/1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;color:var(--tx);cursor:default;}
+.lod-cal-cell.empty{cursor:default;}
+.lod-cal-cell.has{cursor:pointer;background:rgba(49,130,246,.08);font-weight:700;}
+.lod-cal-cell.has:hover{background:rgba(49,130,246,.18);}
+.lod-cal-cell.sel{outline:2px solid #3182F6;}
+.lod-cal-cell.today{box-shadow:inset 0 0 0 1px var(--bd);}
+.lod-cal-cnt{font-size:10px;color:#2563EB;font-weight:800;line-height:1;margin-top:2px;}
+.lod-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(49,130,246,.4);vertical-align:middle;}
+.lod-cal-legend{font-size:11px;color:var(--tx2);margin-top:10px;text-align:center;}
+.lod-detail-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid var(--bd);padding-bottom:8px;}
+.lod-detail-date{font-size:16px;font-weight:800;color:var(--tx);}
+.lod-detail-total{font-size:14px;font-weight:800;color:#2563EB;}
+.lod-rounds{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.lod-round{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg2,rgba(127,127,127,.03));}
+.lod-round-badge{background:#2563EB;color:#fff;font-size:12px;font-weight:800;border-radius:7px;padding:3px 9px;flex-shrink:0;}
+.lod-round-name{font-size:12.5px;color:var(--tx);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lod-round-cnt{font-size:13px;font-weight:800;color:var(--tx);flex-shrink:0;}
+.lod-round-del{border:none;background:none;color:#EF4444;cursor:pointer;font-size:13px;flex-shrink:0;padding:2px 4px;}
+.lod-sec-t{font-size:13px;font-weight:800;color:var(--tx);margin:4px 0 8px;}
+.lod-type-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+.lod-type-tbl th,.lod-type-tbl td{border-bottom:1px solid var(--bd);padding:6px 8px;text-align:right;color:var(--tx);}
+.lod-type-tbl th:first-child,.lod-type-tbl td:first-child{text-align:left;font-weight:700;}
+.lod-type-tbl th{font-size:11px;color:var(--tx2);background:rgba(127,127,127,.04);}
+.lod-type-tbl tr.tot td{font-weight:800;background:rgba(49,130,246,.06);border-top:2px solid var(--bd);}
+.lod-unmatched{font-size:11.5px;color:#B45309;margin-top:10px;line-height:1.5;}
+.lod-empty{color:var(--tx2);font-size:13px;text-align:center;padding:30px 0;}
+</style>
 <div class="page" id="page-logistock">
-  <div style="display:flex;align-items:center;justify-content:center;height:calc(100vh - 160px);">
-    <div style="text-align:center;color:var(--tx2);">
-      <div style="font-size:48px;margin-bottom:12px;">📦</div>
-      <div style="font-size:18px;font-weight:800;color:var(--tx);margin-bottom:6px;">소장재고 확인</div>
-      <div style="font-size:13px;">준비 중입니다.</div>
+  <div class="lod-wrap">
+    <div class="lod-top">
+      <div class="lod-drop" id="lodDrop">
+        <input type="file" id="lodFile" accept=".xlsx,.xls" multiple style="display:none;" onchange="lodPickFiles(this.files)">
+        <div class="lod-drop-inner">
+          <div style="font-size:32px;">📥</div>
+          <div class="lod-drop-t">발주서 엑셀을 여기에 끌어다 놓으세요</div>
+          <div class="lod-drop-s">또는 <button class="btn btn-pr btn-sm" onclick="document.getElementById('lodFile').click()">파일 선택</button> · 여러 파일·차수 동시 업로드 가능</div>
+          <div class="lod-drop-hint">파일명에서 날짜(MM-DD)와 차수(-N)를 자동 인식합니다. 예: <b>06-23 발주서 -1.xlsx</b></div>
+        </div>
+      </div>
     </div>
+
+    <div class="lod-body">
+      <section class="lod-card lod-cal">
+        <div class="lod-cal-head">
+          <button class="lod-navbtn" onclick="lodCalMove(-1)">‹</button>
+          <span id="lodCalTitle" class="lod-cal-title"></span>
+          <button class="lod-navbtn" onclick="lodCalMove(1)">›</button>
+        </div>
+        <div class="lod-cal-grid" id="lodCalGrid"></div>
+        <div class="lod-cal-legend"><span class="lod-dot"></span> 발주 등록된 날 · 아래 숫자 = 택배수량</div>
+      </section>
+
+      <section class="lod-card lod-detail">
+        <div class="lod-detail-head">
+          <span id="lodDetailDate" class="lod-detail-date">날짜를 선택하세요</span>
+          <span id="lodDetailTotal" class="lod-detail-total"></span>
+        </div>
+        <div id="lodRounds" class="lod-rounds"></div>
+        <div class="lod-type-wrap">
+          <div class="lod-sec-t">📦 구분별 택배건수 (성함·연락처·주소 동일 시 1건)</div>
+          <table class="lod-type-tbl"><thead><tr><th>구분</th><th>택배건수</th><th>품목수</th><th>수량합</th></tr></thead><tbody id="lodTypeBody"></tbody></table>
+        </div>
+        <div id="lodUnmatched" class="lod-unmatched"></div>
+      </section>
+    </div>
+
+    <section class="lod-card lod-chart">
+      <div class="lod-sec-t">📊 일별 택배수량 (최근 등록일)</div>
+      <div style="height:240px;position:relative;"><canvas id="lodChart"></canvas></div>
+    </section>
   </div>
 </div>
 
@@ -3279,7 +3362,7 @@ const MENUS = [
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
-  {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 소장재고 확인'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'},
+  {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 발주건 정리'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'},
   {id:'coupangad',label:'👥 인사관리'}
 ];
 // 매출관리 하위탭 — 각각 개별 권한 부여 가능
@@ -3367,7 +3450,7 @@ function permKeyRows(){
       rows.push({ header:'물류팀' });
       rows.push({ key:'logihome', label:'홈' });
     } else if(m.id==='logistock'){
-      rows.push({ key:'logistock', label:'소장재고 확인' });
+      rows.push({ key:'logistock', label:'발주건 정리' });
     } else if(m.id==='logibox'){
       rows.push({ key:'logibox', label:'택배박스' });
     } else if(m.id==='logistatus'){
@@ -4876,6 +4959,278 @@ function rgYrChange(){ rgYear=parseInt(document.getElementById('rgYrSel').value)
 // ══════════════════════════════════════════════
 // 페이지 라우팅
 // ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// 물류팀 발주건 정리 — 발주서 엑셀 업로드 → 구분 매칭 → 택배 집계 → 달력·그래프
+//   저장 구조(egress 절약):
+//     · cloudKv 'logi_order_idx'  : [{id,date,round,fileName,parcelCount,itemCount,uploadedAt,uploadedBy}]  (페이지 열 때 1회)
+//     · cloudKv 'logi_order_<id>' : {items:[{recv,phone,addr,name,qty,code}]}  (날짜 상세 볼 때만)
+// ══════════════════════════════════════════════
+let _lodIdx = null;            // 인덱스 배열
+let _lodCalRef = new Date();   // 달력 기준 달
+let _lodSelDate = null;        // 선택된 날짜(YYYY-MM-DD)
+let _lodItemsCache = {};       // id → items
+let _lodChart = null;
+let _lodLoaded = false;
+
+function _lodEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function _lodNorm(s){ return String(s||'').replace(/\s+/g,'').trim(); }
+function _lodNormPhone(s){ return String(s||'').replace(/[^0-9]/g,''); }
+function _lodParcelKey(it){ return _lodNorm(it.recv)+'|'+_lodNormPhone(it.phone)+'|'+_lodNorm(it.addr); }
+
+// 상품코드 → 구분. ss소장 코드는 상품명으로 구분.
+function _lodMatchType(code, name){
+  const c = String(code||'').trim();
+  const cl = c.toLowerCase();
+  if(cl==='ss소장' || c===''){
+    const m = _bdData.find(b=> String(b.name||'').trim()===String(name||'').trim());
+    return m ? (m.type||'미분류') : null;
+  }
+  const m = _bdData.find(b=> String(b.code||'').trim().toLowerCase()===cl);
+  if(m) return m.type||'미분류';
+  // 코드 미매칭 시 상품명으로 보조 매칭
+  const mn = _bdData.find(b=> String(b.name||'').trim()===String(name||'').trim());
+  return mn ? (mn.type||'미분류') : null;
+}
+
+// 파일명에서 날짜/차수 추출
+function _lodMetaFromName(name){
+  const base = String(name).replace(/\.[^.]+$/,'');
+  let date = '';
+  let m = base.match(/(20\d{2})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+  if(m){ date = `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`; }
+  else { m = base.match(/(\d{1,2})[-.](\d{1,2})/); if(m){ date = `${new Date().getFullYear()}-${pad(+m[1])}-${pad(+m[2])}`; } }
+  if(!date) date = new Date().toISOString().slice(0,10);
+  let round = 1;
+  const r = base.match(/-\s*(\d+)\s*$/);
+  if(r) round = +r[1];
+  return { date, round };
+}
+
+// 시트(AOA) → 품목 배열
+function _lodParseSheet(aoa){
+  if(!aoa || !aoa.length) return [];
+  const head = aoa[0].map(h=>String(h).trim());
+  const ix = n => head.indexOf(n);
+  let iRecv=ix('수취인'), iPhone=ix('수취인연락처1'), iAddr=ix('기본주소'),
+      iName=ix('상품명'), iQty=ix('수량'), iCode=ix('패밀리상품코드');
+  if(iCode<0) iCode = ix('상품코드');
+  // 헤더 인식 실패 시 발주서 표준 컬럼 순서로 폴백
+  if(iRecv<0 && iName<0){ iRecv=2; iPhone=3; iAddr=6; iName=7; iQty=8; iCode=13; }
+  const items=[];
+  aoa.slice(1).forEach(r=>{
+    const name = String(r[iName]!=null?r[iName]:'').trim();
+    const code = String(r[iCode]!=null?r[iCode]:'').trim();
+    if(!name && !code) return;
+    items.push({
+      recv: String(r[iRecv]!=null?r[iRecv]:'').trim(),
+      phone: String(r[iPhone]!=null?r[iPhone]:'').trim(),
+      addr: String(r[iAddr]!=null?r[iAddr]:'').trim(),
+      name, qty: Number(r[iQty])||0, code
+    });
+  });
+  return items;
+}
+
+// 품목배열 → 통계(택배건수·구분별 집계·미매칭)
+function _lodStats(items){
+  const parcels = new Set();
+  items.forEach(it=>parcels.add(_lodParcelKey(it)));
+  // 구분별: 택배건수(해당 구분 품목을 포함한 택배 수), 품목수, 수량합
+  const byType = {};              // type → {parcels:Set, itemCount, qty}
+  const unmatched = new Set();
+  items.forEach(it=>{
+    const t = _lodMatchType(it.code, it.name);
+    const key = t || '⚠️ 미분류';
+    if(!t) unmatched.add(it.code ? `${it.code} (${it.name})` : it.name);
+    if(!byType[key]) byType[key] = { parcels:new Set(), itemCount:0, qty:0 };
+    byType[key].parcels.add(_lodParcelKey(it));
+    byType[key].itemCount++;
+    byType[key].qty += it.qty;
+  });
+  return { parcelCount: parcels.size, itemCount: items.length, byType, unmatched:[...unmatched] };
+}
+
+async function loadLogiStock(){
+  if(!_bdLoaded) { try{ await loadBackdata(); }catch{} }
+  if(_lodIdx===null){
+    _lodIdx = (await cloudKvLoad('logi_order_idx')) || [];
+  }
+  if(!_lodLoaded){
+    // 등록된 가장 최근 날짜로 달력/선택 초기화
+    if(_lodIdx.length){
+      const latest = _lodIdx.map(e=>e.date).sort().slice(-1)[0];
+      _lodCalRef = new Date(latest+'T00:00:00');
+      _lodSelDate = latest;
+    }
+    _lodLoaded = true;
+  }
+  _lodInitDrop();
+  lodRenderCal();
+  lodRenderChart();
+  lodRenderDetail();
+}
+
+let _lodDropBound = false;
+function _lodInitDrop(){
+  if(_lodDropBound) return;
+  const dz = document.getElementById('lodDrop'); if(!dz) return;
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', e=>{ const f=e.dataTransfer && e.dataTransfer.files; if(f && f.length) lodPickFiles(f); });
+  _lodDropBound = true;
+}
+
+async function lodPickFiles(fileList){
+  const files = [...fileList].filter(f=>/\.xlsx?$/i.test(f.name));
+  if(!files.length){ toast('엑셀(.xlsx) 파일만 업로드할 수 있습니다.'); return; }
+  let ok=0, lastDate='';
+  for(const file of files){
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+      const items = _lodParseSheet(aoa);
+      if(!items.length){ toast(`❌ ${file.name}: 발주서 형식을 인식하지 못했습니다`); continue; }
+      const meta = _lodMetaFromName(file.name);
+      const st = _lodStats(items);
+      // 같은 날짜+차수 중복 → 덮어쓰기 확인
+      const dup = _lodIdx.find(e=>e.date===meta.date && e.round===meta.round);
+      if(dup){
+        if(!confirm(`${meta.date} ${meta.round}차 발주건이 이미 등록되어 있습니다.\n새 파일로 덮어쓸까요?`)) continue;
+      }
+      const id = dup ? dup.id : ('o'+Date.now()+Math.floor(Math.random()*1000));
+      await cloudKvSave('logi_order_'+id, { items });
+      _lodItemsCache[id] = items;
+      const entry = {
+        id, date:meta.date, round:meta.round, fileName:file.name,
+        parcelCount: st.parcelCount, itemCount: st.itemCount,
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: (window.__CURRENT_USER && window.__CURRENT_USER.name) || ''
+      };
+      if(dup) Object.assign(dup, entry); else _lodIdx.push(entry);
+      ok++; lastDate = meta.date;
+    }catch(e){ console.warn('발주서 업로드 실패', file.name, e); toast(`❌ ${file.name}: ${e.message}`); }
+  }
+  if(ok){
+    await cloudKvSave('logi_order_idx', _lodIdx);
+    if(lastDate){ _lodSelDate = lastDate; _lodCalRef = new Date(lastDate+'T00:00:00'); }
+    lodRenderCal(); lodRenderChart(); lodRenderDetail();
+    toast(`✅ ${ok}개 발주서 등록 완료`);
+  }
+  const fi=document.getElementById('lodFile'); if(fi) fi.value='';
+}
+
+function lodCalMove(delta){
+  _lodCalRef = new Date(_lodCalRef.getFullYear(), _lodCalRef.getMonth()+delta, 1);
+  lodRenderCal();
+}
+function lodRenderCal(){
+  const grid=document.getElementById('lodCalGrid'), title=document.getElementById('lodCalTitle');
+  if(!grid||!title) return;
+  const y=_lodCalRef.getFullYear(), m=_lodCalRef.getMonth();
+  title.textContent = `${y}년 ${m+1}월`;
+  // 날짜별 택배수량 합계 맵
+  const dayCnt={};
+  (_lodIdx||[]).forEach(e=>{ dayCnt[e.date]=(dayCnt[e.date]||0)+(e.parcelCount||0); });
+  const today=new Date(), tStr=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+  const firstDow=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  let html=DNAMES.map((d,i)=>`<div class="lod-cal-dow" style="${i===0?'color:#EF4444':i===6?'color:#3182F6':''}">${d}</div>`).join('');
+  for(let i=0;i<firstDow;i++) html+=`<div class="lod-cal-cell empty"></div>`;
+  for(let day=1;day<=days;day++){
+    const ds=`${y}-${pad(m+1)}-${pad(day)}`;
+    const cnt=dayCnt[ds];
+    const cls=['lod-cal-cell'];
+    if(cnt) cls.push('has'); if(ds===_lodSelDate) cls.push('sel'); if(ds===tStr) cls.push('today');
+    html+=`<div class="${cls.join(' ')}" ${cnt?`onclick="lodSelectDate('${ds}')"`:''}>`
+        + `<span>${day}</span>${cnt?`<span class="lod-cal-cnt">${cnt}</span>`:''}</div>`;
+  }
+  grid.innerHTML=html;
+}
+
+async function lodSelectDate(ds){
+  _lodSelDate=ds;
+  lodRenderCal();
+  await lodRenderDetail();
+}
+
+async function lodRenderDetail(){
+  const dEl=document.getElementById('lodDetailDate'), tEl=document.getElementById('lodDetailTotal'),
+        rEl=document.getElementById('lodRounds'), bEl=document.getElementById('lodTypeBody'),
+        uEl=document.getElementById('lodUnmatched');
+  if(!dEl) return;
+  if(!_lodSelDate){
+    dEl.textContent='날짜를 선택하세요'; tEl.textContent='';
+    rEl.innerHTML=''; bEl.innerHTML=`<tr><td colspan="4" class="lod-empty">달력에서 발주 등록된 날을 클릭하세요.</td></tr>`; uEl.innerHTML='';
+    return;
+  }
+  const entries=(_lodIdx||[]).filter(e=>e.date===_lodSelDate).sort((a,b)=>a.round-b.round);
+  const wd=DNAMES[new Date(_lodSelDate+'T00:00:00').getDay()];
+  dEl.textContent=`${_lodSelDate} (${wd})`;
+  // 필요한 파일 items 로드
+  for(const e of entries){
+    if(!_lodItemsCache[e.id]){
+      const d=await cloudKvLoad('logi_order_'+e.id);
+      _lodItemsCache[e.id]=(d&&d.items)||[];
+    }
+  }
+  // 차수 목록 + 하루 합계(각 차수 택배수량 합)
+  let dayTotal=0;
+  rEl.innerHTML=entries.map(e=>{
+    dayTotal+=(e.parcelCount||0);
+    return `<div class="lod-round">`
+      +`<span class="lod-round-badge">${e.round}차</span>`
+      +`<span class="lod-round-name" title="${_lodEsc(e.fileName)}">${_lodEsc(e.fileName)}</span>`
+      +`<span class="lod-round-cnt">택배 ${e.parcelCount||0}건 · 품목 ${e.itemCount||0}</span>`
+      +`<button class="lod-round-del" onclick="lodDeleteFile('${e.id}')" title="삭제">✕</button>`
+      +`</div>`;
+  }).join('') || `<div class="lod-empty">등록된 발주건이 없습니다.</div>`;
+  tEl.textContent = entries.length ? `하루 택배수량 ${dayTotal}건` : '';
+  // 구분별 집계(차수 합산)
+  const allItems=entries.flatMap(e=>_lodItemsCache[e.id]||[]);
+  const st=_lodStats(allItems);
+  const rows=Object.entries(st.byType).sort((a,b)=>b[1].parcels.size-a[1].parcels.size);
+  if(!rows.length){
+    bEl.innerHTML=`<tr><td colspan="4" class="lod-empty">데이터가 없습니다.</td></tr>`;
+  }else{
+    bEl.innerHTML=rows.map(([t,v])=>`<tr><td>${_lodEsc(t)}</td><td>${v.parcels.size}</td><td>${v.itemCount}</td><td>${v.qty}</td></tr>`).join('')
+      +`<tr class="tot"><td>합계 (고유 택배)</td><td>${st.parcelCount}</td><td>${st.itemCount}</td><td>${allItems.reduce((s,i)=>s+i.qty,0)}</td></tr>`;
+  }
+  uEl.innerHTML = st.unmatched.length
+    ? `⚠️ 백데이터 미매칭 ${st.unmatched.length}건 (구분 없음): ${st.unmatched.slice(0,15).map(_lodEsc).join(', ')}${st.unmatched.length>15?' …':''}<br><span style="opacity:.8;">매출관리 › 백데이터에 코드를 등록하면 구분이 자동 분류됩니다.</span>`
+    : '';
+}
+
+function lodRenderChart(){
+  const cv=document.getElementById('lodChart'); if(!cv||typeof Chart==='undefined') return;
+  const dayCnt={};
+  (_lodIdx||[]).forEach(e=>{ dayCnt[e.date]=(dayCnt[e.date]||0)+(e.parcelCount||0); });
+  const dates=Object.keys(dayCnt).sort().slice(-30);
+  const data=dates.map(d=>dayCnt[d]);
+  const labels=dates.map(d=>d.slice(5));
+  if(_lodChart){ _lodChart.destroy(); _lodChart=null; }
+  if(!dates.length){ const ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height); return; }
+  _lodChart=new Chart(cv.getContext('2d'),{
+    type:'bar',
+    data:{ labels, datasets:[{ label:'택배수량', data, backgroundColor:'rgba(49,130,246,.55)', borderColor:'#2563EB', borderWidth:1, borderRadius:5 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      layout:{padding:{top:22}},
+      plugins:{ legend:{display:false}, datalabels:{ anchor:'end', align:'end', color:'#2563EB', font:{weight:'700',size:11}, formatter:v=>v||'' } },
+      scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } }
+  });
+}
+
+async function lodDeleteFile(id){
+  const e=(_lodIdx||[]).find(x=>x.id===id); if(!e) return;
+  if(!confirm(`${e.date} ${e.round}차 발주건을 삭제할까요?`)) return;
+  _lodIdx=_lodIdx.filter(x=>x.id!==id);
+  delete _lodItemsCache[id];
+  await cloudKvSave('logi_order_idx', _lodIdx);
+  await cloudKvSave('logi_order_'+id, { items:[] });
+  if(!_lodIdx.some(x=>x.date===_lodSelDate)) _lodSelDate=null;
+  lodRenderCal(); lodRenderChart(); lodRenderDetail();
+  toast('🗑️ 삭제되었습니다.');
+}
+
 function goPage(p){
   // 권한 없는 메뉴 접근 차단
   if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
@@ -4889,6 +5244,7 @@ function goPage(p){
   if(p==='calendar') loadCalPage();
   if(p==='collab') loadCollabPage();
   if(p==='logihome') loadLogiHome();
+  if(p==='logistock') loadLogiStock();
   if(p==='logibox') loadLogiBox();
   if(p==='logistatus') loadLogiStatus();
   // 디자인팀 메뉴에서는 채팅 버튼 숨김 (UI 겹침 방지)
