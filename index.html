@@ -2307,6 +2307,38 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-order .ord-kpi-card:hover{box-shadow:0 3px 11px rgba(16,24,40,.09);transform:translateY(-1px);}
 /* 계산 기준 박스 */
 #page-order .fbox{border-radius:8px;}
+
+/* ▣ 컴팩트 카드 리스트 — 넓은 표 대신 카드형으로 가로 스크롤 제거·한눈에 보기 */
+#page-order .rc-list,#page-order .oc-list{display:flex;flex-direction:column;gap:7px;padding:9px 11px;overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 248px);}
+#page-order .oc-list{max-height:calc(100vh - 430px);}
+#page-order .rc-card,#page-order .oc-card{border:1px solid var(--bd);border-radius:9px;background:var(--bg);padding:8px 10px;border-left:4px solid var(--bd);transition:box-shadow .12s;}
+#page-order .rc-card:hover,#page-order .oc-card:hover{box-shadow:0 2px 9px rgba(16,24,40,.1);}
+/* 상태/긴급도 좌측 컬러 */
+#page-order .rc-card.st-대기{border-left-color:#9CA3AF;}
+#page-order .rc-card.st-부분입고{border-left-color:#EA580C;}
+#page-order .rc-card.st-입고완료{border-left-color:#059669;}
+#page-order .oc-card.urg-즉시발주{border-left-color:#DC2626;}
+#page-order .oc-card.urg-긴급{border-left-color:#EA580C;}
+#page-order .oc-card.urg-발주필요{border-left-color:#D97706;}
+#page-order .oc-card.urg-추가발주요청{border-left-color:#534AB7;}
+/* 상단 이름+배지 */
+#page-order .rc-top,#page-order .oc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+#page-order .rc-name,#page-order .oc-name{font-size:13px;font-weight:700;color:var(--tx);line-height:1.3;word-break:break-word;flex:1;min-width:0;}
+/* 메타 라인 */
+#page-order .rc-meta,#page-order .oc-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 9px;margin-top:5px;font-size:11px;color:var(--tx2);}
+/* 숫자 칩 줄 */
+#page-order .rc-nums,#page-order .oc-nums{display:flex;flex-wrap:wrap;align-items:flex-end;gap:7px 14px;margin-top:7px;padding-top:7px;border-top:1px dashed var(--bd);}
+#page-order .stat{display:flex;flex-direction:column;gap:2px;}
+#page-order .stat label{font-size:9.5px;color:var(--tx2);font-weight:600;white-space:nowrap;}
+#page-order .stat b{font-size:14px;font-weight:800;color:var(--tx);letter-spacing:-.3px;line-height:1;}
+#page-order .rc-nums .inp{width:58px;}
+#page-order .rc-actbtn,#page-order .oc-actbtn{margin-left:auto;align-self:center;}
+/* 메모 */
+#page-order .rc-memo{margin-top:7px;padding-top:6px;border-top:1px dashed var(--bd);}
+#page-order .rc-memo .memo-add{padding:4px 0 0;border-top:none;}
+/* 정렬 셀렉트 */
+#page-order .sortsel{font-size:11px;border:1px solid var(--bd);border-radius:7px;padding:5px 7px;background:var(--bg);color:var(--tx);cursor:pointer;font-family:inherit;}
+#page-order .rc-empty{text-align:center;color:var(--tx2);font-size:12px;padding:26px 10px;}
 </style>
 <div class="page" id="page-order">
 <div class="main">
@@ -2316,8 +2348,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ch">
       <div><div class="ct">발주 입고 체크</div><div class="cs">수정 후 확인 — 완전입고 시 완료탭 이동</div></div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="recvSrch" placeholder="상품명, 코드..." oninput="renderRecv()" style="width:130px;"></div>
+        <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="recvSrch" placeholder="상품명, 코드..." oninput="renderRecv()" style="width:110px;"></div>
         <select class="sel" id="recvFilter" onchange="renderRecv()"><option value="">전체</option><option value="대기">대기</option><option value="부분입고">부분입고</option></select>
+        <select class="sortsel" id="recvSortSel" onchange="onRecvSort(this.value)" title="정렬">
+          <option value="date_desc">주문일↓</option><option value="date_asc">주문일↑</option>
+          <option value="miss_desc">미입고많은순</option><option value="state">상태순</option><option value="name">상품명순</option>
+        </select>
       </div>
     </div>
     <div class="tab-bar">
@@ -2325,29 +2361,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="tab" id="rt-d" onclick="switchRecvTab('d')">입고완료 <span id="rdCnt" style="font-size:10px;color:#059669;"></span></div>
     </div>
     <div class="tc active" id="rtc-a">
-      <div class="tw-recv"><table class="tab-table">
-        <thead><tr>
-          <th onclick="sortRecv('orderDate')" style="cursor:pointer;user-select:none;" id="rth-orderDate">주문날짜 <span id="rs-orderDate">▼</span></th>
-          <th onclick="sortRecv('uploadTime')" style="cursor:pointer;user-select:none;" id="rth-uploadTime">업로드시간 <span id="rs-uploadTime" style="color:var(--tx2);font-size:9px;"></span></th>
-          <th>코드</th>
-          <th style="min-width:140px;">상품명</th>
-          <th style="text-align:right;">주문수량</th>
-          <th style="text-align:right;width:80px;">1차입고</th>
-          <th style="text-align:right;width:80px;">2차입고</th>
-          <th style="text-align:right;">입고합계</th>
-          <th style="text-align:right;">미입고</th>
-          <th style="text-align:center;">상태</th>
-          <th style="text-align:center;">확인</th>
-          <th>메모</th>
-        </tr></thead>
-        <tbody id="recvActiveBody"></tbody>
-      </table></div>
+      <div class="rc-list" id="recvActiveBody"></div>
     </div>
     <div class="tc" id="rtc-d">
-      <div class="tw-recv"><table class="tab-table">
-        <thead><tr><th>주문날짜</th><th>업로드시간</th><th>완료시간</th><th>코드</th><th style="min-width:140px;">상품명</th><th style="text-align:right;">주문수량</th><th style="text-align:right;">최종입고</th><th style="text-align:center;">상태</th><th>메모</th></tr></thead>
-        <tbody id="recvDoneBody"></tbody>
-      </table></div>
+      <div class="rc-list" id="recvDoneBody"></div>
     </div>
   </div>
 
@@ -2355,7 +2372,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ch">
       <div><div class="ct">발주 필요 목록</div><div class="cs" id="orderCs">제품별 판매 패턴 기반 — AI 시즌 보정 적용</div></div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="orderSrch" placeholder="상품명, 코드..." oninput="recalcOrders()" style="width:130px;"></div>
+        <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="orderSrch" placeholder="상품명, 코드..." oninput="recalcOrders()" style="width:110px;"></div>
+        <select class="sortsel" id="orderSortSel" onchange="onOrderSort(this.value)" title="정렬">
+          <option value="urgency">긴급도순</option><option value="boxes_desc">필요박스많은순</option>
+          <option value="stock_asc">현재고적은순</option><option value="name">상품명순</option>
+        </select>
         <button class="btn btn-pr btn-sm" onclick="recalcOrders()">재계산</button>
       </div>
     </div>
@@ -2364,10 +2385,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="fbox" id="formulaBox"></div>
     <div class="sum-row" id="orderSum"></div>
     <div class="ord-kpi" id="orderKpi"></div>
-    <div class="tw-scroll"><table>
-      <thead><tr><th>상품명</th><th>코드</th><th>구분</th><th style="text-align:right;">현재고</th><th style="text-align:right;">발주시점</th><th style="text-align:right;">예상월소진</th><th style="text-align:right;">필요수량(박스)</th><th>제품시즌</th><th>시즌보정</th><th>리드타임</th><th>긴급도</th><th class="ns" style="text-align:center;">입고등록</th></tr></thead>
-      <tbody id="orderBody"></tbody>
-    </table></div>
+    <div class="oc-list" id="orderBody"></div>
   </div>
   </div>
 </div>
@@ -3941,6 +3959,9 @@ async function logiNoticeAdd(){
 }
 
 // ── 공지 등록 알림 (컴퓨터 알림창 + 30대 여성 음성, 미확인 시 3분마다 반복) ──
+// ⚠️ 임시 비활성화 (사용자 요청 2026-06-24): 추후 수정 후 다시 true 로 켜면 알림+음성 복구됨.
+//    공지/전달사항 화면 동기화는 그대로 동작하고, 알림창·차임·음성·3분 반복만 멈춥니다.
+const LOGI_ALERTS_ENABLED = false;
 let _logiNotifyTimer = null;
 let _logiNotifyHandle = null;
 let _logiSeenNoticeId = 0;       // 이미 본 공지 중 가장 최근 id (이 값보다 큰 새 공지 → 알람)
@@ -4034,6 +4055,7 @@ function _logiFireNotice(text){
   }catch(e){ toast('📢 ' + text); }
 }
 function logiNotifyStart(text){
+  if(!LOGI_ALERTS_ENABLED) return;   // 임시 비활성화: 알림창·차임·음성·반복 모두 멈춤 (화면 동기화는 유지)
   logiNotifyStop();
   const fire = ()=> _logiFireNotice(text);
   if('Notification' in window && Notification.permission==='default'){
@@ -4899,6 +4921,10 @@ function _initOrderCycleSel(){
 let products=[], receiveList=[], doneList=[], rgProducts=[], historyLog=[];
 let invSort='code', invDir=1, ioTarget=null, _showHidden=false, editProdId=null;
 let recvSort='orderDate', recvDir=-1; // 발주관리 정렬 (기본: 주문날짜 최신순)
+let recvSortMode='date_desc';   // 카드형 입고체크 정렬 모드
+let orderSortMode='urgency';    // 카드형 발주 필요 목록 정렬 모드
+function onRecvSort(v){ recvSortMode=v; renderRecv(); }
+function onOrderSort(v){ orderSortMode=v; renderOrderTable(); }
 let orderTypeFilter=''; // 발주 필요 목록 구분 KPI 필터 ('' = 전체)
 let salesPeriod='monthly', salesYear=CUR_YEAR, salesSel=new Set(), salesChart=null;
 let rgPeriod='monthly',    rgYear=CUR_YEAR,    rgSel=new Set(),    rgChart=null;
@@ -10543,30 +10569,49 @@ function renderOrderKpi(){
 }
 function setOrderType(t){ orderTypeFilter=t; renderOrderKpi(); renderOrderTable(); }
 function renderOrderTable(){
-  const list=orderTypeFilter?orderList.filter(p=>(p.type||'기타')===orderTypeFilter):orderList;
+  let list=orderTypeFilter?orderList.filter(p=>(p.type||'기타')===orderTypeFilter):orderList;
+  // 정렬
+  const ratio=p=>p.stock/(p.reorderPoint||1);
+  list=[...list].sort((a,b)=>{
+    switch(orderSortMode){
+      case 'boxes_desc': return (b.boxes||0)-(a.boxes||0);
+      case 'stock_asc':  return a.stock-b.stock;
+      case 'name':       return String(a.name||'').localeCompare(String(b.name||''));
+      case 'urgency': default: return ratio(a)-ratio(b);
+    }
+  });
+  const sel=document.getElementById('orderSortSel'); if(sel&&sel.value!==orderSortMode) sel.value=orderSortMode;
   document.getElementById('orderBody').innerHTML=list.length?list.map(p=>{
     const r=p.stock/p.reorderPoint;
     const ug=p.isAdditional
       ? {l:'추가발주요청',c:'b-pu'}
       : r<=0.3?{l:'즉시발주',c:'b-da'}:r<=0.6?{l:'긴급',c:'b-or'}:{l:'발주필요',c:'b-wa'};
     const pendingInfo=p.isAdditional
-      ? `<span style="font-size:10px;color:#534AB7;">진행중 ${p.pending.toLocaleString()}개</span>`
+      ? `<div class="stat"><label>진행중</label><b style="color:#534AB7;">${p.pending.toLocaleString()}개</b></div>`
       : '';
-    return `<tr>
-      <td style="font-weight:500;max-width:110px;overflow:hidden;text-overflow:ellipsis;">${p.name}${p.inSeason?`<span style="font-size:9px;color:#EA580C;"> ●성수기</span>`:''}</td>
-      <td><span class="code-chip">${p.code}</span></td>
-      <td><span class="badge b-gy">${p.type}</span></td>
-      <td style="text-align:right;font-weight:500;color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':'var(--tx)'};">${p.stock.toLocaleString()}</td>
-      <td style="text-align:right;color:var(--tx2);">${p.reorderPoint.toLocaleString()}</td>
-      <td style="text-align:right;">${p.expM.toLocaleString()}개</td>
-      <td style="text-align:right;font-weight:500;">${p.needed.toLocaleString()}개 <span style="color:var(--tx2);">(${p.boxes}박스)</span><br>${pendingInfo}</td>
-      <td><span class="badge ${p.season.badge}">${p.season.label}</span></td>
-      <td style="font-size:11px;color:${p.sr>1.15?'#DC2626':p.sr<0.85?'#059669':'var(--tx2)'};">${p.corrLabel}</td>
-      <td><span class="badge b-gy">${Math.round(p.leadTime*30)}일</span></td>
-      <td><span class="badge ${ug.c}">${ug.l}</span></td>
-      <td style="text-align:center;"><button class="btn btn-su btn-sm" onclick="openInReg(${p.id})">입고등록</button></td>
-    </tr>`;
-  }).join(''):`<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--tx2);">${orderTypeFilter?`'${orderTypeFilter}' 구분에 발주 필요 상품이 없습니다`:'발주 필요 상품이 없습니다'}</td></tr>`;
+    const stockColor=r<=0.3?'#DC2626':r<=0.6?'#EA580C':'var(--tx)';
+    return `<div class="oc-card urg-${ug.l}">
+      <div class="oc-top">
+        <span class="oc-name">${p.name}${p.inSeason?`<span style="font-size:10px;color:#EA580C;font-weight:700;"> ●성수기</span>`:''}</span>
+        <span class="badge ${ug.c}">${ug.l}</span>
+      </div>
+      <div class="oc-meta">
+        <span class="code-chip">${p.code}</span>
+        <span class="badge b-gy">${p.type}</span>
+        <span class="badge ${p.season.badge}">${p.season.label}</span>
+        <span style="color:${p.sr>1.15?'#DC2626':p.sr<0.85?'#059669':'var(--tx2)'};">${p.corrLabel}</span>
+        <span>⏱ 리드타임 ${Math.round(p.leadTime*30)}일</span>
+      </div>
+      <div class="oc-nums">
+        <div class="stat"><label>현재고</label><b style="color:${stockColor};">${p.stock.toLocaleString()}</b></div>
+        <div class="stat"><label>발주시점</label><b style="color:var(--tx2);">${p.reorderPoint.toLocaleString()}</b></div>
+        <div class="stat"><label>예상월소진</label><b>${p.expM.toLocaleString()}개</b></div>
+        <div class="stat"><label>필요수량</label><b style="color:var(--pr);">${p.needed.toLocaleString()}개 <span style="font-size:11px;color:var(--tx2);">(${p.boxes}박스)</span></b></div>
+        ${pendingInfo}
+        <button class="btn btn-su btn-sm oc-actbtn" onclick="openInReg(${p.id})">입고등록</button>
+      </div>
+    </div>`;
+  }).join(''):`<div class="rc-empty">${orderTypeFilter?`'${orderTypeFilter}' 구분에 발주 필요 상품이 없습니다`:'발주 필요 상품이 없습니다'}</div>`;
 }
 // ── AI 발주 브리핑 (Groq 재사용) ──
 function _buildOrderBriefContext(){
@@ -10631,45 +10676,59 @@ function renderRecv(){
   let list=receiveList;
   if(filter) list=list.filter(r=>getRecvSt(r).l===filter);
   if(srch) list=list.filter(r=>r.name.toLowerCase().includes(srch)||r.code.toLowerCase().includes(srch));
-  // 정렬
+  // 정렬 (카드 정렬 셀렉트)
+  const recvMiss=r=>Math.max(0,r.orderQty-(r.in1+r.in2));
+  const stOrd={'대기':0,'부분입고':1,'입고완료':2};
   list=[...list].sort((a,b)=>{
-    const av=a[recvSort]||'', bv=b[recvSort]||'';
-    return av.localeCompare(bv)*recvDir;
-  });
-  // 정렬 아이콘 업데이트
-  ['orderDate','uploadTime'].forEach(k=>{
-    const el=document.getElementById('rs-'+k);
-    if(el) el.textContent=recvSort===k?(recvDir===1?'▲':'▼'):'';
-    if(el&&recvSort!==k) el.style.color='var(--tx2)';
+    switch(recvSortMode){
+      case 'date_asc':  return String(a.orderDate||'').localeCompare(String(b.orderDate||''));
+      case 'miss_desc': return recvMiss(b)-recvMiss(a);
+      case 'state':     return (stOrd[getRecvSt(a).l]??9)-(stOrd[getRecvSt(b).l]??9);
+      case 'name':      return String(a.name||'').localeCompare(String(b.name||''));
+      case 'date_desc': default: return String(b.orderDate||'').localeCompare(String(a.orderDate||''));
+    }
   });
   document.getElementById('raCnt').textContent=`(${receiveList.length})`;
   document.getElementById('rdCnt').textContent=`(${doneList.length})`;
-  // 1차/2차 입고 칸 너비 줄이고 상품명 넓게
-  document.getElementById('recvActiveBody').innerHTML=list.map(r=>{
+  const sel=document.getElementById('recvSortSel'); if(sel&&sel.value!==recvSortMode) sel.value=recvSortMode;
+  // ── 진행중: 컴팩트 카드 (모든 입력칸·핸들러 ID 유지) ──
+  document.getElementById('recvActiveBody').innerHTML=list.length?list.map(r=>{
     const tot=r.in1+r.in2,miss=Math.max(0,r.orderQty-tot),st=getRecvSt(r);
-    const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):`<div style="font-size:10px;color:var(--tx2);padding:3px 6px;">메모 없음</div>`;
-    return `<tr id="rv-${r.id}">
-      <td>${r.orderDate}</td>
-      <td style="color:var(--tx2);font-size:11px;">${r.uploadTime}</td>
-      <td><input class="inp" style="width:90px;font-family:monospace;font-size:11px;" id="code-${r.id}" value="${r.code}" onchange="onRecvCodeChange(${r.id})" placeholder="코드"></td>
-      <td class="recv-name-cell" id="name-${r.id}">${r.name}</td>
-      <td style="text-align:right;"><input class="inp" style="width:60px;" id="ord-${r.id}" type="number" value="${r.orderQty}" min="1" onchange="liveCalc(${r.id})"></td>
-      <td style="text-align:right;"><input class="inp" style="width:50px;" id="i1-${r.id}" type="number" value="${r.in1}" min="0" onchange="liveCalc(${r.id})"></td>
-      <td style="text-align:right;"><input class="inp" style="width:50px;" id="i2-${r.id}" type="number" value="${r.in2}" min="0" onchange="liveCalc(${r.id})"></td>
-      <td style="text-align:right;font-weight:500;" id="tot-${r.id}">${tot.toLocaleString()}개</td>
-      <td style="text-align:right;color:${miss>0?'#DC2626':'#059669'};" id="mis-${r.id}">${miss.toLocaleString()}개</td>
-      <td style="text-align:center;"><span class="badge ${st.c}" id="st-${r.id}">${st.l}</span></td>
-      <td style="text-align:center;"><button class="btn btn-sm" id="cb-${r.id}" onclick="confirmRecv(${r.id})" style="background:${st.l==='입고완료'?'#ECFDF5':'var(--bg)'};color:${st.l==='입고완료'?'#059669':'var(--tx)'};">확인</button></td>
-      <td class="memo-panel"><div class="memo-list">${ml}</div><div class="memo-add"><input type="text" id="mi-${r.id}" placeholder="메모..." onkeydown="if(event.key==='Enter')addMemo(${r.id})"><button onclick="addMemo(${r.id})">+</button></div></td>
-    </tr>`;
-  }).join('');
-  // 입고완료 목록도 검색어 적용
+    const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):`<div style="font-size:10px;color:var(--tx2);padding:2px 0;">메모 없음</div>`;
+    return `<div class="rc-card st-${st.l}" id="rv-${r.id}">
+      <div class="rc-top">
+        <span class="rc-name" id="name-${r.id}">${r.name}</span>
+        <span class="badge ${st.c}" id="st-${r.id}">${st.l}</span>
+      </div>
+      <div class="rc-meta">
+        <input class="inp" style="width:96px;font-family:monospace;font-size:11px;" id="code-${r.id}" value="${r.code}" onchange="onRecvCodeChange(${r.id})" placeholder="코드">
+        <span>📅 ${r.orderDate}</span><span>⬆ ${r.uploadTime}</span>
+      </div>
+      <div class="rc-nums">
+        <div class="stat"><label>주문수량</label><input class="inp" id="ord-${r.id}" type="number" value="${r.orderQty}" min="1" onchange="liveCalc(${r.id})"></div>
+        <div class="stat"><label>1차입고</label><input class="inp" id="i1-${r.id}" type="number" value="${r.in1}" min="0" onchange="liveCalc(${r.id})"></div>
+        <div class="stat"><label>2차입고</label><input class="inp" id="i2-${r.id}" type="number" value="${r.in2}" min="0" onchange="liveCalc(${r.id})"></div>
+        <div class="stat"><label>입고합계</label><b id="tot-${r.id}">${tot.toLocaleString()}개</b></div>
+        <div class="stat"><label>미입고</label><b id="mis-${r.id}" style="color:${miss>0?'#DC2626':'#059669'};">${miss.toLocaleString()}개</b></div>
+        <button class="btn btn-sm rc-actbtn" id="cb-${r.id}" onclick="confirmRecv(${r.id})" style="background:${st.l==='입고완료'?'#ECFDF5':'var(--bg)'};color:${st.l==='입고완료'?'#059669':'var(--tx)'};">확인</button>
+      </div>
+      <div class="rc-memo"><div class="memo-list">${ml}</div><div class="memo-add"><input type="text" id="mi-${r.id}" placeholder="메모..." onkeydown="if(event.key==='Enter')addMemo(${r.id})"><button onclick="addMemo(${r.id})">+</button></div></div>
+    </div>`;
+  }).join(''):`<div class="rc-empty">${srch?'검색 결과 없음':'진행중 발주가 없습니다'}</div>`;
+  // ── 입고완료: 컴팩트 카드 (검색어 적용) ──
   let doneShown=doneList;
   if(srch) doneShown=doneList.filter(r=>r.name.toLowerCase().includes(srch)||r.code.toLowerCase().includes(srch));
   document.getElementById('recvDoneBody').innerHTML=doneShown.length?doneShown.map(r=>{
-    const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):`<div style="font-size:10px;color:var(--tx2);padding:3px 6px;">-</div>`;
-    return `<tr><td>${r.orderDate}</td><td style="color:var(--tx2);font-size:11px;">${r.uploadTime}</td><td style="color:var(--tx2);font-size:11px;">${r.doneTime}</td><td><span class="code-chip">${r.code}</span></td><td class="recv-name-cell">${r.name}</td><td style="text-align:right;font-weight:500;">${r.orderQty.toLocaleString()}개</td><td style="text-align:right;color:#059669;font-weight:500;">${(r.in1+r.in2).toLocaleString()}개</td><td style="text-align:center;"><span class="badge b-su">완료</span></td><td class="memo-panel"><div class="memo-list">${ml}</div></td></tr>`;
-  }).join(''):`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--tx2);">${srch?'검색 결과 없음':'완료 내역 없음'}</td></tr>`;
+    const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):'';
+    return `<div class="rc-card st-입고완료">
+      <div class="rc-top"><span class="rc-name">${r.name}</span><span class="badge b-su">완료</span></div>
+      <div class="rc-meta"><span class="code-chip">${r.code}</span><span>📅 ${r.orderDate}</span><span>✅ ${r.doneTime}</span></div>
+      <div class="rc-nums">
+        <div class="stat"><label>주문수량</label><b>${r.orderQty.toLocaleString()}개</b></div>
+        <div class="stat"><label>최종입고</label><b style="color:#059669;">${(r.in1+r.in2).toLocaleString()}개</b></div>
+      </div>${ml?`<div class="rc-memo"><div class="memo-list">${ml}</div></div>`:''}
+    </div>`;
+  }).join(''):`<div class="rc-empty">${srch?'검색 결과 없음':'완료 내역 없음'}</div>`;
 }
 // 코드 변경 시 products에서 상품명 자동 연동
 async function onRecvCodeChange(id){
