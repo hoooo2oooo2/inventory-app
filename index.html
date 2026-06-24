@@ -10623,10 +10623,13 @@ function renderRecv(){
       <td class="memo-panel"><div class="memo-list">${ml}</div><div class="memo-add"><input type="text" id="mi-${r.id}" placeholder="메모..." onkeydown="if(event.key==='Enter')addMemo(${r.id})"><button onclick="addMemo(${r.id})">+</button></div></td>
     </tr>`;
   }).join('');
-  document.getElementById('recvDoneBody').innerHTML=doneList.length?doneList.map(r=>{
+  // 입고완료 목록도 검색어 적용
+  let doneShown=doneList;
+  if(srch) doneShown=doneList.filter(r=>r.name.toLowerCase().includes(srch)||r.code.toLowerCase().includes(srch));
+  document.getElementById('recvDoneBody').innerHTML=doneShown.length?doneShown.map(r=>{
     const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):`<div style="font-size:10px;color:var(--tx2);padding:3px 6px;">-</div>`;
     return `<tr><td>${r.orderDate}</td><td style="color:var(--tx2);font-size:11px;">${r.uploadTime}</td><td style="color:var(--tx2);font-size:11px;">${r.doneTime}</td><td><span class="code-chip">${r.code}</span></td><td class="recv-name-cell">${r.name}</td><td style="text-align:right;font-weight:500;">${r.orderQty.toLocaleString()}개</td><td style="text-align:right;color:#059669;font-weight:500;">${(r.in1+r.in2).toLocaleString()}개</td><td style="text-align:center;"><span class="badge b-su">완료</span></td><td class="memo-panel"><div class="memo-list">${ml}</div></td></tr>`;
-  }).join(''):`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--tx2);">완료 내역 없음</td></tr>`;
+  }).join(''):`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--tx2);">${srch?'검색 결과 없음':'완료 내역 없음'}</td></tr>`;
 }
 // 코드 변경 시 products에서 상품명 자동 연동
 async function onRecvCodeChange(id){
