@@ -228,7 +228,7 @@ body{background:var(--bg2);min-height:100vh;}
 .cw-add:hover{background:#FDE9B8;}
 .collab-col-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;}
 .collab-col-empty{color:var(--tx2);font-size:12px;text-align:center;padding:24px 6px;line-height:1.6;}
-.postit{background:#fff;border:1px solid var(--bd);border-left:5px solid #ccc;border-radius:9px;padding:6px 8px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .08s,box-shadow .12s;display:flex;flex-direction:column;height:66px;overflow:hidden;flex-shrink:0;}
+.postit{background:#fff;border:1px solid var(--bd);border-left:5px solid #ccc;border-radius:9px;padding:6px 8px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:transform .08s,box-shadow .12s;display:flex;flex-direction:column;height:84px;overflow:hidden;flex-shrink:0;}
 .postit.expanded{height:auto;overflow:visible;}
 .postit:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);}
 .postit.dragging{opacity:.45;}
@@ -243,9 +243,14 @@ body{background:var(--bg2);min-height:100vh;}
 .nas-link{cursor:pointer;text-decoration:none;font-size:14px;}
 .nas-link:hover{filter:brightness(1.1);}
 .postit-detail a{color:#2563EB;text-decoration:underline;word-break:break-all;}
-/* 하단 정보: expanded 시만 표시 */
-.postit-foot{display:none;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:6px;border-top:0.5px dashed var(--bd);font-size:10px;color:var(--tx2);}
-.postit.expanded .postit-foot{display:flex;}
+/* 하단 정보: 항상 표시 (시간 · 게이지 · 담당자) */
+.postit-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:5px;border-top:0.5px dashed var(--bd);font-size:10px;color:var(--tx2);}
+.postit-foot .pf-time{flex-shrink:0;white-space:nowrap;}
+.postit-foot .pf-name{flex-shrink:0;white-space:nowrap;}
+/* 작업 마감 게이지바 (시간·담당자 사이) — 텍스트 크기와 비슷한 높이 */
+.postit-gauge{flex:1;min-width:34px;position:relative;height:12px;background:var(--bd);border-radius:7px;overflow:hidden;}
+.postit-gauge-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:7px;transition:width .4s ease,background .4s;}
+.postit-gauge-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#1f2937;line-height:1;letter-spacing:-.2px;}
 .postit-actions{display:flex;align-items:center;gap:2px;opacity:0;transition:opacity .15s;}
 .postit:hover .postit-actions{opacity:1;}
 .postit-act{background:none;border:none;cursor:pointer;font-size:11px;color:#aaa;padding:0 2px;line-height:1;}
@@ -1167,6 +1172,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="cl-lbl">업무 진행</div>
         <div class="cl-status-pick" id="collabStatusPick"></div>
       </div>
+      <div>
+        <div class="cl-lbl">⏱ 작업 마감 타이머 (게이지바 진행도)</div>
+        <select id="collabDeadline" onchange="_collabFormDeadline=this.value;"
+          style="width:100%;height:38px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;background:var(--bg);color:var(--tx);font-family:inherit;cursor:pointer;">
+          <option value="">설정 안 함 (게이지 없음)</option>
+        </select>
+      </div>
     </div>
     <div class="ma" style="margin-top:16px;">
       <button class="btn" onclick="closeModal('collabModal')">취소</button>
@@ -1228,6 +1240,41 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div class="page" id="page-coupangad">
   <iframe id="coupangAdFrame" src="" title="쿠팡 광고 관리" style="width:100%;height:calc(100vh - 94px);border:none;display:block;"></iframe>
 </div>
+
+<!-- ▣ 디자인팀·물류팀 레이아웃 직각 테두리 (레이아웃 박스만 — 배지/칩/원형/버튼 등 내용은 유지) -->
+<style>
+#page-collab .collab-projects,
+#page-collab .collab-cal-box,
+#page-collab .collab-report-sidebar,
+#page-collab .report-panel,
+#page-collab .rp-head,
+#page-collab .rp-body,
+#page-collab .collab-col,
+#page-collab .today-summary,
+#page-collab .plan-card,
+#page-collab .postit,
+#page-collab .cw-block,
+#page-collab .rp-block,
+#page-collab .rp-pinned-item,
+#page-logihome .lh2-alertbar,
+#page-logihome .lh2-card,
+#page-logihome .logi-notice-item,
+#page-logihome .lh2-handover-item,
+#page-logihome .lh2-chk-table-wrap,
+#page-logihome .lh2-memo,
+#page-logistock .lod-drop,
+#page-logistock .lod-card,
+#page-logistock .lod-round,
+#page-logistock .lod-staff-card,
+#page-logibox .lbx-table-scroll,
+#page-logibox .lbx-order-item,
+#page-logibox .lbx-rcv-card,
+#page-logistatus .lst2-period,
+#page-logistatus .lst2-kpi,
+#page-logistatus .lst2-card{
+  border-radius:0 !important;
+}
+</style>
 
 <!-- ═══ 협업업무 (디자인팀) ═══ -->
 <div class="page" id="page-collab">
@@ -11501,7 +11548,7 @@ let _calLoaded = false;
 function loadCalPage() {
   const iframe = document.getElementById('calPageFrame');
   if (!iframe || _calLoaded) return;
-  iframe.src = 'calendar.html?v=20260617b&mode=full';
+  iframe.src = 'calendar.html?v=20260624a&mode=full';
   _calLoaded = true;
   // 기존에 주입됐던 재고 이벤트 제거 (연동 해제)
   iframe.onload = () => {
@@ -11543,6 +11590,7 @@ let _collabBusy = false;        // 저장 중(자기 변경) — 폴링/실시�
 let _collabEditId = null;       // 수정 중인 포스트잇 id
 let _collabFormPerson = '실장님';
 let _collabFormStatus = 'plan';
+let _collabFormDeadline = '';   // 작업 마감 타이머(시간), '' = 미설정
 const _collabExpanded = new Set(); // 펼쳐진 카드 id 추적
 const _planExpanded = new Set();   // 진행예정 프로젝트 카드 펼침 추적
 let _planEditId = null;
@@ -11555,13 +11603,15 @@ function loadCollabPage(){
   // 캘린더 iframe 1회 로드
   const f = document.getElementById('collabCalFrame');
   if(f && !_collabCalLoaded){
-    f.src = 'calendar.html?v=20260617c';
+    f.src = 'calendar.html?v=20260624a';
     _collabCalLoaded = true;
     f.addEventListener('load', ()=>{ setTimeout(_reportInjectCalDots, 600); });
   }
   // 협업업무 데이터 로드 + 실시간 구독 + 폴링
   collabReload().then(renderCollab);
   collabStartRealtime();
+  // 작업 마감 게이지바 실시간 갱신 (1분 주기)
+  if(!_collabGaugeTimer) _collabGaugeTimer = setInterval(_collabUpdateGauges, 60000);
   // 업무보고서 패널 초기화 + 구 calendar.html 데이터 1회 마이그레이션
   if(!_reportDate) _reportDate = _reportTodayStr();
   _renderCatSidebar();
@@ -11903,10 +11953,50 @@ function _collabCardHTML(t, canEdit){
     <div class="postit-detail">${t.detail?_collabLinkify(t.detail):''}</div>
     ${isExp?doneBox:''}
     <div class="postit-foot">
-      <span>🕒 ${_collabFmtTime(t.created_at)}</span>
-      <span style="color:${pcolor};font-weight:700;">${t.assignee}</span>
+      <span class="pf-time">🕒 ${_collabFmtTime(t.created_at)}</span>
+      ${_collabGaugeHTML(t)}
+      <span class="pf-name" style="color:${pcolor};font-weight:700;">${t.assignee}</span>
     </div>
   </div>`;
+}
+
+// 작업 마감 게이지바 (시간이 지날수록 채워짐 + 진행% 표시)
+function _gaugeColor(pct){
+  if(pct>=100) return '#DC2626';   // 마감 도달/초과
+  if(pct>=75)  return '#F59E0B';   // 임박
+  if(pct>=40)  return '#3182F6';
+  return '#05C072';                // 여유
+}
+function _collabProgress(t){
+  if(!t || !t.deadline_hours) return null;
+  const start = new Date(t.timer_start || t.created_at).getTime();
+  const total = t.deadline_hours * 3600000;
+  if(!total) return null;
+  if(t.status==='done') return 100;
+  return Math.max(0, Math.min(100, (Date.now()-start)/total*100));
+}
+function _collabGaugeHTML(t){
+  const p = _collabProgress(t);
+  if(p===null) return '<span class="postit-gauge" style="visibility:hidden;"></span>';
+  const pct = Math.round(p);
+  const start = new Date(t.timer_start || t.created_at).getTime();
+  const total = t.deadline_hours * 3600000;
+  return `<div class="postit-gauge" title="마감 ${t.deadline_hours}시간 · 진행 ${pct}%" data-start="${start}" data-total="${total}" data-done="${t.status==='done'?1:0}">
+      <div class="postit-gauge-fill" style="width:${pct}%;background:${_gaugeColor(pct)};"></div>
+      <span class="postit-gauge-pct">${pct}%</span>
+    </div>`;
+}
+// 1분마다 보이는 게이지들을 실시간으로 갱신
+let _collabGaugeTimer = null;
+function _collabUpdateGauges(){
+  document.querySelectorAll('.postit-gauge[data-start]').forEach(g=>{
+    const start=+g.dataset.start, total=+g.dataset.total, done=g.dataset.done==='1';
+    if(!total) return;
+    const pct = Math.round(done?100:Math.max(0,Math.min(100,(Date.now()-start)/total*100)));
+    const fill=g.querySelector('.postit-gauge-fill'); const lab=g.querySelector('.postit-gauge-pct');
+    if(fill){ fill.style.width=pct+'%'; fill.style.background=_gaugeColor(pct); }
+    if(lab){ lab.textContent=pct+'%'; }
+  });
 }
 
 // 담당자별 카드 정렬: 수동 순서(order)가 있으면 그 순서, 없으면 상태→최신 기본정렬
@@ -13223,6 +13313,7 @@ function collabOpenNew(person){
   _collabEditId = null;
   _collabFormPerson = COLLAB_ALL.includes(person) ? person : '유현';
   _collabFormStatus = 'plan';
+  _collabFormDeadline = '';
   document.getElementById('collabModalTitle').textContent = '📝 업무 등록';
   document.getElementById('collabTitle').value = '';
   document.getElementById('collabDetail').value = '';
@@ -13237,6 +13328,7 @@ function collabOpenEdit(id){
   _collabEditId = id;
   _collabFormPerson = t.assignee;
   _collabFormStatus = t.status;
+  _collabFormDeadline = t.deadline_hours ? String(t.deadline_hours) : '';
   document.getElementById('collabModalTitle').textContent = '✏️ 업무 수정';
   document.getElementById('collabTitle').value = t.title || '';
   document.getElementById('collabDetail').value = t.detail || '';
@@ -13254,6 +13346,14 @@ function _collabRenderPicks(){
     const on = k===_collabFormStatus;
     return `<div class="cl-chip ${on?'on':''}" style="${on?`background:${v.color};`:''}" onclick="collabPickStatus('${k}')">${v.label}</div>`;
   }).join('');
+  // 작업 마감 타이머 select (1~50시간) 1회 구성
+  const dl = document.getElementById('collabDeadline');
+  if(dl && dl.options.length<=1){
+    let html = '<option value="">설정 안 함 (게이지 없음)</option>';
+    for(let h=1; h<=50; h++) html += `<option value="${h}">${h}시간</option>`;
+    dl.innerHTML = html;
+  }
+  if(dl) dl.value = _collabFormDeadline || '';
 }
 function collabPickPerson(p){ _collabFormPerson=p; _collabRenderPicks(); }
 function collabPickStatus(s){ _collabFormStatus=s; _collabRenderPicks(); }
@@ -13263,14 +13363,25 @@ async function collabSubmit(){
   const title = document.getElementById('collabTitle').value.trim();
   const detail = document.getElementById('collabDetail').value.trim();
   if(!title){ toast('업무명을 입력하세요.'); return; }
+  const dh = parseInt(document.getElementById('collabDeadline').value, 10);
+  const deadlineHours = (dh>=1 && dh<=50) ? dh : null;
+  const nowIso = new Date().toISOString();
   if(_collabEditId){
     const t = _collabTasks.find(x=>x.id===_collabEditId);
-    if(t){ t.assignee=_collabFormPerson; t.title=title; t.detail=detail; _collabSetStatus(t,_collabFormStatus); t.updated_at=new Date().toISOString(); }
+    if(t){
+      t.assignee=_collabFormPerson; t.title=title; t.detail=detail; _collabSetStatus(t,_collabFormStatus); t.updated_at=nowIso;
+      // 마감 타이머가 새로 설정·변경되면 타이머 시작점을 지금으로 리셋
+      if(deadlineHours !== (t.deadline_hours||null)){
+        t.deadline_hours = deadlineHours;
+        t.timer_start = deadlineHours ? nowIso : null;
+      }
+    }
   }else{
     const t = {
       id: 'c'+Date.now()+Math.random().toString(36).slice(2,6),
       assignee:_collabFormPerson, title, detail, status:'plan', completed_at:null,
-      created_at:new Date().toISOString(), updated_at:new Date().toISOString(),
+      created_at:nowIso, updated_at:nowIso,
+      deadline_hours: deadlineHours, timer_start: deadlineHours ? nowIso : null,
       author:(window.__CURRENT_USER&&window.__CURRENT_USER.name)||'',
     };
     _collabSetStatus(t,_collabFormStatus);
