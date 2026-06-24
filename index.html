@@ -59,9 +59,6 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-projects.drop-on{outline:2px dashed #05C072;outline-offset:-3px;background:#ECFDF522;}
 .collab-cal-box{flex:1;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-box iframe{width:100%;height:100%;border:none;display:block;}
-/* 디자인팀 직원별 업무보고 스코프: 4칸 협업보드 숨기고 상단(프로젝트+캘린더)을 전체 높이로 */
-body.design-scope #collabCols{display:none !important;}
-body.design-scope .collab-top-row{flex:1 1 auto;}
 /* 업무보고서 사이드바 (우측 전체높이) */
 .collab-report-sidebar{flex:0 0 35%;min-width:240px;max-width:460px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 /* 기존 클래스 호환 유지 */
@@ -1231,9 +1228,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
-  <div class="ni" id="nav-rpt_yuhyun" onclick="goMenu('rpt_yuhyun')" style="display:none;">📝 유현</div>
-  <div class="ni" id="nav-rpt_bora" onclick="goMenu('rpt_bora')" style="display:none;">📝 보라</div>
-  <div class="ni" id="nav-rpt_yeonjeong" onclick="goMenu('rpt_yeonjeong')" style="display:none;">📝 연정</div>
   <div class="ni" id="nav-logihome" onclick="goMenu('logihome')" style="display:none;">🏠 홈</div>
   <div class="ni" id="nav-logistock" onclick="goMenu('logistock')" style="display:none;">📦 발주건 정리</div>
   <div class="ni" id="nav-logibox" onclick="goMenu('logibox')" style="display:none;">📮 택배박스</div>
@@ -1293,12 +1287,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="collab-projects" id="planDropZone"
           ondragover="planDropOver(event)" ondragleave="planDropLeave(event)" ondrop="planDropDrop(event)">
           <div class="collab-board-head">
-            <span id="collabProjTitle" style="font-size:14px;font-weight:800;color:var(--tx);">📋 진행 예정 프로젝트</span>
+            <span style="font-size:14px;font-weight:800;color:var(--tx);">📋 진행 예정 프로젝트</span>
             <div style="display:flex;align-items:center;gap:8px;">
               <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
               <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 PC당 1회 실행 필요">📂 폴더열기</button>
               <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
-              <button class="collab-done-btn" style="color:#fff;background:#05C072;" id="planProjAddBtn" onclick="planProjOpenNew(_designScopePerson||undefined)">＋ 프로젝트 등록</button>
+              <button class="collab-done-btn" style="color:#fff;background:#05C072;" id="planProjAddBtn" onclick="planProjOpenNew()">＋ 프로젝트 등록</button>
             </div>
           </div>
           <div class="collab-manager" id="collabManager" style="flex:1;overflow-y:auto;"></div>
@@ -3504,7 +3498,6 @@ const MENUS = [
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
-  {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 발주건 정리'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'},
   {id:'coupangad',label:'👥 인사관리'}
 ];
@@ -3519,7 +3512,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
   { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family'] },
-  { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong'] },
+  { id:'design', label:'디자인팀',  menus:['collab','calendar'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
 ];
@@ -3588,9 +3581,7 @@ function permKeyRows(){
       rows.push({ header:'디자인팀' });
       rows.push({ key:'collab', label:'협업업무' });
     } else if(m.id==='calendar'){
-      rows.push({ key:'calendar', label:'업무보고(유현·보라·연정)' });
-    } else if(m.id==='rpt_yuhyun'||m.id==='rpt_bora'||m.id==='rpt_yeonjeong'){
-      /* 직원별 업무보고는 calendar 권한을 공유하므로 별도 행 없음 */
+      rows.push({ key:'calendar', label:'업무보고' });
     } else if(m.id==='logihome'){
       rows.push({ header:'물류팀' });
       rows.push({ key:'logihome', label:'홈' });
@@ -3619,8 +3610,6 @@ function _permOf(key){
 }
 // 상단 메뉴(네비) 권한 — 매출관리는 하위탭 중 최댓값
 function _menuPerm(menuId){
-  // 디자인팀 직원별 업무보고(rpt_*)는 기존 '업무보고(calendar)' 권한을 그대로 상속
-  if(menuId && menuId.indexOf('rpt_')===0) return _permOf('calendar');
   if(menuId==='revenue'){
     let best='none';
     REV_SUBS.forEach(s=>{ const v=_permOf('revenue.'+s.id); if(_PERM_RANK[v]>_PERM_RANK[best]) best=v; });
@@ -5466,31 +5455,25 @@ async function lodDeleteFile(id){
   toast('🗑️ 삭제되었습니다.');
 }
 
-// 디자인팀 직원별 업무보고 메뉴 → 협업업무 페이지를 해당 직원 스코프로 재사용
-const PERSON_MENUS = { rpt_yuhyun:'유현', rpt_bora:'보라', rpt_yeonjeong:'연정' };
-let _designScopePerson = null;
 function goPage(p){
   // 권한 없는 메뉴 접근 차단
   if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   currentPage=p;
-  // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
-  _designScopePerson = PERSON_MENUS[p] || null;
-  const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
-    document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
+    document.getElementById('page-'+x)?.classList.toggle('active',x===p);
   });
   // 쿠팡광고: 처음 열 때만 iframe 로드(지연 로딩)
   if(p==='coupangad'){ const f=document.getElementById('coupangAdFrame'); if(f && !f.getAttribute('src')) f.setAttribute('src','coupang-ad-dashboard.html?v=20260623e'); }
   if(p==='calendar') loadCalPage();
-  if(_pageId==='collab') loadCollabPage();
+  if(p==='collab') loadCollabPage();
   if(p==='logihome') loadLogiHome();
   if(p==='logistock') loadLogiStock();
   if(p==='logibox') loadLogiBox();
   if(p==='logistatus') loadLogiStatus();
   // 디자인팀 메뉴에서는 채팅 버튼 숨김 (UI 겹침 방지)
   const _chatFab = document.getElementById('chatFab');
-  if(_chatFab) _chatFab.style.display = ['collab','calendar','logihome','logistock','logibox','logistatus','coupangad'].includes(_pageId) ? 'none' : '';
+  if(_chatFab) _chatFab.style.display = ['collab','calendar','logihome','logistock','logibox','logistatus','coupangad'].includes(p) ? 'none' : '';
   document.getElementById('addTopBtn').style.display=p==='inv'?'':'none';
   document.getElementById('addTopBtn').onclick=()=>openAddProd();
   document.getElementById('uploadTopBtn').onclick=()=>openUpload(p);
@@ -5512,11 +5495,11 @@ function goPage(p){
   if(p==='family') initFamilyPage();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
-  if(fw) fw.style.visibility = (_pageId==='revenue'||_pageId==='price'||_pageId==='quote'||_pageId==='collab'||_pageId==='calendar'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logistatus'||_pageId==='coupangad') ? 'hidden' : '';
+  if(fw) fw.style.visibility = (p==='revenue'||p==='price'||p==='quote'||p==='collab'||p==='calendar'||p==='logihome'||p==='logistock'||p==='logibox'||p==='logistatus'||p==='coupangad') ? 'hidden' : '';
   if(window.__CURRENT_USER) updateNavVisibility();
   _applyWriteLockUI();
   // 캘린더 페이지에서는 상단 엑셀 업로드 버튼 숨김 (해당 없음) — _applyWriteLockUI 이후 적용
-  if(_pageId==='calendar'||_pageId==='collab'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logistatus'||_pageId==='coupangad'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
+  if(p==='calendar'||p==='collab'||p==='logihome'||p==='logistock'||p==='logibox'||p==='logistatus'||p==='coupangad'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
 }
 
 // ══════════════════════════════════════════════
@@ -11719,8 +11702,6 @@ let _planFormPriority = 'mid';
 function _collabCanEdit(){ return _menuPerm('collab')==='edit'; }
 
 function loadCollabPage(){
-  // 직원 스코프(유현/보라/연정) 즉시 적용 — 보고서 패널이 비동기 렌더되기 전에 직원 고정
-  _applyDesignScope();
   // 캘린더 iframe 1회 로드
   const f = document.getElementById('collabCalFrame');
   if(f && !_collabCalLoaded){
@@ -11878,9 +11859,7 @@ function planProjToggleExpand(id){
 function renderPlanProjects(){
   const mgr = document.getElementById('collabManager'); if(!mgr) return;
   const canEdit = _collabCanEdit();
-  let active = _planProjects.filter(p=>p.status!=='done');
-  // 디자인팀 직원 스코프: 해당 직원이 담당(assignees)인 프로젝트만 (협업업무 실시간 데이터 공유)
-  if(_designScopePerson) active = active.filter(p=>(p.assignees||[]).includes(_designScopePerson));
+  const active = _planProjects.filter(p=>p.status!=='done');
   if(!active.length){
     mgr.innerHTML = `<div class="collab-manager-empty-msg">등록된 프로젝트가 없습니다.<br>＋ 프로젝트 등록 버튼으로 추가하세요.</div>`;
     return;
@@ -12178,28 +12157,6 @@ function renderCollab(){
       </div>
     </div>`;
   }).join('');
-  // 직원 스코프(유현/보라/연정) 적용 — 4칸 보드 숨김·담당자 잠금·보고서 직원 고정
-  _applyDesignScope();
-}
-
-// 디자인팀 직원별 업무보고: 협업업무 페이지를 해당 직원 전용으로 좁힘 (비스코프=협업업무 원상복구)
-function _applyDesignScope(){
-  const person = _designScopePerson;
-  const scoped = !!person;
-  document.body.classList.toggle('design-scope', scoped);
-  // 업무보고서 담당자 드롭다운: 스코프 시 숨김(직원 고정), 협업업무 시 복원
-  const pick = document.querySelector('#reportPanel .rp-assignee-pick');
-  if(pick) pick.style.display = scoped ? 'none' : '';
-  // 제목 라벨
-  const rpTitle = document.querySelector('#reportPanel .rp-head-title');
-  if(rpTitle) rpTitle.textContent = scoped ? `📋 ${person} 업무 보고서` : '📋 업무 보고서';
-  const projTitle = document.getElementById('collabProjTitle');
-  if(projTitle) projTitle.textContent = scoped ? `📋 ${person} 진행중인 프로젝트` : '📋 진행 예정 프로젝트';
-  // 스코프 시 보고서 패널을 해당 직원으로 고정 후 재렌더
-  if(scoped && _reportPerson !== person){
-    _reportPerson = person;
-    if(document.getElementById('reportPanel')){ renderReportPanel(); _reportInjectCalDots(); }
-  }
 }
 
 // 주간 목표 업무 섹션 (직원 업무 리스트 위)
