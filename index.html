@@ -3452,6 +3452,11 @@ function _getSession(){
 }
 window.__CURRENT_USER = null;
 
+// 디자인팀 직원별 업무보고 메뉴 → 협업업무 페이지를 해당 직원 스코프로 재사용
+// (반드시 _initAuthGate/goPage 실행보다 앞에서 초기화 — TDZ 방지)
+const PERSON_MENUS = { rpt_yuhyun:'유현', rpt_bora:'보라', rpt_yeonjeong:'연정' };
+let _designScopePerson = null;
+
 function _revealApp(sess){
   window.__CURRENT_USER = sess;
   window.__ACTOR = sess.name || sess.username;   // 변동이력 작업자
@@ -5466,9 +5471,6 @@ async function lodDeleteFile(id){
   toast('🗑️ 삭제되었습니다.');
 }
 
-// 디자인팀 직원별 업무보고 메뉴 → 협업업무 페이지를 해당 직원 스코프로 재사용
-const PERSON_MENUS = { rpt_yuhyun:'유현', rpt_bora:'보라', rpt_yeonjeong:'연정' };
-let _designScopePerson = null;
 function goPage(p){
   // 권한 없는 메뉴 접근 차단
   if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
