@@ -2004,8 +2004,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <tbody id="qt-rows"></tbody>
           <tfoot>
             <tr class="qt-total">
-              <td colspan="4" style="text-align:center;">합 계</td>
-              <td id="qt-total" style="color:#2563EB;">0원</td>
+              <td colspan="3" style="text-align:center;">합 계</td>
+              <td colspan="2" id="qt-total" style="color:#2563EB;white-space:nowrap;">0원</td>
               <td colspan="2" style="text-align:center;padding:0;">
                 <select id="qt-vat" class="qt-vat-sel">
                   <option value="포함">부가세 포함</option>
@@ -6364,6 +6364,7 @@ async function qtDownloadPdf(){
   if(!doc){ return; }
   const name=(document.getElementById('qt-name').value.trim()||'견적서');
   const fillerRows=[];
+  let _savedTotalFs=null;
   try{
     // 인쇄용 글씨 크기를 먼저 적용 (빈 행 채움 측정·캡처가 동일 크기 기준이 되도록)
     doc.classList.add('qt-printing');
@@ -6379,6 +6380,18 @@ async function qtDownloadPdf(){
         tbody.appendChild(tr); fillerRows.push(tr);
         guard++;
       }
+    }
+    // 합계 금액이 칸을 넘으면 폰트 자동 축소 (금액 길어져도 안 짤리게)
+    const totalEl=document.getElementById('qt-total');
+    if(totalEl){
+      _savedTotalFs=totalEl.style.fontSize;
+      const cs=getComputedStyle(totalEl);
+      const cellW=totalEl.clientWidth - 16; // 좌우 패딩 여유
+      const ctx=document.createElement('canvas').getContext('2d');
+      let fs=parseFloat(cs.fontSize), g=0;
+      const measure=px=>{ ctx.font=`${cs.fontWeight} ${px}px ${cs.fontFamily}`; return ctx.measureText(totalEl.textContent||'').width; };
+      while(cellW>0 && measure(fs) > cellW && fs>9 && g<80){ fs-=0.5; g++; }
+      totalEl.style.fontSize=fs+'px';
     }
     const canvas=await qtCaptureDoc(doc);
     const img=canvas.toDataURL('image/jpeg',0.95);
@@ -6417,6 +6430,8 @@ async function qtDownloadPdf(){
     alert('PDF 생성 실패: '+e.message);
   }finally{
     fillerRows.forEach(tr=>tr.remove());
+    const totalEl=document.getElementById('qt-total');
+    if(totalEl && _savedTotalFs!==null) totalEl.style.fontSize=_savedTotalFs;
     doc.classList.remove('qt-printing');
   }
 }
