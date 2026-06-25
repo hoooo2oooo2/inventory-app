@@ -11884,9 +11884,8 @@ function planProjToggleExpand(id){
 function renderPlanProjects(){
   const mgr = document.getElementById('collabManager'); if(!mgr) return;
   const canEdit = _collabCanEdit();
-  let active = _planProjects.filter(p=>p.status!=='done');
-  // 디자인팀 직원 스코프: 해당 직원이 담당(assignees)인 프로젝트만 (협업업무 실시간 데이터 공유)
-  if(_designScopePerson) active = active.filter(p=>(p.assignees||[]).includes(_designScopePerson));
+  // 직원 페이지도 협업업무에 등록된 모든 진행중 프로젝트를 그대로 표시 (실시간 공유)
+  const active = _planProjects.filter(p=>p.status!=='done');
   if(!active.length){
     mgr.innerHTML = `<div class="collab-manager-empty-msg">등록된 프로젝트가 없습니다.<br>＋ 프로젝트 등록 버튼으로 추가하세요.</div>`;
     return;
