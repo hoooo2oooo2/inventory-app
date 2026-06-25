@@ -1302,7 +1302,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
               <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 PC당 1회 실행 필요">📂 폴더열기</button>
               <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
-              <button class="collab-done-btn" style="color:#fff;background:#05C072;" id="planProjAddBtn" onclick="planProjOpenNew(_designScopePerson||undefined)">＋ 프로젝트 등록</button>
+              <button class="collab-done-btn" style="color:#fff;background:#05C072;" id="planProjAddBtn" onclick="_designScopePerson ? collabOpenNew(_designScopePerson) : planProjOpenNew()">＋ 프로젝트 등록</button>
             </div>
           </div>
           <div class="collab-manager" id="collabManager" style="flex:1;overflow-y:auto;"></div>
@@ -11884,7 +11884,14 @@ function planProjToggleExpand(id){
 function renderPlanProjects(){
   const mgr = document.getElementById('collabManager'); if(!mgr) return;
   const canEdit = _collabCanEdit();
-  // 직원 페이지도 협업업무에 등록된 모든 진행중 프로젝트를 그대로 표시 (실시간 공유)
+  // 디자인팀 직원 페이지: 해당 담당자의 협업보드 진행중 업무(collab_tasks) 카드를 그대로 표시 (실시간 공유)
+  if(_designScopePerson){
+    const myTasks = _collabOrderedTasks(_designScopePerson);
+    mgr.innerHTML = myTasks.length
+      ? myTasks.map(t=>_collabCardHTML(t, canEdit)).join('')
+      : `<div class="collab-manager-empty-msg">진행중인 업무가 없습니다.${canEdit?'<br>＋ 업무 등록 버튼으로 추가하세요.':''}</div>`;
+    return;
+  }
   const active = _planProjects.filter(p=>p.status!=='done');
   if(!active.length){
     mgr.innerHTML = `<div class="collab-manager-empty-msg">등록된 프로젝트가 없습니다.<br>＋ 프로젝트 등록 버튼으로 추가하세요.</div>`;
@@ -12200,6 +12207,8 @@ function _applyDesignScope(){
   if(rpTitle) rpTitle.textContent = scoped ? `📋 ${person} 업무 보고서` : '📋 업무 보고서';
   const projTitle = document.getElementById('collabProjTitle');
   if(projTitle) projTitle.textContent = scoped ? `📋 ${person} 진행중인 프로젝트` : '📋 진행 예정 프로젝트';
+  const projAddBtn = document.getElementById('planProjAddBtn');
+  if(projAddBtn) projAddBtn.textContent = scoped ? '＋ 업무 등록' : '＋ 프로젝트 등록';
   // 스코프 시 보고서 패널을 해당 직원으로 고정 후 재렌더
   if(scoped && _reportPerson !== person){
     _reportPerson = person;
