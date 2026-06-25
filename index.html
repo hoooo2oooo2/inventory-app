@@ -740,6 +740,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .qt-mgr-btn.active{background:#3182F6;color:#fff;border-color:#3182F6;}
 .qt-vat-sel{border:none;outline:none;background:transparent;font:inherit;font-size:12px;font-weight:700;color:#2563EB;text-align:center;cursor:pointer;width:100%;padding:4px;appearance:auto;}
 .qt-doc.qt-printing .qt-noprint{display:none !important;}
+/* PDF(인쇄) 시 전체 글씨 키움 */
+.qt-doc.qt-printing{font-size:15px;}
+.qt-doc.qt-printing .qt-tbl th{font-size:14px;}
+.qt-doc.qt-printing .qt-tbl td{font-size:15px;}
+.qt-doc.qt-printing .qt-tbl td input,.qt-doc.qt-printing .qt-tbl td .qt-model{font-size:15px;}
+.qt-doc.qt-printing tr.qt-total td{font-size:20px;}
+.qt-doc.qt-printing .qt-vat-sel{font-size:17px;font-weight:800;}
 
 /* ── 패밀리 오더 ── */
 #page-family.active{display:flex;flex-direction:column;}
@@ -6358,12 +6365,14 @@ async function qtDownloadPdf(){
   const name=(document.getElementById('qt-name').value.trim()||'견적서');
   const fillerRows=[];
   try{
+    // 인쇄용 글씨 크기를 먼저 적용 (빈 행 채움 측정·캡처가 동일 크기 기준이 되도록)
+    doc.classList.add('qt-printing');
     // A4 세로 한 장을 꽉 채우도록 품목 표에 빈 행 추가 (텍스트 왜곡 없이 표가 페이지 아래까지 — 합계행은 tfoot라 맨 아래로)
     const tbody=document.getElementById('qt-rows');
     if(tbody){
       const targetH = doc.clientWidth * (281/194); // A4 세로 인쇄영역 비율(여백 8mm 기준) 목표 높이(px)
       let guard=0;
-      while(doc.offsetHeight < targetH - 16 && guard < 80){
+      while(doc.offsetHeight < targetH - 24 && guard < 80){
         const tr=document.createElement('tr');
         tr.className='qt-filler';
         tr.innerHTML='<td></td><td class="qt-model"></td><td class="qt-num"></td><td class="qt-num"></td><td class="qt-num" style="background:#f8fafc;"></td><td></td><td class="qt-noprint"></td>';
@@ -6378,10 +6387,15 @@ async function qtDownloadPdf(){
     const pw=pdf.internal.pageSize.getWidth();
     const ph=pdf.internal.pageSize.getHeight();
     const margin=8;
-    const iw=pw-margin*2;
-    const ih=canvas.height*iw/canvas.width;
-    if(ih<=ph-margin*2){
-      pdf.addImage(img,'JPEG',margin,margin,iw,ih);
+    let iw=pw-margin*2;
+    let ih=canvas.height*iw/canvas.width;
+    const availH=ph-margin*2;
+    if(ih<=availH){
+      pdf.addImage(img,'JPEG',(pw-iw)/2,margin,iw,ih);
+    } else if(fillerRows.length>0){
+      // 빈 행으로 채운 견적서는 항상 한 장: 살짝 넘치면 높이 기준으로 축소(가로 중앙)
+      ih=availH; iw=canvas.width*ih/canvas.height;
+      pdf.addImage(img,'JPEG',(pw-iw)/2,margin,iw,ih);
     } else {
       // 여러 페이지 분할
       let remain=canvas.height, pos=0;
