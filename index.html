@@ -66,6 +66,9 @@ body.design-scope .collab-top-row{flex:1 1 auto;}
 body.design-scope .collab-cal-box{order:-1;flex:0 0 32%;}
 body.design-scope .collab-projects{order:1;flex:1 1 auto;}
 body.design-scope .collab-report-sidebar{flex:0 0 49%;max-width:none;}
+/* 직원 업무 카드: 한 줄에 3개 균등 고정 · 길이↑ 폭↓ */
+body.design-scope #collabManager{grid-template-columns:repeat(3,1fr);gap:8px;}
+body.design-scope #collabManager .postit{height:108px;}
 /* 업무보고서 사이드바 (우측 전체높이) */
 .collab-report-sidebar{flex:0 0 35%;min-width:240px;max-width:460px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 /* 기존 클래스 호환 유지 */
@@ -11888,7 +11891,7 @@ function renderPlanProjects(){
   if(_designScopePerson){
     const myTasks = _collabOrderedTasks(_designScopePerson);
     mgr.innerHTML = myTasks.length
-      ? myTasks.map(t=>_collabCardHTML(t, canEdit)).join('')
+      ? myTasks.map(t=>_collabCardHTML(t, canEdit, true)).join('')
       : `<div class="collab-manager-empty-msg">진행중인 업무가 없습니다.${canEdit?'<br>＋ 업무 등록 버튼으로 추가하세요.':''}</div>`;
     return;
   }
@@ -12065,10 +12068,12 @@ function collabToggleExpand(ev, id){
   if(_collabExpanded.has(id)) _collabExpanded.delete(id); else _collabExpanded.add(id);
   renderCollab();
 }
-function _collabCardHTML(t, canEdit){
+function _collabCardHTML(t, canEdit, editOnDbl){
   const st = COLLAB_STATUS[t.status] || COLLAB_STATUS.plan;
   const pcolor = COLLAB_PERSON_COLOR[t.assignee] || '#888';
   const isExp = _collabExpanded.has(t.id);
+  // 직원 페이지: 더블클릭 시 수정 팝업 / 협업업무 보드: 더블클릭 시 펼치기
+  const dblAction = (editOnDbl && canEdit) ? `collabOpenEdit('${t.id}')` : `collabToggleExpand(event,'${t.id}')`;
   const doneBox = (t.status==='done' && t.completed_at)
     ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabDur(t.created_at, t.completed_at)}</b></div>`
     : '';
@@ -12076,7 +12081,7 @@ function _collabCardHTML(t, canEdit){
   return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};background:${cardBg};" draggable="${canEdit&&!isExp}"
       ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
       ondragover="collabCardOver(event)" ondragleave="collabCardLeave(event)" ondrop="collabCardDrop(event,'${t.id}')"
-      ondblclick="collabToggleExpand(event,'${t.id}')">
+      ondblclick="${dblAction}">
     <div class="postit-top">
       <span class="postit-badge" style="background:${st.color};">${st.label}</span>
       <div class="postit-actions">
