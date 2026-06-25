@@ -59,9 +59,13 @@ body{background:var(--bg2);min-height:100vh;}
 .collab-projects.drop-on{outline:2px dashed #05C072;outline-offset:-3px;background:#ECFDF522;}
 .collab-cal-box{flex:1;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 .collab-cal-box iframe{width:100%;height:100%;border:none;display:block;}
-/* 디자인팀 직원별 업무보고 스코프: 4칸 협업보드 숨기고 상단(프로젝트+캘린더)을 전체 높이로 */
+/* 디자인팀 직원별 업무보고 스코프: 4칸 협업보드 숨기고 상단(캘린더+프로젝트)을 전체 높이로 */
 body.design-scope #collabCols{display:none !important;}
 body.design-scope .collab-top-row{flex:1 1 auto;}
+/* 좌→우 순서: 캘린더 · 진행중인 프로젝트 · 업무보고서 / 너비: 프로젝트↓ 보고서↑ 캘린더 유지 */
+body.design-scope .collab-cal-box{order:-1;flex:0 0 32%;}
+body.design-scope .collab-projects{order:1;flex:1 1 auto;}
+body.design-scope .collab-report-sidebar{flex:0 0 49%;max-width:none;}
 /* 업무보고서 사이드바 (우측 전체높이) */
 .collab-report-sidebar{flex:0 0 35%;min-width:240px;max-width:460px;display:flex;flex-direction:column;background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 /* 기존 클래스 호환 유지 */
@@ -11922,7 +11926,7 @@ function collabStartRealtime(){
   if(!_collabPoll){
     let _cv = { collab:undefined, plan:undefined };
     _collabPoll = setInterval(async ()=>{
-      if(currentPage!=='collab' || _collabBusy || document.hidden) return;
+      if((currentPage!=='collab' && !PERSON_MENUS[currentPage]) || _collabBusy || document.hidden) return;
       // 먼저 updated_at만 확인 → 변경 없으면 전체 로드 생략(egress 절약)
       const [vc, vp] = await Promise.all([cloudKvVersion(COLLAB_KIND), cloudKvVersion(PLAN_KIND)]);
       if(vc===_cv.collab && vp===_cv.plan) return;
