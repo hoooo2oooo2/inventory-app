@@ -6356,7 +6356,21 @@ async function qtDownloadPdf(){
   const doc=document.getElementById('qtDoc');
   if(!doc){ return; }
   const name=(document.getElementById('qt-name').value.trim()||'견적서');
+  const fillerRows=[];
   try{
+    // A4 세로 한 장을 꽉 채우도록 품목 표에 빈 행 추가 (텍스트 왜곡 없이 표가 페이지 아래까지 — 합계행은 tfoot라 맨 아래로)
+    const tbody=document.getElementById('qt-rows');
+    if(tbody){
+      const targetH = doc.clientWidth * (281/194); // A4 세로 인쇄영역 비율(여백 8mm 기준) 목표 높이(px)
+      let guard=0;
+      while(doc.offsetHeight < targetH - 16 && guard < 80){
+        const tr=document.createElement('tr');
+        tr.className='qt-filler';
+        tr.innerHTML='<td></td><td class="qt-model"></td><td class="qt-num"></td><td class="qt-num"></td><td class="qt-num" style="background:#f8fafc;"></td><td></td><td class="qt-noprint"></td>';
+        tbody.appendChild(tr); fillerRows.push(tr);
+        guard++;
+      }
+    }
     const canvas=await qtCaptureDoc(doc);
     const img=canvas.toDataURL('image/jpeg',0.95);
     const { jsPDF }=window.jspdf;
@@ -6388,6 +6402,7 @@ async function qtDownloadPdf(){
   }catch(e){
     alert('PDF 생성 실패: '+e.message);
   }finally{
+    fillerRows.forEach(tr=>tr.remove());
     doc.classList.remove('qt-printing');
   }
 }
