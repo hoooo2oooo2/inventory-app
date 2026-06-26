@@ -136,8 +136,10 @@ body.design-scope #collabManager .postit-foot{margin-top:2px;}
 .rp-line{display:inline-block;box-sizing:border-box;width:calc(100% - 22px);vertical-align:top;outline:none;min-height:18px;font-size:12.5px;line-height:1.5;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
 .rp-line[data-empty-ph]:empty::before{content:attr(data-empty-ph);color:var(--tx2);opacity:.4;pointer-events:none;font-style:italic;}
 /* 블럭 카드 */
-.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:none;-webkit-user-select:none;cursor:grab;}
-.rp-block:active{cursor:grabbing;}
+.rp-block{border:1px solid #D1E9FF;border-left:3px solid #3182F6;border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:#F5FAFF;display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:text;-webkit-user-select:text;cursor:default;}
+.rp-block:active{cursor:default;}
+.rp-block-handle{cursor:grab;flex-shrink:0;color:#b0c4de;font-size:13px;line-height:1;user-select:none;-webkit-user-select:none;padding:0 2px;}
+.rp-block-handle:active{cursor:grabbing;}
 .rp-block.pinned{border-color:#FDE68A;border-left-color:#F59E0B;background:#FFFEF5;}
 .rp-drop-mark{box-shadow:0 -3px 0 -1px #3182F6;}
 .rp-block-text{flex:1;min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden;}
@@ -12899,7 +12901,8 @@ function _rpBlockHTML(item, section){
     const catBadge = item.category ? `<span class="rp-block-cat" style="background:${REPORT_CAT_COLOR[item.category]||'#888'};">${_esc(item.category)}</span>` : '';
     textInner = `${catBadge}<span class="rp-block-main">⏱ ${_esc(item.task)}</span>${timePart?`<span class="rp-block-sub">${timePart}</span>`:''}`;
   }
-  return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" data-section="${sec}" contenteditable="false" tabindex="0" draggable="true" ondragstart="_rpBlockDragStart(event,'${item.id}','${sec}')" ondragend="_rpBlockDragEnd(event)" title="드래그하여 위·아래로 이동">
+  return `<div class="rp-block${item.pinned?' pinned':''}" data-id="${item.id}" data-section="${sec}" tabindex="0">
+    <span class="rp-block-handle" draggable="true" ondragstart="_rpBlockDragStart(event,'${item.id}','${sec}')" ondragend="_rpBlockDragEnd(event)" title="드래그하여 위·아래로 이동">⠿</span>
     <div class="rp-block-text">
       ${textInner}
     </div>
