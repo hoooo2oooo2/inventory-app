@@ -892,8 +892,21 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lh2-chk-table tr.chk-done{background:#F0FDF4;}
 .lh2-chk-table tr.chk-done .lh2-chk-name{text-decoration:line-through;color:var(--tx2);}
 .lh2-chk-name{text-align:left!important;font-weight:600;color:var(--tx);}
+.lh2-chk-namecell{text-align:left!important;}
+.lh2-chk-link{cursor:pointer;border-bottom:1px dashed transparent;}
+.lh2-chk-link:hover{color:var(--pr);border-bottom-color:var(--pr);}
+.lh2-chk-meta{font-size:11px;color:var(--tx2);margin-top:3px;font-weight:500;}
 .lh2-chkbox{width:21px;height:21px;cursor:pointer;}
 .lh2-chk-qty{width:100px;padding:7px 9px;border:1px solid var(--bd);border-radius:8px;font-size:14px;text-align:right;color:var(--tx);background:var(--bg);}
+/* 소장재고 변동 이력 모달 */
+.lcl-list{display:flex;flex-direction:column;gap:8px;max-height:54vh;overflow-y:auto;}
+.lcl-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--bg2);}
+.lcl-badge{flex-shrink:0;font-size:12px;font-weight:800;padding:4px 9px;border-radius:7px;color:#fff;white-space:nowrap;}
+.lcl-inc{background:#05C072;}
+.lcl-dec{background:#EF4444;}
+.lcl-info{flex:1;min-width:0;}
+.lcl-qty{font-size:14px;color:var(--tx);font-weight:600;}
+.lcl-meta{font-size:11.5px;color:var(--tx2);margin-top:2px;}
 /* 메모장 (글씨 크게) */
 .lh2-memo-status{font-size:11px;color:var(--tx2);font-weight:600;}
 .lh2-memo{flex:1;min-height:60px;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:18px;line-height:1.7;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;}
@@ -1128,6 +1141,28 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="delPwMsg" style="color:#DC2626;font-size:12px;min-height:16px;margin-top:6px;"></div>
     <div class="ma"><button class="btn" onclick="closeModal('delPwModal')">취소</button>
       <button class="btn btn-da" onclick="confirmDelPw()">삭제</button></div>
+  </div>
+</div>
+
+<!-- ═══ 소장재고 변동 이력 ═══ -->
+<div class="modal-overlay" id="logiChkLogModal">
+  <div class="modal" style="max-width:460px;">
+    <h3 id="logiChkLogTitle">📦 재고 변동 이력</h3>
+    <div id="logiChkLogMeta" style="font-size:12px;color:var(--tx2);margin-bottom:12px;line-height:1.6;"></div>
+    <div id="logiChkLogBody"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('logiChkLogModal')">닫기</button></div>
+  </div>
+</div>
+
+<!-- ═══ 소장재고 삭제 확인 ═══ -->
+<div class="modal-overlay" id="logiChkDelModal">
+  <div class="modal" style="max-width:360px;">
+    <h3>⚠️ 삭제 확인</h3>
+    <div id="logiChkDelMsg" style="font-size:14px;color:var(--tx);margin:6px 0 18px;line-height:1.55;"></div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('logiChkDelModal')">취소</button>
+      <button class="btn btn-da" onclick="logiChkDelConfirm()">삭제</button>
+    </div>
   </div>
 </div>
 
@@ -4814,25 +4849,41 @@ async function logiLoadChk(){
   if(_logiChk===null){ _logiChk = (await cloudKvLoad('logi_checklist')) || []; }
   logiRenderChk();
 }
+function _logiChkActor(){
+  const u = window.__CURRENT_USER;
+  return u ? (u.name||u.username) : (window.__ACTOR || '-');
+}
+function _logiChkNow(){
+  const d = new Date();
+  return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 function logiRenderChk(){
   const tb = document.getElementById('logiChkBody');
   if(!tb) return;
   const list = _logiChk || [];
   if(!list.length){ tb.innerHTML = `<tr><td colspan="4" class="logi-empty" style="padding:20px 0;">등록된 품목이 없습니다. 제품명과 수량을 입력해 추가하세요.</td></tr>`; return; }
-  tb.innerHTML = list.map(c=>`<tr class="${c.checked?'chk-done':''}"${c.checked?'':` style="background:${_logiCardColor(c.id)};"`}>
+  tb.innerHTML = list.map(c=>{
+    const meta = `등록자 ${_logiEsc(c.createdBy||'-')} · ${_logiEsc(c.createdAt||'-')} · 초기수량 ${c.initQty==null?'-':_lbxNum(c.initQty)}`;
+    return `<tr class="${c.checked?'chk-done':''}"${c.checked?'':` style="background:${_logiCardColor(c.id)};"`}>
     <td><input type="checkbox" class="lh2-chkbox" ${c.checked?'checked':''} onchange="logiChkToggle(${c.id})"></td>
-    <td class="lh2-chk-name">${_logiEsc(c.name)}</td>
+    <td class="lh2-chk-namecell">
+      <span class="lh2-chk-name lh2-chk-link" title="재고 변동 이력 보기" onclick="logiChkLog(${c.id})">${_logiEsc(c.name)}</span>
+      <div class="lh2-chk-meta">${meta}</div>
+    </td>
     <td><input type="number" class="lh2-chk-qty" min="0" value="${c.qty==null?'':c.qty}" onchange="logiChkQty(${c.id}, this.value)"></td>
     <td><button class="logi-notice-del" title="삭제" onclick="logiChkDel(${c.id})">✕</button></td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 async function logiChkAdd(){
   const nameEl = document.getElementById('lhChkName');
   const qtyEl = document.getElementById('lhChkQty');
   const name = (nameEl.value||'').trim();
   if(!name){ toast('제품명을 입력하세요.'); nameEl.focus(); return; }
+  const qty = _lbxNum(qtyEl.value);
   _logiChk = _logiChk || [];
-  _logiChk.push({ id: Date.now(), name, qty: _lbxNum(qtyEl.value), checked: false });
+  _logiChk.push({ id: Date.now(), name, qty, checked: false,
+    createdBy: _logiChkActor(), createdAt: _logiChkNow(), initQty: qty, logs: [] });
   nameEl.value=''; qtyEl.value=''; nameEl.focus();
   logiRenderChk();
   await cloudKvSave('logi_checklist', _logiChk);
@@ -4845,11 +4896,55 @@ async function logiChkToggle(id){
 }
 async function logiChkQty(id, val){
   const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
-  c.qty = _lbxNum(val);
+  const from = _lbxNum(c.qty);
+  const to = _lbxNum(val);
+  if(from===to) return;
+  c.logs = c.logs || [];
+  c.logs.unshift({ ts: _logiChkNow(), by: _logiChkActor(), from, to, delta: to-from });
+  c.qty = to;
+  logiRenderChk();
   await cloudKvSave('logi_checklist', _logiChk);
 }
-async function logiChkDel(id){
+// 재고 변동 이력 팝업
+function logiChkLog(id){
+  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
+  document.getElementById('logiChkLogTitle').textContent = `📦 ${c.name} — 재고 변동 이력`;
+  document.getElementById('logiChkLogMeta').innerHTML =
+    `등록자 <b>${_logiEsc(c.createdBy||'-')}</b> · ${_logiEsc(c.createdAt||'-')}<br>초기수량 <b>${c.initQty==null?'-':_lbxNum(c.initQty)}</b> · 현재수량 <b>${_lbxNum(c.qty)}</b>`;
+  const logs = c.logs || [];
+  const body = document.getElementById('logiChkLogBody');
+  if(!logs.length){
+    body.innerHTML = `<div class="logi-empty" style="padding:18px 0;">아직 재고 변동 이력이 없습니다.</div>`;
+  } else {
+    body.innerHTML = `<div class="lcl-list">` + logs.map(l=>{
+      const delta = _lbxNum(l.delta!=null ? l.delta : (l.to-l.from));
+      const inc = delta>=0;
+      return `<div class="lcl-item">
+        <span class="lcl-badge ${inc?'lcl-inc':'lcl-dec'}">${inc?'증가 +':'차감 −'}${Math.abs(delta)}</span>
+        <div class="lcl-info">
+          <div class="lcl-qty">${_lbxNum(l.from)} → <b>${_lbxNum(l.to)}</b></div>
+          <div class="lcl-meta">${_logiEsc(l.by||'-')} · ${_logiEsc(l.ts||'-')}</div>
+        </div>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+  openModal('logiChkLogModal');
+}
+// 삭제 확인 팝업
+let _logiChkDelId = null;
+function logiChkDel(id){
+  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
+  _logiChkDelId = id;
+  document.getElementById('logiChkDelMsg').innerHTML =
+    `<b>${_logiEsc(c.name)}</b> 항목을 삭제하시겠습니까?<br>삭제하면 재고 변동 이력도 함께 사라집니다.`;
+  openModal('logiChkDelModal');
+}
+async function logiChkDelConfirm(){
+  const id = _logiChkDelId;
+  if(id==null) return;
   _logiChk = (_logiChk||[]).filter(x=>x.id!==id);
+  _logiChkDelId = null;
+  closeModal('logiChkDelModal');
   logiRenderChk();
   await cloudKvSave('logi_checklist', _logiChk);
 }
