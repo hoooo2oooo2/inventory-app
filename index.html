@@ -931,10 +931,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-datelab{font-size:12px;color:var(--tx2);display:flex;align-items:center;gap:6px;}
 .lbx-datelab input{padding:5px 8px;border:0.5px solid var(--bd);border-radius:7px;font-size:12px;color:var(--tx);background:var(--bg);}
 .lbx-table-scroll{flex:1;overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
-.lbx-table{border-collapse:collapse;width:100%;font-size:15px;min-width:1180px;}
-.lbx-table th,.lbx-table td{padding:9px 11px;border-bottom:1px solid var(--bd);text-align:center;white-space:nowrap;}
+.lbx-table{border-collapse:collapse;width:auto;font-size:15px;margin:0 auto;}
+.lbx-table th,.lbx-table td{padding:12px 18px;border-bottom:1px solid var(--bd);text-align:center;white-space:nowrap;}
 .lbx-table thead th{position:sticky;top:0;background:var(--bg2);color:var(--tx);font-weight:700;font-size:13px;z-index:1;}
-.lbx-table th:nth-child(1),.lbx-table th:nth-child(2),.lbx-table td:nth-child(1),.lbx-table td:nth-child(2){text-align:left;}
+.lbx-table th:nth-child(1),.lbx-table td:nth-child(1){text-align:left;}
+/* 명칭/업체 셀 */
+.lbx-namecell{text-align:left!important;}
+.lbx-sub{font-size:11.5px;color:var(--tx2);margin-top:3px;}
+.lbx-boxno{font-weight:700;font-size:15px;color:var(--tx);}
+/* 박스 사이즈 강조 */
+.lbx-size-th{background:#EFF6FF!important;}
+.lbx-size-cell{background:#F7FBFF;}
+.lbx-size{font-weight:800;font-size:16px;color:#1D4ED8;font-variant-numeric:tabular-nums;white-space:nowrap;}
+/* 주문·입고 명칭 옆 (박스번호·사이즈) 태그 */
+.lbx-nametag{color:var(--tx2);font-weight:600;font-size:.86em;}
 .lbx-strong{font-weight:800;font-size:17px;color:var(--tx);}
 .lbx-pricewarn{color:#DC2626;font-size:11px;font-weight:700;margin-top:3px;}
 .lbx-saved-val{font-weight:700;}
@@ -1633,11 +1643,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <table class="lbx-table">
         <thead>
           <tr>
-            <th>업체명</th><th>명칭</th><th>박스번호</th>
-            <th>가로<span class="lbx-unit">mm</span></th><th>세로<span class="lbx-unit">mm</span></th><th>높이<span class="lbx-unit">mm</span></th>
+            <th>명칭 / 업체</th><th>박스번호</th>
+            <th class="lbx-size-th">박스 사이즈<br><span class="lbx-unit">가로 × 세로 × 높이 mm</span></th>
             <th>박스당<br>수량</th><th>박스당<br>금액</th><th>낱개<br>금액</th>
             <th>저장된 현재고<br><span class="lbx-unit">(저장일)</span></th>
-            <th>안전재고</th>
             <th class="lbx-stock-th">현재고 입력<br><span class="lbx-stock-date" id="lbxStockDateLbl">—</span></th>
             <th>관리</th>
           </tr>
@@ -4280,6 +4289,23 @@ function _lbxNum(v){ const n=Number(v); return isNaN(n)?0:n; }
 function _lbxComma(n){ return _lbxNum(n).toLocaleString('ko-KR'); }
 // 낱개 금액 = 박스당 금액 ÷ 박스당 수량 (엑셀과 동일 방식, 자동계산)
 function _lbxUnit(b){ const q=_lbxNum(b&&b.qtyPerBox); return q>0 ? _lbxNum(b.pricePerBox)/q : 0; }
+// 박스 사이즈 문자열 (가로×세로×높이)
+function _lbxSizeStr(b){ const w=_lbxNum(b&&b.w),d=_lbxNum(b&&b.d),h=_lbxNum(b&&b.h); return (w||d||h)?`${_lbxComma(w)}×${_lbxComma(d)}×${_lbxComma(h)}`:''; }
+// 명칭 옆 (박스번호 · 사이즈) 태그
+function _lbxNameTag(b){
+  if(!b) return '';
+  const parts=[]; if(b.boxNo) parts.push(_logiEsc(b.boxNo));
+  const sz=_lbxSizeStr(b); if(sz) parts.push(sz);
+  return parts.length?` <small class="lbx-nametag">(${parts.join(' · ')})</small>`:'';
+}
+// 주문 항목(it)에서 박스 정보 → 태그 (저장된 필드 우선, 없으면 박스 마스터 조회)
+function _lbxItemTag(it){
+  const b=(_logiBoxes||[]).find(x=>x.id===it.id)||{};
+  return _lbxNameTag({
+    boxNo: it.boxNo!=null?it.boxNo:b.boxNo,
+    w: it.w!=null?it.w:b.w, d: it.d!=null?it.d:b.d, h: it.h!=null?it.h:b.h
+  });
+}
 function _lbxMonth(d){ d=d||new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
 // 현재고 이력(분석용, 화면 비표시). 구버전 b.stock(날짜맵)은 1회 이관.
 function _lbxLog(b){
@@ -4353,7 +4379,7 @@ function logiBoxRender(){
   const lbl=document.getElementById('lbxStockDateLbl'); if(lbl) lbl.textContent=_lbxToday();
   const tb=document.getElementById('lbxTbody'); if(!tb) return;
   const list=_logiBoxes||[];
-  if(!list.length){ tb.innerHTML=`<tr><td colspan="13" class="lbx-empty">등록된 택배박스가 없습니다. ‘＋ 박스 추가’로 등록하세요.</td></tr>`; return; }
+  if(!list.length){ tb.innerHTML=`<tr><td colspan="9" class="lbx-empty">등록된 택배박스가 없습니다. ‘＋ 박스 추가’로 등록하세요.</td></tr>`; return; }
   const cheap=_lbxCheapestMap();
   const curMonth=_lbxMonth();
   tb.innerHTML=list.map(b=>{
@@ -4364,23 +4390,17 @@ function logiBoxRender(){
     const cheapTag = (c&&c.save>0) ? `<div class="lbx-cheap">최저가 ▼${_lbxComma(Math.round(c.save))}원 저렴</div>` : '';
     // 박스당 금액 월단위 수정 요청
     const priceWarn = (b.priceUpdatedAt!==curMonth) ? `<div class="lbx-pricewarn">📌 이번 달 단가 수정 요청</div>` : '';
-    // 저장된(최근) 현재고 + 안전재고 상태
+    // 저장된(최근) 현재고
     const ls=_lbxLatestStock(b);
     const savedCell = ls ? `<span class="lbx-saved-val">${_lbxComma(ls.qty)}</span><div class="lbx-saved-date">${ls.date.slice(5)}</div>` : '<span class="lbx-saved-date">-</span>';
-    const st=_lbxStockStatus(b);
-    const stBadge = st==='need' ? `<div class="lbx-need">🔴 주문 필요</div>` : st==='near' ? `<div class="lbx-near">🟡 임박</div>` : '';
     return `<tr>
-      <td>${_logiEsc(b.company)}</td>
-      <td><span class="lbx-strong">${_logiEsc(b.name)}</span></td>
-      <td><span class="lbx-strong">${_logiEsc(b.boxNo)}</span></td>
-      <td class="lbx-num">${_lbxComma(b.w)}</td>
-      <td class="lbx-num">${_lbxComma(b.d)}</td>
-      <td class="lbx-num">${_lbxComma(b.h)}</td>
+      <td class="lbx-namecell"><span class="lbx-strong">${_logiEsc(b.name)}</span><div class="lbx-sub">${_logiEsc(b.company||'-')}</div></td>
+      <td><span class="lbx-boxno">${_logiEsc(b.boxNo)}</span></td>
+      <td class="lbx-size-cell"><span class="lbx-size">${_lbxComma(b.w)} × ${_lbxComma(b.d)} × ${_lbxComma(b.h)}</span></td>
       <td class="lbx-num">${_lbxComma(b.qtyPerBox)}</td>
       <td class="lbx-num">${_lbxComma(b.pricePerBox)}${priceWarn}</td>
       <td class="lbx-num">${_lbxComma(Math.round(unit))}${cheapTag}</td>
-      <td>${savedCell}${stBadge}</td>
-      <td><input class="lbx-safe-inp" type="number" min="0" value="${b.safetyStock||''}" placeholder="-" onchange="logiBoxSetSafety(${b.id}, this.value)"></td>
+      <td>${savedCell}</td>
       <td class="lbx-stock-cell"><input class="lbx-stock-inp" type="number" value="${stock}" placeholder="-" onchange="logiBoxSetStock(${b.id}, this.value)"></td>
       <td>
         <button class="lbx-row-btn edit" title="수정" onclick="logiBoxOpenEdit(${b.id})">✏️</button>
@@ -4479,7 +4499,7 @@ function logiBoxOpenOrder(){
     const stockTxt = ls ? `현재고 <b class="${st==='need'?'ow':''}">${_lbxComma(ls.qty)}</b>` : `현재고 <b>-</b>`;
     return `<label class="lbx-order-item" id="lbxoi-${b.id}">
       <input type="checkbox" value="${b.id}" onchange="logiBoxOrderToggle(${b.id})">
-      <span class="lbx-order-info">${_logiEsc(b.name||'(명칭없음)')} <small>· ${_logiEsc(b.company||'-')} · 박스당 ${_lbxComma(b.qtyPerBox)}개 · ${_lbxComma(b.pricePerBox)}원</small></span>
+      <span class="lbx-order-info">${_logiEsc(b.name||'(명칭없음)')}${_lbxNameTag(b)} <small>· ${_logiEsc(b.company||'-')} · 박스당 ${_lbxComma(b.qtyPerBox)}개 · ${_lbxComma(b.pricePerBox)}원</small></span>
       <span class="lbx-order-stock">${stockTxt}${st==='need'?' ⚠️':''}</span>
       <input class="lbx-order-qty" type="number" min="1" max="5" placeholder="박스수(최대5)" id="lbxoq-${b.id}" disabled oninput="logiBoxOrderClamp(this);logiBoxOrderSum()">
     </label>`;
@@ -4506,7 +4526,7 @@ function _logiBoxOrderRows(){
     const id=Number(c.value);
     const b=(_logiBoxes||[]).find(x=>x.id===id); if(!b) return;
     const q=_lbxNum(document.getElementById('lbxoq-'+id).value);
-    if(q>0) rows.push({ id, name:b.name, company:b.company, boxCount:q, pricePerBox:_lbxNum(b.pricePerBox), amount:q*_lbxNum(b.pricePerBox), totalUnits:q*_lbxNum(b.qtyPerBox) });
+    if(q>0) rows.push({ id, name:b.name, company:b.company, boxNo:b.boxNo, w:b.w, d:b.d, h:b.h, boxCount:q, pricePerBox:_lbxNum(b.pricePerBox), amount:q*_lbxNum(b.pricePerBox), totalUnits:q*_lbxNum(b.qtyPerBox) });
   });
   return rows;
 }
@@ -4578,7 +4598,7 @@ function logiRcvRender(){
         ? `<button class="btn btn-sm" onclick="logiRcvUndo(${oi},${ii})">입고취소</button>`
         : `<button class="btn btn-pr btn-sm" onclick="logiRcvConfirm(${oi},${ii})">입고확인</button>`;
       return `<tr class="${rcv?'rcv-done':''}">
-        <td class="l">${_logiEsc(it.name||it.company||'-')}${(it.company&&it.name)?`<br><small>${_logiEsc(it.company)}</small>`:''}</td>
+        <td class="l">${_logiEsc(it.name||it.company||'-')}${_lbxItemTag(it)}${(it.company&&it.name)?`<br><small>${_logiEsc(it.company)}</small>`:''}</td>
         <td>${_lbxComma(it.boxCount)} 박스${units!==''?`<br><small>${_lbxComma(units)}개</small>`:''}</td>
         <td>${action}</td>
         <td>${btn}</td>
@@ -4653,7 +4673,7 @@ function openProgressOrders(){
       const rows=items.map(it=>{
         const rcv=it.received===true;
         return `<tr class="${rcv?'rcv-done':''}">
-          <td class="l">${_logiEsc(it.name||it.company||'-')}</td>
+          <td class="l">${_logiEsc(it.name||it.company||'-')}${_lbxItemTag(it)}</td>
           <td>${_lbxComma(it.boxCount)} 박스</td>
           <td>${rcv?`<span class="lbx-rcv-ok">✓ 입고완료</span>`:`<span class="lst2-prog-wait">⏳ 입고대기</span>`}</td>
         </tr>`;
