@@ -3076,6 +3076,22 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- ── 지역·연령별 현황 탭 ── -->
     <div class="rpage" id="rpage-region">
+      <style>
+      #rpage-region .rgn-toggle{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden;cursor:pointer;}
+      #rpage-region .rgn-toggle span{padding:5px 12px;font-size:11.5px;font-weight:700;color:var(--tx2);background:var(--bg);user-select:none;}
+      #rpage-region .rgn-toggle span.on{background:var(--pr);color:#fff;}
+      #rpage-region .rgn-warn{display:flex;align-items:center;gap:8px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:9px;padding:9px 13px;font-size:12px;font-weight:600;}
+      #rpage-region .rgn-seg-tbl{width:100%;border-collapse:collapse;font-size:11.5px;}
+      #rpage-region .rgn-seg-tbl th{font-size:10px;color:var(--tx2);font-weight:600;text-align:right;padding:5px 8px;border-bottom:1px solid var(--bd);white-space:nowrap;}
+      #rpage-region .rgn-seg-tbl th:first-child{text-align:left;}
+      #rpage-region .rgn-seg-tbl td{padding:6px 8px;border-bottom:0.5px solid var(--bd);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+      #rpage-region .rgn-seg-tbl td:first-child{text-align:left;font-weight:600;white-space:normal;}
+      #rpage-region .rgn-seg-tbl tr:last-child td{border-bottom:none;}
+      #rpage-region .rgn-seg-pick{display:flex;gap:5px;flex-wrap:wrap;}
+      #rpage-region .rgn-seg-pick .rfbtn{padding:3px 10px;font-size:11px;}
+      #rpage-region .rgn-quad-legend{font-size:10.5px;color:var(--tx2);display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;}
+      #rpage-region .rgn-quad-legend b{font-weight:700;}
+      </style>
       <!-- 컨트롤 바: 판매처 토글 + 기간 + 작은 업로드 -->
       <div class="rev-filter" style="justify-content:space-between;gap:12px;">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
@@ -3092,6 +3108,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <select id="rgnMonthSel" class="sel" style="font-size:12px;height:30px;" onchange="rgnSetMonth(this.value)"></select>
           </div>
           <div style="font-size:12px;color:var(--tx2);font-weight:500;" id="rgnPeriod">기간: —</div>
+          <div class="rgn-toggle" id="rgnNetToggle" title="순매출 = 결제금액 − 환불금액">
+            <span class="on" data-net="0" onclick="rgnSetNet(false)">총매출</span>
+            <span data-net="1" onclick="rgnSetNet(true)">순매출</span>
+          </div>
           <span style="font-size:11px;color:var(--pr);background:var(--prl);padding:3px 9px;border-radius:12px;font-weight:600;">👆 그래프·항목 클릭 시 상세보기</span>
         </div>
         <!-- 작은 드롭존 업로드 -->
@@ -3117,11 +3137,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div id="rgnBody" style="display:none;flex-direction:column;gap:14px;">
         <!-- KPI -->
         <div class="rev-kpi">
-          <div class="rev-kpi-card"><div class="rev-kpi-lbl">💳 총 결제금액</div><div class="rev-kpi-val" id="rgnK0">—</div><div class="rev-kpi-sub" id="rgnK0s" style="color:var(--tx2);"></div></div>
+          <div class="rev-kpi-card"><div class="rev-kpi-lbl" id="rgnK0lbl">💳 총 결제금액</div><div class="rev-kpi-val" id="rgnK0">—</div><div class="rev-kpi-sub" id="rgnK0s" style="color:var(--tx2);"></div></div>
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">🧾 총 결제수</div><div class="rev-kpi-val" id="rgnK1">—</div><div class="rev-kpi-sub" id="rgnK1s" style="color:var(--tx2);"></div></div>
           <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 결제상품수량</div><div class="rev-kpi-val" id="rgnK2">—</div><div class="rev-kpi-sub" id="rgnK2s" style="color:var(--tx2);"></div></div>
           <div class="rev-kpi-card" id="rgnK3card" onclick="rgnOpenDetail('refund')" style="cursor:pointer;" title="클릭 시 제품별 환불 비중 보기"><div class="rev-kpi-lbl">↩️ 환불율 <span style="font-size:10px;color:var(--pr);font-weight:600;">👆</span></div><div class="rev-kpi-val" id="rgnK3" style="color:#D97706;">—</div><div class="rev-kpi-sub" id="rgnK3s" style="color:var(--tx2);"></div></div>
         </div>
+        <!-- 인구통계 미상 비중 경고 -->
+        <div id="rgnUnknownWarn" class="rgn-warn" style="display:none;"></div>
         <!-- 매출 추이 (일/주/월) -->
         <div class="rev-card" id="rgnTrendCard">
           <div class="rev-card-title" style="flex-wrap:wrap;gap:8px;">
@@ -3179,6 +3201,45 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               </table>
             </div>
           </div>
+        </div>
+
+        <!-- 🔬 세그먼트 심화: 객단가·UPT·환불율 -->
+        <div class="rev-card" id="rgnSegCard">
+          <div class="rev-card-title"><span>🔬 세그먼트 심화 (객단가·주문당수량·환불율)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">금액=만원 · UPT=주문당 상품수</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;" id="rgnSegGrid"></div>
+        </div>
+
+        <!-- 🎯 세그먼트별 오버인덱스 + 🗺 지역×상품 (2열) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+          <div class="rev-card" id="rgnOverCard">
+            <div class="rev-card-title" style="flex-wrap:wrap;gap:8px;"><span>🎯 세그먼트별 '특히 잘 사는' 상품</span></div>
+            <div class="rgn-seg-pick" id="rgnOverPick" style="margin-bottom:6px;"></div>
+            <div style="font-size:11px;color:var(--tx2);margin-bottom:8px;">집중지수 100 = 전체 평균. 200이면 이 세그먼트가 평균보다 2배 집중 구매. 클릭 시 상품 상세.</div>
+            <div id="rgnOverBody"></div>
+          </div>
+          <div class="rev-card" id="rgnRegionProdCard">
+            <div class="rev-card-title" style="flex-wrap:wrap;gap:8px;"><span>🗺 지역 × 상품 히트맵</span><span id="rgnConc" style="font-size:11px;color:var(--tx2);font-weight:500;"></span></div>
+            <div style="overflow-x:auto;" id="rgnRegionProdBody"></div>
+          </div>
+        </div>
+
+        <!-- ⚠️ 환불 리스크 4분면 -->
+        <div class="rev-card" id="rgnQuadCard">
+          <div class="rev-card-title"><span>⚠️ 환불 리스크 4분면 (매출규모 × 환불율)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">버블 클릭 → 상품 상세</span></div>
+          <div class="rev-chart-wrap" style="height:320px;"><canvas id="rgnQuadChart"></canvas></div>
+          <div class="rgn-quad-legend">
+            <span><b style="color:#DC2626;">●</b> 고매출·고환불 = 즉시 개선</span>
+            <span><b style="color:#059669;">●</b> 고매출·저환불 = 효자(밀어주기)</span>
+            <span><b style="color:#6B7280;">●</b> 저매출·고환불 = 단종 후보</span>
+            <span><b style="color:#CBD5E1;">●</b> 저매출·저환불 = 방치 가능</span>
+          </div>
+          <div class="rev-empty" id="rgnQuadEmpty" style="display:none;padding:60px 0;">환불 데이터 없음</div>
+        </div>
+
+        <!-- 🗂 카테고리별 환불율 -->
+        <div class="rev-card" id="rgnCatCard">
+          <div class="rev-card-title"><span>🗂 카테고리별 환불율</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">환불금액 ÷ 결제금액</span></div>
+          <div id="rgnCatBody"></div>
         </div>
       </div>
 
@@ -7790,6 +7851,11 @@ let _rgnTrendMode = 'week';// 'day' | 'week' | 'month'
 let _rgnCharts = {};
 let _rgnCur = null;        // 현재 표시 중 {R, agg} (드릴다운 상세에서 사용)
 let _rgnProdIds = [];      // 상품 차트 막대 index → 상품ID
+let _rgnNet = false;       // 순매출(환불차감) 보기 토글
+let _rgnOverSeg = null;    // 오버인덱스: 선택된 세그먼트 (예: 'g여성','a30대')
+let _rgnProdQuadIds = [];  // 환불 4분면 점 index → 상품ID
+// 순매출 전환 시 환불 차감액 (region 데이터는 환불 없음 → 그대로)
+function _rgnNetAmt(amt,rAmt){ return _rgnNet ? Math.max(0,(amt||0)-(rAmt||0)) : (amt||0); }
 
 // 금액 포맷 (억/만/원)
 const rgnWon = n => { n=Math.round(n||0); return n>=1e8?`${(n/1e8).toFixed(n%1e8?1:0)}억`:n>=1e4?`${Math.round(n/1e4).toLocaleString()}만`:n.toLocaleString(); };
@@ -7948,12 +8014,19 @@ async function rgnCollect(){
 }
 // ── 집계 ──
 function rgnBuild(R){
-  const byGender={}, byAge={}, cross={}, products={}, totals={amt:0,cnt:0,qty:0,rAmt:0,rCnt:0};
+  const byGender={}, byAge={}, cross={}, crossR={}, products={}, byCat={}, totals={amt:0,cnt:0,qty:0,rAmt:0,rCnt:0};
+  const meta=R.prodMeta||{};
   R.demoRows.forEach(([id,g,a,amt,cnt,qty,rAmt,rCnt])=>{
-    (byGender[g] ||= {amt:0,cnt:0,qty:0}); byGender[g].amt+=amt; byGender[g].cnt+=cnt; byGender[g].qty+=qty;
-    (byAge[a]   ||= {amt:0,cnt:0,qty:0}); byAge[a].amt+=amt;   byAge[a].cnt+=cnt;   byAge[a].qty+=qty;
+    rAmt=rAmt||0; rCnt=rCnt||0;
+    (byGender[g] ||= {amt:0,cnt:0,qty:0,rAmt:0,rCnt:0}); byGender[g].amt+=amt; byGender[g].cnt+=cnt; byGender[g].qty+=qty; byGender[g].rAmt+=rAmt; byGender[g].rCnt+=rCnt;
+    (byAge[a]   ||= {amt:0,cnt:0,qty:0,rAmt:0,rCnt:0}); byAge[a].amt+=amt;   byAge[a].cnt+=cnt;   byAge[a].qty+=qty;   byAge[a].rAmt+=rAmt;   byAge[a].rCnt+=rCnt;
     (cross[g]   ||= {}); cross[g][a]=(cross[g][a]||0)+amt;
-    if(id){ (products[id] ||= {amt:0,cnt:0,qty:0,rAmt:0}); products[id].amt+=amt; products[id].cnt+=cnt; products[id].qty+=qty; products[id].rAmt+=rAmt; }
+    (crossR[g]  ||= {}); crossR[g][a]=(crossR[g][a]||0)+rAmt;
+    if(id){
+      (products[id] ||= {amt:0,cnt:0,qty:0,rAmt:0,rCnt:0}); products[id].amt+=amt; products[id].cnt+=cnt; products[id].qty+=qty; products[id].rAmt+=rAmt; products[id].rCnt+=rCnt;
+      const cat=(meta[id]&&meta[id].cat)||'(미분류)';
+      (byCat[cat] ||= {amt:0,cnt:0,qty:0,rAmt:0,rCnt:0}); byCat[cat].amt+=amt; byCat[cat].cnt+=cnt; byCat[cat].qty+=qty; byCat[cat].rAmt+=rAmt; byCat[cat].rCnt+=rCnt;
+    }
     totals.amt+=amt; totals.cnt+=cnt; totals.qty+=qty; totals.rAmt+=rAmt; totals.rCnt+=rCnt;
   });
   const bySido={}, bySigungu={}, rTotals={amt:0,cnt:0,qty:0};
@@ -7963,7 +8036,7 @@ function rgnBuild(R){
     (bySigungu[full]||= {amt:0,cnt:0,qty:0}); bySigungu[full].amt+=amt; bySigungu[full].cnt+=cnt; bySigungu[full].qty+=qty;
     rTotals.amt+=amt; rTotals.cnt+=cnt; rTotals.qty+=qty;
   });
-  return {byGender,byAge,cross,products,totals,bySido,bySigungu,rTotals,
+  return {byGender,byAge,cross,crossR,products,byCat,totals,bySido,bySigungu,rTotals,
     hasDemo:R.demoRows.length>0, hasRegion:R.regionRows.length>0,
     prodMeta:R.prodMeta, period:R.period, channels:R.channels};
 }
@@ -7996,8 +8069,10 @@ async function renderRegionPage(){
 
   // KPI (인구통계 우선, 없으면 지역)
   const tot = agg.hasDemo ? agg.totals : {...agg.rTotals, rAmt:0, rCnt:0};
-  document.getElementById('rgnK0').textContent = rgnWon(tot.amt);
-  document.getElementById('rgnK0s').textContent = rgnWonFull(tot.amt);
+  const k0 = _rgnNet ? Math.max(0, tot.amt-(tot.rAmt||0)) : tot.amt;
+  const k0lbl=document.getElementById('rgnK0lbl'); if(k0lbl) k0lbl.textContent = _rgnNet?'💰 순매출 (환불차감)':'💳 총 결제금액';
+  document.getElementById('rgnK0').textContent = rgnWon(k0);
+  document.getElementById('rgnK0s').textContent = (_rgnNet && agg.hasDemo) ? `총 ${rgnWon(tot.amt)} − 환불 ${rgnWon(tot.rAmt||0)}` : rgnWonFull(tot.amt);
   document.getElementById('rgnK1').textContent = (tot.cnt||0).toLocaleString()+'건';
   document.getElementById('rgnK2').textContent = (tot.qty||0).toLocaleString()+'개';
   document.getElementById('rgnK1s').textContent = '객단가 '+rgnWonFull(tot.cnt?tot.amt/tot.cnt:0);
@@ -8008,6 +8083,8 @@ async function renderRegionPage(){
 
   rgnRenderTrend();
   rgnRenderGender(agg); rgnRenderAge(agg); rgnRenderRegion(agg); rgnRenderProducts(agg); rgnRenderCross(agg); rgnRenderSigungu(agg);
+  rgnRenderUnknownWarn(agg); rgnRenderSegTable(agg); rgnRenderOverIndex(agg);
+  rgnRenderRegionProd(agg); rgnRenderRefundQuadrant(agg); rgnRenderCatRefund(agg);
 }
 
 function rgnSetTrendMode(m){
@@ -8022,6 +8099,15 @@ function rgnDailyTotals(months, chans){
     Object.entries(o).forEach(([key,s])=>{ const day=key.slice(0,10);
       let amt=0; if(s.d&&s.d.length) s.d.forEach(r=>amt+=r[3]); else if(s.r) s.r.forEach(r=>amt+=r[3]);
       map[day]=(map[day]||0)+amt; }); }); });
+  return map;
+}
+// 날짜별 환불금액 합 ({ 'YYYY-MM-DD': rAmt }) — 인구통계(demo) 행에만 환불 존재
+function rgnDailyRefund(months, chans){
+  const map={};
+  months.forEach(m=>{ const shard=_rgnMonths[m]||{}; chans.forEach(c=>{ const o=shard[c]; if(!o)return;
+    Object.entries(o).forEach(([key,s])=>{ const day=key.slice(0,10);
+      let r=0; if(s.d&&s.d.length) s.d.forEach(row=>r+=(row[6]||0));
+      map[day]=(map[day]||0)+r; }); }); });
   return map;
 }
 // 로컬 기준 YYYY-MM-DD (toISOString의 UTC 보정 오차 방지)
@@ -8041,45 +8127,55 @@ async function rgnRenderTrend(){
   _rgnToggleEmpty('rgnTrendEmpty', !months.length);
   if(!months.length){ ctx.style.display='none'; if(totalEl)totalEl.textContent=''; return; } ctx.style.display='';
   const chans = _rgnCh==='__ALL__' ? ['스마트스토어','쿠팡'] : [_rgnCh];
-  let labels=[], data=[], colors=[], tips=[], onClick=null;
+  let labels=[], data=[], colors=[], tips=[], onClick=null, rdata=[];
   const mode=_rgnTrendMode;
 
   if(mode==='month'){
     labels = months.map(m=>{const[y,mo]=m.split('-');return `${y.slice(2)}.${mo}`;});
     data = months.map(m=> chans.reduce((s,c)=> s+(((_rgnIdx.summary[c]||{})[m]||{}).amt||0),0));
+    rdata = months.map(m=> chans.reduce((s,c)=> s+(((_rgnIdx.summary[c]||{})[m]||{}).rAmt||0),0));
     colors = months.map(m=> m===_rgnMonth?'#3182F6':'#AECBFA');
     tips = months.map(m=>{const[y,mo]=m.split('-');return `${y}년 ${mo}월`;});
-    onClick=(e,els)=>{ if(els.length) rgnSetMonth(months[els[0].index]); };
+    onClick=(e,els)=>{ const b=els.find(x=>x.datasetIndex===0); if(b) rgnSetMonth(months[b.index]); };
   } else {
     // 일/주: 일별 데이터 필요 → 해당 월 shard 로드
     const scope = _rgnMonth==='ALL' ? months : (months.includes(_rgnMonth)?[_rgnMonth]:[]);
     for(const m of scope) await rgnLoadMonth(m);
     const daily = rgnDailyTotals(scope, chans);
+    const dailyR = rgnDailyRefund(scope, chans);
     const days = Object.keys(daily).sort();
     if(mode==='day'){
       labels = days.map(_mdLabel);
       data = days.map(d=>daily[d]);
+      rdata = days.map(d=>dailyR[d]||0);
       colors = days.map(()=> '#3182F6');
       tips = days.slice();
     } else { // week
-      const wk={};
-      days.forEach(d=>{ const ws=rgnWeekStart(d); wk[ws]=(wk[ws]||0)+daily[d]; });
+      const wk={}, wkR={};
+      days.forEach(d=>{ const ws=rgnWeekStart(d); wk[ws]=(wk[ws]||0)+daily[d]; wkR[ws]=(wkR[ws]||0)+(dailyR[d]||0); });
       const wkeys=Object.keys(wk).sort();
       labels = wkeys.map(ws=>{ const e=new Date(ws+'T00:00:00'); e.setDate(e.getDate()+6); return `${_mdLabel(ws)}~${_mdLabel(_ymd(e))}`; });
       data = wkeys.map(w=>wk[w]);
+      rdata = wkeys.map(w=>wkR[w]||0);
       colors = wkeys.map(()=> '#3182F6');
       tips = wkeys.map((ws,i)=>`${labels[i]} (주)`);
     }
   }
   const total=data.reduce((s,x)=>s+x,0);
   if(totalEl) totalEl.textContent = data.length ? `합계 ${rgnWonFull(total)}` : '';
-  _rgnCharts.trend=new Chart(ctx,{type:'bar',
-    data:{labels,datasets:[{data:data.map(Math.round),backgroundColor:colors,borderRadius:5,maxBarThickness:mode==='month'?54:30}]},
+  const rRate = data.map((a,i)=> a>0 ? +(rdata[i]/a*100).toFixed(1) : 0);
+  const hasRef = rdata.some(x=>x>0);
+  const datasets=[{type:'bar',label:'매출',data:data.map(Math.round),backgroundColor:colors,borderRadius:5,maxBarThickness:mode==='month'?54:30,order:2}];
+  if(hasRef) datasets.push({type:'line',label:'환불율(%)',data:rRate,yAxisID:'y1',borderColor:'#DC2626',backgroundColor:'#DC2626',borderWidth:2,pointRadius:2,tension:.3,order:1});
+  _rgnCharts.trend=new Chart(ctx,{
+    data:{labels,datasets},
     options:{responsive:true,maintainAspectRatio:false,
       onHover:_rgnHover, onClick,
-      plugins:{legend:{display:false},
-        tooltip:{callbacks:{title:items=>tips[items[0].dataIndex]||'',label:c=>rgnWonFull(c.parsed.y)}}},
-      scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},x:{ticks:{font:{size:10},autoSkip:labels.length>14,maxRotation:labels.length>8?50:0}}}}});
+      plugins:{legend:{display:hasRef,position:'top',labels:{font:{size:10},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{title:items=>tips[items[0].dataIndex]||'',label:c=> c.datasetIndex===0 ? `매출 ${rgnWonFull(c.parsed.y)}` : `환불율 ${c.parsed.y}%`}}},
+      scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},
+              y1:{display:hasRef,position:'right',min:0,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%',font:{size:9},color:'#DC2626'}},
+              x:{ticks:{font:{size:10},autoSkip:labels.length>14,maxRotation:labels.length>8?50:0}}}}});
 }
 
 function rgnRenderGender(agg){
@@ -8090,7 +8186,7 @@ function rgnRenderGender(agg){
   const cmap={'남성':'#3182F6','여성':'#EC4899'};
   const order=['남성','여성',...keys.filter(k=>k!=='남성'&&k!=='여성')];
   const labels=[],data=[],colors=[];
-  order.forEach(g=>{ if(bg[g]){ labels.push(g); data.push(Math.round(bg[g].amt)); colors.push(cmap[g]||'#94A3B8'); } });
+  order.forEach(g=>{ if(bg[g]){ labels.push(g); data.push(Math.round(_rgnNetAmt(bg[g].amt,bg[g].rAmt))); colors.push(cmap[g]||'#94A3B8'); } });
   const t=data.reduce((s,x)=>s+x,0)||1;
   _rgnCharts.gender=new Chart(ctx,{type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
@@ -8105,7 +8201,7 @@ function rgnRenderAge(agg){
   _rgnToggleEmpty('rgnAgeEmpty', !ages.length);
   if(!ages.length){ if(ctx)ctx.style.display='none'; return; } ctx.style.display='';
   _rgnCharts.age=new Chart(ctx,{type:'bar',
-    data:{labels:ages,datasets:[{data:ages.map(a=>Math.round(ba[a].amt)),backgroundColor:'#3182F6',borderRadius:5,maxBarThickness:34}]},
+    data:{labels:ages,datasets:[{data:ages.map(a=>Math.round(_rgnNetAmt(ba[a].amt,ba[a].rAmt))),backgroundColor:'#3182F6',borderRadius:5,maxBarThickness:34}]},
     options:{responsive:true,maintainAspectRatio:false,
       onHover:_rgnHover, onClick:(e,els)=>{ if(els.length) rgnOpenDetail('age', ages[els[0].index]); },
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>rgnWonFull(c.parsed)}}},
@@ -8144,7 +8240,7 @@ function rgnRenderRegion(agg){
 }
 function rgnRenderProducts(agg){
   const ctx=document.getElementById('rgnProductChart'); _rgnKill('product');
-  const entries = Object.entries(agg.products).map(([id,v])=>({id,amt:v.amt})).sort((a,b)=>b.amt-a.amt);
+  const entries = Object.entries(agg.products).map(([id,v])=>({id,amt:_rgnNetAmt(v.amt,v.rAmt)})).sort((a,b)=>b.amt-a.amt);
   _rgnToggleEmpty('rgnProductEmpty', !entries.length);
   if(!entries.length){ if(ctx)ctx.style.display='none'; _rgnProdIds=[]; return; } ctx.style.display='';
   const top=entries.slice(0,10);
@@ -8168,7 +8264,7 @@ function rgnRenderCross(agg){
   const ageSet=new Set(); genders.forEach(g=>Object.keys(cross[g]).forEach(a=>ageSet.add(a)));
   const ages=[...ageSet].sort((a,b)=>rgnAgeKey(a)-rgnAgeKey(b));
   const cmap={'남성':'#3182F6','여성':'#EC4899'}; const fallback=['#94A3B8','#F59E0B','#14B8A6'];
-  const datasets=genders.map((g,i)=>({label:g,data:ages.map(a=>Math.round(cross[g][a]||0)),backgroundColor:cmap[g]||fallback[i%fallback.length],borderRadius:4,maxBarThickness:30}));
+  const datasets=genders.map((g,i)=>({label:g,data:ages.map(a=>Math.round(_rgnNet?Math.max(0,(cross[g][a]||0)-((agg.crossR[g]||{})[a]||0)):(cross[g][a]||0))),backgroundColor:cmap[g]||fallback[i%fallback.length],borderRadius:4,maxBarThickness:30}));
   _rgnCharts.cross=new Chart(ctx,{type:'bar',
     data:{labels:ages,datasets},
     options:{responsive:true,maintainAspectRatio:false,
@@ -8189,6 +8285,134 @@ function rgnRenderSigungu(agg){
     <td style="text-align:right;color:var(--tx2);">${(e.cnt||0).toLocaleString()}</td>
     <td style="text-align:right;color:var(--pr);font-weight:600;">${(e.amt/tot*100).toFixed(1)}%</td>
   </tr>`).join('');
+}
+
+// ── 순매출 토글 ──
+function rgnSetNet(v){
+  _rgnNet=!!v;
+  document.querySelectorAll('#rgnNetToggle span').forEach(s=>s.classList.toggle('on',(s.dataset.net==='1')===_rgnNet));
+  renderRegionPage();
+}
+// ── 미상(기타) 비중 경고 ──
+function rgnRenderUnknownWarn(agg){
+  const el=document.getElementById('rgnUnknownWarn'); if(!el) return;
+  if(!agg.hasDemo){ el.style.display='none'; return; }
+  const tot=agg.totals.amt||0; if(!tot){ el.style.display='none'; return; }
+  const gU=Object.entries(agg.byGender).filter(([k])=>!['남성','여성'].includes(k)).reduce((s,[,v])=>s+v.amt,0);
+  const aU=Object.entries(agg.byAge).filter(([k])=>rgnAgeKey(k)===999).reduce((s,[,v])=>s+v.amt,0);
+  const gp=gU/tot*100, ap=aU/tot*100;
+  if(Math.max(gp,ap)<10){ el.style.display='none'; return; }
+  el.style.display='flex';
+  el.innerHTML=`⚠️ 인구통계 '미상' 비중이 높습니다 — 성별 미상 ${gp.toFixed(0)}% · 연령 미상 ${ap.toFixed(0)}%. 세그먼트 분석은 참고용으로 보세요.`;
+}
+// ── 세그먼트 심화 표 (객단가·UPT·환불율) ──
+function _rgnSegTable(map, head1, sortFn){
+  const tot=Object.values(map).reduce((s,v)=>s+v.amt,0)||1;
+  const rows=Object.entries(map).sort(sortFn).map(([k,v])=>{
+    const net=_rgnNetAmt(v.amt,v.rAmt);
+    const aov=v.cnt?v.amt/v.cnt:0, upt=v.cnt?v.qty/v.cnt:0, rr=v.amt?(v.rAmt||0)/v.amt*100:0;
+    return `<tr><td>${rgnEsc(k)}</td><td>${rgnWon(net)}</td><td>${(v.amt/tot*100).toFixed(0)}%</td><td>${rgnWon(aov)}</td><td>${upt.toFixed(1)}</td><td style="color:${rr>=5?'#DC2626':'var(--tx2)'};font-weight:${rr>=5?700:400};">${rr.toFixed(1)}%</td></tr>`;
+  }).join('');
+  return `<div><table class="rgn-seg-tbl"><thead><tr><th>${head1}</th><th>${_rgnNet?'순매출':'매출'}</th><th>비중</th><th>객단가</th><th>UPT</th><th>환불율</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:left;color:var(--tx2);">데이터 없음</td></tr>'}</tbody></table></div>`;
+}
+function rgnRenderSegTable(agg){
+  const grid=document.getElementById('rgnSegGrid'), card=document.getElementById('rgnSegCard'); if(!grid||!card) return;
+  if(!agg.hasDemo){ card.style.display='none'; return; } card.style.display='';
+  grid.innerHTML=_rgnSegTable(agg.byGender,'성별',(a,b)=>b[1].amt-a[1].amt)
+               +_rgnSegTable(agg.byAge,'연령대',(a,b)=>rgnAgeKey(a[0])-rgnAgeKey(b[0]));
+}
+// ── 세그먼트별 선호 상품 (오버인덱스) ──
+function rgnSetOverSeg(t,k){ _rgnOverSeg=t+k; if(_rgnCur) rgnRenderOverIndex(_rgnCur.agg); }
+function rgnRenderOverIndex(agg){
+  const card=document.getElementById('rgnOverCard'), pick=document.getElementById('rgnOverPick'), body=document.getElementById('rgnOverBody');
+  if(!card||!pick||!body) return;
+  if(!agg.hasDemo||!_rgnCur){ card.style.display='none'; return; }
+  const gs=Object.keys(agg.byGender).filter(g=>['남성','여성'].includes(g));
+  const as=Object.keys(agg.byAge).filter(a=>rgnAgeKey(a)!==999).sort((a,b)=>rgnAgeKey(a)-rgnAgeKey(b));
+  const segs=[...gs.map(g=>({type:'g',key:g})),...as.map(a=>({type:'a',key:a}))];
+  if(!segs.length){ card.style.display='none'; return; } card.style.display='';
+  if(!_rgnOverSeg||!segs.some(s=>s.type+s.key===_rgnOverSeg)) _rgnOverSeg=segs[0].type+segs[0].key;
+  pick.innerHTML=segs.map(s=>`<div class="rfbtn ${_rgnOverSeg===s.type+s.key?'active':''}" onclick="rgnSetOverSeg('${s.type}','${rgnEsc(s.key).replace(/'/g,"\\'")}')">${rgnEsc(s.key)}</div>`).join('');
+  const seg=segs.find(s=>s.type+s.key===_rgnOverSeg);
+  const R=_rgnCur.R;
+  const overall={}; let overallTot=0;
+  R.demoRows.forEach(r=>{ if(r[0]){ overall[r[0]]=(overall[r[0]]||0)+r[3]; overallTot+=r[3]; } });
+  const segP={}; let segTot=0;
+  R.demoRows.forEach(r=>{ const m=seg.type==='g'?r[1]===seg.key:r[2]===seg.key; if(m&&r[0]){ segP[r[0]]=(segP[r[0]]||0)+r[3]; segTot+=r[3]; } });
+  if(!segTot){ body.innerHTML='<div style="color:var(--tx2);padding:10px;">데이터 없음</div>'; return; }
+  const rows=Object.entries(segP).map(([id,amt])=>{
+    const idx=(overall[id]>0&&overallTot>0)?(amt/segTot)/((overall[id])/overallTot)*100:0;
+    return {id,amt,idx,share:amt/segTot};
+  }).filter(p=>p.amt>0&&p.idx>0).sort((a,b)=>b.idx-a.idx).slice(0,12);
+  body.innerHTML=`<table class="rgn-seg-tbl"><thead><tr><th>상품</th><th>이 세그 매출</th><th>세그내비중</th><th>집중지수</th></tr></thead><tbody>`
+    +rows.map(p=>`<tr style="cursor:pointer;" onclick="rgnOpenDetail('product','${rgnEsc(p.id).replace(/'/g,"\\'")}')">
+        <td style="white-space:normal;word-break:break-all;">${rgnEsc(_rgnName(p.id))}</td>
+        <td>${rgnWon(p.amt)}</td><td>${(p.share*100).toFixed(1)}%</td>
+        <td style="font-weight:700;color:${p.idx>=130?'#059669':'var(--tx)'};">${Math.round(p.idx)}</td></tr>`).join('')
+    +`</tbody></table>`;
+}
+// ── 지역 × 상품 히트맵 + 집중도 ──
+function rgnRenderRegionProd(agg){
+  const card=document.getElementById('rgnRegionProdCard'), body=document.getElementById('rgnRegionProdBody'), conc=document.getElementById('rgnConc');
+  if(!card||!body||!_rgnCur) return;
+  if(!agg.hasRegion){ card.style.display='none'; return; }
+  const R=_rgnCur.R;
+  const topSido=Object.entries(agg.bySido).map(([k,v])=>[k,v.amt]).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const prodAmt={}; R.regionRows.forEach(r=>{ if(r[0]) prodAmt[r[0]]=(prodAmt[r[0]]||0)+r[3]; });
+  const topProd=Object.entries(prodAmt).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id])=>id);
+  if(!topSido.length||!topProd.length){ card.style.display='none'; return; } card.style.display='';
+  const cell={}; R.regionRows.forEach(r=>{ if(r[0]&&topProd.includes(r[0])) cell[r[1]+'||'+r[0]]=(cell[r[1]+'||'+r[0]]||0)+r[3]; });
+  let html='<table class="rgn-seg-tbl" style="min-width:540px;"><thead><tr><th>지역</th>'
+    +topProd.map(id=>`<th title="${rgnEsc(_rgnName(id))}">${rgnEsc(_rgnName(id).slice(0,8))}</th>`).join('')+'</tr></thead><tbody>';
+  topSido.forEach(([s,sAmt])=>{
+    html+=`<tr><td>${rgnEsc(s)}<div style="font-size:9.5px;color:var(--tx2);">${rgnWon(sAmt)}</div></td>`;
+    topProd.forEach(id=>{
+      const v=cell[s+'||'+id]||0, share=sAmt?v/sAmt:0, a=Math.min(1,share/0.6);
+      html+=`<td style="background:rgba(5,150,105,${(a*0.85).toFixed(2)});color:${a>0.5?'#fff':'var(--tx)'};text-align:center;">${v?(share*100).toFixed(0)+'%':'·'}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table><div style="font-size:10.5px;color:var(--tx2);margin-top:5px;">셀 = 그 지역 매출 중 해당 상품이 차지하는 비중. 진할수록 그 지역에서 특히 잘 팔리는 상품.</div>';
+  body.innerHTML=html;
+  const allSido=Object.values(agg.bySido).reduce((s,v)=>s+v.amt,0)||1;
+  const top3=Object.values(agg.bySido).map(v=>v.amt).sort((a,b)=>b-a).slice(0,3).reduce((s,x)=>s+x,0);
+  const hhi=Object.values(agg.bySido).reduce((s,v)=>s+Math.pow(v.amt/allSido,2),0);
+  const lvl=hhi>0.25?'매우 집중':hhi>0.15?'다소 집중':'전국 분산';
+  if(conc) conc.textContent=`상위 3개 시·도 ${(top3/allSido*100).toFixed(0)}% · ${lvl}`;
+}
+// ── 환불 리스크 4분면 ──
+function rgnRenderRefundQuadrant(agg){
+  const ctx=document.getElementById('rgnQuadChart'), card=document.getElementById('rgnQuadCard'); _rgnKill('quad');
+  if(!ctx||!card) return;
+  const prods=Object.entries(agg.products).map(([id,v])=>({id,amt:v.amt,r:v.rAmt||0})).filter(p=>p.amt>0);
+  const hasR=prods.some(p=>p.r>0);
+  if(!agg.hasDemo||!hasR){ card.style.display=agg.hasDemo?'':'none'; _rgnToggleEmpty('rgnQuadEmpty',agg.hasDemo); if(ctx)ctx.style.display='none'; return; }
+  card.style.display=''; _rgnToggleEmpty('rgnQuadEmpty',false); ctx.style.display='';
+  const top=prods.sort((a,b)=>b.amt-a.amt).slice(0,40);
+  const pts=top.map(p=>({x:+(p.r/p.amt*100).toFixed(1), y:_rgnNet?Math.max(0,p.amt-p.r):p.amt, id:p.id, amt:p.amt}));
+  const med=arr=>{ const s=arr.slice().sort((a,b)=>a-b); return s.length?s[Math.floor(s.length/2)]:0; };
+  const mx=med(pts.map(p=>p.x)), my=med(pts.map(p=>p.y));
+  const col=p=>{ const hx=p.x>=mx, hy=p.y>=my; return hx&&hy?'#DC2626':(!hx&&hy?'#059669':(hx&&!hy?'#6B7280':'#CBD5E1')); };
+  _rgnProdQuadIds=pts.map(p=>p.id);
+  _rgnCharts.quad=new Chart(ctx,{type:'scatter',
+    data:{datasets:[{data:pts.map(p=>({x:p.x,y:p.y})),pointBackgroundColor:pts.map(col),pointRadius:6,pointHoverRadius:9}]},
+    options:{responsive:true,maintainAspectRatio:false,onHover:_rgnHover,
+      onClick:(e,els)=>{ if(els.length) rgnOpenDetail('product',_rgnProdQuadIds[els[0].index]); },
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>{const p=pts[c.dataIndex]; return [_rgnName(p.id), `환불율 ${p.x}% · 매출 ${rgnWon(p.amt)}`];}}}},
+      scales:{x:{title:{display:true,text:'환불율 (%) →',font:{size:10}},ticks:{callback:v=>v+'%',font:{size:10}}},
+              y:{title:{display:true,text:(_rgnNet?'순매출':'매출')+' →',font:{size:10}},ticks:{callback:rgnAxis,font:{size:10}}}}}});
+}
+// ── 카테고리별 환불율 ──
+function rgnRenderCatRefund(agg){
+  const card=document.getElementById('rgnCatCard'), body=document.getElementById('rgnCatBody'); if(!card||!body) return;
+  const cats=Object.entries(agg.byCat||{}).map(([k,v])=>({k,amt:v.amt,r:v.rAmt||0})).filter(c=>c.amt>0);
+  if(!agg.hasDemo||!cats.length){ card.style.display='none'; return; } card.style.display='';
+  const hasR=cats.some(c=>c.r>0);
+  cats.sort((a,b)=>(b.r/(b.amt||1))-(a.r/(a.amt||1)));
+  body.innerHTML=`<table class="rgn-seg-tbl"><thead><tr><th>카테고리</th><th>매출</th><th>환불액</th><th>환불율</th></tr></thead><tbody>`
+    +cats.map(c=>{ const rr=c.amt?c.r/c.amt*100:0; return `<tr><td>${rgnEsc(c.k)}</td><td>${rgnWon(c.amt)}</td><td style="color:#DC2626;">${rgnWon(c.r)}</td><td style="font-weight:700;color:${rr>=5?'#DC2626':rr>=2?'#D97706':'var(--tx2)'};">${rr.toFixed(1)}%</td></tr>`; }).join('')
+    +`</tbody></table>`+(hasR?'':'<div style="font-size:11px;color:var(--tx2);margin-top:5px;">이 기간에는 환불 데이터가 없습니다.</div>');
 }
 
 // ── 드릴다운 상세 모달 ──
@@ -8267,12 +8491,14 @@ function rgnOpenDetail(type, key){
   }
   else if(type==='refund'){
     title = '제품별 환불 비중 (금액)';
-    const totR = agg.totals.rAmt||0, totA = agg.totals.amt||0;
+    const totR = agg.totals.rAmt||0, totA = agg.totals.amt||0, totRc = agg.totals.rCnt||0;
     const rRate = totA ? totR/totA*100 : 0;
-    const prods = Object.entries(agg.products).map(([id,v])=>({id,r:v.rAmt||0,amt:v.amt})).filter(p=>p.r>0).sort((a,b)=>b.r-a.r);
-    const head = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px;">
+    const perCase = totRc ? totR/totRc : 0;
+    const prods = Object.entries(agg.products).map(([id,v])=>({id,r:v.rAmt||0,amt:v.amt,rc:v.rCnt||0})).filter(p=>p.r>0).sort((a,b)=>b.r-a.r);
+    const head = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px;">
         <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);">총 환불금액</div><div style="font-size:13.5px;font-weight:700;color:#DC2626;">${rgnWonFull(totR)}</div></div>
         <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);">환불율</div><div style="font-size:13.5px;font-weight:700;color:#D97706;">${rRate.toFixed(1)}%</div></div>
+        <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);">건당 환불금액</div><div style="font-size:13.5px;font-weight:700;">${perCase?rgnWonFull(perCase):'-'}<span style="font-size:10px;color:var(--tx2);">${totRc?` · ${totRc.toLocaleString()}건`:''}</span></div></div>
         <div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);">환불 상품 수</div><div style="font-size:13.5px;font-weight:700;">${prods.length.toLocaleString()}개</div></div>
       </div>`;
     if(!prods.length){ html = head + '<div style="padding:18px;color:var(--tx2);text-align:center;">환불 데이터가 없습니다.</div>'; }
@@ -8281,11 +8507,11 @@ function rgnOpenDetail(type, key){
         <td style="text-align:center;color:var(--tx2);">${i+1}</td>
         <td style="white-space:normal;word-break:break-all;line-height:1.3;">${rgnEsc(_rgnName(p.id))}</td>
         <td style="text-align:right;font-weight:600;color:#DC2626;">${rgnWonFull(p.r)}</td>
-        <td style="text-align:right;color:var(--pr);font-weight:600;">${(p.r/(totR||1)*100).toFixed(1)}%</td>
+        <td style="text-align:right;color:var(--tx2);">${p.rc?rgnWon(p.r/p.rc):'-'}</td>
         <td style="text-align:right;color:var(--tx2);">${p.amt?(p.r/p.amt*100).toFixed(1)+'%':'-'}</td>
       </tr>`).join('');
       html = head + `<div style="font-size:12px;font-weight:700;margin:10px 0 3px;color:var(--tx);">상품별 환불 순위 (환불금액 기준)</div>`
-        + `<table class="dt" style="width:100%;table-layout:fixed;"><thead><tr><th style="width:26px;text-align:center;">#</th><th>상품</th><th style="width:96px;text-align:right;">환불금액</th><th style="width:64px;text-align:right;">환불비중</th><th style="width:72px;text-align:right;">상품환불율</th></tr></thead><tbody>${rows}</tbody></table>`;
+        + `<table class="dt" style="width:100%;table-layout:fixed;"><thead><tr><th style="width:26px;text-align:center;">#</th><th>상품</th><th style="width:92px;text-align:right;">환불금액</th><th style="width:70px;text-align:right;">건당</th><th style="width:72px;text-align:right;">상품환불율</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
   }
   document.getElementById('rgnModalTitle').textContent = title;
