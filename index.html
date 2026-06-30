@@ -4186,7 +4186,9 @@ async function mpDeleteAccount(username){
 
   // 기존 세션이 있으면 앱 바로 표시, 없으면 로그인 화면 유지
   const sess = _getSession();
-  if(sess) _revealApp(sess);
+  // _revealApp는 뒤에 선언된 모듈 변수(_logiWatchStarted 등)를 사용하므로,
+  // 스크립트가 끝까지 실행돼 모든 선언이 초기화된 뒤(마이크로태스크) 호출 — TDZ 오류 방지
+  if(sess) queueMicrotask(()=>_revealApp(sess));
   else { const f=document.getElementById('lgId'); if(f) f.focus(); }
 })();
 
