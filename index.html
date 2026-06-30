@@ -812,6 +812,23 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cs-mini-btn:hover{border-color:#3182F6;color:#3182F6;}
 .cs-sum-item.cs-sum-hi{background:#FFFBEB;border-color:#F59E0B66;}
 .cs-sum-item.cs-sum-hi .cs-sum-val{color:#D97706;}
+/* 위탁: 폭 고정 래퍼(표가 화면 전체로 늘어나 휑해지는 문제 방지) */
+.cs-wrap{max-width:1100px;}
+/* 위탁: 제품 카드 그리드 */
+.cs-pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px;}
+.cs-pcard{position:relative;border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:14px 15px;transition:.12s;}
+.cs-pcard:hover{border-color:#3182F6;box-shadow:0 3px 12px rgba(49,130,246,.10);}
+.cs-pcard-top{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+.cs-pcard-name{font-size:13.5px;font-weight:700;color:var(--tx);line-height:1.4;margin-bottom:2px;word-break:keep-all;}
+.cs-pcard-code{font-size:11.5px;color:var(--tx2);font-family:ui-monospace,monospace;margin-bottom:11px;}
+.cs-pcard-price{display:flex;align-items:flex-end;justify-content:space-between;border-top:1px dashed var(--bd);padding-top:10px;}
+.cs-pcard-plbl{font-size:10.5px;color:var(--tx2);margin-bottom:2px;}
+.cs-pcard-unit{font-size:13px;font-weight:600;color:var(--tx);}
+.cs-pcard-vat{font-size:18px;font-weight:800;color:#3182F6;line-height:1;}
+.cs-pcard-acts{position:absolute;top:11px;right:11px;display:flex;gap:1px;opacity:0;transition:.12s;}
+.cs-pcard:hover .cs-pcard-acts{opacity:1;}
+.cs-pcard-add{display:flex;align-items:center;justify-content:center;gap:7px;border:1.5px dashed var(--bd);border-radius:12px;background:transparent;color:var(--tx2);font-size:13px;font-weight:600;cursor:pointer;min-height:118px;font-family:inherit;transition:.12s;}
+.cs-pcard-add:hover{border-color:#3182F6;color:#3182F6;background:#F8FAFF;}
 /* 견적서 */
 #page-quote .qt-wrap{display:flex;gap:14px;height:calc(100vh - 102px);overflow:hidden;}
 #page-quote .qt-main{flex:1;min-width:0;overflow-y:auto;padding:14px 16px 60px;}
@@ -1263,7 +1280,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="topbar-title">📦 재고관리 시스템</span>
     <span class="topbar-time" id="topTime"></span>
-    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.06.30g</span>
+    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.06.30h</span>
   </div>
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -2409,6 +2426,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 패밀리 오더 ═══ -->
 <!-- ═══ 위탁 배송건 (CX팀) ═══ -->
 <div class="page" id="page-consign">
+ <div class="cs-wrap">
   <!-- 위탁 배송처 선택 바 -->
   <div class="cs-vendorbar">
     <div class="cs-vendorbar-label">🚚 위탁 배송처</div>
@@ -2458,6 +2476,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     </div>
     <div class="cs-card" id="csOrderCard"></div>
   </div>
+ </div>
 </div>
 
 <!-- 위탁: 배송처 추가/수정 모달 -->
@@ -16137,27 +16156,32 @@ function csRenderProducts(){
   if(q) list = list.filter(p => [_csVendorName(p.vendorId),p.cat,p.name,p.code].some(v => (v||'').toLowerCase().includes(q)));
   document.getElementById('csProdCount').textContent = list.length;
   const card = document.getElementById('csProdCard');
-  if(!_csVendors.length){ card.innerHTML = `<div class="cs-empty">먼저 위쪽 <b>[＋ 배송처]</b>로 위탁 배송처를 추가하세요.</div>`; return; }
-  if(!list.length){ card.innerHTML = `<div class="cs-empty">${_csProducts.length?'검색 결과가 없습니다.':'등록된 제품이 없습니다. <b>[＋ 제품 추가]</b>로 등록하세요.'}</div>`; return; }
-  card.innerHTML = `<table class="cs-table"><thead><tr>
-      ${showV?'<th style="width:110px;">배송처</th>':''}
-      <th style="width:120px;">카테고리</th>
-      <th style="text-align:left;">상품명</th>
-      <th style="width:130px;">상품번호</th>
-      <th style="width:100px;">단가</th>
-      <th style="width:130px;">부가세 포함단가</th>
-      <th style="width:80px;text-align:center;">관리</th>
-    </tr></thead><tbody>${list.map(p=>`<tr>
-      ${showV?`<td style="text-align:center;"><span class="cs-tag cs-vendor-tag">${_csEsc(_csVendorName(p.vendorId))}</span></td>`:''}
-      <td style="text-align:center;">${p.cat?`<span class="cs-tag cs-cat-tag2">${_csEsc(p.cat)}</span>`:'—'}</td>
-      <td class="cs-name">${_csEsc(p.name)}</td>
-      <td class="cs-l" style="font-family:ui-monospace,monospace;font-size:11.5px;color:var(--tx2);">${_csEsc(p.code||'—')}</td>
-      <td>${_csWon(p.price)}</td>
-      <td style="font-weight:700;color:#3182F6;">${_csWon(p.vat)}</td>
-      <td style="text-align:center;">
+  card.style.border='none'; card.style.background='transparent'; card.style.overflow='visible';
+  if(!_csVendors.length){ card.innerHTML = `<div class="cs-empty" style="border:1px solid var(--bd);border-radius:12px;">먼저 위쪽 <b>[＋ 배송처]</b>로 위탁 배송처를 추가하세요.</div>`; return; }
+  const addCard = (!showV) ? `<button class="cs-pcard-add" onclick="csOpenProdModal()">＋ 제품 추가</button>` : '';
+  if(!list.length){
+    card.innerHTML = _csProducts.length
+      ? `<div class="cs-empty" style="border:1px solid var(--bd);border-radius:12px;">검색 결과가 없습니다.</div>`
+      : `<div class="cs-pgrid">${addCard||`<div class="cs-empty" style="grid-column:1/-1;border:1px solid var(--bd);border-radius:12px;">등록된 제품이 없습니다. <b>[＋ 제품 추가]</b>로 등록하세요.</div>`}</div>`;
+    return;
+  }
+  card.innerHTML = `<div class="cs-pgrid">${list.map(p=>`
+    <div class="cs-pcard">
+      <div class="cs-pcard-acts">
         <button class="cs-icon-btn cs-edit-btn" onclick="csOpenProdModal('${_csEsc(p.id)}')" title="수정">✏️</button>
         <button class="cs-icon-btn cs-del-btn" onclick="csDeleteProd('${_csEsc(p.id)}')" title="삭제">🗑</button>
-      </td></tr>`).join('')}</tbody></table>`;
+      </div>
+      <div class="cs-pcard-top">
+        ${showV?`<span class="cs-tag cs-vendor-tag">${_csEsc(_csVendorName(p.vendorId))}</span>`:''}
+        ${p.cat?`<span class="cs-tag cs-cat-tag2">${_csEsc(p.cat)}</span>`:''}
+      </div>
+      <div class="cs-pcard-name">${_csEsc(p.name)}</div>
+      <div class="cs-pcard-code">${p.code?'No. '+_csEsc(p.code):'상품번호 없음'}</div>
+      <div class="cs-pcard-price">
+        <div><div class="cs-pcard-plbl">단가</div><div class="cs-pcard-unit">${_csWon(p.price)}</div></div>
+        <div style="text-align:right;"><div class="cs-pcard-plbl">부가세 포함단가</div><div class="cs-pcard-vat">${_csWon(p.vat)}</div></div>
+      </div>
+    </div>`).join('')}${addCard}</div>`;
 }
 function csOpenProdModal(id){
   if(!_csVendors.length){ toast('먼저 [＋ 배송처]로 위탁 배송처를 추가하세요.'); return; }
@@ -16288,10 +16312,11 @@ function csRenderOrders(){
   list.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || String(b.id).localeCompare(String(a.id)));
   document.getElementById('csOrderCount').textContent = list.length;
   const card = document.getElementById('csOrderCard');
+  card.style.overflowX='auto';   // 좁은 화면에서 잘리지 않고 가로 스크롤
   csRenderSummary(list);
   if(!_csVendors.length){ card.innerHTML = `<div class="cs-empty">먼저 위쪽 <b>[＋ 배송처]</b>로 위탁 배송처를 추가하세요.</div>`; return; }
   if(!list.length){ card.innerHTML = `<div class="cs-empty">${_csOrders.length?'조건에 맞는 주문이 없습니다.':'저장된 주문이 없습니다. <b>[＋ 주문 추가]</b>로 등록하세요.'}</div>`; return; }
-  card.innerHTML = `<table class="cs-table"><thead><tr>
+  card.innerHTML = `<table class="cs-table" style="min-width:940px;"><thead><tr>
       <th style="width:96px;">날짜</th>
       ${showV?'<th style="width:96px;">배송처</th>':''}
       <th style="width:90px;">고객명</th>
