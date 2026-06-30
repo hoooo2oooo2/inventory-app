@@ -747,6 +747,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-set-amt{font-size:15px;font-weight:800;color:#3182F6;white-space:nowrap;}
 .cmb-badge{font-size:11px;color:var(--tx2);background:var(--bg2);padding:2px 8px;border-radius:10px;font-weight:600;}
 .cmb-empty{padding:24px;text-align:center;color:var(--tx2);font-size:12px;line-height:1.6;}
+/* 조합 세트 구분(카테고리) */
+.cmb-cat-bar{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px;border-bottom:0.5px solid var(--bd);align-items:center;flex-shrink:0;}
+.cmb-cat-chip{padding:4px 11px;border:1px solid var(--bd);border-radius:14px;background:var(--bg);color:var(--tx2);font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s;}
+.cmb-cat-chip:hover{border-color:#3182F6;color:#3182F6;}
+.cmb-cat-chip.active{background:#3182F6;color:#fff;border-color:#3182F6;}
+.cmb-cat-add{padding:4px 10px;border:1px dashed var(--bd);border-radius:14px;background:transparent;color:var(--tx2);font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.cmb-cat-add:hover{border-color:#059669;color:#059669;}
+.cmb-cat-tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#FEF3C7;color:#B45309;margin-right:6px;vertical-align:middle;}
 /* 견적서 */
 #page-quote .qt-wrap{display:flex;gap:14px;height:calc(100vh - 102px);overflow:hidden;}
 #page-quote .qt-main{flex:1;min-width:0;overflow-y:auto;padding:14px 16px 60px;}
@@ -1371,6 +1379,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-price" onclick="goMenu('price')">🧮 단가계산기</div>
   <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서</div>
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
+  <div class="ni" id="nav-consign" onclick="goMenu('consign')">🚚 위탁 배송건</div>
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
   <div class="ni" id="nav-rpt_yuhyun" onclick="goMenu('rpt_yuhyun')" style="display:none;">📝 유현</div>
@@ -2130,6 +2139,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <span>📁 저장된 세트</span>
           <span class="cmb-badge" id="cmbSetCount">0개</span>
         </div>
+        <!-- 구분 필터 바 -->
+        <div class="cmb-cat-bar" id="cmbCatBar"></div>
         <div class="cmb-saved-body" id="cmbSavedList">
           <div class="cmb-empty">저장된 세트가 없습니다.</div>
         </div>
@@ -2143,7 +2154,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="background:var(--bg);border-radius:14px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
     <div id="cmbSaveTitle" style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:16px;">💾 세트 저장</div>
     <div class="pc-lbl" style="margin-bottom:6px;">세트명</div>
-    <input type="text" id="cmbSetNameInp" placeholder="예: 거실 조명 세트A" class="pc-inp" style="margin-bottom:16px;" onkeydown="if(event.key==='Enter')cmbConfirmSave()"/>
+    <input type="text" id="cmbSetNameInp" placeholder="예: 거실 조명 세트A" class="pc-inp" style="margin-bottom:14px;" onkeydown="if(event.key==='Enter')cmbConfirmSave()"/>
+    <div class="pc-lbl" style="margin-bottom:6px;">구분 <span style="font-weight:400;color:var(--tx2);">(선택 · 새 구분 직접 입력 가능)</span></div>
+    <input type="text" id="cmbSetCatInp" list="cmbCatDatalist" placeholder="구분 선택 또는 새로 입력" class="pc-inp" style="margin-bottom:16px;" autocomplete="off" onkeydown="if(event.key==='Enter')cmbConfirmSave()"/>
+    <datalist id="cmbCatDatalist"></datalist>
     <div style="display:flex;gap:8px;">
       <button onclick="document.getElementById('cmbSaveModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
       <button onclick="cmbConfirmSave()" style="flex:2;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">저장</button>
@@ -2334,6 +2348,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 </div>
 
 <!-- ═══ 패밀리 오더 ═══ -->
+<!-- ═══ 위탁 배송건 (CX팀) — 메뉴 골격만, 내용 추후 추가 ═══ -->
+<div class="page" id="page-consign">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 120px);text-align:center;color:var(--tx2);gap:10px;">
+    <div style="font-size:46px;">🚚</div>
+    <div style="font-size:18px;font-weight:700;color:var(--tx);">위탁 배송건</div>
+    <div style="font-size:13px;line-height:1.6;">메뉴가 생성되었습니다. 세부 내용은 곧 추가될 예정입니다.</div>
+  </div>
+</div>
+
 <div class="page" id="page-family">
   <!-- 서브탭 -->
   <div class="fo-subtabs">
@@ -3736,7 +3759,7 @@ const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', 
 //   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
-  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit' } },
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit', logistatus:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit', coupangad:'edit' } },
@@ -3823,7 +3846,7 @@ function logout(){
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 발주건 정리'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'},
@@ -3839,7 +3862,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign'] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
@@ -5910,7 +5933,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -15355,8 +15378,11 @@ const COMBO_RAW=[["NMSCG015FA","(검정) 엔틱등(대) 문주등 부속",100,24
 const COMBO_PRODUCTS = COMBO_RAW.map(r=>({ code:r[0], name:r[1], box:r[2], arrival:r[3], supply:r[4] }));
 let _cmbState = {};      // code -> {checked:bool, qty:string}
 let _cmbSel = [];        // 선택 제품 리스트 [{code,name,basis,unit,qty,amount}]
-let _cmbSets = [];       // 저장된 세트 [{id,name,items,total,date,author}]
+let _cmbSets = [];       // 저장된 세트 [{id,name,items,total,date,author,cat}]
 let _cmbSetsLoaded = false;
+let _cmbCats = [];       // 사용자 정의 구분(카테고리) 목록
+let _cmbCatsLoaded = false;
+let _cmbCatFilter = '';  // 현재 구분 필터 ('' = 전체)
 let _cmbEditId = null;   // 수정 중인 세트 id
 let _cmbDetailId = null; // 상세 모달에 표시 중인 세트 id
 let _cmbSub = 'single';
@@ -15378,6 +15404,7 @@ function pcSwitchSub(sub){
 function cmbInit(){
   cmbRenderList();
   cmbRenderSel();
+  if(!_cmbCatsLoaded){ cmbLoadCats(); } else { cmbRenderCatBar(); }
   if(!_cmbSetsLoaded){ cmbLoadSets(); }
   else { cmbRenderSaved(); }
 }
@@ -15511,31 +15538,70 @@ function cmbOpenSaveModal(){
   const set = _cmbEditId ? _cmbSets.find(x=>x.id===_cmbEditId) : null;
   document.getElementById('cmbSaveTitle').textContent = set ? '✏️ 세트 수정' : '💾 세트 저장';
   document.getElementById('cmbSetNameInp').value = set ? set.name : '';
+  document.getElementById('cmbSetCatInp').value = set ? (set.cat||'') : (_cmbCatFilter||'');
+  cmbPopulateDatalist();
   document.getElementById('cmbSaveModal').style.display='flex';
   setTimeout(()=>document.getElementById('cmbSetNameInp').focus(),50);
+}
+// 저장 모달 구분 datalist 채우기
+function cmbPopulateDatalist(){
+  const dl = document.getElementById('cmbCatDatalist'); if(!dl) return;
+  dl.innerHTML = _cmbCats.map(c=>`<option value="${_cmbEsc(c)}"></option>`).join('');
 }
 async function cmbConfirmSave(){
   const name = (document.getElementById('cmbSetNameInp').value||'').trim();
   if(!name){ toast('세트명을 입력하세요.'); return; }
+  const cat = (document.getElementById('cmbSetCatInp').value||'').trim();
   const total = _cmbSel.reduce((a,s)=>a+s.amount,0);
   const items = _cmbSel.map(s=>({...s}));
+  // 새 구분이면 구분 목록에 추가
+  let catsChanged = false;
+  if(cat && !_cmbCats.includes(cat)){ _cmbCats.push(cat); catsChanged = true; }
   if(_cmbEditId){
     const set = _cmbSets.find(x=>x.id===_cmbEditId);
-    if(set){ set.name=name; set.items=items; set.total=total; set.date=_cmbToday(); }
+    if(set){ set.name=name; set.cat=cat; set.items=items; set.total=total; set.date=_cmbToday(); }
   } else {
     _cmbSets.unshift({
       id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
-      name, items, total, date:_cmbToday(),
+      name, cat, items, total, date:_cmbToday(),
       author:(window.__CURRENT_USER&&window.__CURRENT_USER.name)||''
     });
   }
   document.getElementById('cmbSaveModal').style.display='none';
   _cmbEditId = null;
-  cmbRenderSel(); cmbRenderSaved();
+  cmbRenderCatBar(); cmbRenderSel(); cmbRenderSaved();
+  if(catsChanged) await cmbSaveCats();
   await cloudKvSave('combo_sets', _cmbSets);
   toast('세트를 저장했습니다.');
 }
 function _cmbToday(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+// ── 구분(카테고리) 로드/저장/렌더 ──
+async function cmbLoadCats(){
+  const data = await cloudKvLoad('combo_cats');
+  _cmbCats = Array.isArray(data) ? data.filter(Boolean) : [];
+  _cmbCatsLoaded = true;
+  cmbRenderCatBar();
+}
+async function cmbSaveCats(){ await cloudKvSave('combo_cats', _cmbCats); }
+function cmbRenderCatBar(){
+  const bar = document.getElementById('cmbCatBar'); if(!bar) return;
+  let html = `<button class="cmb-cat-chip ${_cmbCatFilter===''?'active':''}" onclick="cmbSetFilter('')">전체</button>`;
+  html += _cmbCats.map(c=>`<button class="cmb-cat-chip ${_cmbCatFilter===c?'active':''}" onclick="cmbSetFilter('${_cmbEsc(c)}')">${_cmbEsc(c)}</button>`).join('');
+  html += `<button class="cmb-cat-add" onclick="cmbAddCat()">＋ 구분 추가</button>`;
+  bar.innerHTML = html;
+}
+function cmbSetFilter(cat){ _cmbCatFilter = cat; cmbRenderCatBar(); cmbRenderSaved(); }
+async function cmbAddCat(){
+  const name = (prompt('추가할 구분명을 입력하세요.')||'').trim();
+  if(!name) return;
+  if(_cmbCats.includes(name)){ toast('이미 있는 구분입니다.'); _cmbCatFilter=name; cmbRenderCatBar(); cmbRenderSaved(); return; }
+  _cmbCats.push(name);
+  _cmbCatFilter = name;
+  cmbRenderCatBar(); cmbRenderSaved();
+  await cmbSaveCats();
+  toast(`'${name}' 구분을 추가했습니다.`);
+}
 
 // ── 저장된 세트 로드/렌더 ──
 async function cmbLoadSets(){
@@ -15547,11 +15613,13 @@ async function cmbLoadSets(){
 function cmbRenderSaved(){
   const box = document.getElementById('cmbSavedList');
   document.getElementById('cmbSetCount').textContent = _cmbSets.length+'개';
+  const list = _cmbCatFilter ? _cmbSets.filter(s=>(s.cat||'')===_cmbCatFilter) : _cmbSets;
   if(!_cmbSets.length){ box.innerHTML = `<div class="cmb-empty">저장된 세트가 없습니다.</div>`; return; }
-  box.innerHTML = _cmbSets.map(s=>`
+  if(!list.length){ box.innerHTML = `<div class="cmb-empty">'${_cmbEsc(_cmbCatFilter)}' 구분의 세트가 없습니다.</div>`; return; }
+  box.innerHTML = list.map(s=>`
     <div class="cmb-set-card" ondblclick="cmbOpenDetail('${_cmbEsc(s.id)}')" title="더블클릭하여 상세 보기">
       <div style="min-width:0;">
-        <div class="cmb-set-nm">${_cmbEsc(s.name)}</div>
+        <div class="cmb-set-nm">${s.cat?`<span class="cmb-cat-tag">${_cmbEsc(s.cat)}</span>`:''}${_cmbEsc(s.name)}</div>
         <div class="cmb-set-meta">${(s.items||[]).length}개 품목 · ${_cmbEsc(s.date||'')}${s.author?' · '+_cmbEsc(s.author):''}</div>
       </div>
       <div class="cmb-set-amt">${_cmbWon(s.total)}</div>
@@ -15576,7 +15644,12 @@ function cmbOpenDetail(id){
     </tr>`;
   }).join('');
   document.getElementById('cmbDetailContent').innerHTML = `
-    <div style="font-size:11px;color:var(--tx2);margin-bottom:8px;">${_cmbEsc(set.date||'')}${set.author?' · 작성자 '+_cmbEsc(set.author):''}</div>
+    <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;">${_cmbEsc(set.date||'')}${set.author?' · 작성자 '+_cmbEsc(set.author):''}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span class="pc-lbl" style="margin:0;">구분</span>
+      <input type="text" id="cmbDetailCatInp" list="cmbCatDatalist" value="${_cmbEsc(set.cat||'')}" placeholder="구분 선택 또는 새로 입력" class="pc-inp" style="flex:1;max-width:260px;padding:7px 10px;font-size:12px;" autocomplete="off"/>
+      <button onclick="cmbChangeCat()" style="padding:7px 14px;border:none;border-radius:7px;background:#3182F6;color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">구분 적용</button>
+    </div>
     <table class="cmb-sel-table" style="width:100%;">
       <thead><tr>
         <th style="text-align:left;">상품명</th><th style="width:90px;">기준</th><th style="width:90px;">단가</th><th style="width:60px;">수량</th><th style="width:110px;">금액</th>
@@ -15587,7 +15660,21 @@ function cmbOpenDetail(id){
       <span style="font-size:12px;color:var(--tx2);">합계 (${(set.items||[]).length}개 품목)</span>
       <span style="font-size:18px;font-weight:800;color:#3182F6;">${_cmbWon(set.total)}</span>
     </div>`;
+  cmbPopulateDatalist();
   document.getElementById('cmbDetailModal').style.display='flex';
+}
+// 상세 모달에서 구분만 변경/적용
+async function cmbChangeCat(){
+  const set = _cmbSets.find(x=>x.id===_cmbDetailId); if(!set) return;
+  const cat = (document.getElementById('cmbDetailCatInp').value||'').trim();
+  set.cat = cat;
+  let catsChanged = false;
+  if(cat && !_cmbCats.includes(cat)){ _cmbCats.push(cat); catsChanged = true; }
+  document.getElementById('cmbDetailTitle').textContent = `📦 ${set.name}`;
+  cmbRenderCatBar(); cmbRenderSaved();
+  if(catsChanged) await cmbSaveCats();
+  await cloudKvSave('combo_sets', _cmbSets);
+  toast(cat ? `구분을 '${cat}'(으)로 변경했습니다.` : '구분을 해제했습니다.');
 }
 function cmbEditFromDetail(){
   const set = _cmbSets.find(x=>x.id===_cmbDetailId); if(!set) return;
