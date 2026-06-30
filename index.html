@@ -1243,7 +1243,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="topbar-title">📦 재고관리 시스템</span>
     <span class="topbar-time" id="topTime"></span>
-    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.06.30e</span>
+    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.06.30f</span>
   </div>
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -4381,6 +4381,70 @@ async function cloudKvVersion(kind){
 }
 
 // ══════════════════════════════════════════════
+// egress 절약 캐시 (IndexedDB) — 큰 테이블(매출/일별)을 로컬에 저장,
+// "버전(행수|최대id|쓰기스탬프)"이 바뀐 경우에만 다시 다운로드.
+//   · 다른 PC가 추가·삭제 → 행수/최대id로 자동 감지
+//   · 다른 PC가 기존 행 수정(단가·마진 등) → 쓰기 시 _bump*()가 스탬프 갱신 → 감지
+//   화면/숫자는 그대로, 단지 "안 바뀌었으면 22MB 재다운로드 생략".
+// ══════════════════════════════════════════════
+const _IDB_NAME='egress_cache_v1', _IDB_STORE='kv';
+let _idbP=null;
+function _idbOpen(){
+  if(_idbP) return _idbP;
+  _idbP=new Promise((res,rej)=>{
+    try{
+      const rq=indexedDB.open(_IDB_NAME,1);
+      rq.onupgradeneeded=()=>{ const db=rq.result; if(!db.objectStoreNames.contains(_IDB_STORE)) db.createObjectStore(_IDB_STORE); };
+      rq.onsuccess=()=>res(rq.result);
+      rq.onerror=()=>rej(rq.error);
+    }catch(e){ rej(e); }
+  });
+  return _idbP;
+}
+async function _idbGet(key){
+  try{ const db=await _idbOpen(); return await new Promise((res,rej)=>{
+    const t=db.transaction(_IDB_STORE,'readonly').objectStore(_IDB_STORE).get(key);
+    t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error);
+  }); }catch(e){ return undefined; }
+}
+async function _idbSet(key,val){
+  try{ const db=await _idbOpen(); return await new Promise((res,rej)=>{
+    const t=db.transaction(_IDB_STORE,'readwrite').objectStore(_IDB_STORE).put(val,key);
+    t.onsuccess=()=>res(true); t.onerror=()=>rej(t.error);
+  }); }catch(e){ return false; }
+}
+
+// 쓰기 스탬프: 기존 행을 "수정"(행수·id 불변)해도 캐시를 무효화하기 위함.
+async function _bumpDataVer(table){ try{ await cloudKvSave('dataver_'+table, Date.now()); }catch(e){} }
+function _bumpRev(){ return _bumpDataVer('revenue'); }
+function _bumpDaily(){ return _bumpDataVer('daily_sales'); }
+
+// 연도별 매출 버전(행수|최대id|스탬프) — egress 거의 0(1행+카운트 헤더+스탬프 1행)
+async function _revYearVer(year){
+  try{
+    const [{data,count,error}, stamp] = await Promise.all([
+      sb.from('revenue').select('id',{count:'exact'}).eq('year',year).order('id',{ascending:false}).limit(1),
+      cloudKvVersion('dataver_revenue')
+    ]);
+    if(error || count==null || stamp===undefined) return null;  // 조회 불확실 → 캐시 사용 안 함(안전)
+    const maxId=(data&&data[0])?data[0].id:0;
+    return `${count}|${maxId}|${stamp||''}`;
+  }catch(e){ return null; }
+}
+// 일별(is_rg=false) 버전
+async function _dailyVer(){
+  try{
+    const [{data,count,error}, stamp] = await Promise.all([
+      sb.from('daily_sales').select('id',{count:'exact'}).eq('is_rg',false).order('id',{ascending:false}).limit(1),
+      cloudKvVersion('dataver_daily_sales')
+    ]);
+    if(error || count==null || stamp===undefined) return null;
+    const maxId=(data&&data[0])?data[0].id:0;
+    return `${count}|${maxId}|${stamp||''}`;
+  }catch(e){ return null; }
+}
+
+// ══════════════════════════════════════════════
 // 물류팀 홈 — 현재시각 / 달력 / 공지사항 / 메모장
 // ══════════════════════════════════════════════
 let _logiClockTimer = null;
@@ -5662,7 +5726,17 @@ async function addHistory(item){
   await sb.from('history_log').insert({time:t,menu:item.menu,type:item.type,code:item.code,name:item.name,description:item.desc,before_val:item.before,after_val:item.after,user_type:userField});
 }
 let _dCache={};
-async function loadDailyCache(){
+let _dCacheVer=null;
+async function loadDailyCache(force){
+  // egress 절약: 버전(행수|최대id|스탬프)이 그대로면 재다운로드 생략
+  //  · 같은 세션 내(메모리 보유) → 즉시 반환
+  //  · 새로고침 직후(메모리 없음) → IndexedDB에서 복원
+  const ver=await _dailyVer();
+  if(!force && ver && _dCacheVer===ver && Object.keys(_dCache).length) return;
+  if(!force && ver){
+    const c=await _idbGet('daily_all');
+    if(c && c.ver===ver && c.map){ _dCache=c.map; _dCacheVer=ver; return; }
+  }
   // 날짜 제한 없이 전체 daily_sales 데이터 로드 (페이지네이션)
   _dCache={};
   let from=0; const pageSize=1000;
@@ -5680,6 +5754,8 @@ async function loadDailyCache(){
     if(data.length<pageSize) break;
     from+=pageSize;
   }
+  _dCacheVer=ver;
+  if(ver){ _idbSet('daily_all',{ver,map:_dCache}); }
 }
 async function loadDailySales(code,start,end){
   const out={};
@@ -8040,6 +8116,16 @@ async function loadRevYearRange(){
 async function loadRevenueYear(year){
   if(year==null) return;
   year=Number(year);
+  // egress 절약: 버전이 캐시와 같으면 IndexedDB에서 즉시 복원(다운로드 생략)
+  const ver=await _revYearVer(year);
+  if(ver){
+    const c=await _idbGet('rev_y_'+year);
+    if(c && c.ver===ver && Array.isArray(c.rows)){
+      _revData=_revData.filter(r=>r.year!==year).concat(c.rows);
+      _revYearsLoaded.add(year);
+      return;
+    }
+  }
   const PAGE=1000; let all=[], from=0;
   while(true){
     const {data,error}=await sb.from('revenue').select(REV_COLS).eq('year',year)
@@ -8050,8 +8136,10 @@ async function loadRevenueYear(year){
     if(data.length<PAGE) break;
     from+=PAGE;
   }
-  _revData=_revData.filter(r=>r.year!==year).concat(all.map(_revMapRow));
+  const mapped=all.map(_revMapRow);
+  _revData=_revData.filter(r=>r.year!==year).concat(mapped);
   _revYearsLoaded.add(year);
+  if(ver){ _idbSet('rev_y_'+year,{ver,rows:mapped}); }   // 다음 새로고침부터 재사용
 }
 
 // 연도 데이터 보장(없으면 로드)
@@ -8071,6 +8159,7 @@ async function ensureRevAllYears(){
 }
 // 업로드/일괄수정 후: 현재 적재된 연도들을 최신값으로 재로드 + 범위 갱신
 async function reloadRevLoadedYears(){
+  await _bumpRev();                 // 쓰기 발생 → 다른 PC 캐시 무효화
   await loadRevYearRange();
   const yrs=[..._revYearsLoaded];
   _revData=[]; _revYearsLoaded=new Set();
@@ -10181,6 +10270,7 @@ async function applyRowCodeName(id, code, name){
     unit_cost:unitCost, cost_price:costPrice, margin, margin_rate:marginRate
   }).eq('id',id);
   if(error) throw error;
+  _bumpRev();
   r.itemCode=code; r.modelName=name; r.itemType=itemType;
   r.unitCost=unitCost; r.costPrice=costPrice; r.margin=margin; r.marginRate=marginRate;
 }
@@ -10225,6 +10315,7 @@ async function updateRowShipping(id, val){
     const {error}=await sb.from('revenue')
       .update({shipping_fee:ship, margin, margin_rate:marginRate}).eq('id',id);
     if(error) throw error;
+    _bumpRev();
     r.shipping=ship; r.margin=margin; r.marginRate=marginRate;
     renderUnifiedTable();
   }catch(e){
@@ -10417,6 +10508,7 @@ async function propagateBdPriceChange(bdRow, oldPrice){
       sb.from('revenue').update({unit_cost:u.unit_cost,cost_price:u.cost_price,margin:u.margin,margin_rate:u.margin_rate}).eq('id',u.id)
     ));
   }
+  if(updates.length) _bumpRev();
   if(_revLoaded){
     const updMap = new Map(updates.map(u=>[u.id,u]));
     _revData.forEach(r=>{
@@ -10494,6 +10586,7 @@ async function resyncRevenuePrices(){
       updated+=upd.length;
       if(data.length<PAGE) break; from+=PAGE;
     }
+    if(updated) await _bumpRev();
     if(_revLoaded) _renderRevCurrentPage();
     alert(`완료: ${scanned.toLocaleString()}건 검사, ${updated.toLocaleString()}건 단가·마진 반영했습니다.`);
   }catch(e){
@@ -10559,6 +10652,7 @@ async function resyncRevenueTypes(){
       updated+=upd.length;
       if(data.length<PAGE) break; from+=PAGE;
     }
+    if(updated) await _bumpRev();
     if(_revLoaded) _renderRevCurrentPage();
     alert(`완료: ${scanned.toLocaleString()}건 검사, ${updated.toLocaleString()}건 구분 반영했습니다.`);
   }catch(e){
@@ -12157,6 +12251,7 @@ async function applyMonthlyBatchFix(selected){
       fixed++;
     }catch(e){ console.error('fix error',code,date,e); failed++; }
   }
+  if(fixed) await _bumpDaily();
   return {fixed,failed};
 }
 
@@ -12367,6 +12462,7 @@ async function confirmUpload(){
         const {error}=await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100),{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
         if(error) console.error('daily_sales upsert error:',error.message);
       }
+      if(dailyRows.length) await _bumpDaily();   // 같은 날짜 재업로드(덮어쓰기)도 캐시 무효화
       await addHistory({menu:'판매분석',type:'upload',code:'MULTI',name:`${_pendingRows.length}건`,desc:'출고 데이터 업로드',before:'-',after:`${Object.keys(upd).length}개 상품`,user:'업로드'});
       if(currentPage==='sales'){renderSalesPeriod();renderSalesTbody();}
     } else if(type==='order'){
