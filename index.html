@@ -5401,8 +5401,23 @@ async function logiHandoverDel(id){
 // ── 소장재고 체크리스트 (제품명 + 수량, 체크 / 모든 PC 공유) ──
 let _logiChk = null;
 async function logiLoadChk(){
-  if(_logiChk===null){ _logiChk = (await cloudKvLoad('logi_checklist')) || []; }
+  await _logiChkRefresh();
   logiRenderChk();
+}
+// 여러 PC가 같은 리스트를 공유하므로, 수정 직전 항상 클라우드 최신본을 다시 받아온 뒤
+// 그 위에 변경을 적용한다. (안 그러면 다른 PC가 먼저 저장한 변경을 이 PC의 오래된
+// 메모리 복사본으로 덮어써 수량차감·등록정보가 통째로 사라지는 문제가 있었음)
+async function _logiChkRefresh(){
+  const cloud = (await cloudKvLoad('logi_checklist')) || [];
+  let changed = false;
+  cloud.forEach(c=>{
+    if(c.createdBy==null){ c.createdBy='미상'; changed=true; }
+    if(c.createdAt==null){ c.createdAt='-'; changed=true; }
+    if(c.initQty==null){ c.initQty=c.qty; changed=true; }
+    if(!Array.isArray(c.logs)){ c.logs=[]; changed=true; }
+  });
+  _logiChk = cloud;
+  if(changed) await cloudKvSave('logi_checklist', _logiChk);
 }
 function _logiChkActor(){
   const u = window.__CURRENT_USER;
@@ -5440,7 +5455,7 @@ async function logiChkAdd(){
   const name = (nameEl.value||'').trim();
   if(!name){ toast('제품명을 입력하세요.'); nameEl.focus(); return; }
   const qty = _lbxNum(qtyEl.value);
-  _logiChk = _logiChk || [];
+  await _logiChkRefresh();
   _logiChk.push({ id: Date.now(), name, qty, checked: false,
     createdBy: _logiChkActor(), createdAt: _logiChkNow(), initQty: qty, logs: [] });
   nameEl.value=''; qtyEl.value=''; nameEl.focus();
@@ -5448,7 +5463,8 @@ async function logiChkAdd(){
   await cloudKvSave('logi_checklist', _logiChk);
 }
 async function logiChkToggle(id){
-  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
+  await _logiChkRefresh();
+  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) { logiRenderChk(); return; }
   c.checked = !c.checked;
   if(c.checked){ c.doneAt = _logiChkNow(); c.doneBy = _logiChkActor(); c.doneReason = '수동완료'; }
   else { c.doneAt = ''; c.doneBy = ''; c.doneReason = ''; }
@@ -5456,10 +5472,11 @@ async function logiChkToggle(id){
   await cloudKvSave('logi_checklist', _logiChk);
 }
 async function logiChkQty(id, val){
-  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
+  await _logiChkRefresh();
+  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) { logiRenderChk(); return; }
   const from = _lbxNum(c.qty);
   const to = _lbxNum(val);
-  if(from===to) return;
+  if(from===to) { logiRenderChk(); return; }
   c.logs = c.logs || [];
   c.logs.unshift({ ts: _logiChkNow(), by: _logiChkActor(), from, to, delta: to-from });
   c.qty = to;
@@ -5498,7 +5515,8 @@ function logiChkDoneList(){
 }
 // 완료 → 다시 진행으로 되돌리기
 async function logiChkRestore(id){
-  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) return;
+  await _logiChkRefresh();
+  const c = (_logiChk||[]).find(x=>x.id===id); if(!c) { logiRenderChk(); return; }
   c.checked = false; c.doneAt = ''; c.doneBy = ''; c.doneReason = '';
   logiRenderChk();
   logiChkDoneList();   // 팝업 갱신
@@ -5541,6 +5559,7 @@ function logiChkDel(id){
 async function logiChkDelConfirm(){
   const id = _logiChkDelId;
   if(id==null) return;
+  await _logiChkRefresh();
   _logiChk = (_logiChk||[]).filter(x=>x.id!==id);
   _logiChkDelId = null;
   closeModal('logiChkDelModal');
