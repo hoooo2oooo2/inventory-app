@@ -15447,10 +15447,15 @@ function cmbAddChecked(basis){
     const item = { code:p.code, name:p.name, basis, unit, qty, amount:unit*qty };
     const ix = _cmbSel.findIndex(s=>s.code===code);
     if(ix>=0) _cmbSel[ix] = item; else _cmbSel.push(item);
-    // 추가 후 체크 해제 — 다른 기준 버튼을 눌러도 이전 batch가 재변환되지 않도록
+    // 추가 후 체크 해제 + 좌측 수량 비우기 — 다른 기준 버튼을 눌러도 이전 batch가 재변환되지 않도록
     _cmbState[code].checked = false;
+    _cmbState[code].qty = '';
     const tr = document.querySelector(`#cmbTbody tr[data-code="${CSS.escape(code)}"]`);
-    if(tr){ const cb=tr.querySelector('input[type=checkbox]'); if(cb) cb.checked=false; tr.classList.remove('cmb-on'); }
+    if(tr){
+      const cb=tr.querySelector('input[type=checkbox]'); if(cb) cb.checked=false;
+      const qi=tr.querySelector('.cmb-qty-inp'); if(qi) qi.value='';
+      tr.classList.remove('cmb-on');
+    }
     added++;
   });
   cmbUpdateCheckedCount();
