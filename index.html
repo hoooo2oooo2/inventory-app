@@ -8640,18 +8640,14 @@ async function rgnRenderTrend(){
   }
   const total=data.reduce((s,x)=>s+x,0);
   if(totalEl) totalEl.textContent = data.length ? `합계 ${rgnWonFull(total)}` : '';
-  const rRate = data.map((a,i)=> a>0 ? +(rdata[i]/a*100).toFixed(1) : 0);
-  const hasRef = rdata.some(x=>x>0);
   const datasets=[{type:'bar',label:'매출',data:data.map(Math.round),backgroundColor:colors,borderRadius:5,maxBarThickness:mode==='month'?54:30,order:2}];
-  if(hasRef) datasets.push({type:'line',label:'환불율(%)',data:rRate,yAxisID:'y1',borderColor:'#DC2626',backgroundColor:'#DC2626',borderWidth:2,pointRadius:2,tension:.3,order:1});
   _rgnCharts.trend=new Chart(ctx,{
     data:{labels,datasets},
     options:{responsive:true,maintainAspectRatio:false,
       onHover:_rgnHover, onClick,
-      plugins:{legend:{display:hasRef,position:'top',labels:{font:{size:10},boxWidth:12,padding:8}},
-        tooltip:{callbacks:{title:items=>tips[items[0].dataIndex]||'',label:c=> c.datasetIndex===0 ? `매출 ${rgnWonFull(c.parsed.y)}` : `환불율 ${c.parsed.y}%`}}},
+      plugins:{legend:{display:false,position:'top',labels:{font:{size:10},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{title:items=>tips[items[0].dataIndex]||'',label:c=> `매출 ${rgnWonFull(c.parsed.y)}`}}},
       scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},
-              y1:{display:hasRef,position:'right',min:0,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%',font:{size:9},color:'#DC2626'}},
               x:{ticks:{font:{size:10},autoSkip:labels.length>14,maxRotation:labels.length>8?50:0}}}}});
 }
 
