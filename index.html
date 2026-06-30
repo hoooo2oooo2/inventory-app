@@ -702,7 +702,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .pc-subtab.active{background:var(--bg);color:#3182F6;border-color:var(--bd);border-bottom:1px solid var(--bg);font-weight:700;}
 /* 조합 계산기 */
 .cmb-wrap{display:flex;gap:12px;height:calc(100vh - 142px);overflow:hidden;padding:12px 14px;}
-.cmb-left{flex:0 0 30%;min-width:330px;display:flex;flex-direction:column;border:1px solid var(--bd);border-radius:12px;overflow:hidden;background:var(--bg);}
+.cmb-left{flex:1 1 0;min-width:0;display:flex;flex-direction:column;border:1px solid var(--bd);border-radius:12px;overflow:hidden;background:var(--bg);}
 .cmb-left-head{padding:11px 12px;border-bottom:1px solid var(--bd);display:flex;flex-direction:column;gap:8px;flex-shrink:0;}
 .cmb-title{font-size:14px;font-weight:700;color:var(--tx);}
 .cmb-calc-btns{display:flex;gap:6px;}
@@ -725,7 +725,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-qty-inp{width:46px;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
 .cmb-qty-inp:focus{border-color:#3182F6;background:var(--bg);}
 .cmb-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;}
-.cmb-sel,.cmb-saved{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+.cmb-sel,.cmb-saved{flex:1 1 0;min-width:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--bd);border-radius:12px;}
 .cmb-card-head{padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--tx);flex-shrink:0;}
 .cmb-mini-btn{padding:5px 11px;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
 .cmb-mini-btn:hover{border-color:#3182F6;color:#3182F6;}
@@ -829,6 +829,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cs-pcard:hover .cs-pcard-acts{opacity:1;}
 .cs-pcard-add{display:flex;align-items:center;justify-content:center;gap:7px;border:1.5px dashed var(--bd);border-radius:12px;background:transparent;color:var(--tx2);font-size:13px;font-weight:600;cursor:pointer;min-height:118px;font-family:inherit;transition:.12s;}
 .cs-pcard-add:hover{border-color:#3182F6;color:#3182F6;background:#F8FAFF;}
+/* 위탁: 주문 모달 제품 선택 행 */
+.cs-pickrow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:0.5px solid var(--bd);}
+.cs-pickrow:last-child{border-bottom:none;}
+.cs-pickrow:hover{background:var(--bg2);}
+.cs-pickrow-info{flex:1;min-width:0;}
+.cs-pickrow-name{font-size:12.5px;font-weight:600;color:var(--tx);line-height:1.3;word-break:keep-all;}
+.cs-pickrow-sub{font-size:10.5px;color:var(--tx2);margin-top:1px;}
+.cs-pickrow-qty{width:62px;border:1px solid var(--bd);border-radius:7px;padding:6px 8px;font-size:13px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;flex-shrink:0;}
+.cs-pickrow-qty:focus{border-color:#3182F6;background:var(--bg);}
+.cs-pickrow-qty.cs-has{border-color:#3182F6;background:#EEF4FF;font-weight:700;}
 /* 견적서 */
 #page-quote .qt-wrap{display:flex;gap:14px;height:calc(100vh - 102px);overflow:hidden;}
 #page-quote .qt-main{flex:1;min-width:0;overflow-y:auto;padding:14px 16px 60px;}
@@ -2175,9 +2185,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
     </div>
 
-    <!-- 우 70%: 상하 분할 -->
-    <div class="cmb-right">
-      <!-- 상: 선택 제품 리스트 -->
+    <!-- 가운데: 선택 제품 리스트 (1/3) -->
       <div class="cmb-sel card">
         <div class="cmb-card-head">
           <span>📋 선택 제품 리스트 <b id="cmbEditFlag" style="display:none;color:#D97706;font-size:11px;font-weight:700;margin-left:6px;"></b></span>
@@ -2220,7 +2228,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="cmb-empty">저장된 세트가 없습니다.</div>
         </div>
       </div>
-    </div>
   </div>
 </div><!-- /pc-view-combo -->
 </div><!-- /page-price (이 닫는 태그 누락으로 이후 페이지들이 단가계산기 안에 중첩되어 안 보이던 버그 수정) -->
@@ -2519,23 +2526,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 <!-- 위탁: 주문 추가/수정 모달 -->
 <div id="csOrderModal" class="pc-modal-bg">
-  <div style="background:var(--bg);border-radius:14px;padding:24px;width:420px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
-    <div id="csOrderModalTitle" style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:18px;">＋ 주문 추가</div>
+  <div style="background:var(--bg);border-radius:14px;padding:22px;width:min(94vw,520px);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div id="csOrderModalTitle" style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:16px;">＋ 주문 추가</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div><div class="pc-lbl">위탁 배송처</div><select id="csOVendor" class="pc-inp" style="cursor:pointer;" onchange="csOrderVendorChange()"></select></div>
       <div><div class="pc-lbl">날짜</div><input type="date" id="csODate" class="pc-inp"/></div>
-      <div style="grid-column:1/-1;"><div class="pc-lbl">구매제품</div>
-        <select id="csOProduct" class="pc-inp" style="cursor:pointer;" onchange="csUpdateOrderPreview()"></select>
-      </div>
-      <div><div class="pc-lbl">고객명 (선택)</div><input type="text" id="csOCustomer" class="pc-inp" placeholder="고객/수령인" autocomplete="off"/></div>
-      <div><div class="pc-lbl">수량</div><input type="number" id="csOQty" class="pc-inp" placeholder="1" min="1" value="1" oninput="csUpdateOrderPreview()"/></div>
-      <div style="grid-column:1/-1;background:var(--bg2);border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:12px;color:var(--tx2);">발생금액 (부가세포함단가 × 수량, 자동)</span>
-        <span id="csOVatPreview" style="font-size:15px;font-weight:700;color:#3182F6;">0원</span>
-      </div>
-      <div style="grid-column:1/-1;font-size:11px;color:var(--tx2);line-height:1.5;">배송비·정산금액은 저장 후 리스트에서 직접 입력하면 마진이 자동 계산됩니다.</div>
+      <div style="grid-column:1/-1;"><div class="pc-lbl">고객명 (선택)</div><input type="text" id="csOCustomer" class="pc-inp" placeholder="고객/수령인" autocomplete="off"/></div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:18px;">
+    <div class="pc-lbl" style="margin:13px 0 5px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>구매제품 <span style="font-weight:400;color:var(--tx2);">· 수량 입력 (여러 제품 선택 가능)</span></span>
+      <input id="csOProdSearch" placeholder="제품 검색" autocomplete="off" oninput="csOrderRenderPicker()" style="width:130px;border:1px solid var(--bd);border-radius:7px;padding:5px 9px;font-size:11.5px;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;"/>
+    </div>
+    <div id="csOProdList" style="border:1px solid var(--bd);border-radius:10px;overflow:auto;min-height:120px;max-height:40vh;"></div>
+    <div style="margin-top:12px;background:var(--bg2);border-radius:8px;padding:10px 13px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;color:var(--tx2);">발생금액 합계 · <span id="csOItemCnt" style="font-weight:600;color:var(--tx);">0개 품목</span></span>
+      <span id="csOVatPreview" style="font-size:16px;font-weight:800;color:#3182F6;">0원</span>
+    </div>
+    <div style="grid-column:1/-1;font-size:11px;color:var(--tx2);line-height:1.5;margin-top:8px;">배송비·정산금액은 저장 후 리스트에서 입력하면 마진이 자동 계산됩니다.</div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
       <button onclick="document.getElementById('csOrderModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
       <button onclick="csConfirmOrder()" style="flex:2;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">저장</button>
     </div>
@@ -15868,10 +15876,27 @@ async function cmbLoadCats(){
   cmbRenderCatBar();
 }
 async function cmbSaveCats(){ await cloudKvSave('combo_cats', _cmbCats); }
+// 구분별 고유 색상 (이름 해시 → 팔레트) — 저장 세트 가시성용
+const _CMB_CAT_COLORS = [
+  {bg:'#EEF4FF',fg:'#2563EB'},{bg:'#F0FDF4',fg:'#059669'},{bg:'#FEF2F2',fg:'#DC2626'},
+  {bg:'#FFF7ED',fg:'#EA580C'},{bg:'#FAF5FF',fg:'#9333EA'},{bg:'#FDF2F8',fg:'#DB2777'},
+  {bg:'#F0FDFA',fg:'#0D9488'},{bg:'#FEFCE8',fg:'#CA8A04'},{bg:'#EEF2FF',fg:'#4F46E5'},
+  {bg:'#F7FEE7',fg:'#65A30D'},{bg:'#FFF1F2',fg:'#E11D48'},{bg:'#ECFEFF',fg:'#0891B2'}
+];
+function _cmbCatColor(name){
+  const s=String(name||''); let h=0;
+  for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return _CMB_CAT_COLORS[h % _CMB_CAT_COLORS.length];
+}
 function cmbRenderCatBar(){
   const bar = document.getElementById('cmbCatBar'); if(!bar) return;
   let html = `<button class="cmb-cat-chip ${_cmbCatFilter===''?'active':''}" onclick="cmbSetFilter('')">전체</button>`;
-  html += _cmbCats.map(c=>`<button class="cmb-cat-chip ${_cmbCatFilter===c?'active':''}" onclick="cmbSetFilter('${_cmbEsc(c)}')">${_cmbEsc(c)}</button>`).join('');
+  html += _cmbCats.map(c=>{
+    const col=_cmbCatColor(c), on=_cmbCatFilter===c;
+    const style = on ? `background:${col.fg};border-color:${col.fg};color:#fff;`
+                     : `background:${col.bg};border-color:${col.fg}55;color:${col.fg};`;
+    return `<button class="cmb-cat-chip" style="${style}" onclick="cmbSetFilter('${_cmbEsc(c)}')">${_cmbEsc(c)}</button>`;
+  }).join('');
   html += `<button class="cmb-cat-add" onclick="cmbAddCat()">＋ 구분 추가</button>`;
   bar.innerHTML = html;
 }
@@ -15903,7 +15928,7 @@ function cmbRenderSaved(){
   box.innerHTML = list.map(s=>`
     <div class="cmb-set-card" ondblclick="cmbOpenDetail('${_cmbEsc(s.id)}')" title="더블클릭하여 상세 보기">
       <div style="min-width:0;">
-        <div class="cmb-set-nm">${s.cat?`<span class="cmb-cat-tag">${_cmbEsc(s.cat)}</span>`:''}${_cmbEsc(s.name)}</div>
+        <div class="cmb-set-nm">${s.cat?`<span class="cmb-cat-tag" style="background:${_cmbCatColor(s.cat).bg};color:${_cmbCatColor(s.cat).fg};">${_cmbEsc(s.cat)}</span>`:''}${_cmbEsc(s.name)}</div>
         <div class="cmb-set-meta">${(s.items||[]).length}개 품목 · ${_cmbEsc(s.date||'')}${s.author?' · '+_cmbEsc(s.author):''}</div>
       </div>
       <div class="cmb-set-amt">${_cmbWon(s.total)}</div>
@@ -16043,9 +16068,17 @@ function _csMigrate(){
     p.vendorId = vd.id; if(!p.vendor) p.vendor = name; changed = true;
   });
   _csOrders.forEach(o=>{
-    if(o.vendorId) return;
-    const p = _csProducts.find(x=>x.id===o.productId);
-    if(p && p.vendorId){ o.vendorId = p.vendorId; changed = true; }
+    if(!o.vendorId){
+      const p = _csProducts.find(x=>x.id===o.productId);
+      if(p && p.vendorId){ o.vendorId = p.vendorId; changed = true; }
+    }
+    // 단일제품 주문 → items 배열로 승격(여러 제품 지원)
+    if(!Array.isArray(o.items)){
+      o.items = o.productId ? [{ productId:o.productId, productName:o.productName, productCode:o.productCode||'', vatUnit:o.vatUnit||0, qty:o.qty||0, vatTotal:o.vatTotal||((o.vatUnit||0)*(o.qty||0)) }] : [];
+      changed = true;
+    }
+    const sum = o.items.reduce((s,it)=>s+(it.vatTotal||0),0);
+    if(o.vatTotal !== sum){ o.vatTotal = sum; changed = true; }
   });
   return changed;
 }
@@ -16235,7 +16268,8 @@ async function csDeleteProd(id){
   toast('제품을 삭제했습니다.');
 }
 
-// ── 주문·거래 리스트 ──
+// ── 주문·거래 리스트 (한 주문에 여러 제품) ──
+let _csOrderQty = {};   // 모달 작업용 {productId: qty}
 function csOpenOrderModal(id){
   if(!_csVendors.length){ toast('먼저 [＋ 배송처]로 위탁 배송처를 추가하세요.'); return; }
   if(!_csProducts.length){ toast('먼저 [제품 세팅]에서 제품을 등록하세요.'); return; }
@@ -16244,39 +16278,68 @@ function csOpenOrderModal(id){
   document.getElementById('csOrderModalTitle').textContent = o ? '✏️ 주문 수정' : '＋ 주문 추가';
   const defVendor = o ? o.vendorId : (_csSelVendor!=='ALL' ? _csSelVendor : (_csVendors[0]&&_csVendors[0].id));
   document.getElementById('csOVendor').innerHTML = _csVendorOptions(defVendor);
-  csOrderVendorChange();   // 제품 select 채우기
   document.getElementById('csODate').value = o?o.date:_csToday();
   document.getElementById('csOCustomer').value = o?o.customer||'':'';
-  if(o){ const sel=document.getElementById('csOProduct'); if(_csProducts.find(p=>p.id===o.productId&&p.vendorId===o.vendorId)) sel.value=o.productId; }
-  document.getElementById('csOQty').value = o?o.qty:1;
-  csUpdateOrderPreview();
+  document.getElementById('csOProdSearch').value = '';
+  _csOrderQty = {};
+  if(o){ (o.items||[]).forEach(it=>{ if(it.qty>0) _csOrderQty[it.productId] = it.qty; }); }
+  csOrderRenderPicker(); csOrderRecalc();
   document.getElementById('csOrderModal').style.display='flex';
-  setTimeout(()=>document.getElementById('csOProduct').focus(),50);
 }
-function csOrderVendorChange(){
+function csOrderVendorChange(){   // 배송처 직접 변경 → 제품 목록 교체(수량 초기화)
+  _csOrderQty = {};
+  const s = document.getElementById('csOProdSearch'); if(s) s.value='';
+  csOrderRenderPicker(); csOrderRecalc();
+}
+function csOrderRenderPicker(){
   const vid = document.getElementById('csOVendor').value;
-  const sel = document.getElementById('csOProduct');
-  const prods = _csProducts.filter(p=>p.vendorId===vid);
-  sel.innerHTML = prods.length
-    ? prods.map(p=>`<option value="${_csEsc(p.id)}">${_csEsc(p.name)}${p.code?` (${_csEsc(p.code)})`:''} — ${_csWon(p.vat)}</option>`).join('')
-    : `<option value="">(이 배송처에 등록된 제품 없음)</option>`;
-  csUpdateOrderPreview();
+  const q = (document.getElementById('csOProdSearch').value||'').trim().toLowerCase();
+  const all = _csProducts.filter(p=>p.vendorId===vid);
+  let prods = all;
+  if(q) prods = all.filter(p=>[p.name,p.code,p.cat].some(v=>(v||'').toLowerCase().includes(q)));
+  const box = document.getElementById('csOProdList');
+  if(!prods.length){
+    box.innerHTML = `<div style="padding:20px;text-align:center;color:var(--tx2);font-size:12px;">${all.length?'검색 결과가 없습니다.':'이 배송처에 등록된 제품이 없습니다. [제품 세팅]에서 먼저 등록하세요.'}</div>`;
+    return;
+  }
+  box.innerHTML = prods.map(p=>{
+    const qv = _csOrderQty[p.id]||'';
+    return `<div class="cs-pickrow">
+      <div class="cs-pickrow-info">
+        <div class="cs-pickrow-name">${_csEsc(p.name)}</div>
+        <div class="cs-pickrow-sub">${p.code?'No. '+_csEsc(p.code)+' · ':''}${_csWon(p.vat)}</div>
+      </div>
+      <input type="number" min="0" placeholder="0" value="${qv}" class="cs-pickrow-qty ${qv?'cs-has':''}" oninput="csOrderSetQty('${_csEsc(p.id)}',this.value,this)">
+    </div>`;
+  }).join('');
 }
-function csUpdateOrderPreview(){
-  const p = _csProducts.find(x=>x.id===document.getElementById('csOProduct').value);
-  const qty = Math.max(1, Math.floor(Number(document.getElementById('csOQty').value)||1));
-  document.getElementById('csOVatPreview').textContent = _csWon(p?(p.vat*qty):0);
+function csOrderSetQty(pid, val, el){
+  const n = Math.max(0, Math.floor(Number(val)||0));
+  if(n) _csOrderQty[pid] = n; else delete _csOrderQty[pid];
+  if(el) el.classList.toggle('cs-has', !!n);
+  csOrderRecalc();
+}
+function csOrderRecalc(){
+  let total=0, cnt=0;
+  Object.entries(_csOrderQty).forEach(([pid,qty])=>{
+    const p=_csProducts.find(x=>x.id===pid);
+    if(p && qty>0){ total += p.vat*qty; cnt++; }
+  });
+  document.getElementById('csOVatPreview').textContent = _csWon(total);
+  document.getElementById('csOItemCnt').textContent = cnt+'개 품목';
 }
 async function csConfirmOrder(){
   const vendorId = document.getElementById('csOVendor').value;
-  const p = _csProducts.find(x=>x.id===document.getElementById('csOProduct').value);
-  if(!p){ toast('구매제품을 선택하세요.'); return; }
   const date = document.getElementById('csODate').value;
   if(!date){ toast('날짜를 선택하세요.'); return; }
   const customer = (document.getElementById('csOCustomer').value||'').trim();
-  const qty = Math.max(1, Math.floor(Number(document.getElementById('csOQty').value)||1));
-  const vatUnit = p.vat;
-  const base = { vendorId:p.vendorId, date, customer, productId:p.id, productName:p.name, productCode:p.code||'', vatUnit, qty, vatTotal: vatUnit*qty };
+  const items = []; let vatTotal = 0;
+  Object.entries(_csOrderQty).forEach(([pid,qty])=>{
+    const p=_csProducts.find(x=>x.id===pid);
+    if(p && qty>0){ const lt=p.vat*qty; items.push({ productId:p.id, productName:p.name, productCode:p.code||'', vatUnit:p.vat, qty, vatTotal:lt }); vatTotal += lt; }
+  });
+  if(!items.length){ toast('제품 수량을 1개 이상 입력하세요.'); return; }
+  const base = { vendorId, date, customer, items, vatTotal };
   if(_csEditOrderId){
     const o = _csOrders.find(x=>x.id===_csEditOrderId);
     if(o) Object.assign(o, base);   // shipping/settlement 유지
@@ -16303,7 +16366,10 @@ function _csOrderFilter(){
   let list = _csOrders.slice();
   if(_csSelVendor!=='ALL') list = list.filter(o=>o.vendorId===_csSelVendor);
   if(month) list = list.filter(o => (o.date||'').slice(0,7)===month);
-  if(q) list = list.filter(o => [o.customer,o.productName,o.productCode,_csVendorName(o.vendorId)].some(v=>(v||'').toLowerCase().includes(q)));
+  if(q) list = list.filter(o => {
+    const hay = [o.customer, _csVendorName(o.vendorId)].concat((o.items||[]).flatMap(it=>[it.productName,it.productCode]));
+    return hay.some(v=>(v||'').toLowerCase().includes(q));
+  });
   return list;
 }
 function csRenderOrders(){
@@ -16316,13 +16382,11 @@ function csRenderOrders(){
   csRenderSummary(list);
   if(!_csVendors.length){ card.innerHTML = `<div class="cs-empty">먼저 위쪽 <b>[＋ 배송처]</b>로 위탁 배송처를 추가하세요.</div>`; return; }
   if(!list.length){ card.innerHTML = `<div class="cs-empty">${_csOrders.length?'조건에 맞는 주문이 없습니다.':'저장된 주문이 없습니다. <b>[＋ 주문 추가]</b>로 등록하세요.'}</div>`; return; }
-  card.innerHTML = `<table class="cs-table" style="min-width:940px;"><thead><tr>
+  card.innerHTML = `<table class="cs-table" style="min-width:980px;"><thead><tr>
       <th style="width:96px;">날짜</th>
       ${showV?'<th style="width:96px;">배송처</th>':''}
       <th style="width:90px;">고객명</th>
-      <th style="text-align:left;">구매제품</th>
-      <th style="width:46px;">수량</th>
-      <th style="width:104px;">부가세 포함단가</th>
+      <th style="text-align:left;min-width:220px;">구매제품</th>
       <th style="width:104px;">발생금액</th>
       <th style="width:96px;">배송비</th>
       <th style="width:108px;">정산금액</th>
@@ -16331,13 +16395,16 @@ function csRenderOrders(){
       <th style="width:44px;text-align:center;">관리</th>
     </tr></thead><tbody>${list.map(o=>{
       const m = _csOrderMargin(o);
+      const items = (o.items&&o.items.length) ? o.items : (o.productId ? [{productName:o.productName,productCode:o.productCode,vatUnit:o.vatUnit,qty:o.qty}] : []);
+      const itemsHtml = items.map(it=>`<div style="${items.length>1?'padding:2px 0;':''}">
+          <span>${_csEsc(it.productName)}</span>${it.productCode?`<span style="font-weight:400;color:var(--tx2);font-size:11px;font-family:ui-monospace,monospace;"> (${_csEsc(it.productCode)})</span>`:''}
+          <span style="color:var(--tx2);font-size:11px;"> × ${it.qty}개</span>
+        </div>`).join('');
       return `<tr>
       <td style="text-align:center;">${_csEsc(o.date)}</td>
       ${showV?`<td style="text-align:center;"><span class="cs-tag cs-vendor-tag">${_csEsc(_csVendorName(o.vendorId))}</span></td>`:''}
       <td style="text-align:center;">${_csEsc(o.customer||'—')}</td>
-      <td class="cs-name">${_csEsc(o.productName)}${o.productCode?`<span style="font-weight:400;color:var(--tx2);font-size:11px;font-family:ui-monospace,monospace;"> (${_csEsc(o.productCode)})</span>`:''}</td>
-      <td>${o.qty}</td>
-      <td style="color:var(--tx2);">${_csWon(o.vatUnit)}</td>
+      <td class="cs-name">${itemsHtml}</td>
       <td style="color:#3182F6;font-weight:600;">${_csWon(o.vatTotal)}</td>
       <td><input type="number" min="0" class="cs-cell-inp ${(o.shipping||0)?'':'cs-empty-hint'}" value="${o.shipping||''}" placeholder="입력" oninput="csOnShip('${_csEsc(o.id)}',this.value)" onchange="csSaveOrders()"></td>
       <td><input type="number" min="0" class="cs-cell-inp ${m.has?'':'cs-empty-hint'}" value="${o.settlement||''}" placeholder="입력" oninput="csOnSettle('${_csEsc(o.id)}',this.value)" onchange="csSaveOrders()"></td>
