@@ -2607,6 +2607,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div><label for="moeumBase">할인가 (대표가)<span class="moeum-editable-hint">직접 입력 가능</span></label><input type="number" id="moeumBase" placeholder="자동 계산" step="100"></div>
       <div><label for="moeumRange">허용 변동폭 (%)</label><input type="number" id="moeumRange" value="50" step="1" readonly style="background:var(--bg2);color:var(--tx2);cursor:not-allowed;"></div>
       <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">옵션가 허용 범위 (판매가 기준)</div><div class="val" id="moeumRangeOut">-</div></div></div>
+      <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">최종가 범위 (대표가 기준)</div><div class="val" id="moeumFinalRangeOut">-</div></div></div>
     </div>
     <div id="moeumDiscountStatusBar" class="moeum-discount-status-bar"></div>
     <div id="moeumDiscountRecoBox" class="moeum-discount-reco"></div>
@@ -16796,6 +16797,12 @@ function moeumRender(src){
   const optMin = -sell * (pct/100);
   const optMax =  sell * (pct/100);
   document.getElementById('moeumRangeOut').textContent = sell > 0 ? (_moeumFmt(optMin) + '원 ~ +' + _moeumFmt(optMax) + '원') : '-';
+  const finalRangeOutEl = document.getElementById('moeumFinalRangeOut');
+  if(sell > 0 && finalBase > 0){
+    finalRangeOutEl.textContent = _moeumFmt(finalBase + optMin) + '원 ~ ' + _moeumFmt(finalBase + optMax) + '원';
+  } else {
+    finalRangeOutEl.textContent = '-';
+  }
 
   const statusBar = document.getElementById('moeumDiscountStatusBar');
   const warn = sell > 0 && finalDiscAmt > 0 && finalDiscRate >= 49;
