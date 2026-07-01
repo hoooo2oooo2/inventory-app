@@ -9937,15 +9937,18 @@ async function downloadDailyExcel(){
   fmt(ws2,totR,4,WON); fmt(ws2,totR,5,MARGIN_FMT); fmt(ws2,totR,6,PCT);
   U.book_append_sheet(wb,ws2,'제품별_판매현황');
 
-  // ── 상세데이터 시트 (선택월 1일~기준일 누적) ──
+  // ── 상세데이터 시트 (다운로드 기준일 기준: 특정 일자 선택 시 해당 일자만, 미선택 시 1일~기준일 누적) ──
   const chIdx=ch=>{const i=CH_ORDER.indexOf(ch);return i>=0?i:999;};
-  const detail=[...cumRows].sort((a,b)=>{
+  const detail=[...dayRowsForBreakdown].sort((a,b)=>{
     const dc=(a.date||'').localeCompare(b.date||''); if(dc)return dc;
     const cc=chIdx(a.ch)-chIdx(b.ch); if(cc)return cc;
     return(a.orderNo||'').localeCompare(b.orderNo||'');
   });
+  const detailTitle=_dlyFilter.day!==null
+    ?`상세 데이터 - ${selY}-${selMonStr}-${pad(endDay)} [${chLabel}]`
+    :`상세 데이터 - ${selY}-${selMonStr} (1일~${pad(endDay)}일 누적) [${chLabel}]`;
   const s3=[];
-  s3.push([`상세 데이터 - ${selY}-${selMonStr} (1일~${pad(endDay)}일 누적) [${chLabel}]`]);
+  s3.push([detailTitle]);
   s3.push([]);
   s3.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2','우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수','배송비','판매가','매입액','마진','마진율','개당단가']);
   detail.forEach(r=>s3.push([r.year,r.date,r.ch,r.orderNo,r.buyer,r.receiver,r.phone1,r.phone2,r.zip,r.addr,r.itemType,r.itemCode,r.modelName,r.orderQty,r.shipQty,r.shipping,r.salePrice,r.costPrice,r.margin,r.marginRate,r.unitCost]));
