@@ -4778,9 +4778,9 @@ async function logiStartNoticeWatch(){
   // 기준선: 로그인 시점의 가장 최근 공지/전달사항 id (기존 항목으로는 알람 X)
   try{ const cur=(await cloudKvLoad('logi_notices'))||[]; _logiNotices=cur; _logiSeenNoticeId=_logiLatestId(cur); }catch{}
   try{ const h=(await cloudKvLoad('logi_handovers'))||[]; _logiHandovers=h; _logiSeenHandoverId=_logiLatestId(h); }catch{}
-  // 폴링 폴백 (12초, updated_at만 확인 → 변경 시에만 전체 로드) — broadcast가 즉시성 담당, 폴링은 안전망
+  // 폴링 폴백 (60초, updated_at만 확인 → 변경 시에만 전체 로드) — broadcast가 즉시성 담당, 폴링은 안전망
   if(!_logiWatchPoll){
-    _logiWatchPoll = setInterval(_logiPollTick, 12000);
+    _logiWatchPoll = setInterval(_logiPollTick, 60000);
     // 백그라운드였다 돌아오면 즉시 1회 점검(놓친 변경 따라잡기)
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _logiPollTick(); });
   }
@@ -12899,7 +12899,7 @@ return `<div class="plan-card${isExp?' expanded':''}${isWip?' wip-card':''}"
 }
 
 function collabStartRealtime(){
-  // 폴링 폴백 (4초) — realtime publication 미설정 환경에서도 동작
+  // 폴링 폴백 (30초) — realtime publication 미설정 환경에서도 동작
   if(!_collabPoll){
     let _cv = { collab:undefined, plan:undefined };
     _collabPoll = setInterval(async ()=>{
@@ -12915,9 +12915,9 @@ function collabStartRealtime(){
       if(JSON.stringify(arr) !== JSON.stringify(_collabTasks)){ _collabTasks = arr; changed = true; }
       if(JSON.stringify(planArr) !== JSON.stringify(_planProjects)){ _planProjects = planArr; renderPlanProjects(); }
       if(changed){ renderCollab(); _collabSyncMark(); }
-    }, 20000);
+    }, 30000);
   }
-  // Supabase realtime (즉시 반영) — Broadcast(publication 불필요) + postgres_changes 동시. 폴링은 안전망(20s)
+  // Supabase realtime (즉시 반영) — Broadcast(publication 불필요) + postgres_changes 동시. 폴링은 안전망(30s)
   if(_collabChannel) return;
   try{
     const _collabApply = async ()=>{ if(_collabBusy) return; await collabReload(); renderCollab(); renderPlanProjects(); _collabSyncMark(); };
