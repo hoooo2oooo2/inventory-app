@@ -2538,18 +2538,27 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-moeum .moeum-range-box.warn{background:#fdeef0;border-color:#f3c6cd;}
 #page-moeum .moeum-range-box.warn .lbl, #page-moeum .moeum-range-box.warn .val{color:#e0455a;}
 #page-moeum .moeum-range-box .sub{font-size:11px;margin-top:2px;font-weight:600;}
+#page-moeum .moeum-editable-hint{font-size:10px;color:var(--pr);font-weight:500;margin-left:5px;background:var(--prl);padding:1px 5px;border-radius:4px;}
+#page-moeum .moeum-discount-status-bar{margin-top:12px;font-size:12.5px;font-weight:600;display:none;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;}
+#page-moeum .moeum-discount-status-bar.ok{display:flex;background:#e8f8f1;color:#22a06b;}
+#page-moeum .moeum-discount-status-bar.warn{display:flex;background:#fdeef0;color:#e0455a;}
 #page-moeum .moeum-discount-reco{margin-top:12px;}
 #page-moeum .moeum-discount-reco:empty{margin-top:0;}
 #page-moeum .moeum-discount-reco-inner{background:#fdeef0;border:1px solid #f3c6cd;border-radius:10px;padding:10px 14px;font-size:12.5px;color:#e0455a;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 #page-moeum .moeum-reco-chip{font-weight:700;text-decoration:underline;text-decoration-style:dotted;cursor:pointer;}
 #page-moeum .moeum-reco-chip:hover{color:var(--pr);}
 #page-moeum table.moeum-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}
-#page-moeum table.moeum-table colgroup col:nth-child(1){width:32%;}
-#page-moeum table.moeum-table colgroup col:nth-child(2){width:15%;}
-#page-moeum table.moeum-table colgroup col:nth-child(3){width:15%;}
-#page-moeum table.moeum-table colgroup col:nth-child(4){width:12%;}
-#page-moeum table.moeum-table colgroup col:nth-child(5){width:16%;}
-#page-moeum table.moeum-table colgroup col:nth-child(6){width:10%;}
+#page-moeum table.moeum-table colgroup col:nth-child(1){width:28px;}
+#page-moeum table.moeum-table colgroup col:nth-child(2){width:38%;}
+#page-moeum table.moeum-table colgroup col:nth-child(3){width:14%;}
+#page-moeum table.moeum-table colgroup col:nth-child(4){width:14%;}
+#page-moeum table.moeum-table colgroup col:nth-child(5){width:10%;}
+#page-moeum table.moeum-table colgroup col:nth-child(6){width:14%;}
+#page-moeum table.moeum-table colgroup col:nth-child(7){width:8%;}
+#page-moeum .moeum-drag-handle{text-align:center;color:var(--tx2);cursor:grab;font-size:16px;user-select:none;padding:8px 4px;}
+#page-moeum .moeum-drag-handle:active{cursor:grabbing;}
+#page-moeum tr.moeum-dragging{opacity:0.4;}
+#page-moeum tr.moeum-drag-over td{border-top:2px solid var(--pr);}
 #page-moeum table.moeum-table thead th{text-align:left;padding:9px 7px;font-weight:600;color:var(--tx2);border-bottom:1.5px solid var(--bd);font-size:11.5px;}
 #page-moeum table.moeum-table thead th.r{text-align:right;}
 #page-moeum table.moeum-table thead th.c{text-align:center;}
@@ -2594,21 +2603,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="moeum-top-grid">
       <div><label for="moeumSell">판매가</label><input type="number" id="moeumSell" placeholder="예: 50000" step="100"></div>
       <div><label for="moeumDiscount">기본할인 (원)</label><input type="number" id="moeumDiscount" placeholder="예: 30000" step="100"></div>
-      <div><label for="moeumRange">허용 변동폭 (%)</label><input type="number" id="moeumRange" value="50" step="1"></div>
-    </div>
-    <div class="moeum-top-grid" style="margin-top:14px;">
-      <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">할인가 (대표가)</div><div class="val" id="moeumBaseOut">-</div></div></div>
-      <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">할인율</div><div class="val" id="moeumDiscountOut">-</div><div class="sub" id="moeumDiscountStatus"></div></div></div>
+      <div><label for="moeumDiscountRate">할인율 (%)<span class="moeum-editable-hint">직접 입력 가능</span></label><input type="number" id="moeumDiscountRate" placeholder="예: 48" step="0.1" min="0" max="99.9"></div>
+      <div><label for="moeumBase">할인가 (대표가)<span class="moeum-editable-hint">직접 입력 가능</span></label><input type="number" id="moeumBase" placeholder="자동 계산" step="100"></div>
+      <div><label for="moeumRange">허용 변동폭 (%)</label><input type="number" id="moeumRange" value="50" step="1" readonly style="background:var(--bg2);color:var(--tx2);cursor:not-allowed;"></div>
       <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">옵션가 허용 범위 (판매가 기준)</div><div class="val" id="moeumRangeOut">-</div></div></div>
     </div>
+    <div id="moeumDiscountStatusBar" class="moeum-discount-status-bar"></div>
     <div id="moeumDiscountRecoBox" class="moeum-discount-reco"></div>
   </div>
 
   <div class="moeum-card">
     <div class="moeum-card-title">옵션 목록 <span class="moeum-badge-count" id="moeumRowCount">0</span></div>
     <table class="moeum-table">
-      <colgroup><col><col><col><col><col><col></colgroup>
-      <thead><tr><th>옵션명</th><th class="r">옵션가</th><th class="r">최종판매가</th><th class="c">상태</th><th class="r">추천 금액</th><th></th></tr></thead>
+      <colgroup><col><col><col><col><col><col><col></colgroup>
+      <thead><tr><th></th><th>옵션명</th><th class="r">옵션가</th><th class="r">최종판매가</th><th class="c">상태</th><th class="r">추천 금액</th><th></th></tr></thead>
       <tbody id="moeumRows"></tbody>
     </table>
     <div class="moeum-actions">
@@ -16639,18 +16647,41 @@ function csRenderSummary(list){
 let _moeumLoaded = false;
 let _moeumSuppressSave = false;
 let _moeumSaveTimer = null;
+let _moeumDragSrc = null;
+let _moeumUploadSchema = null;   // 업로드 파일의 열 구조 보존(다운로드 시 동일 양식 적용)
+const _MOEUM_DEFAULT_SCHEMA = { nameHeaders:['옵션 선택'], priceHeader:'옵션가', stockHeader:'재고수량', codeHeader:'관리코드', usedHeader:'사용여부' };
 
 function _moeumFmt(n){ return Math.round(n).toLocaleString('ko-KR'); }
 
-function _moeumMakeRow(name, price){
+function _moeumMakeRow(name, price, stock, code){
   const tr = document.createElement('tr');
+
+  const handleTd = document.createElement('td');
+  handleTd.className = 'moeum-drag-handle';
+  handleTd.innerHTML = '⠿';
+  handleTd.title = '드래그하여 순서 변경';
+  handleTd.addEventListener('mousedown', () => { tr.draggable = true; });
+  handleTd.addEventListener('mouseup', () => { tr.draggable = false; });
+  tr.appendChild(handleTd);
 
   const nameTd = document.createElement('td');
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.value = name;
   nameInput.addEventListener('input', moeumRender);
+  nameInput.addEventListener('mousedown', () => { tr.draggable = false; });
   nameTd.appendChild(nameInput);
+
+  const stockInput = document.createElement('input');
+  stockInput.type = 'hidden';
+  stockInput.dataset.role = 'stock';
+  stockInput.value = stock || '';
+  nameTd.appendChild(stockInput);
+  const codeInput = document.createElement('input');
+  codeInput.type = 'hidden';
+  codeInput.dataset.role = 'code';
+  codeInput.value = code || '';
+  nameTd.appendChild(codeInput);
 
   const priceTd = document.createElement('td');
   const priceInput = document.createElement('input');
@@ -16688,61 +16719,108 @@ function _moeumMakeRow(name, price){
   tr.appendChild(recoTd);
   tr.appendChild(delTd);
 
+  tr.addEventListener('dragstart', (e) => {
+    _moeumDragSrc = tr;
+    setTimeout(() => tr.classList.add('moeum-dragging'), 0);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  tr.addEventListener('dragend', () => {
+    tr.draggable = false;
+    tr.classList.remove('moeum-dragging');
+    document.querySelectorAll('#moeumRows tr').forEach(r => r.classList.remove('moeum-drag-over'));
+  });
+  tr.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('#moeumRows tr').forEach(r => r.classList.remove('moeum-drag-over'));
+    if(tr !== _moeumDragSrc) tr.classList.add('moeum-drag-over');
+  });
+  tr.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if(_moeumDragSrc && _moeumDragSrc !== tr){
+      const rows = [...document.getElementById('moeumRows').children];
+      const srcIdx = rows.indexOf(_moeumDragSrc);
+      const tgtIdx = rows.indexOf(tr);
+      if(srcIdx < tgtIdx) tr.after(_moeumDragSrc);
+      else tr.before(_moeumDragSrc);
+      moeumRender();
+    }
+    tr.classList.remove('moeum-drag-over');
+  });
+
   return tr;
 }
 
-function moeumRender(){
+function moeumRender(src){
   const sellInput = document.getElementById('moeumSell');
   const discountInput = document.getElementById('moeumDiscount');
+  const discountRateInput = document.getElementById('moeumDiscountRate');
+  const baseInput = document.getElementById('moeumBase');
   const rangeInput = document.getElementById('moeumRange');
   const rowsEl = document.getElementById('moeumRows');
   if(!sellInput || !rowsEl) return;
 
   const sell = parseFloat(sellInput.value) || 0;
-  const discountAmt = parseFloat(discountInput.value) || 0;
-  const base = sell > 0 ? Math.max(sell - discountAmt, 0) : 0;
-  const pct = parseFloat(rangeInput.value) || 0;
+  const pct  = parseFloat(rangeInput.value) || 0;
 
-  const optMin = -sell * (pct/100);
-  const optMax = sell * (pct/100);
-  const rangeOut = document.getElementById('moeumRangeOut');
-  rangeOut.textContent = sell > 0 ? (_moeumFmt(optMin) + '원 ~ +' + _moeumFmt(optMax) + '원') : '-';
+  let discountAmt  = parseFloat(discountInput.value)     || 0;
+  let discountRate = parseFloat(discountRateInput.value);
+  let base         = parseFloat(baseInput.value);
 
-  const baseOut = document.getElementById('moeumBaseOut');
-  const discountOut = document.getElementById('moeumDiscountOut');
-  const discountStatusEl = document.getElementById('moeumDiscountStatus');
-  const discountRecoBox = document.getElementById('moeumDiscountRecoBox');
-  if(sell > 0 && discountAmt > 0){
-    baseOut.textContent = _moeumFmt(base) + '원';
-    const discountPct = discountAmt / sell * 100;
-    discountOut.textContent = discountPct.toFixed(1) + '%';
-    const warn = discountPct > 50;
-    discountOut.parentElement.classList.toggle('warn', warn);
-    baseOut.parentElement.classList.toggle('warn', warn);
-    discountStatusEl.textContent = warn ? '50% 초과' : '50% 이내 (정상)';
-    discountStatusEl.style.color = warn ? '#e0455a' : '#22a06b';
-
-    if(warn){
-      const recoDiscount = Math.floor(sell * 0.5);
-      const recoSell = Math.ceil(discountAmt / 0.5);
-      discountRecoBox.innerHTML = `
-        <div class="moeum-discount-reco-inner">
-          <span>할인율이 50%를 넘었습니다. 둘 중 하나로 조정하세요:</span>
-          <span class="moeum-reco-chip" id="moeumRecoDiscountChip">기본할인을 ${_moeumFmt(recoDiscount)}원으로 낮추기</span>
-          <span>또는</span>
-          <span class="moeum-reco-chip" id="moeumRecoSellChip">판매가를 ${_moeumFmt(recoSell)}원으로 올리기</span>
-        </div>`;
-      document.getElementById('moeumRecoDiscountChip').addEventListener('click', () => { discountInput.value = recoDiscount; moeumRender(); });
-      document.getElementById('moeumRecoSellChip').addEventListener('click', () => { sellInput.value = recoSell; moeumRender(); });
+  if(sell > 0){
+    if(src === 'rate' && !isNaN(discountRate)){
+      discountAmt = Math.round(sell * discountRate / 100);
+      base        = sell - discountAmt;
+      discountInput.value = discountAmt > 0 ? discountAmt : '';
+      baseInput.value     = base > 0 ? base : '';
+    } else if(src === 'base' && !isNaN(base) && base > 0){
+      discountAmt  = sell - base;
+      discountRate = discountAmt / sell * 100;
+      discountInput.value     = discountAmt > 0 ? discountAmt : '';
+      discountRateInput.value = discountAmt > 0 ? discountRate.toFixed(1) : '';
     } else {
-      discountRecoBox.innerHTML = '';
+      base         = Math.max(sell - discountAmt, 0);
+      discountRate = sell > 0 ? discountAmt / sell * 100 : 0;
+      baseInput.value         = discountAmt > 0 ? base : '';
+      discountRateInput.value = discountAmt > 0 ? discountRate.toFixed(1) : '';
     }
   } else {
-    baseOut.textContent = sell > 0 ? _moeumFmt(sell) + '원' : '-';
-    discountOut.textContent = sell > 0 ? '0%' : '-';
-    discountOut.parentElement.classList.remove('warn');
-    baseOut.parentElement.classList.remove('warn');
-    discountStatusEl.textContent = '';
+    baseInput.value = '';
+    discountRateInput.value = '';
+  }
+
+  const finalBase     = parseFloat(baseInput.value) || 0;
+  const finalDiscAmt  = sell > 0 ? sell - finalBase : 0;
+  const finalDiscRate = sell > 0 && finalDiscAmt > 0 ? finalDiscAmt / sell * 100 : 0;
+
+  const optMin = -sell * (pct/100);
+  const optMax =  sell * (pct/100);
+  document.getElementById('moeumRangeOut').textContent = sell > 0 ? (_moeumFmt(optMin) + '원 ~ +' + _moeumFmt(optMax) + '원') : '-';
+
+  const statusBar = document.getElementById('moeumDiscountStatusBar');
+  const warn = sell > 0 && finalDiscAmt > 0 && finalDiscRate >= 49;
+  statusBar.className = 'moeum-discount-status-bar' + (sell > 0 && finalDiscAmt > 0 ? (warn ? ' warn' : ' ok') : '');
+  statusBar.textContent = sell > 0 && finalDiscAmt > 0
+    ? (warn
+        ? `⚠ 할인율 ${finalDiscRate.toFixed(1)}% — 49% 이상이므로 조정 필요`
+        : `✓ 할인율 ${finalDiscRate.toFixed(1)}% — 정상 (49% 미만)`)
+    : '';
+
+  const discountRecoBox = document.getElementById('moeumDiscountRecoBox');
+  if(warn){
+    const recoDiscount = Math.floor(sell * 0.49) - 1;
+    const recoSell     = Math.ceil(finalDiscAmt / 0.49) + 1;
+    const recoBase     = sell - recoDiscount;
+    discountRecoBox.innerHTML = `
+      <div class="moeum-discount-reco-inner">
+        <span>둘 중 하나로 조정하세요:</span>
+        <span class="moeum-reco-chip" id="moeumRecoDiscountChip">기본할인을 ${_moeumFmt(recoDiscount)}원으로 낮추기 → 할인가 ${_moeumFmt(recoBase)}원</span>
+        <span>또는</span>
+        <span class="moeum-reco-chip" id="moeumRecoSellChip">판매가를 ${_moeumFmt(recoSell)}원으로 올리기</span>
+      </div>`;
+    document.getElementById('moeumRecoDiscountChip').addEventListener('click', () => { discountInput.value = recoDiscount; moeumRender('amt'); });
+    document.getElementById('moeumRecoSellChip').addEventListener('click', () => { sellInput.value = recoSell; moeumRender(); });
+  } else {
     discountRecoBox.innerHTML = '';
   }
 
@@ -16750,10 +16828,10 @@ function moeumRender(){
   let worstName = '', worstGap = -1;
 
   [...rowsEl.children].forEach(tr => {
-    const nameVal = tr.children[0].querySelector('input').value || '이름없음';
-    const priceInputEl = tr.children[1].querySelector('input');
+    const nameVal = tr.children[1].querySelector('input').value || '이름없음';
+    const priceInputEl = tr.children[2].querySelector('input');
     const optionPrice = parseFloat(priceInputEl.value) || 0;
-    const finalPrice = base + optionPrice;
+    const finalPrice = finalBase + optionPrice;
     total++;
 
     const addTd = tr.querySelector('[data-role="add"]');
@@ -16827,13 +16905,16 @@ function _moeumScheduleSave(){
 async function _moeumSaveState(){
   const rowsEl = document.getElementById('moeumRows');
   const rows = [...rowsEl.children].map(tr => ({
-    name: tr.children[0].querySelector('input').value || '',
-    price: parseFloat(tr.children[1].querySelector('input').value) || 0
+    name: tr.children[1].querySelector('input[type=text]').value || '',
+    price: parseFloat(tr.children[2].querySelector('input').value) || 0,
+    stock: tr.children[1].querySelector('[data-role=stock]')?.value || '',
+    code: tr.children[1].querySelector('[data-role=code]')?.value || ''
   }));
   const state = {
     sellPrice: parseFloat(document.getElementById('moeumSell').value) || 0,
     discountAmt: parseFloat(document.getElementById('moeumDiscount').value) || 0,
     rangePct: parseFloat(document.getElementById('moeumRange').value) || 50,
+    uploadSchema: _moeumUploadSchema,
     rows
   };
   await cloudKvSave('moeum_calc', state);
@@ -16851,7 +16932,8 @@ async function moeumLoadAll(){
     document.getElementById('moeumSell').value = st.sellPrice || '';
     document.getElementById('moeumDiscount').value = st.discountAmt || '';
     document.getElementById('moeumRange').value = st.rangePct || 50;
-    (st.rows||[]).forEach(r => rowsEl.appendChild(_moeumMakeRow(r.name, r.price)));
+    _moeumUploadSchema = st.uploadSchema || null;
+    (st.rows||[]).forEach(r => rowsEl.appendChild(_moeumMakeRow(r.name, r.price, r.stock, r.code)));
   }
   _moeumLoaded = true;
   moeumRender();
@@ -16862,8 +16944,13 @@ function moeumClearAll(){
   if(!confirm('옵션 목록과 입력값을 모두 삭제할까요?')) return;
   document.getElementById('moeumSell').value = '';
   document.getElementById('moeumDiscount').value = '';
+  document.getElementById('moeumDiscountRate').value = '';
+  document.getElementById('moeumBase').value = '';
   document.getElementById('moeumRange').value = 50;
   document.getElementById('moeumRows').innerHTML = '';
+  _moeumUploadSchema = null;
+  const bar = document.getElementById('moeumDiscountStatusBar');
+  bar.className = 'moeum-discount-status-bar'; bar.textContent = '';
   const msgEl = document.getElementById('moeumUploadMsg');
   if(msgEl){ msgEl.className = 'moeum-upload-msg'; msgEl.textContent = ''; }
   moeumRender();
@@ -16912,13 +16999,17 @@ function _moeumReadExcelFile(file){
       }
 
       const priceKeys = ['옵션가','가격','price','단가','옵션가격'];
-      const ignoreKeys = ['재고수량','재고','관리코드','사용여부','stock','code','use'];
+      const stockKeys = ['재고수량','재고','stock'];
+      const codeKeys  = ['관리코드','code'];
+      const ignoreKeys = ['사용여부','use'];
 
       const headerRow = rowsJson[0].map(v => String(v).trim());
       const headerCandidates = headerRow.map(h => h.toLowerCase());
 
       const priceIdx = headerCandidates.findIndex(h => priceKeys.some(k => h.includes(k.toLowerCase())));
       const hasHeader = priceIdx !== -1;
+      const stockIdx = hasHeader ? headerCandidates.findIndex(h => stockKeys.some(k => h.includes(k.toLowerCase()))) : -1;
+      const codeIdx  = hasHeader ? headerCandidates.findIndex(h => codeKeys.some(k => h.includes(k.toLowerCase()))) : -1;
 
       let nameIdxs = [];
       let startIdx = 0;
@@ -16929,6 +17020,7 @@ function _moeumReadExcelFile(file){
         finalPriceIdx = priceIdx;
         headerCandidates.forEach((h, idx) => {
           if(idx === priceIdx) return;
+          if(idx === stockIdx || idx === codeIdx) return;
           if(ignoreKeys.some(k => h.includes(k.toLowerCase()))) return;
           if(h === '') return;
           nameIdxs.push(idx);
@@ -16953,7 +17045,10 @@ function _moeumReadExcelFile(file){
         let priceNum = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice).replace(/[^0-9.-]/g,''));
         if(!name && isNaN(priceNum)) continue;
 
-        parsed.push([name || '이름없음', isNaN(priceNum) ? 0 : priceNum]);
+        const stock = stockIdx >= 0 && row[stockIdx] != null ? String(row[stockIdx]) : '';
+        const code  = codeIdx  >= 0 && row[codeIdx]  != null ? String(row[codeIdx])  : '';
+
+        parsed.push([name || '이름없음', isNaN(priceNum) ? 0 : priceNum, stock, code]);
       }
 
       if(!parsed.length){
@@ -16963,11 +17058,20 @@ function _moeumReadExcelFile(file){
       }
 
       rowsEl.innerHTML = '';
-      parsed.forEach(([n,p]) => rowsEl.appendChild(_moeumMakeRow(n,p)));
+      parsed.forEach(([n,p,s,c]) => rowsEl.appendChild(_moeumMakeRow(n,p,s,c)));
+
+      _moeumUploadSchema = {
+        nameHeaders: hasHeader ? nameIdxs.map(i => headerRow[i]) : ['옵션 선택'],
+        priceHeader: hasHeader && priceIdx >= 0 ? headerRow[priceIdx] : '옵션가',
+        stockHeader: hasHeader && stockIdx >= 0 ? headerRow[stockIdx] : '재고수량',
+        codeHeader:  hasHeader && codeIdx  >= 0 ? headerRow[codeIdx]  : '관리코드',
+        usedHeader:  '사용여부',
+      };
+
       moeumRender();
 
       uploadMsg.className = 'moeum-upload-msg success';
-      uploadMsg.textContent = `${parsed.length}개 옵션을 불러왔습니다 (옵션명 ${nameIdxs.length}개 열 결합, 파일: ${file.name})`;
+      uploadMsg.textContent = `${parsed.length}개 옵션을 불러왔습니다 (옵션명 ${nameIdxs.length}개 열, 파일: ${file.name})`;
     } catch(err){
       uploadMsg.className = 'moeum-upload-msg error';
       uploadMsg.textContent = '파일을 읽는 중 오류가 발생했습니다. 형식을 확인해 주세요.';
@@ -16987,15 +17091,23 @@ document.getElementById('moeumDownloadBtn').addEventListener('click', () => {
     return;
   }
   const rowsEl = document.getElementById('moeumRows');
+  const schema = _moeumUploadSchema || _MOEUM_DEFAULT_SCHEMA;
+  const nameCols = schema.nameHeaders.length;
+
   const rowsData = [...rowsEl.children].map(tr => {
-    const name = tr.children[0].querySelector('input').value || '';
-    const price = parseFloat(tr.children[1].querySelector('input').value) || 0;
-    return [name, price, '', '', 'Y'];
+    const name  = tr.children[1].querySelector('input[type=text]').value || '';
+    const price = parseFloat(tr.children[2].querySelector('input').value) || 0;
+    const stock = tr.children[1].querySelector('[data-role=stock]')?.value || '';
+    const code  = tr.children[1].querySelector('[data-role=code]')?.value  || '';
+    const nameParts = name.split(' / ').map(s => s.trim());
+    const nameCells = Array.from({length: nameCols}, (_, i) => nameParts[i] || '');
+    return [...nameCells, price, stock, code, 'Y'];
   });
 
-  const aoa = [['사이즈', '옵션가', '재고수량', '관리코드', '사용여부'], ...rowsData];
+  const header = [...schema.nameHeaders, schema.priceHeader, schema.stockHeader, schema.codeHeader, schema.usedHeader];
+  const aoa = [header, ...rowsData];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:30},{wch:10},{wch:10},{wch:12},{wch:8}];
+  ws['!cols'] = [...schema.nameHeaders.map(() => ({wch:30})), {wch:10}, {wch:10}, {wch:12}, {wch:8}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'optionCombination');
 
@@ -17027,7 +17139,7 @@ document.getElementById('moeumApplyAllBtn').addEventListener('click', () => {
 
   let appliedCount = 0;
   [...document.getElementById('moeumRows').children].forEach(tr => {
-    const priceInputEl = tr.children[1].querySelector('input');
+    const priceInputEl = tr.children[2].querySelector('input');
     const optionPrice = parseFloat(priceInputEl.value) || 0;
     if(optionPrice < optMin || optionPrice > optMax){
       const recoVal = optionPrice > optMax ? optMax : optMin;
@@ -17044,9 +17156,11 @@ document.getElementById('moeumApplyAllBtn').addEventListener('click', () => {
     : '범위를 벗어난 옵션이 없습니다.';
 });
 
-document.getElementById('moeumDiscount').addEventListener('input', moeumRender);
-document.getElementById('moeumSell').addEventListener('input', moeumRender);
-document.getElementById('moeumRange').addEventListener('input', moeumRender);
+document.getElementById('moeumDiscount').addEventListener('input', () => moeumRender('amt'));
+document.getElementById('moeumDiscountRate').addEventListener('input', () => moeumRender('rate'));
+document.getElementById('moeumBase').addEventListener('input', () => moeumRender('base'));
+document.getElementById('moeumSell').addEventListener('input', () => moeumRender());
+document.getElementById('moeumRange').addEventListener('input', () => moeumRender());
 
 </script>
 </body>
