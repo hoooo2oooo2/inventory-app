@@ -1481,6 +1481,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-rpt_yuhyun" onclick="goMenu('rpt_yuhyun')" style="display:none;">📝 유현</div>
   <div class="ni" id="nav-rpt_bora" onclick="goMenu('rpt_bora')" style="display:none;">📝 보라</div>
   <div class="ni" id="nav-rpt_yeonjeong" onclick="goMenu('rpt_yeonjeong')" style="display:none;">📝 연정</div>
+  <div class="ni" id="nav-moeum" onclick="goMenu('moeum')" style="display:none;">🧮 모음전 계산기</div>
   <div class="ni" id="nav-logihome" onclick="goMenu('logihome')" style="display:none;">🏠 홈</div>
   <div class="ni" id="nav-logistock" onclick="goMenu('logistock')" style="display:none;">📦 발주건 정리</div>
   <div class="ni" id="nav-logibox" onclick="goMenu('logibox')" style="display:none;">📮 택배박스</div>
@@ -2494,6 +2495,128 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     </div>
     <div class="cs-card" id="csOrderCard"></div>
   </div>
+ </div>
+</div>
+
+<!-- ═══ 모음전 계산기 (디자인팀) ═══ -->
+<style>
+#page-moeum{ padding:20px 24px 40px; }
+#page-moeum .moeum-banner{background:var(--prl);border:1px solid #cdd8fb;border-radius:14px;padding:14px 18px;font-size:13px;color:#1d3fb8;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+#page-moeum .moeum-banner .dot{width:8px;height:8px;border-radius:50%;background:var(--pr);flex-shrink:0;}
+#page-moeum .moeum-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px;}
+#page-moeum .moeum-stat-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:14px;padding:16px 18px;}
+#page-moeum .moeum-stat-card.accent{border:1.5px solid var(--pr);background:var(--prl);}
+#page-moeum .moeum-stat-card .lbl{font-size:12px;color:var(--tx2);font-weight:500;margin-bottom:6px;}
+#page-moeum .moeum-stat-card .val{font-size:24px;font-weight:700;color:var(--tx);}
+#page-moeum .moeum-stat-card .val.mc-green{color:#22a06b;}
+#page-moeum .moeum-stat-card .val.mc-orange{color:#f5944a;}
+#page-moeum .moeum-stat-card .val.mc-red{color:#e0455a;}
+#page-moeum .moeum-stat-card .val.mc-blue{color:var(--pr);}
+#page-moeum .moeum-stat-card .sub{font-size:11px;color:var(--tx2);margin-top:2px;}
+#page-moeum .moeum-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:14px;padding:20px 22px;margin-bottom:18px;}
+#page-moeum .moeum-card-title{font-size:14px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:6px;color:var(--tx);}
+#page-moeum .moeum-badge-count{background:var(--pr);color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;}
+#page-moeum .moeum-top-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
+#page-moeum label{font-size:12px;color:var(--tx2);font-weight:500;display:block;margin-bottom:6px;}
+#page-moeum input[type=number], #page-moeum input[type=text]{width:100%;height:38px;border:1px solid var(--bd);border-radius:10px;padding:0 12px;font-size:13.5px;background:var(--bg2);color:var(--tx);}
+#page-moeum input[type=number]:focus, #page-moeum input[type=text]:focus{outline:none;border-color:var(--pr);box-shadow:0 0 0 3px var(--prl);background:var(--bg);}
+#page-moeum .moeum-range-box{background:var(--prl);border:1px solid #cdd8fb;border-radius:10px;padding:9px 12px;}
+#page-moeum .moeum-range-box .lbl{font-size:11px;color:#1d3fb8;margin-bottom:2px;}
+#page-moeum .moeum-range-box .val{font-size:14.5px;font-weight:700;color:#1d3fb8;}
+#page-moeum .moeum-range-box.warn{background:#fdeef0;border-color:#f3c6cd;}
+#page-moeum .moeum-range-box.warn .lbl, #page-moeum .moeum-range-box.warn .val{color:#e0455a;}
+#page-moeum .moeum-range-box .sub{font-size:11px;margin-top:2px;font-weight:600;}
+#page-moeum .moeum-discount-reco{margin-top:12px;}
+#page-moeum .moeum-discount-reco:empty{margin-top:0;}
+#page-moeum .moeum-discount-reco-inner{background:#fdeef0;border:1px solid #f3c6cd;border-radius:10px;padding:10px 14px;font-size:12.5px;color:#e0455a;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#page-moeum .moeum-reco-chip{font-weight:700;text-decoration:underline;text-decoration-style:dotted;cursor:pointer;}
+#page-moeum .moeum-reco-chip:hover{color:var(--pr);}
+#page-moeum table.moeum-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}
+#page-moeum table.moeum-table colgroup col:nth-child(1){width:32%;}
+#page-moeum table.moeum-table colgroup col:nth-child(2){width:15%;}
+#page-moeum table.moeum-table colgroup col:nth-child(3){width:15%;}
+#page-moeum table.moeum-table colgroup col:nth-child(4){width:12%;}
+#page-moeum table.moeum-table colgroup col:nth-child(5){width:16%;}
+#page-moeum table.moeum-table colgroup col:nth-child(6){width:10%;}
+#page-moeum table.moeum-table thead th{text-align:left;padding:9px 7px;font-weight:600;color:var(--tx2);border-bottom:1.5px solid var(--bd);font-size:11.5px;}
+#page-moeum table.moeum-table thead th.r{text-align:right;}
+#page-moeum table.moeum-table thead th.c{text-align:center;}
+#page-moeum table.moeum-table tbody td{padding:8px 7px;border-bottom:0.5px solid var(--bd);vertical-align:middle;}
+#page-moeum table.moeum-table tbody tr:hover{background:var(--bg2);}
+#page-moeum .moeum-add-val{font-weight:700;text-align:right;}
+#page-moeum .moeum-badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;}
+#page-moeum .moeum-badge.ok{background:#e8f8f1;color:#22a06b;}
+#page-moeum .moeum-badge.bad{background:#fdeef0;color:#e0455a;}
+#page-moeum .moeum-badge.empty{background:#f1f1f4;color:var(--tx2);}
+#page-moeum .moeum-status-cell{text-align:center;}
+#page-moeum .moeum-reco-cell{text-align:right;font-size:12px;}
+#page-moeum .moeum-reco-cell .moeum-reco-val{color:#1d3fb8;font-weight:700;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;}
+#page-moeum .moeum-reco-cell .moeum-reco-val:hover{color:var(--pr);}
+#page-moeum .moeum-reco-empty{color:var(--tx2);}
+#page-moeum .moeum-del-btn{width:30px;height:30px;border:1px solid var(--bd);background:var(--bg);border-radius:10px;cursor:pointer;color:var(--tx2);font-size:13px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
+#page-moeum .moeum-del-btn:hover{background:#fdeef0;color:#e0455a;border-color:#e0455a;}
+#page-moeum .moeum-price-input{text-align:right;}
+#page-moeum .moeum-actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+#page-moeum button.moeum-primary, #page-moeum button.moeum-ghost{height:36px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;padding:0 16px;border:none;}
+#page-moeum button.moeum-primary{background:var(--pr);color:#fff;}
+#page-moeum button.moeum-primary:hover{background:#1d3fb8;}
+#page-moeum button.moeum-ghost{background:var(--bg);border:1px solid var(--bd);color:var(--tx);}
+#page-moeum button.moeum-ghost:hover{background:var(--bg2);}
+#page-moeum .moeum-upload-msg{margin-top:10px;font-size:12px;color:var(--tx2);}
+#page-moeum .moeum-upload-msg.error{color:#e0455a;}
+#page-moeum .moeum-upload-msg.success{color:#22a06b;}
+#page-moeum .moeum-upload-hint{font-size:11px;color:var(--tx2);margin-top:4px;}
+#page-moeum .moeum-footnote{font-size:12px;color:var(--tx2);margin-top:14px;line-height:1.7;}
+</style>
+<div class="page" id="page-moeum">
+ <div class="moeum-wrap">
+  <div class="moeum-banner">
+    <span class="dot"></span>
+    <span id="moeumBannerText">네이버 판매가를 입력하면 옵션가 허용 범위와 추천 금액이 자동으로 계산됩니다.</span>
+  </div>
+
+  <div class="moeum-stat-grid" id="moeumStatGrid"></div>
+
+  <div class="moeum-card">
+    <div class="moeum-card-title">기준 정보</div>
+    <div class="moeum-top-grid">
+      <div><label for="moeumSell">판매가</label><input type="number" id="moeumSell" placeholder="예: 50000" step="100"></div>
+      <div><label for="moeumDiscount">기본할인 (원)</label><input type="number" id="moeumDiscount" placeholder="예: 30000" step="100"></div>
+      <div><label for="moeumRange">허용 변동폭 (%)</label><input type="number" id="moeumRange" value="50" step="1"></div>
+    </div>
+    <div class="moeum-top-grid" style="margin-top:14px;">
+      <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">할인가 (대표가)</div><div class="val" id="moeumBaseOut">-</div></div></div>
+      <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">할인율</div><div class="val" id="moeumDiscountOut">-</div><div class="sub" id="moeumDiscountStatus"></div></div></div>
+      <div><label>&nbsp;</label><div class="moeum-range-box"><div class="lbl">옵션가 허용 범위 (판매가 기준)</div><div class="val" id="moeumRangeOut">-</div></div></div>
+    </div>
+    <div id="moeumDiscountRecoBox" class="moeum-discount-reco"></div>
+  </div>
+
+  <div class="moeum-card">
+    <div class="moeum-card-title">옵션 목록 <span class="moeum-badge-count" id="moeumRowCount">0</span></div>
+    <table class="moeum-table">
+      <colgroup><col><col><col><col><col><col></colgroup>
+      <thead><tr><th>옵션명</th><th class="r">옵션가</th><th class="r">최종판매가</th><th class="c">상태</th><th class="r">추천 금액</th><th></th></tr></thead>
+      <tbody id="moeumRows"></tbody>
+    </table>
+    <div class="moeum-actions">
+      <button class="moeum-primary" id="moeumAddRow">＋ 옵션 추가</button>
+      <button class="moeum-ghost" id="moeumUploadBtn">⬆ 엑셀 업로드</button>
+      <input type="file" id="moeumFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+      <button class="moeum-ghost" id="moeumDownloadBtn">⬇ 엑셀 다운로드</button>
+      <button class="moeum-ghost" id="moeumApplyAllBtn">✓ 추천 금액 전체 적용</button>
+      <button class="moeum-ghost" id="moeumResetBtn">전체 삭제</button>
+    </div>
+    <div id="moeumUploadMsg" class="moeum-upload-msg"></div>
+    <div class="moeum-upload-hint">엑셀 첫 행을 헤더로 인식하며, "옵션가" 열을 자동으로 찾습니다. 옵션 선택/상품 선택/색상 선택처럼 옵션명 관련 열이 여러 개여도 모두 "/"로 합쳐서 옵션명으로 표시하고, 재고수량·관리코드·사용여부 열은 자동으로 제외합니다.</div>
+    <div class="moeum-upload-hint">엑셀 다운로드는 네이버 옵션조합 업로드 양식(사이즈/옵션가/재고수량/관리코드/사용여부)에 맞춰 저장됩니다.</div>
+  </div>
+
+  <p class="moeum-footnote">
+    옵션가는 판매가에 더해지는 추가금액입니다(0원 = 추가 없음). 네이버 규정상 옵션가는 할인가와 무관하게 판매가의 ±{허용 변동폭}% 범위 안에 있어야 하며, 벗어나면 추천 금액(가장 가까운 한도 값)이 표시됩니다. 최종판매가(할인가+옵션가)는 실제 결제 금액을 보여주는 참고용 수치입니다.
+    추천 금액을 클릭하면 옵션가 입력란에 바로 적용됩니다.
+  </p>
+  <div style="font-size:11px;color:var(--tx2);margin-top:6px;">💾 저장된 내용은 자동으로 클라우드에 저장되어 다른 PC에서도 동일하게 보입니다.</div>
  </div>
 </div>
 
@@ -3964,7 +4087,7 @@ const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', 
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
   cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit' } },
-  design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit' } },
+  design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit', moeum:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit', logistatus:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit', coupangad:'edit' } },
 };
@@ -4053,6 +4176,7 @@ const MENUS = [
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
+  {id:'moeum',label:'🧮 모음전 계산기'},
   {id:'logihome',label:'🏠 홈'}, {id:'logistock',label:'📦 발주건 정리'}, {id:'logibox',label:'📮 택배박스'}, {id:'logistatus',label:'📊 박스 현황'},
   {id:'coupangad',label:'👥 인사관리'}
 ];
@@ -4067,7 +4191,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
   { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign'] },
-  { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong'] },
+  { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
 ];
@@ -6234,7 +6358,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -6269,9 +6393,10 @@ function goPage(p){
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
+  if(p==='moeum') moeumInit();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
-  if(fw) fw.style.visibility = (_pageId==='revenue'||_pageId==='price'||_pageId==='quote'||_pageId==='collab'||_pageId==='calendar'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logistatus'||_pageId==='coupangad') ? 'hidden' : '';
+  if(fw) fw.style.visibility = (_pageId==='revenue'||_pageId==='price'||_pageId==='quote'||_pageId==='collab'||_pageId==='calendar'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logistatus'||_pageId==='coupangad'||_pageId==='moeum') ? 'hidden' : '';
   if(window.__CURRENT_USER) updateNavVisibility();
   _applyWriteLockUI();
   // 캘린더 페이지에서는 상단 엑셀 업로드 버튼 숨김 (해당 없음) — _applyWriteLockUI 이후 적용
@@ -16475,6 +16600,421 @@ function csRenderSummary(list){
   const mEl=document.getElementById('csSumMargin'); mEl.textContent=_csWon(marginSum); mEl.className='cs-sum-val '+(marginSum>=0?'cs-pos':'cs-neg');
   const rEl=document.getElementById('csSumRate'); rEl.textContent = rate==null?'—':rate.toFixed(1)+'%'; rEl.className='cs-sum-val '+(rate==null?'':(rate>=0?'cs-pos':'cs-neg'));
 }
+
+// ══════════════════════════════════════════════
+// 모음전 계산기 (디자인팀) — 네이버 옵션가 허용범위 계산 + 클라우드 저장(cloudKv 'moeum_calc')
+// ══════════════════════════════════════════════
+let _moeumLoaded = false;
+let _moeumSuppressSave = false;
+let _moeumSaveTimer = null;
+
+function _moeumFmt(n){ return Math.round(n).toLocaleString('ko-KR'); }
+
+function _moeumMakeRow(name, price){
+  const tr = document.createElement('tr');
+
+  const nameTd = document.createElement('td');
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = name;
+  nameInput.addEventListener('input', moeumRender);
+  nameTd.appendChild(nameInput);
+
+  const priceTd = document.createElement('td');
+  const priceInput = document.createElement('input');
+  priceInput.type = 'number';
+  priceInput.value = price;
+  priceInput.step = '100';
+  priceInput.className = 'moeum-price-input';
+  priceInput.addEventListener('input', moeumRender);
+  priceTd.appendChild(priceInput);
+
+  const addTd = document.createElement('td');
+  addTd.className = 'moeum-add-val';
+  addTd.dataset.role = 'add';
+
+  const statusTd = document.createElement('td');
+  statusTd.className = 'moeum-status-cell';
+  statusTd.dataset.role = 'status';
+
+  const recoTd = document.createElement('td');
+  recoTd.className = 'moeum-reco-cell';
+  recoTd.dataset.role = 'reco';
+
+  const delTd = document.createElement('td');
+  const delBtn = document.createElement('button');
+  delBtn.className = 'moeum-del-btn';
+  delBtn.innerHTML = '✕';
+  delBtn.setAttribute('aria-label', '옵션 삭제');
+  delBtn.addEventListener('click', () => { tr.remove(); moeumRender(); });
+  delTd.appendChild(delBtn);
+
+  tr.appendChild(nameTd);
+  tr.appendChild(priceTd);
+  tr.appendChild(addTd);
+  tr.appendChild(statusTd);
+  tr.appendChild(recoTd);
+  tr.appendChild(delTd);
+
+  return tr;
+}
+
+function moeumRender(){
+  const sellInput = document.getElementById('moeumSell');
+  const discountInput = document.getElementById('moeumDiscount');
+  const rangeInput = document.getElementById('moeumRange');
+  const rowsEl = document.getElementById('moeumRows');
+  if(!sellInput || !rowsEl) return;
+
+  const sell = parseFloat(sellInput.value) || 0;
+  const discountAmt = parseFloat(discountInput.value) || 0;
+  const base = sell > 0 ? Math.max(sell - discountAmt, 0) : 0;
+  const pct = parseFloat(rangeInput.value) || 0;
+
+  const optMin = -sell * (pct/100);
+  const optMax = sell * (pct/100);
+  const rangeOut = document.getElementById('moeumRangeOut');
+  rangeOut.textContent = sell > 0 ? (_moeumFmt(optMin) + '원 ~ +' + _moeumFmt(optMax) + '원') : '-';
+
+  const baseOut = document.getElementById('moeumBaseOut');
+  const discountOut = document.getElementById('moeumDiscountOut');
+  const discountStatusEl = document.getElementById('moeumDiscountStatus');
+  const discountRecoBox = document.getElementById('moeumDiscountRecoBox');
+  if(sell > 0 && discountAmt > 0){
+    baseOut.textContent = _moeumFmt(base) + '원';
+    const discountPct = discountAmt / sell * 100;
+    discountOut.textContent = discountPct.toFixed(1) + '%';
+    const warn = discountPct > 50;
+    discountOut.parentElement.classList.toggle('warn', warn);
+    baseOut.parentElement.classList.toggle('warn', warn);
+    discountStatusEl.textContent = warn ? '50% 초과' : '50% 이내 (정상)';
+    discountStatusEl.style.color = warn ? '#e0455a' : '#22a06b';
+
+    if(warn){
+      const recoDiscount = Math.floor(sell * 0.5);
+      const recoSell = Math.ceil(discountAmt / 0.5);
+      discountRecoBox.innerHTML = `
+        <div class="moeum-discount-reco-inner">
+          <span>할인율이 50%를 넘었습니다. 둘 중 하나로 조정하세요:</span>
+          <span class="moeum-reco-chip" id="moeumRecoDiscountChip">기본할인을 ${_moeumFmt(recoDiscount)}원으로 낮추기</span>
+          <span>또는</span>
+          <span class="moeum-reco-chip" id="moeumRecoSellChip">판매가를 ${_moeumFmt(recoSell)}원으로 올리기</span>
+        </div>`;
+      document.getElementById('moeumRecoDiscountChip').addEventListener('click', () => { discountInput.value = recoDiscount; moeumRender(); });
+      document.getElementById('moeumRecoSellChip').addEventListener('click', () => { sellInput.value = recoSell; moeumRender(); });
+    } else {
+      discountRecoBox.innerHTML = '';
+    }
+  } else {
+    baseOut.textContent = sell > 0 ? _moeumFmt(sell) + '원' : '-';
+    discountOut.textContent = sell > 0 ? '0%' : '-';
+    discountOut.parentElement.classList.remove('warn');
+    baseOut.parentElement.classList.remove('warn');
+    discountStatusEl.textContent = '';
+    discountRecoBox.innerHTML = '';
+  }
+
+  let okCount = 0, badCount = 0, total = 0;
+  let worstName = '', worstGap = -1;
+
+  [...rowsEl.children].forEach(tr => {
+    const nameVal = tr.children[0].querySelector('input').value || '이름없음';
+    const priceInputEl = tr.children[1].querySelector('input');
+    const optionPrice = parseFloat(priceInputEl.value) || 0;
+    const finalPrice = base + optionPrice;
+    total++;
+
+    const addTd = tr.querySelector('[data-role="add"]');
+    addTd.textContent = _moeumFmt(finalPrice) + '원';
+
+    const statusTd = tr.querySelector('[data-role="status"]');
+    const recoTd = tr.querySelector('[data-role="reco"]');
+    const hasBasis = sell > 0;
+    const inRange = !hasBasis || (optionPrice >= optMin && optionPrice <= optMax);
+
+    statusTd.innerHTML = '';
+    const badge = document.createElement('span');
+    if(!hasBasis){
+      badge.className = 'moeum-badge empty';
+      badge.textContent = '판매가 미입력';
+    } else {
+      badge.className = 'moeum-badge ' + (inRange ? 'ok' : 'bad');
+      badge.textContent = inRange ? '정상' : '범위 초과';
+    }
+    statusTd.appendChild(badge);
+
+    recoTd.innerHTML = '';
+    if(hasBasis && !inRange){
+      const recoVal = optionPrice > optMax ? optMax : optMin;
+      const span = document.createElement('span');
+      span.className = 'moeum-reco-val';
+      span.textContent = (recoVal >= 0 ? '+' : '') + _moeumFmt(recoVal) + '원';
+      span.title = '클릭하면 옵션가에 적용';
+      span.addEventListener('click', () => { priceInputEl.value = Math.round(recoVal); moeumRender(); });
+      recoTd.appendChild(span);
+
+      const gap = Math.abs(optionPrice) - (sell * pct/100);
+      if(gap > worstGap){ worstGap = gap; worstName = nameVal; }
+    } else {
+      const span = document.createElement('span');
+      span.className = 'moeum-reco-empty';
+      span.textContent = '-';
+      recoTd.appendChild(span);
+    }
+
+    if(!hasBasis){ /* 집계 제외 */ }
+    else if(inRange) okCount++; else badCount++;
+  });
+
+  document.getElementById('moeumRowCount').textContent = total + '개';
+
+  document.getElementById('moeumStatGrid').innerHTML = `
+    <div class="moeum-stat-card accent"><div class="lbl">전체 옵션</div><div class="val mc-blue">${total}개</div><div class="sub">전체 등록 옵션</div></div>
+    <div class="moeum-stat-card"><div class="lbl">정상</div><div class="val mc-green">${okCount}개</div><div class="sub">허용 범위 이내</div></div>
+    <div class="moeum-stat-card"><div class="lbl">범위 초과</div><div class="val mc-red">${badCount}개</div><div class="sub">조정 필요</div></div>
+    <div class="moeum-stat-card"><div class="lbl">허용 변동폭</div><div class="val mc-orange">±${_moeumFmt(pct)}%</div><div class="sub">판매가 기준</div></div>
+  `;
+
+  const bannerText = document.getElementById('moeumBannerText');
+  if(!sell){
+    bannerText.textContent = '네이버 판매가를 입력하면 옵션가 허용 범위와 추천 금액이 자동으로 계산됩니다.';
+  } else if(badCount > 0){
+    bannerText.textContent = `전체 ${total}개 중 ${badCount}개가 옵션가 범위 초과 — 가장 큰 편차는 "${worstName}". 추천 금액 칼럼을 확인해 보정하세요.`;
+  } else {
+    bannerText.textContent = `전체 ${total}개 옵션이 모두 허용 범위(${_moeumFmt(optMin)}원 ~ +${_moeumFmt(optMax)}원) 안에 있습니다.`;
+  }
+
+  _moeumScheduleSave();
+}
+
+function _moeumScheduleSave(){
+  if(_moeumSuppressSave || !_moeumLoaded) return;
+  clearTimeout(_moeumSaveTimer);
+  _moeumSaveTimer = setTimeout(_moeumSaveState, 700);
+}
+async function _moeumSaveState(){
+  const rowsEl = document.getElementById('moeumRows');
+  const rows = [...rowsEl.children].map(tr => ({
+    name: tr.children[0].querySelector('input').value || '',
+    price: parseFloat(tr.children[1].querySelector('input').value) || 0
+  }));
+  const state = {
+    sellPrice: parseFloat(document.getElementById('moeumSell').value) || 0,
+    discountAmt: parseFloat(document.getElementById('moeumDiscount').value) || 0,
+    rangePct: parseFloat(document.getElementById('moeumRange').value) || 50,
+    rows
+  };
+  await cloudKvSave('moeum_calc', state);
+}
+
+function moeumInit(){
+  if(!_moeumLoaded) moeumLoadAll();
+}
+async function moeumLoadAll(){
+  const st = await cloudKvLoad('moeum_calc');
+  _moeumSuppressSave = true;
+  const rowsEl = document.getElementById('moeumRows');
+  rowsEl.innerHTML = '';
+  if(st){
+    document.getElementById('moeumSell').value = st.sellPrice || '';
+    document.getElementById('moeumDiscount').value = st.discountAmt || '';
+    document.getElementById('moeumRange').value = st.rangePct || 50;
+    (st.rows||[]).forEach(r => rowsEl.appendChild(_moeumMakeRow(r.name, r.price)));
+  }
+  _moeumLoaded = true;
+  moeumRender();
+  _moeumSuppressSave = false;
+}
+
+function moeumClearAll(){
+  if(!confirm('옵션 목록과 입력값을 모두 삭제할까요?')) return;
+  document.getElementById('moeumSell').value = '';
+  document.getElementById('moeumDiscount').value = '';
+  document.getElementById('moeumRange').value = 50;
+  document.getElementById('moeumRows').innerHTML = '';
+  const msgEl = document.getElementById('moeumUploadMsg');
+  if(msgEl){ msgEl.className = 'moeum-upload-msg'; msgEl.textContent = ''; }
+  moeumRender();
+}
+
+document.getElementById('moeumAddRow').addEventListener('click', () => {
+  document.getElementById('moeumRows').appendChild(_moeumMakeRow('새 옵션', 0));
+  moeumRender();
+});
+document.getElementById('moeumResetBtn').addEventListener('click', moeumClearAll);
+
+const _moeumUploadBtn = document.getElementById('moeumUploadBtn');
+const _moeumFileInput = document.getElementById('moeumFileInput');
+_moeumUploadBtn.addEventListener('click', () => _moeumFileInput.click());
+
+_moeumFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const uploadMsg = document.getElementById('moeumUploadMsg');
+  uploadMsg.className = 'moeum-upload-msg';
+  uploadMsg.textContent = '파일을 읽는 중...';
+  if(!window.XLSX){
+    uploadMsg.className = 'moeum-upload-msg error';
+    uploadMsg.textContent = '엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.';
+    _moeumFileInput.value = '';
+    return;
+  }
+  _moeumReadExcelFile(file);
+});
+
+function _moeumReadExcelFile(file){
+  const uploadMsg = document.getElementById('moeumUploadMsg');
+  const rowsEl = document.getElementById('moeumRows');
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rowsJson = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+
+      if(!rowsJson.length){
+        uploadMsg.className = 'moeum-upload-msg error';
+        uploadMsg.textContent = '파일에 데이터가 없습니다.';
+        return;
+      }
+
+      const priceKeys = ['옵션가','가격','price','단가','옵션가격'];
+      const ignoreKeys = ['재고수량','재고','관리코드','사용여부','stock','code','use'];
+
+      const headerRow = rowsJson[0].map(v => String(v).trim());
+      const headerCandidates = headerRow.map(h => h.toLowerCase());
+
+      const priceIdx = headerCandidates.findIndex(h => priceKeys.some(k => h.includes(k.toLowerCase())));
+      const hasHeader = priceIdx !== -1;
+
+      let nameIdxs = [];
+      let startIdx = 0;
+      let finalPriceIdx = 1;
+
+      if(hasHeader){
+        startIdx = 1;
+        finalPriceIdx = priceIdx;
+        headerCandidates.forEach((h, idx) => {
+          if(idx === priceIdx) return;
+          if(ignoreKeys.some(k => h.includes(k.toLowerCase()))) return;
+          if(h === '') return;
+          nameIdxs.push(idx);
+        });
+        if(nameIdxs.length === 0) nameIdxs = [0];
+      } else {
+        nameIdxs = [0];
+        finalPriceIdx = 1;
+      }
+
+      const parsed = [];
+      for(let i = startIdx; i < rowsJson.length; i++){
+        const row = rowsJson[i];
+        if(!row || row.length === 0) continue;
+
+        const nameParts = nameIdxs.map(idx => String(row[idx] || '').trim()).filter(v => v !== '');
+        const name = nameParts.join(' / ');
+        const rawPrice = row[finalPriceIdx];
+
+        if(!name && (rawPrice === '' || rawPrice === undefined)) continue;
+
+        let priceNum = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice).replace(/[^0-9.-]/g,''));
+        if(!name && isNaN(priceNum)) continue;
+
+        parsed.push([name || '이름없음', isNaN(priceNum) ? 0 : priceNum]);
+      }
+
+      if(!parsed.length){
+        uploadMsg.className = 'moeum-upload-msg error';
+        uploadMsg.textContent = '옵션명/옵션가로 인식 가능한 데이터를 찾지 못했습니다. 열 이름을 확인해 주세요.';
+        return;
+      }
+
+      rowsEl.innerHTML = '';
+      parsed.forEach(([n,p]) => rowsEl.appendChild(_moeumMakeRow(n,p)));
+      moeumRender();
+
+      uploadMsg.className = 'moeum-upload-msg success';
+      uploadMsg.textContent = `${parsed.length}개 옵션을 불러왔습니다 (옵션명 ${nameIdxs.length}개 열 결합, 파일: ${file.name})`;
+    } catch(err){
+      uploadMsg.className = 'moeum-upload-msg error';
+      uploadMsg.textContent = '파일을 읽는 중 오류가 발생했습니다. 형식을 확인해 주세요.';
+    } finally {
+      _moeumFileInput.value = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('moeumDownloadBtn').addEventListener('click', () => {
+  const uploadMsg = document.getElementById('moeumUploadMsg');
+  uploadMsg.className = 'moeum-upload-msg';
+  if(!window.XLSX){
+    uploadMsg.className = 'moeum-upload-msg error';
+    uploadMsg.textContent = '엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.';
+    return;
+  }
+  const rowsEl = document.getElementById('moeumRows');
+  const rowsData = [...rowsEl.children].map(tr => {
+    const name = tr.children[0].querySelector('input').value || '';
+    const price = parseFloat(tr.children[1].querySelector('input').value) || 0;
+    return [name, price, '', '', 'Y'];
+  });
+
+  const aoa = [['사이즈', '옵션가', '재고수량', '관리코드', '사용여부'], ...rowsData];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:30},{wch:10},{wch:10},{wch:12},{wch:8}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'optionCombination');
+
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  const ts = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const filename = `optionCombination_${ts}.xls`;
+  XLSX.writeFile(wb, filename, {bookType:'biff8'});
+
+  uploadMsg.className = 'moeum-upload-msg success';
+  uploadMsg.textContent = `${rowsData.length}개 옵션을 ${filename} 파일로 내려받았습니다.`;
+});
+
+document.getElementById('moeumApplyAllBtn').addEventListener('click', () => {
+  const uploadMsg = document.getElementById('moeumUploadMsg');
+  const sellInput = document.getElementById('moeumSell');
+  const rangeInput = document.getElementById('moeumRange');
+  const sell = parseFloat(sellInput.value) || 0;
+  const pct = parseFloat(rangeInput.value) || 0;
+
+  if(!sell){
+    uploadMsg.className = 'moeum-upload-msg error';
+    uploadMsg.textContent = '네이버 판매가를 먼저 입력해 주세요.';
+    return;
+  }
+
+  const optMin = -sell * (pct/100);
+  const optMax = sell * (pct/100);
+
+  let appliedCount = 0;
+  [...document.getElementById('moeumRows').children].forEach(tr => {
+    const priceInputEl = tr.children[1].querySelector('input');
+    const optionPrice = parseFloat(priceInputEl.value) || 0;
+    if(optionPrice < optMin || optionPrice > optMax){
+      const recoVal = optionPrice > optMax ? optMax : optMin;
+      priceInputEl.value = Math.round(recoVal);
+      appliedCount++;
+    }
+  });
+
+  moeumRender();
+
+  uploadMsg.className = appliedCount > 0 ? 'moeum-upload-msg success' : 'moeum-upload-msg';
+  uploadMsg.textContent = appliedCount > 0
+    ? `범위를 벗어난 ${appliedCount}개 옵션에 추천 금액을 적용했습니다.`
+    : '범위를 벗어난 옵션이 없습니다.';
+});
+
+document.getElementById('moeumDiscount').addEventListener('input', moeumRender);
+document.getElementById('moeumSell').addEventListener('input', moeumRender);
+document.getElementById('moeumRange').addEventListener('input', moeumRender);
 
 </script>
 </body>
