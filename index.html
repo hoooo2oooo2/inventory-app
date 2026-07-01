@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+// 모바일(좁은 화면)에서만 데스크톱 레이아웃 전체가 화면 안에 들어오도록 뷰포트 폭을 고정(축소 표시).
+// PC는 viewport meta 태그 자체를 브라우저가 무시하므로 원래도 영향 없지만, 이중 안전장치로 넓은 화면에서는 아예 건드리지 않음.
+(function(){
+  if (window.innerWidth <= 820) {
+    var vp = document.querySelector('meta[name="viewport"]');
+    if (vp) vp.setAttribute('content', 'width=1400');
+  }
+})();
+</script>
 <!-- 캐시 무효화: 항상 최신 index.html을 받도록(이전 버전 캐시로 인한 오류 방지) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
