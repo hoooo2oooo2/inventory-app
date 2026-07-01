@@ -2467,6 +2467,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="cs-toolbar">
       <div class="cs-title">📦 제품 목록 <span class="cs-count" id="csProdCount">0</span></div>
       <div style="display:flex;gap:8px;">
+        <select id="csProdCatFilter" class="cs-search" style="cursor:pointer;max-width:140px;" onchange="csProdCatFilterChange(this.value)"><option value="">전체 카테고리</option></select>
         <input class="cs-search" id="csProdSearch" placeholder="상품명·번호·카테고리 검색" autocomplete="off" oninput="csRenderProducts()"/>
         <button class="cs-add-btn" onclick="csOpenProdModal()">＋ 제품 추가</button>
       </div>
@@ -2642,7 +2643,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="csProdModalTitle" style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:18px;">＋ 제품 추가</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div><div class="pc-lbl">위탁 배송처</div><select id="csPVendor" class="pc-inp" style="cursor:pointer;"></select></div>
-      <div><div class="pc-lbl">카테고리 (선택)</div><input type="text" id="csPCat" class="pc-inp" placeholder="예: 전구" autocomplete="off"/></div>
+      <div><div class="pc-lbl">카테고리 (선택)</div><input type="text" id="csPCat" class="pc-inp" list="csCatDatalist" placeholder="선택 또는 새로 입력" autocomplete="off"/><datalist id="csCatDatalist"></datalist></div>
       <div style="grid-column:1/-1;"><div class="pc-lbl">상품명</div><input type="text" id="csPName" class="pc-inp" placeholder="상품명" autocomplete="off"/></div>
       <div><div class="pc-lbl">상품번호</div><input type="text" id="csPCode" class="pc-inp" placeholder="상품번호" autocomplete="off"/></div>
       <div><div class="pc-lbl">단가 (원)</div><input type="number" id="csPPrice" class="pc-inp" placeholder="0" min="0" oninput="csUpdateVatPreview()"/></div>
@@ -16171,6 +16172,7 @@ let _csOrders = [];
 let _csLoaded = false;
 let _csTab = 'products';
 let _csSelVendor = 'ALL';     // 선택된 배송처 id 또는 'ALL'
+let _csProdCatFilter = '';    // 제품 목록 카테고리 필터('' = 전체)
 let _csEditVendorId = null, _csEditProdId = null, _csEditOrderId = null;
 
 function _csEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -16335,11 +16337,21 @@ function _csVendorOptions(selId){
 }
 
 // ── 제품 세팅 ──
+function csProdCatFilterChange(v){ _csProdCatFilter = v||''; csRenderProducts(); }
 function csRenderProducts(){
   const q = (document.getElementById('csProdSearch').value||'').trim().toLowerCase();
   const showV = _csSelVendor==='ALL';
   let list = _csProducts.slice();
   if(!showV) list = list.filter(p=>p.vendorId===_csSelVendor);
+
+  // 카테고리 필터 select: 현재 범위(배송처)의 제품에서 쓰인 카테고리만 옵션으로 노출
+  const catSel = document.getElementById('csProdCatFilter');
+  const cats = [...new Set(list.map(p=>(p.cat||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(!cats.includes(_csProdCatFilter)) _csProdCatFilter = '';
+  catSel.innerHTML = `<option value="">전체 카테고리</option>` + cats.map(c=>`<option value="${_csEsc(c)}"${c===_csProdCatFilter?' selected':''}>${_csEsc(c)}</option>`).join('');
+  catSel.value = _csProdCatFilter;
+
+  if(_csProdCatFilter) list = list.filter(p=>(p.cat||'').trim()===_csProdCatFilter);
   if(q) list = list.filter(p => [_csVendorName(p.vendorId),p.cat,p.name,p.code].some(v => (v||'').toLowerCase().includes(q)));
   document.getElementById('csProdCount').textContent = list.length;
   const card = document.getElementById('csProdCard');
@@ -16377,6 +16389,8 @@ function csOpenProdModal(id){
   document.getElementById('csProdModalTitle').textContent = p ? '✏️ 제품 수정' : '＋ 제품 추가';
   const defVendor = p ? p.vendorId : (_csSelVendor!=='ALL' ? _csSelVendor : (_csVendors[0]&&_csVendors[0].id));
   document.getElementById('csPVendor').innerHTML = _csVendorOptions(defVendor);
+  const allCats = [...new Set(_csProducts.map(x=>(x.cat||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  document.getElementById('csCatDatalist').innerHTML = allCats.map(c=>`<option value="${_csEsc(c)}">`).join('');
   document.getElementById('csPCat').value = p?p.cat||'':'';
   document.getElementById('csPName').value = p?p.name||'':'';
   document.getElementById('csPCode').value = p?p.code||'':'';
