@@ -2244,6 +2244,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <span>📁 저장된 세트</span>
           <span class="cmb-badge" id="cmbSetCount">0개</span>
         </div>
+        <input type="text" id="cmbSetSearch" class="pc-inp" placeholder="🔍 세트명·구분·품목명 검색" autocomplete="off" oninput="cmbSetSearchChange(this.value)" style="margin-bottom:8px;"/>
         <!-- 구분 필터 바 -->
         <div class="cmb-cat-bar" id="cmbCatBar"></div>
         <div class="cmb-saved-body" id="cmbSavedList">
@@ -15840,6 +15841,7 @@ let _cmbSetsLoaded = false;
 let _cmbCats = [];       // 사용자 정의 구분(카테고리) 목록
 let _cmbCatsLoaded = false;
 let _cmbCatFilter = '';  // 현재 구분 필터 ('' = 전체)
+let _cmbSetSearch = '';  // 저장된 세트 검색어
 let _cmbEditId = null;   // 수정 중인 세트 id
 let _cmbDetailId = null; // 상세 모달에 표시 중인 세트 id
 let _cmbSub = 'single';
@@ -16084,12 +16086,18 @@ async function cmbLoadSets(){
   _cmbSetsLoaded = true;
   cmbRenderSaved();
 }
+function cmbSetSearchChange(v){ _cmbSetSearch = (v||'').trim(); cmbRenderSaved(); }
 function cmbRenderSaved(){
   const box = document.getElementById('cmbSavedList');
   document.getElementById('cmbSetCount').textContent = _cmbSets.length+'개';
-  const list = _cmbCatFilter ? _cmbSets.filter(s=>(s.cat||'')===_cmbCatFilter) : _cmbSets;
+  let list = _cmbCatFilter ? _cmbSets.filter(s=>(s.cat||'')===_cmbCatFilter) : _cmbSets;
+  const q = _cmbSetSearch.toLowerCase();
+  if(q) list = list.filter(s =>
+    [s.name, s.cat, s.author].some(v=>(v||'').toLowerCase().includes(q))
+    || (s.items||[]).some(it=>[it.name,it.code].some(v=>(v||'').toLowerCase().includes(q)))
+  );
   if(!_cmbSets.length){ box.innerHTML = `<div class="cmb-empty">저장된 세트가 없습니다.</div>`; return; }
-  if(!list.length){ box.innerHTML = `<div class="cmb-empty">'${_cmbEsc(_cmbCatFilter)}' 구분의 세트가 없습니다.</div>`; return; }
+  if(!list.length){ box.innerHTML = `<div class="cmb-empty">${q?`'${_cmbEsc(_cmbSetSearch)}' 검색 결과가 없습니다.`:`'${_cmbEsc(_cmbCatFilter)}' 구분의 세트가 없습니다.`}</div>`; return; }
   box.innerHTML = list.map(s=>`
     <div class="cmb-set-card" ondblclick="cmbOpenDetail('${_cmbEsc(s.id)}')" title="더블클릭하여 상세 보기">
       <div style="min-width:0;">
