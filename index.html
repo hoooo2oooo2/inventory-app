@@ -21,6 +21,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+  Chart.register(ChartDataLabels);
+  // 기본은 꺼둠(display:false) — register만 하면 datalabels 옵션 없는 기존 차트(파이/스캐터 등)에도
+  // 플러그인 자체 기본 라벨이 나타나 의도치 않게 화면이 바뀔 수 있음. datalabels를 명시 설정한 차트만 표시.
+  Chart.defaults.set('plugins.datalabels', { display:false });
+</script>
+<!-- 위 register 누락 시 앱 전체 차트의 datalabels 옵션이 조용히 무시됨(플러그인이 로드만 되고 등록은 안 된 상태였음) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>window._XLSX_PLAIN = window.XLSX;</script>
 <!-- 셀 스타일 지원 빌드(xlsx-js-style) + JSZip(차트 주입용) — 일일보고 엑셀 전용 -->
@@ -9903,12 +9910,12 @@ async function renderDlyProdChart(){
       responsive:true,maintainAspectRatio:false,
       layout:{padding:{top:20}},
       plugins:{legend:{display:false},
-        tooltip:{backgroundColor:'var(--bg2)',borderColor:'var(--bd)',borderWidth:1,titleColor:'var(--tx)',bodyColor:'var(--tx2)',
+        tooltip:{backgroundColor:'#F7F8FA',borderColor:'rgba(0,0,0,.08)',borderWidth:1,titleColor:'#191919',bodyColor:'#191919',
           callbacks:{label:c=>` ${c.parsed.y.toLocaleString()}개`}},
-        datalabels:{anchor:'end',align:'end',offset:2,color:'#3182F6',font:{size:11,weight:'700'},formatter:v=>v||''}},
+        datalabels:{display:true,anchor:'end',align:'end',offset:2,color:'#3182F6',font:{size:11,weight:'700'},formatter:v=>v||''}},
       scales:{
-        x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:10}}},
-        y:{beginAtZero:true,suggestedMax:maxQty*1.15,grid:{color:'rgba(100,100,120,.15)'},ticks:{color:'var(--tx2)',font:{size:11},callback:v=>v+'개'}},
+        x:{grid:{display:false},ticks:{color:'#888',font:{size:10}}},
+        y:{beginAtZero:true,suggestedMax:maxQty*1.15,grid:{color:'rgba(100,100,120,.15)'},ticks:{color:'#888',font:{size:11},callback:v=>v+'개'}},
       }
     }
   });
