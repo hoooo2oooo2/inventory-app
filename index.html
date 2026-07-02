@@ -4183,6 +4183,7 @@ window.__CURRENT_USER = null;
 const PERSON_MENUS = { rpt_yuhyun:'유현', rpt_bora:'보라', rpt_yeonjeong:'연정' };
 let _designScopePerson = null;
 
+let _appDataStarted = false;   // loadAll() 중복/미인증 실행 방지 가드
 function _revealApp(sess){
   window.__CURRENT_USER = sess;
   window.__ACTOR = sess.name || sess.username;   // 변동이력 작업자
@@ -4192,6 +4193,30 @@ function _revealApp(sess){
   if(who) who.innerHTML = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원') + ' <span style="opacity:.5;">▾</span>';
   applyPermissions();
   logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
+  _startAppData();   // 실제 로그인 성공(또는 저장된 세션 복원) 후에만 데이터 로드 시작 — 로그인 전 방문(봇/크롤러 포함)에는 Supabase egress 발생 안 함
+}
+function _startAppData(){
+  if(_appDataStarted) return;
+  _appDataStarted = true;
+  loadAll().then(async ()=>{
+    checkTelegramAlert();
+    startTgPolling();
+    // 페이지 로드 시 월별집계 오류 자동 감지 & 수정
+    const issues=_detectMonthlyBatch();
+    if(issues.length){
+      const {fixed,failed}=await applyMonthlyBatchFix(issues);
+      if(fixed>0){
+        renderInv(); updateFloat();
+        console.log(`✅ 자동 데이터 정상화: ${fixed}개 수정됨`);
+        // 우상단에 5초 알림 표시
+        const n=document.createElement('div');
+        n.style.cssText='position:fixed;top:56px;right:12px;z-index:9999;background:#059669;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);';
+        n.textContent=`✅ 데이터 자동 정상화 ${fixed}건 완료`;
+        document.body.appendChild(n);
+        setTimeout(()=>n.remove(),5000);
+      }
+    }
+  });
 }
 
 async function doLogin(e){
@@ -15299,25 +15324,8 @@ document.getElementById('salesUpdLbl').textContent='최근 갱신: '+fmtFull(now
 document.getElementById('rgUpdLbl').textContent='최근 갱신: '+fmtFull(now);
 buildYearSelects();
 _initOrderCycleSel();
-loadAll().then(async ()=>{
-  checkTelegramAlert();
-  startTgPolling();
-  // 페이지 로드 시 월별집계 오류 자동 감지 & 수정
-  const issues=_detectMonthlyBatch();
-  if(issues.length){
-    const {fixed,failed}=await applyMonthlyBatchFix(issues);
-    if(fixed>0){
-      renderInv(); updateFloat();
-      console.log(`✅ 자동 데이터 정상화: ${fixed}개 수정됨`);
-      // 우상단에 5초 알림 표시
-      const n=document.createElement('div');
-      n.style.cssText='position:fixed;top:56px;right:12px;z-index:9999;background:#059669;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);';
-      n.textContent=`✅ 데이터 자동 정상화 ${fixed}건 완료`;
-      document.body.appendChild(n);
-      setTimeout(()=>n.remove(),5000);
-    }
-  }
-});
+// loadAll()은 로그인 성공(또는 세션 복원) 시점에 _revealApp()→_startAppData()에서 실행됨
+// (로그인 전에는 호출 안 함 — 비로그인 방문/봇 크롤링으로 인한 불필요한 Supabase egress 방지)
 
 // ══════════════════════════════════════════════
 // 패밀리 오더 — 상품 목록 & 주문서 관리
