@@ -5931,7 +5931,8 @@ function mapProd(r){
 }
 
 async function loadAll(){
-  await Promise.all([loadProducts(), loadReceive(), loadRg(), loadHist(), loadDailyCache(), loadRgDailyCache()]);
+  // loadRg()(rg_products 테이블)는 화면 어디에도 쓰이지 않는 죽은 데이터라 로드 자체를 생략(egress 절감)
+  await Promise.all([loadProducts(), loadReceive(), loadHist(), loadDailyCache(), loadRgDailyCache()]);
   const ySet = new Set([CUR_YEAR-1, CUR_YEAR]);
   products.forEach(p=>{
     Object.keys(p).forEach(k=>{
@@ -5954,13 +5955,55 @@ async function loadAll(){
   rgSel=new Set();
 }
 
-async function loadProducts(){
-  const {data}=await sb.from('products').select('*').order('code');
-  if(data) products=data.map(mapProd);
+// products/receive_list 버전(행수|최대id|스탬프) — egress 거의 0(1행+카운트 헤더+스탬프 1행)
+async function _productsVer(){
+  try{
+    const [{data,count,error}, stamp] = await Promise.all([
+      sb.from('products').select('id',{count:'exact'}).order('id',{ascending:false}).limit(1),
+      cloudKvVersion('dataver_products')
+    ]);
+    if(error || count==null || stamp===undefined) return null;
+    const maxId=(data&&data[0])?data[0].id:0;
+    return `${count}|${maxId}|${stamp||''}`;
+  }catch(e){ return null; }
 }
-async function loadReceive(){
-  const {data}=await sb.from('receive_list').select('*').order('created_at',{ascending:false});
+async function _receiveVer(){
+  try{
+    const [{data,count,error}, stamp] = await Promise.all([
+      sb.from('receive_list').select('id',{count:'exact'}).order('id',{ascending:false}).limit(1),
+      cloudKvVersion('dataver_receive_list')
+    ]);
+    if(error || count==null || stamp===undefined) return null;
+    const maxId=(data&&data[0])?data[0].id:0;
+    return `${count}|${maxId}|${stamp||''}`;
+  }catch(e){ return null; }
+}
+function _bumpProducts(){ return _bumpDataVer('products'); }
+function _bumpReceive(){ return _bumpDataVer('receive_list'); }
+
+async function loadProducts(force){
+  // egress 절약: 버전이 캐시와 같으면 IndexedDB에서 즉시 복원(다운로드 생략)
+  const ver=await _productsVer();
+  if(!force && ver){
+    const c=await _idbGet('products_all');
+    if(c && c.ver===ver && Array.isArray(c.rows)){ products=c.rows.map(mapProd); return; }
+  }
+  const {data}=await sb.from('products').select('*').order('code');
+  if(data){ products=data.map(mapProd); if(ver) _idbSet('products_all',{ver,rows:data}); }
+}
+async function loadReceive(force){
+  const ver=await _receiveVer();
+  if(!force && ver){
+    const c=await _idbGet('receive_all');
+    if(c && c.ver===ver && Array.isArray(c.rows)){
+      receiveList=c.rows.filter(r=>!r.done).map(mapRecv);
+      doneList=c.rows.filter(r=>r.done).map(mapRecv);
+      return;
+    }
+  }
+  const {data,error}=await sb.from('receive_list').select('*').order('created_at',{ascending:false});
   if(!data) return;
+  if(ver) _idbSet('receive_all',{ver,rows:data});
   receiveList=data.filter(r=>!r.done).map(mapRecv);
   doneList=data.filter(r=>r.done).map(mapRecv);
 }
@@ -11435,7 +11478,7 @@ async function applyIO(id){
   const p=products.find(x=>x.id===id);
   const inn=parseInt(document.getElementById('ioin-'+id)?.value)||0;
   const out=parseInt(document.getElementById('ioout-'+id)?.value)||0;
-  if(p){const b=p.stock;p.stock=Math.max(0,p.stock+inn-out);await sb.from('products').update({stock:p.stock}).eq('id',id);await addHistory({menu:'재고관리',type:'io',code:p.code,name:p.name,desc:`입고+${inn}/출고-${out}`,before:String(b),after:String(p.stock),user:'수동'});}
+  if(p){const b=p.stock;p.stock=Math.max(0,p.stock+inn-out);await sb.from('products').update({stock:p.stock}).eq('id',id);_bumpProducts();await addHistory({menu:'재고관리',type:'io',code:p.code,name:p.name,desc:`입고+${inn}/출고-${out}`,before:String(b),after:String(p.stock),user:'수동'});}
   ioTarget=null;renderInv();updateFloat();
 }
 function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='40';document.getElementById('pm_disc').value='0';_fillTypeOptions('기타');openModal('prodModal');}
@@ -11455,21 +11498,22 @@ async function saveProd(){
   const name=document.getElementById('pm_name').value.trim();
   if(!code||!name){alert('코드와 상품명을 입력해주세요.');return;}
   const d={code,name,type:document.getElementById('pm_type').value,stock:parseInt(document.getElementById('pm_stock').value)||0,box_qty:parseInt(document.getElementById('pm_boxqty').value)||1,lead_time:(parseFloat(document.getElementById('pm_lead').value)||40)/30,reorder_point:parseInt(document.getElementById('pm_reorder').value)||0,discontinued:document.getElementById('pm_disc').value==='1'};
-  if(editProdId){await sb.from('products').update(d).eq('id',editProdId);await addHistory({menu:'재고관리',type:'edit',code,name,desc:'상품수정',before:'-',after:'수정완료',user:'수동'});await loadProducts();}
-  else{await sb.from('products').insert({...d,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)});await addHistory({menu:'재고관리',type:'edit',code,name,desc:'신규등록',before:'-',after:'등록',user:'수동'});await loadProducts();if(products.length===1)salesSel=new Set([products[0].id]);}
+  if(editProdId){await sb.from('products').update(d).eq('id',editProdId);await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code,name,desc:'상품수정',before:'-',after:'수정완료',user:'수동'});await loadProducts(true);}
+  else{await sb.from('products').insert({...d,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)});await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code,name,desc:'신규등록',before:'-',after:'등록',user:'수동'});await loadProducts(true);if(products.length===1)salesSel=new Set([products[0].id]);}
   closeModal('prodModal');renderInv();updateFloat();
 }
-async function deleteProd(id){const p=products.find(x=>x.id===id);if(!p||!confirm(`"${p.name}" 을 삭제하시겠습니까?`))return;await sb.from('products').delete().eq('id',id);await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:'삭제',before:'존재',after:'삭제',user:'수동'});await loadProducts();renderInv();updateFloat();}
+async function deleteProd(id){const p=products.find(x=>x.id===id);if(!p||!confirm(`"${p.name}" 을 삭제하시겠습니까?`))return;await sb.from('products').delete().eq('id',id);await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:'삭제',before:'존재',after:'삭제',user:'수동'});await loadProducts(true);renderInv();updateFloat();}
 async function discProd(id){
   const p=products.find(x=>x.id===id);if(!p)return;
   const d=!p.disc;
   if(d&&!confirm(`"${p.name}"을 단종 처리하시겠습니까?\n단종 제품은 발주 알림 및 발주 목록에서 제외됩니다.`))return;
   await sb.from('products').update({discontinued:d}).eq('id',id);
+  _bumpProducts();
   p.disc=d;
   await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:d?'단종처리':'단종해제',before:d?'정상':'단종',after:d?'단종':'정상',user:'수동'});
   renderInv();updateFloat();
 }
-async function hideProd(id){const p=products.find(x=>x.id===id);if(!p)return;const h=!p.hidden;await sb.from('products').update({hidden:h}).eq('id',id);p.hidden=h;await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:h?'숨김':'표시복원',before:h?'표시':'숨김',after:h?'숨김':'표시',user:'수동'});renderInv();updateFloat();}
+async function hideProd(id){const p=products.find(x=>x.id===id);if(!p)return;const h=!p.hidden;await sb.from('products').update({hidden:h}).eq('id',id);_bumpProducts();p.hidden=h;await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:h?'숨김':'표시복원',before:h?'표시':'숨김',after:h?'숨김':'표시',user:'수동'});renderInv();updateFloat();}
 function toggleShowHidden(){_showHidden=!_showHidden;const b=document.getElementById('showHiddenBtn');if(b){b.textContent=_showHidden?'👁 전체보기':'🙈 숨긴제품만 보기';b.style.color=_showHidden?'var(--pr)':'var(--tx2)';}renderInv();}
 
 // ══════════════════════════════════════════════
@@ -11924,6 +11968,7 @@ async function saveIn(){
   const dateVal=document.getElementById('inDate').value;
   if(isDup({code:p.code,name:p.name,orderDate:dateVal,orderQty:qty})){document.getElementById('dupMsg').innerHTML=`<strong>${p.name}</strong> (${p.code})<br>주문날짜: ${dateVal} | 수량: ${qty}개<br><br>동일한 데이터가 이미 존재합니다.`;closeModal('inModal');openModal('dupModal');return;}
   const {data}=await sb.from('receive_list').insert({code:p.code,name:p.name,order_date:dateVal,upload_time:fmtFull(new Date()),order_qty:qty,in1,in2,memos:[],done:false}).select();
+  _bumpReceive();
   if(data?.[0])receiveList.unshift(mapRecv(data[0]));
   await addHistory({menu:'발주관리',type:'order',code:p.code,name:p.name,desc:'입고등록',before:'-',after:`${qty}개`,user:'수동'});
   closeModal('inModal');renderRecv();
@@ -12016,6 +12061,7 @@ async function onRecvCodeChange(id){
   }
   // DB 저장
   await sb.from('receive_list').update({code:r.code, name:r.name}).eq('id',id);
+  _bumpReceive();
 }
 
 function liveCalc(id){
@@ -12039,10 +12085,12 @@ async function confirmRecv(id){
   r.in1=parseInt(document.getElementById('i1-'+id)?.value)||0;
   r.in2=parseInt(document.getElementById('i2-'+id)?.value)||0;
   await sb.from('receive_list').update({code:r.code,name:r.name,order_qty:r.orderQty,in1:r.in1,in2:r.in2}).eq('id',id);
+  _bumpReceive();
   const miss=Math.max(0,r.orderQty-r.in1-r.in2);
   if(miss>0){const btn=document.getElementById('cb-'+id);if(btn){btn.textContent='저장됨';setTimeout(()=>{if(btn)btn.textContent='확인';},1200);}liveCalc(id);return;}
   const doneTime=fmtFull(new Date());
   await sb.from('receive_list').update({done:true,done_time:doneTime,in1:r.in1,in2:r.in2}).eq('id',id);
+  _bumpReceive();
   r.doneTime=doneTime;doneList.unshift({...r});receiveList=receiveList.filter(x=>x.id!==id);
   await addHistory({menu:'발주관리',type:'order',code:r.code,name:r.name,desc:'입고완료',before:`주문${r.orderQty}개`,after:`입고${r.in1+r.in2}개`,user:'수동'});
   renderRecv();
@@ -12050,7 +12098,7 @@ async function confirmRecv(id){
 async function addMemo(id){
   const inp=document.getElementById('mi-'+id);if(!inp||!inp.value.trim())return;
   const r=receiveList.find(x=>x.id===id)||doneList.find(x=>x.id===id);
-  if(r){r.memos=r.memos||[];r.memos.push({date:fmtFull(new Date()),text:inp.value.trim()});await sb.from('receive_list').update({memos:r.memos}).eq('id',id);renderRecv();}
+  if(r){r.memos=r.memos||[];r.memos.push({date:fmtFull(new Date()),text:inp.value.trim()});await sb.from('receive_list').update({memos:r.memos}).eq('id',id);_bumpReceive();renderRecv();}
 }
 function switchRecvTab(t){['a','d'].forEach(x=>{document.getElementById('rt-'+x).classList.toggle('active',x===t);document.getElementById('rtc-'+x).classList.toggle('active',x===t);});}
 
@@ -12792,9 +12840,10 @@ async function confirmUpload(){
           );
         }
       }
+      await _bumpProducts();
       await addHistory({menu:'재고관리',type:'upload',code:'MULTI',name:`${_pendingRows.length}개`,desc:'재고 엑셀 업로드',before:'-',after:`${_pendingRows.length}건`,user:'업로드'});
       // DB에서 최신 데이터 다시 로드하여 완전 동기화
-      await loadProducts();
+      await loadProducts(true);
       renderInv();updateFloat();
       if(products.length>0&&salesSel.size===0)salesSel=new Set([products[0].id]);
     } else if(type==='sales'){
@@ -12816,6 +12865,7 @@ async function confirmUpload(){
         const p=products.find(x=>x.id===parseInt(id));
         if(p){for(const[yr,monthly] of Object.entries(yrs)) p['monthly_'+yr]=monthly;}
       }
+      if(Object.keys(upd).length) await _bumpProducts();
       const dailyRows=_pendingRows.filter(r=>r.mIdx>=0&&r.qty>0&&r.dateStr).map(r=>({code:r.code,name:r.name,sale_date:r.dateStr,qty:r.qty,is_rg:false}));
       for(let b=0;b<dailyRows.length;b+=100){
         const {error}=await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100),{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
@@ -12829,6 +12879,7 @@ async function confirmUpload(){
         const{data}=await sb.from('receive_list').insert({code:row.code,name:row.name,order_date:row.orderDate,upload_time:fmtFull(new Date()),order_qty:row.orderQty,in1:0,in2:0,memos:[],done:false}).select();
         if(data?.[0])receiveList.unshift(mapRecv(data[0]));
       }
+      if(_pendingRows.length) await _bumpReceive();
       await addHistory({menu:'발주관리',type:'upload',code:'MULTI',name:`${_pendingRows.length}건`,desc:'입고 데이터 업로드',before:'-',after:`${_pendingRows.length}건`,user:'업로드'});
       renderRecv();
     } else if(type==='rg'){
@@ -12854,8 +12905,8 @@ async function executeClear(){
   const crg=document.getElementById('clr_rg').checked,ch=document.getElementById('clr_hist').checked;
   if(!cp&&!cr&&!crg&&!ch){alert('삭제할 항목을 선택해주세요.');return;}
   if(!confirm('선택한 데이터를 영구 삭제합니다. 계속하시겠습니까?'))return;
-  if(cp){await sb.from('products').delete().neq('id',0);products=[];salesSel=new Set();renderInv();}
-  if(cr){await sb.from('receive_list').delete().neq('id',0);receiveList=[];doneList=[];renderRecv();}
+  if(cp){await sb.from('products').delete().neq('id',0);_bumpProducts();products=[];salesSel=new Set();renderInv();}
+  if(cr){await sb.from('receive_list').delete().neq('id',0);_bumpReceive();receiveList=[];doneList=[];renderRecv();}
   if(crg){await sb.from('rg_products').delete().neq('id','');rgProducts=[];rgSel=new Set();renderRgTbody();renderTop5();}
   if(ch){await sb.from('history_log').delete().neq('id',0);historyLog=[];renderHist();}
   closeModal('clearModal');updateFloat();alert('선택한 데이터가 삭제되었습니다.');
