@@ -4083,6 +4083,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <select class="sel" id="dlyProdYearSel" onchange="renderDlyProdChart()"></select>
       <span class="rev-filter-lbl" style="margin-left:8px;">월</span>
       <select class="sel" id="dlyProdMonthSel" onchange="renderDlyProdChart()"></select>
+      <span class="rev-filter-lbl" style="margin-left:8px;">판매처</span>
+      <select class="sel" id="dlyProdChSel" onchange="renderDlyProdChart()"></select>
     </div>
     <div class="rev-kpi" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px;">
       <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 선택월 판매수량 합계</div><div class="rev-kpi-val" id="dlyProdKpiMonth" style="color:#3182F6;">—</div></div>
@@ -9904,6 +9906,9 @@ async function openDlyProdChart(i){
   const mSel=document.getElementById('dlyProdMonthSel');
   mSel.innerHTML=Array.from({length:12},(_,idx)=>idx+1).map(m=>`<option value="${m}">${m}월</option>`).join('');
   mSel.value=_dlyFilter.month;
+  const chSel=document.getElementById('dlyProdChSel');
+  chSel.innerHTML='<option value="ALL">전체</option>'+REV_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  chSel.value=_dlyFilter.ch&&REV_CHANNELS.includes(_dlyFilter.ch)?_dlyFilter.ch:'ALL';
   openModal('dlyProdChartModal');
   await renderDlyProdChart();
 }
@@ -9912,16 +9917,18 @@ async function renderDlyProdChart(){
   const name=_dlyProdChartKey; if(!name) return;
   const year=Number(document.getElementById('dlyProdYearSel').value);
   const month=Number(document.getElementById('dlyProdMonthSel').value);
+  const ch=document.getElementById('dlyProdChSel').value||'ALL';
   if(!year||!month) return;
   await ensureRevYear(year);
   const monStr=String(month).padStart(2,'0');
   const daysInMonth=new Date(year,month,0).getDate();
   const keyOf=r=>r.modelName||r.itemCode||'미상';
+  const chMatch=r=>ch==='ALL'||r.ch===ch;
 
-  // 선택 연/월 일별 판매수량
+  // 선택 연/월/판매처 일별 판매수량
   const dayQty=Array(daysInMonth).fill(0);
   _revData.forEach(r=>{
-    if(r.year!==year||!r.date||!r.date.startsWith(monStr)||keyOf(r)!==name) return;
+    if(r.year!==year||!r.date||!r.date.startsWith(monStr)||keyOf(r)!==name||!chMatch(r)) return;
     const d=parseInt(r.date.split('-')[1]);
     if(d>=1&&d<=daysInMonth) dayQty[d-1]+=(r.orderQty||0);
   });
@@ -9936,7 +9943,7 @@ async function renderDlyProdChart(){
   for(const y of neededYears) await ensureRevYear(y);
   const week7=days7.reduce((sum,dt)=>{
     const y=dt.getFullYear(), ds=`${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-    const dayTotal=_revData.reduce((s,r)=>(r.year===y&&r.date===ds&&keyOf(r)===name)?s+(r.orderQty||0):s,0);
+    const dayTotal=_revData.reduce((s,r)=>(r.year===y&&r.date===ds&&keyOf(r)===name&&chMatch(r))?s+(r.orderQty||0):s,0);
     return sum+dayTotal;
   },0);
   document.getElementById('dlyProdKpiWeek').textContent=week7.toLocaleString()+'개';
