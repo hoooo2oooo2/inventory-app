@@ -4060,6 +4060,29 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 일일보고 제품별 일별 판매수량 그래프 모달 -->
+<div class="modal-overlay" id="dlyProdChartModal">
+  <div class="modal" style="max-width:620px;">
+    <h3 id="dlyProdChartTitle">📊 일별 판매수량</h3>
+    <div class="rev-filter" style="padding:0 0 10px;flex-wrap:wrap;">
+      <span class="rev-filter-lbl">년도</span>
+      <select class="sel" id="dlyProdYearSel" onchange="renderDlyProdChart()"></select>
+      <span class="rev-filter-lbl" style="margin-left:8px;">월</span>
+      <select class="sel" id="dlyProdMonthSel" onchange="renderDlyProdChart()"></select>
+    </div>
+    <div class="rev-kpi" style="grid-template-columns:repeat(2,1fr);margin-bottom:12px;">
+      <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 선택월 판매수량 합계</div><div class="rev-kpi-val" id="dlyProdKpiMonth">—</div></div>
+      <div class="rev-kpi-card"><div class="rev-kpi-lbl">📅 최근 7일 판매량</div><div class="rev-kpi-val" id="dlyProdKpiWeek">—</div></div>
+    </div>
+    <div style="position:relative;height:260px;">
+      <canvas id="dlyProdChartCv"></canvas>
+    </div>
+    <div class="ma" style="margin-top:12px;">
+      <button class="btn" onclick="closeModal('dlyProdChartModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 통합 행 수정 모달 -->
 <div class="modal-overlay" id="revRowEditModal">
   <div class="modal" style="max-width:400px;">
@@ -4611,20 +4634,26 @@ async function _idbSet(key,val){
 }
 
 // 쓰기 스탬프: 기존 행을 "수정"(행수·id 불변)해도 캐시를 무효화하기 위함.
-async function _bumpDataVer(table){ try{ await cloudKvSave('dataver_'+table, Date.now()); }catch(e){} }
-function _bumpRev(){ return _bumpDataVer('revenue'); }
+//  · year 지정 시 그 연도 스탬프만 갱신(다른 연도 캐시는 안 깨짐) — 인라인 단건 수정처럼 범위가 확실할 때 사용.
+//  · year 생략 시 전체 스탬프 갱신(모든 연도 캐시 무효화) — 여러 연도에 걸칠 수 있는 일괄작업/업로드/삭제 후 안전하게 사용.
+async function _bumpDataVer(table, year){
+  const key = year!=null ? `dataver_${table}_${year}` : `dataver_${table}`;
+  try{ await cloudKvSave(key, Date.now()); }catch(e){}
+}
+function _bumpRev(year){ return _bumpDataVer('revenue', year); }
 function _bumpDaily(){ return _bumpDataVer('daily_sales'); }
 
-// 연도별 매출 버전(행수|최대id|스탬프) — egress 거의 0(1행+카운트 헤더+스탬프 1행)
+// 연도별 매출 버전(행수|최대id|전체스탬프|연도스탬프) — egress 거의 0(1행+카운트 헤더+스탬프 2행)
 async function _revYearVer(year){
   try{
-    const [{data,count,error}, stamp] = await Promise.all([
+    const [{data,count,error}, stamp, yStamp] = await Promise.all([
       sb.from('revenue').select('id',{count:'exact'}).eq('year',year).order('id',{ascending:false}).limit(1),
-      cloudKvVersion('dataver_revenue')
+      cloudKvVersion('dataver_revenue'),
+      cloudKvVersion('dataver_revenue_'+year)
     ]);
-    if(error || count==null || stamp===undefined) return null;  // 조회 불확실 → 캐시 사용 안 함(안전)
+    if(error || count==null || stamp===undefined || yStamp===undefined) return null;  // 조회 불확실 → 캐시 사용 안 함(안전)
     const maxId=(data&&data[0])?data[0].id:0;
-    return `${count}|${maxId}|${stamp||''}`;
+    return `${count}|${maxId}|${stamp||''}|${yStamp||''}`;
   }catch(e){ return null; }
 }
 // 일별(is_rg=false) 버전
@@ -9598,6 +9627,9 @@ function toggleRevMask(){
 let _dlyFilter={year:null,month:null,day:null,ch:'ALL'};
 let _dlyTypeFilter='ALL';   // 제품별 판매현황 '구분' 헤더 필터
 let _revDlyDnut=null;
+let _dlyProdListCache=[];   // 제품별 판매현황 현재 렌더 목록(더블클릭 → 그래프 팝업에서 참조)
+let _dlyProdChart=null;
+let _dlyProdChartKey=null;
 const CH_COLORS_DLY=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
 
 function renderDailyReport(){
@@ -9718,11 +9750,12 @@ function renderDailyReport(){
     typeSel.value=_dlyTypeFilter;
   }
   const viewList=_dlyTypeFilter==='ALL'?prodList:prodList.filter(([,v])=>v.type===_dlyTypeFilter);
+  _dlyProdListCache=viewList;   // 더블클릭 시 인덱스로 참조(이름에 특수문자 있어도 안전)
 
-  if(tbody) tbody.innerHTML=viewList.map(([name,v])=>{
+  if(tbody) tbody.innerHTML=viewList.map(([name,v],i)=>{
     const rate=v.settle>0?(v.margin/v.settle*100):0;
     const rCls=rate<0?'rev-margin-neg':rate>0?'rev-margin-pos':'';
-    return `<tr>
+    return `<tr ondblclick="openDlyProdChart(${i})" title="더블클릭: 일별 판매수량 그래프" style="cursor:pointer;">
       <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</td>
       <td>${v.type}</td>
       <td style="text-align:right;">${v.qty.toLocaleString()}</td>
@@ -9799,6 +9832,76 @@ function setDlyFilter(type, val){
 function setDlyTypeFilter(val){
   _dlyTypeFilter=val||'ALL';
   renderDailyReport();
+}
+
+// 제품별 판매현황 행 더블클릭 → 일별 판매수량 그래프 팝업
+async function openDlyProdChart(i){
+  const entry=_dlyProdListCache[i]; if(!entry) return;
+  const [name]=entry;
+  _dlyProdChartKey=name;
+  document.getElementById('dlyProdChartTitle').textContent=`📊 ${name} — 일별 판매수량`;
+  const years=_revYears();
+  const ySel=document.getElementById('dlyProdYearSel');
+  ySel.innerHTML=years.map(y=>`<option value="${y}">${y}년</option>`).join('');
+  ySel.value=_dlyFilter.year;
+  const mSel=document.getElementById('dlyProdMonthSel');
+  mSel.innerHTML=Array.from({length:12},(_,idx)=>idx+1).map(m=>`<option value="${m}">${m}월</option>`).join('');
+  mSel.value=_dlyFilter.month;
+  openModal('dlyProdChartModal');
+  await renderDlyProdChart();
+}
+
+async function renderDlyProdChart(){
+  const name=_dlyProdChartKey; if(!name) return;
+  const year=Number(document.getElementById('dlyProdYearSel').value);
+  const month=Number(document.getElementById('dlyProdMonthSel').value);
+  if(!year||!month) return;
+  await ensureRevYear(year);
+  const monStr=String(month).padStart(2,'0');
+  const daysInMonth=new Date(year,month,0).getDate();
+  const keyOf=r=>r.modelName||r.itemCode||'미상';
+
+  // 선택 연/월 일별 판매수량
+  const dayQty=Array(daysInMonth).fill(0);
+  _revData.forEach(r=>{
+    if(r.year!==year||!r.date||!r.date.startsWith(monStr)||keyOf(r)!==name) return;
+    const d=parseInt(r.date.split('-')[1]);
+    if(d>=1&&d<=daysInMonth) dayQty[d-1]+=(r.orderQty||0);
+  });
+  const monthTotal=dayQty.reduce((a,b)=>a+b,0);
+  document.getElementById('dlyProdKpiMonth').textContent=monthTotal.toLocaleString()+'개';
+
+  // 최근 7일(오늘 기준 달력일) — 연도 경계 걸치면 필요한 연도도 로드
+  const today=new Date();
+  const days7=[];
+  for(let i=6;i>=0;i--){ const dt=new Date(today); dt.setDate(dt.getDate()-i); days7.push(dt); }
+  const neededYears=[...new Set(days7.map(d=>d.getFullYear()))];
+  for(const y of neededYears) await ensureRevYear(y);
+  const week7=days7.reduce((sum,dt)=>{
+    const y=dt.getFullYear(), ds=`${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    const dayTotal=_revData.reduce((s,r)=>(r.year===y&&r.date===ds&&keyOf(r)===name)?s+(r.orderQty||0):s,0);
+    return sum+dayTotal;
+  },0);
+  document.getElementById('dlyProdKpiWeek').textContent=week7.toLocaleString()+'개';
+
+  // 그래프
+  const labels=Array.from({length:daysInMonth},(_,idx)=>String(idx+1)+'일');
+  if(_dlyProdChart) _dlyProdChart.destroy();
+  const ctx=document.getElementById('dlyProdChartCv').getContext('2d');
+  _dlyProdChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{data:dayQty,backgroundColor:'rgba(49,130,246,.55)',borderRadius:4,borderSkipped:false}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'var(--bg2)',borderColor:'var(--bd)',borderWidth:1,titleColor:'var(--tx)',bodyColor:'var(--tx2)',
+          callbacks:{label:c=>` ${c.parsed.y.toLocaleString()}개`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'var(--tx2)',font:{size:10}}},
+        y:{beginAtZero:true,grid:{color:'rgba(100,100,120,.15)'},ticks:{color:'var(--tx2)',font:{size:11},callback:v=>v+'개'}},
+      }
+    }
+  });
 }
 
 // ══════════════════════════════════════════════
@@ -10485,7 +10588,7 @@ async function applyRowCodeName(id, code, name){
     unit_cost:unitCost, cost_price:costPrice, margin, margin_rate:marginRate
   }).eq('id',id);
   if(error) throw error;
-  _bumpRev();
+  _bumpRev(r.year);
   r.itemCode=code; r.modelName=name; r.itemType=itemType;
   r.unitCost=unitCost; r.costPrice=costPrice; r.margin=margin; r.marginRate=marginRate;
 }
@@ -10530,7 +10633,7 @@ async function updateRowShipping(id, val){
     const {error}=await sb.from('revenue')
       .update({shipping_fee:ship, margin, margin_rate:marginRate}).eq('id',id);
     if(error) throw error;
-    _bumpRev();
+    _bumpRev(r.year);
     r.shipping=ship; r.margin=margin; r.marginRate=marginRate;
     renderUnifiedTable();
   }catch(e){
@@ -10723,7 +10826,7 @@ async function propagateBdPriceChange(bdRow, oldPrice){
       sb.from('revenue').update({unit_cost:u.unit_cost,cost_price:u.cost_price,margin:u.margin,margin_rate:u.margin_rate}).eq('id',u.id)
     ));
   }
-  if(updates.length) _bumpRev();
+  if(updates.length) _bumpRev(curYear);
   if(_revLoaded){
     const updMap = new Map(updates.map(u=>[u.id,u]));
     _revData.forEach(r=>{
@@ -10801,7 +10904,7 @@ async function resyncRevenuePrices(){
       updated+=upd.length;
       if(data.length<PAGE) break; from+=PAGE;
     }
-    if(updated) await _bumpRev();
+    if(updated) await _bumpRev(curYear);
     if(_revLoaded) _renderRevCurrentPage();
     alert(`완료: ${scanned.toLocaleString()}건 검사, ${updated.toLocaleString()}건 단가·마진 반영했습니다.`);
   }catch(e){
@@ -11943,8 +12046,29 @@ function switchRecvTab(t){['a','d'].forEach(x=>{document.getElementById('rt-'+x)
 // daily_sales where is_rg=true 데이터로 출고 집계
 // ══════════════════════════════════════════════
 let _rgDailyCache = {}; // {code: {date: qty}} - is_rg=true 데이터
+let _rgDCacheVer = null;
 
-async function loadRgDailyCache(){
+// RG(is_rg=true) 일별 버전(행수|최대id|스탬프) — 일반 일별매출과 같은 dataver_daily_sales 스탬프 공유(안전 우선)
+async function _rgDailyVer(){
+  try{
+    const [{data,count,error}, stamp] = await Promise.all([
+      sb.from('daily_sales').select('id',{count:'exact'}).eq('is_rg',true).order('id',{ascending:false}).limit(1),
+      cloudKvVersion('dataver_daily_sales')
+    ]);
+    if(error || count==null || stamp===undefined) return null;
+    const maxId=(data&&data[0])?data[0].id:0;
+    return `${count}|${maxId}|${stamp||''}`;
+  }catch(e){ return null; }
+}
+
+async function loadRgDailyCache(force){
+  // egress 절약: 버전이 그대로면 IndexedDB에서 즉시 복원(다운로드 생략)
+  const ver=await _rgDailyVer();
+  if(!force && ver && _rgDCacheVer===ver && Object.keys(_rgDailyCache).length) return;
+  if(!force && ver){
+    const c=await _idbGet('daily_rg_all');
+    if(c && c.ver===ver && c.map){ _rgDailyCache=c.map; _rgDCacheVer=ver; return; }
+  }
   _rgDailyCache = {};
   let from=0; const pageSize=1000;
   while(true){
@@ -11961,6 +12085,8 @@ async function loadRgDailyCache(){
     if(data.length<pageSize) break;
     from+=pageSize;
   }
+  _rgDCacheVer=ver;
+  if(ver){ _idbSet('daily_rg_all',{ver,map:_rgDailyCache}); }
 }
 
 // RG 출고된 제품 목록 (products 중 is_rg 데이터 있는 것)
@@ -12086,8 +12212,9 @@ async function confirmRgUpload(pendingRows){
   for(let b=0;b<dailyRows.length;b+=100){
     await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100),{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
   }
+  if(dailyRows.length) await _bumpDaily();   // 다른 PC 캐시 무효화(같은 날짜 재업로드 포함)
   await addHistory({menu:'로켓그로스',type:'upload',code:'MULTI',name:`${pendingRows.length}건`,desc:'로켓그로스 출고 업로드',before:'-',after:`${pendingRows.length}건`,user:'업로드'});
-  await loadRgDailyCache();
+  await loadRgDailyCache(true);
   if(currentPage==='rg'){
     renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5();
   }
