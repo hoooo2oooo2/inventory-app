@@ -1325,7 +1325,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="topbar-title">📦 재고관리 시스템</span>
     <span class="topbar-time" id="topTime"></span>
-    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.06.30h</span>
+    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.03a</span>
   </div>
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -6564,9 +6564,10 @@ function pcSearchCode(val){
     pcEnsureBackdata().then(()=>{ if(document.getElementById('pc-code').value.trim()===val.trim()) pcSearchCode(val); });
     return;
   }
-  const matched = (_bdData||[]).filter(r=>
+  const allMatched = (_bdData||[]).filter(r=>
     (r.code||'').toLowerCase().includes(kw)||(r.name||'').toLowerCase().includes(kw)
-  ).slice(0,12);
+  );
+  const matched = allMatched.slice(0,200);
   if(!matched.length){ dd.style.display='none'; return; }
   dd.innerHTML = matched.map(r=>{
     const sc=(r.code||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
@@ -6578,7 +6579,7 @@ function pcSearchCode(val){
       <span><b style="color:var(--tx);">${r.code||''}</b><span style="color:var(--tx2);margin-left:6px;">${r.name||''}</span></span>
       <span style="color:#3182F6;white-space:nowrap;">${pr!=null?pr.toLocaleString()+'원':'단가없음'}</span>
     </div>`;
-  }).join('');
+  }).join('') + (allMatched.length>matched.length?`<div style="padding:6px 12px;font-size:11px;color:var(--tx2);text-align:center;">외 ${allMatched.length-matched.length}건 더 있음 (검색어를 구체적으로 입력하세요)</div>`:'');
   dd.style.display='';
 }
 
