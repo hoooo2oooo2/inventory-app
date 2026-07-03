@@ -3179,6 +3179,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="rsni" id="rsni-daily" onclick="goRevPage('daily')">📄 일일보고</div>
     <div class="rsni" id="rsni-adcenter" onclick="goRevPage('adcenter')">📢 광고센터</div>
     <div class="rsni" id="rsni-region" onclick="goRevPage('region')">📍 지역·연령별 현황</div>
+    <div class="rsni" id="rsni-ssa" onclick="goRevPage('ssa')">🧭 판매·방문·고객분석</div>
   </div>
   <div class="rmain">
 
@@ -3809,6 +3810,225 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
     </div>
 
+    <!-- ── 판매·방문·고객분석 탭 (스마트스토어 정책변경 개편판) ── -->
+    <div class="rpage" id="rpage-ssa">
+      <style>
+      #rpage-ssa .ssa-subnav{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--bd);padding-bottom:0;}
+      #rpage-ssa .ssa-sni{padding:8px 16px;font-size:12.5px;font-weight:700;color:var(--tx2);cursor:pointer;border-bottom:2px solid transparent;user-select:none;}
+      #rpage-ssa .ssa-sni.active{color:var(--pr);border-bottom-color:var(--pr);}
+      #rpage-ssa .ssa-sub{display:none;flex-direction:column;gap:14px;}
+      #rpage-ssa .ssa-sub.active{display:flex;}
+      </style>
+
+      <div class="ssa-subnav">
+        <div class="ssa-sni active" id="ssa-sni-sales" onclick="ssaGoSub('sales')">🛒 판매분석</div>
+        <div class="ssa-sni" id="ssa-sni-visit" onclick="ssaGoSub('visit')">👣 방문분석</div>
+        <div class="ssa-sni" id="ssa-sni-customer" onclick="ssaGoSub('customer')">🧑‍🤝‍🧑 고객분석 <span style="font-size:10px;color:var(--tx2);font-weight:500;">(매주 월요일 등록)</span></div>
+      </div>
+
+      <!-- ══ 판매분석 ══ -->
+      <div class="ssa-sub active" id="ssaSub-sales">
+        <div class="rev-filter" style="justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div class="rev-filter-group" id="ssaSalesTrendBtns">
+              <div class="rfbtn" data-mode="day" onclick="ssaSetTrendMode('sales','day')" style="padding:3px 11px;font-size:11.5px;">일별</div>
+              <div class="rfbtn active" data-mode="week" onclick="ssaSetTrendMode('sales','week')" style="padding:3px 11px;font-size:11.5px;">주별</div>
+              <div class="rfbtn" data-mode="month" onclick="ssaSetTrendMode('sales','month')" style="padding:3px 11px;font-size:11.5px;">월별</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="rev-filter-lbl">기간</span>
+              <select id="ssaSalesMonthSel" class="sel" style="font-size:12px;height:30px;" onchange="ssaSetMonth('sales',this.value)"></select>
+            </div>
+            <div style="font-size:12px;color:var(--tx2);font-weight:500;" id="ssaSalesPeriod">기간: —</div>
+            <span style="font-size:11px;color:var(--pr);background:var(--prl);padding:3px 9px;border-radius:12px;font-weight:600;">👆 그래프·항목 더블클릭 시 상세보기</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="ssaSalesDrop" class="rev-up-slot" onclick="document.getElementById('ssaSalesFile').click()"
+              ondragover="event.preventDefault();this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')"
+              ondrop="ssaDropFiles(event,'sales')"
+              style="border:1.5px dashed var(--bd);border-radius:9px;padding:7px 14px;font-size:11.5px;color:var(--tx2);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:all .15s;">
+              <span style="font-size:14px;">⬆</span> 판매분석 엑셀 업로드 <span style="color:var(--tx3,#aaa);">(일별)</span>
+            </div>
+            <input type="file" id="ssaSalesFile" accept=".xlsx,.xls" multiple style="display:none" onchange="ssaPickFiles(event,'sales')">
+          </div>
+        </div>
+
+        <div class="rev-empty" id="ssaSalesEmpty" style="padding:48px 20px;text-align:center;">
+          아직 등록된 판매분석 데이터가 없습니다.<br>스마트스토어에서 매일 내려받은 <b>판매분석</b> 엑셀을 우측 상단에 업로드하세요.
+        </div>
+
+        <div id="ssaSalesBody" style="display:none;flex-direction:column;gap:14px;">
+          <div class="rev-kpi">
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">💳 판매금액(총)</div><div class="rev-kpi-val" id="ssaSK0">—</div><div class="rev-kpi-sub" id="ssaSK0s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 판매금액(순)</div><div class="rev-kpi-val" id="ssaSK1">—</div><div class="rev-kpi-sub" id="ssaSK1s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">🧾 결제건수</div><div class="rev-kpi-val" id="ssaSK2">—</div><div class="rev-kpi-sub" id="ssaSK2s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">↩️ 환불율</div><div class="rev-kpi-val" id="ssaSK3" style="color:#D97706;">—</div><div class="rev-kpi-sub" id="ssaSK3s" style="color:var(--tx2);"></div></div>
+          </div>
+
+          <div class="rev-card">
+            <div class="rev-card-title"><span>📈 매출 추이</span><span id="ssaSalesTrendTotal" style="font-size:12px;font-weight:700;color:var(--pr);"></span></div>
+            <div class="rev-chart-wrap" style="height:230px;"><canvas id="ssaSalesTrendChart"></canvas></div>
+            <div class="rev-empty" id="ssaSalesTrendEmpty" style="display:none;padding:55px 0;">데이터가 쌓이면 추이가 표시됩니다</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+            <div class="rev-card">
+              <div class="rev-card-title"><span>🗂 대카테고리별 매출</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">막대 더블클릭 → 상세</span></div>
+              <div class="rev-chart-wrap" style="height:260px;"><canvas id="ssaSalesCatChart"></canvas></div>
+              <div class="rev-empty" id="ssaSalesCatEmpty" style="display:none;padding:70px 0;">데이터 없음</div>
+            </div>
+            <div class="rev-tbl-card">
+              <div class="rev-tbl-head"><span class="rev-tbl-title">🏆 소카테고리 TOP 15</span><span style="font-size:10.5px;color:var(--tx2);">행 더블클릭 → 상세</span></div>
+              <div class="tw" style="max-height:300px;overflow-y:auto;">
+                <table class="dt"><thead><tr><th style="width:36px;text-align:center;">#</th><th>카테고리</th><th style="text-align:right;">매출</th><th style="text-align:right;">환불율</th></tr></thead>
+                <tbody id="ssaSalesSubTbody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ 방문분석 ══ -->
+      <div class="ssa-sub" id="ssaSub-visit">
+        <div class="rev-filter" style="justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div class="rev-filter-group" id="ssaVisitTrendBtns">
+              <div class="rfbtn" data-mode="day" onclick="ssaSetTrendMode('visit','day')" style="padding:3px 11px;font-size:11.5px;">일별</div>
+              <div class="rfbtn active" data-mode="week" onclick="ssaSetTrendMode('visit','week')" style="padding:3px 11px;font-size:11.5px;">주별</div>
+              <div class="rfbtn" data-mode="month" onclick="ssaSetTrendMode('visit','month')" style="padding:3px 11px;font-size:11.5px;">월별</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="rev-filter-lbl">기간</span>
+              <select id="ssaVisitMonthSel" class="sel" style="font-size:12px;height:30px;" onchange="ssaSetMonth('visit',this.value)"></select>
+            </div>
+            <div style="font-size:12px;color:var(--tx2);font-weight:500;" id="ssaVisitPeriod">기간: —</div>
+            <span style="font-size:11px;color:var(--pr);background:var(--prl);padding:3px 9px;border-radius:12px;font-weight:600;">👆 그래프·항목 더블클릭 시 상세보기</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="ssaVisitDrop" class="rev-up-slot" onclick="document.getElementById('ssaVisitFile').click()"
+              ondragover="event.preventDefault();this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')"
+              ondrop="ssaDropFiles(event,'visit')"
+              style="border:1.5px dashed var(--bd);border-radius:9px;padding:7px 14px;font-size:11.5px;color:var(--tx2);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:all .15s;">
+              <span style="font-size:14px;">⬆</span> 방문분석 엑셀 업로드 <span style="color:var(--tx3,#aaa);">(일별)</span>
+            </div>
+            <input type="file" id="ssaVisitFile" accept=".xlsx,.xls" multiple style="display:none" onchange="ssaPickFiles(event,'visit')">
+          </div>
+        </div>
+
+        <div class="rev-empty" id="ssaVisitEmpty" style="padding:48px 20px;text-align:center;">
+          아직 등록된 방문분석 데이터가 없습니다.<br>스마트스토어에서 매일 내려받은 <b>방문분석</b> 엑셀을 우측 상단에 업로드하세요.
+        </div>
+
+        <div id="ssaVisitBody" style="display:none;flex-direction:column;gap:14px;">
+          <div class="rev-kpi">
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">👣 총 방문수</div><div class="rev-kpi-val" id="ssaVK0">—</div><div class="rev-kpi-sub" id="ssaVK0s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">🧾 결제건수</div><div class="rev-kpi-val" id="ssaVK1">—</div><div class="rev-kpi-sub" id="ssaVK1s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">🎯 구매전환율</div><div class="rev-kpi-val" id="ssaVK2">—</div><div class="rev-kpi-sub" id="ssaVK2s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">💳 판매금액</div><div class="rev-kpi-val" id="ssaVK3">—</div><div class="rev-kpi-sub" id="ssaVK3s" style="color:var(--tx2);"></div></div>
+          </div>
+
+          <div class="rev-card">
+            <div class="rev-card-title" style="flex-wrap:wrap;gap:8px;">
+              <span>📈 방문·매출 추이</span>
+              <div class="rev-filter-group" id="ssaVisitMetricBtns">
+                <div class="rfbtn active" data-metric="visits" onclick="ssaSetVisitMetric('visits')" style="padding:3px 11px;font-size:11.5px;">방문수</div>
+                <div class="rfbtn" data-metric="amt" onclick="ssaSetVisitMetric('amt')" style="padding:3px 11px;font-size:11.5px;">매출</div>
+              </div>
+              <span id="ssaVisitTrendTotal" style="font-size:12px;font-weight:700;color:var(--pr);"></span>
+            </div>
+            <div class="rev-chart-wrap" style="height:230px;"><canvas id="ssaVisitTrendChart"></canvas></div>
+            <div class="rev-empty" id="ssaVisitTrendEmpty" style="display:none;padding:55px 0;">데이터가 쌓이면 추이가 표시됩니다</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+            <div class="rev-card">
+              <div class="rev-card-title"><span>🚪 유입경로 (1단계)</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">방문수 기준 · 더블클릭 → 상세</span></div>
+              <div class="rev-chart-wrap" style="height:260px;"><canvas id="ssaVisitPathChart"></canvas></div>
+              <div class="rev-empty" id="ssaVisitPathEmpty" style="display:none;padding:70px 0;">데이터 없음</div>
+            </div>
+            <div class="rev-tbl-card">
+              <div class="rev-tbl-head"><span class="rev-tbl-title">🏆 세부경로 TOP 15</span><span style="font-size:10.5px;color:var(--tx2);">행 더블클릭 → 상세</span></div>
+              <div class="tw" style="max-height:300px;overflow-y:auto;">
+                <table class="dt"><thead><tr><th style="width:36px;text-align:center;">#</th><th>경로</th><th style="text-align:right;">방문수</th><th style="text-align:right;">전환율</th><th style="text-align:right;">매출</th></tr></thead>
+                <tbody id="ssaVisitSubTbody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ 고객분석 (주간) ══ -->
+      <div class="ssa-sub" id="ssaSub-customer">
+        <div class="rev-filter" style="justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div class="rev-filter-group" id="ssaCustTrendBtns">
+              <div class="rfbtn active" data-mode="week" onclick="ssaSetTrendMode('customer','week')" style="padding:3px 11px;font-size:11.5px;">주별</div>
+              <div class="rfbtn" data-mode="month" onclick="ssaSetTrendMode('customer','month')" style="padding:3px 11px;font-size:11.5px;">월별</div>
+            </div>
+            <div style="font-size:12px;color:var(--tx2);font-weight:500;" id="ssaCustPeriod">기간: —</div>
+            <span style="font-size:11px;color:var(--pr);background:var(--prl);padding:3px 9px;border-radius:12px;font-weight:600;">👆 그래프·항목 더블클릭 시 상세보기</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="ssaCustDrop" class="rev-up-slot" onclick="document.getElementById('ssaCustFile').click()"
+              ondragover="event.preventDefault();this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')"
+              ondrop="ssaDropFiles(event,'customer')"
+              style="border:1.5px dashed var(--bd);border-radius:9px;padding:7px 14px;font-size:11.5px;color:var(--tx2);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:all .15s;">
+              <span style="font-size:14px;">⬆</span> 고객분석 엑셀 업로드 <span style="color:var(--tx3,#aaa);">(주간)</span>
+            </div>
+            <input type="file" id="ssaCustFile" accept=".xlsx,.xls" multiple style="display:none" onchange="ssaPickFiles(event,'customer')">
+          </div>
+        </div>
+
+        <div class="rev-empty" id="ssaCustEmpty" style="padding:48px 20px;text-align:center;">
+          아직 등록된 고객분석 데이터가 없습니다.<br>매주 월요일 스마트스토어에서 내려받은 <b>고객분석</b> 엑셀을 우측 상단에 업로드하세요.
+        </div>
+
+        <div id="ssaCustBody" style="display:none;flex-direction:column;gap:14px;">
+          <div class="rev-kpi">
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">👥 방문고객수</div><div class="rev-kpi-val" id="ssaCK0">—</div><div class="rev-kpi-sub" id="ssaCK0s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">🧾 결제고객수</div><div class="rev-kpi-val" id="ssaCK1">—</div><div class="rev-kpi-sub" id="ssaCK1s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">🎯 구매전환율</div><div class="rev-kpi-val" id="ssaCK2">—</div><div class="rev-kpi-sub" id="ssaCK2s" style="color:var(--tx2);"></div></div>
+            <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 객단가</div><div class="rev-kpi-val" id="ssaCK3">—</div><div class="rev-kpi-sub" id="ssaCK3s" style="color:var(--tx2);"></div></div>
+          </div>
+
+          <div class="rev-card">
+            <div class="rev-card-title"><span>📈 신규·재구매 추이</span><span id="ssaCustTrendTotal" style="font-size:12px;font-weight:700;color:var(--pr);"></span></div>
+            <div class="rev-chart-wrap" style="height:230px;"><canvas id="ssaCustTrendChart"></canvas></div>
+            <div class="rev-empty" id="ssaCustTrendEmpty" style="display:none;padding:55px 0;">데이터가 쌓이면 추이가 표시됩니다</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+            <div class="rev-card">
+              <div class="rev-card-title"><span>🥯 신규 vs 재구매 비중</span><span style="font-size:11px;color:var(--tx2);font-weight:500;">매출 기준 · 선택기간 합계</span></div>
+              <div class="rev-chart-wrap" style="height:230px;"><canvas id="ssaCustSegChart"></canvas></div>
+              <div class="rev-empty" id="ssaCustSegEmpty" style="display:none;padding:70px 0;">데이터 없음</div>
+            </div>
+            <div class="rev-tbl-card">
+              <div class="rev-tbl-head"><span class="rev-tbl-title">📅 주별 상세</span><span style="font-size:10.5px;color:var(--tx2);">행 더블클릭 → 상세</span></div>
+              <div class="tw" style="max-height:300px;overflow-y:auto;">
+                <table class="dt"><thead><tr><th>주</th><th style="text-align:right;">방문고객</th><th style="text-align:right;">결제고객</th><th style="text-align:right;">전환율</th><th style="text-align:right;">매출</th></tr></thead>
+                <tbody id="ssaCustWeekTbody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 상세보기 모달 (공용) -->
+      <div id="ssaModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)ssaCloseDetail()">
+        <div style="background:var(--bg);border-radius:14px;max-width:880px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+          <div style="padding:15px 20px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="font-size:15px;font-weight:700;line-height:1.35;" id="ssaModalTitle">상세</div>
+            <button onclick="ssaCloseDetail()" style="border:none;background:transparent;font-size:18px;cursor:pointer;color:var(--tx2);flex-shrink:0;">✕</button>
+          </div>
+          <div style="padding:14px 20px 20px;overflow-y:auto;" id="ssaModalBody"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -4268,7 +4488,8 @@ const MENUS = [
 // 매출관리 하위탭 — 각각 개별 권한 부여 가능
 const REV_SUBS = [
   {id:'summary',label:'요약'}, {id:'monthly',label:'월별'}, {id:'backdata',label:'백데이터'},
-  {id:'upload',label:'데이터업로드'}, {id:'unified',label:'통합'}, {id:'daily',label:'일일보고'}, {id:'adcenter',label:'광고센터'}, {id:'region',label:'지역·연령별'}
+  {id:'upload',label:'데이터업로드'}, {id:'unified',label:'통합'}, {id:'daily',label:'일일보고'}, {id:'adcenter',label:'광고센터'}, {id:'region',label:'지역·연령별'},
+  {id:'ssa',label:'판매·방문·고객분석'}
 ];
 const PERM_LEVELS = [['none','없음'],['view','열람'],['edit','수정']];
 const _PERM_RANK = { none:0, view:1, edit:2 };
@@ -8116,6 +8337,7 @@ function _renderRevCurrentPage(){
   if(_revPage==='unified')  renderUnifiedTable();
   if(_revPage==='daily')    renderDailyReport();
   if(_revPage==='region')   renderRegionPage();
+  if(_revPage==='ssa')      renderSsaPage();
 }
 
 // ── 택배비 CRUD (Supabase cloud 저장 + localStorage 백업) ──
@@ -8583,7 +8805,7 @@ function goRevPage(p){
     p = f.id;
   }
   _revPage = p;
-  ['summary','monthly','backdata','upload','unified','daily','adcenter','region'].forEach(x=>{
+  ['summary','monthly','backdata','upload','unified','daily','adcenter','region','ssa'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
@@ -9280,6 +9502,738 @@ function rgnOpenDetail(type, key){
   document.getElementById('rgnModalTitle').textContent = title;
   document.getElementById('rgnModalBody').innerHTML = html;
   document.getElementById('rgnModal').style.display = 'flex';
+}
+
+// ══════════════ 판매·방문·고객분석 (스마트스토어 정책변경 개편판) ══════════════
+// 스마트스토어가 지역·연령 데이터 제공을 중단하고 대신 판매분석/방문분석/고객분석
+// 3개 리포트로 개편 → 일별(판매/방문)·주별(고객) 엑셀을 누적 저장해 일/주/월 추이를 봄
+//  · 인덱스 키 'ssa_sales_idx' / 'ssa_visit_idx' = { months:['YYYY-MM'...] }
+//  · 월별 키 'ssa_sales_m_YYYY-MM' = { 'YYYY-MM-DD': {total:{...}, cats:[{catL,catM,catS,...}]} }
+//  · 월별 키 'ssa_visit_m_YYYY-MM' = { 'YYYY-MM-DD': {total:{...}, paths:[{p1,p2,p3,...}]} }
+//  · 고객분석은 주간 리포트라 용량이 작아 통짜 1키 'ssa_customer_all' = { 'YYYY-MM-DD'(월요일):{total,newC,repeat} }
+const SSA_IDX_KEY = k => 'ssa_'+k+'_idx';
+const ssaMKey = (k,m) => 'ssa_'+k+'_m_'+m;
+const SSA_CUST_KEY = 'ssa_customer_all';
+let _ssaIdx = {sales:{months:[]}, visit:{months:[]}};
+let _ssaMonths = {sales:{}, visit:{}};
+let _ssaLoaded = {sales:false, visit:false, customer:false};
+let _ssaCustomer = null;
+let _ssaSub = 'sales';
+let _ssaMonthSel = {sales:'ALL', visit:'ALL'};
+let _ssaTrendMode = {sales:'week', visit:'week', customer:'week'};
+let _ssaVisitMetric = 'visits';
+let _ssaCharts = {};
+let _ssaCur = {sales:null, visit:null, customer:null};
+
+// ── 헤더명 검색(공백 무시) / 날짜 정규화 ──
+function ssaIx(head, name){
+  const norm = s=>String(s).replace(/\s+/g,'');
+  const want = norm(name);
+  return head.findIndex(h=>norm(h)===want);
+}
+function ssaNormDate(v){
+  if(v instanceof Date) return _ymd(v);
+  const s=String(v).trim();
+  const m=s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : s;
+}
+
+// ── 시트 파서: 날짜 컬럼 기준으로 그룹핑(파일이 여러 날짜를 포함해도 안전) ──
+function ssaParseSalesSheet(ws){
+  const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(!json.length) return null;
+  const head=json[0].map(h=>String(h).trim());
+  const ix=n=>ssaIx(head,n);
+  const dI=ix('날짜'), lI=ix('대카테고리'), mI=ix('중카테고리'), sI=ix('소카테고리'),
+        cntI=ix('상품결제건수'), rcntI=ix('환불건수'), amtGI=ix('판매금액(총)'), amtNI=ix('판매금액(순)'),
+        refI=ix('환불금액'), qtyI=ix('결제상품수량'), visI=ix('방문수'), shipI=ix('배송비'), discI=ix('전체할인액');
+  if(dI<0 || lI<0 || amtGI<0) return null;
+  const byDate={};
+  json.slice(1).forEach(r=>{
+    if(!r || !r.length) return;
+    const dateRaw=r[dI]; if(dateRaw===undefined || dateRaw==='') return;
+    const date=ssaNormDate(dateRaw);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const catL=String(r[lI]||'').trim(), catM=String(r[mI]||'').trim(), catS=String(r[sI]||'').trim();
+    const row={catL,catM,catS,
+      cnt:rgnNum(r[cntI]), rCnt:rcntI>=0?rgnNum(r[rcntI]):0, amtG:rgnNum(r[amtGI]), amtN:amtNI>=0?rgnNum(r[amtNI]):0,
+      refund:refI>=0?rgnNum(r[refI]):0, qty:qtyI>=0?rgnNum(r[qtyI]):0, visits:visI>=0?rgnNum(r[visI]):0,
+      shipping:shipI>=0?rgnNum(r[shipI]):0, discount:discI>=0?rgnNum(r[discI]):0};
+    (byDate[date] ||= {total:null, cats:[]});
+    if(catL==='전체' && catM==='전체' && catS==='전체') byDate[date].total=row;
+    else byDate[date].cats.push(row);
+  });
+  Object.values(byDate).forEach(d=>{
+    if(!d.total){
+      const t={cnt:0,rCnt:0,amtG:0,amtN:0,refund:0,qty:0,visits:0,shipping:0,discount:0};
+      d.cats.forEach(c=>{ for(const k in t) t[k]+=c[k]||0; });
+      d.total=t;
+    }
+  });
+  return Object.keys(byDate).length ? byDate : null;
+}
+function ssaParseVisitSheet(ws){
+  const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(!json.length) return null;
+  const head=json[0].map(h=>String(h).trim());
+  const ix=n=>ssaIx(head,n);
+  const dI=ix('날짜'), p1I=ix('경로(1단계)'), p2I=ix('경로(2단계)'), p3I=ix('경로(3단계)'), mkI=ix('마케팅링크여부'),
+        visI=ix('방문수'), cntI=ix('상품결제건수'), convI=ix('구매전환율'), amtI=ix('판매금액(총)'), upI=ix('상품결제단가');
+  if(dI<0 || p1I<0 || visI<0) return null;
+  const byDate={};
+  json.slice(1).forEach(r=>{
+    if(!r || !r.length) return;
+    const dateRaw=r[dI]; if(dateRaw===undefined || dateRaw==='') return;
+    const date=ssaNormDate(dateRaw);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const p1=String(r[p1I]||'').trim(), p2=String(r[p2I]||'').trim(), p3=String(r[p3I]||'').trim();
+    const row={p1,p2,p3,mkt:mkI>=0?String(r[mkI]||'').trim():'',
+      visits:rgnNum(r[visI]), cnt:cntI>=0?rgnNum(r[cntI]):0, conv:convI>=0?rgnNum(r[convI]):0,
+      amt:amtI>=0?rgnNum(r[amtI]):0, unit:upI>=0?rgnNum(r[upI]):0};
+    (byDate[date] ||= {total:null, paths:[]});
+    if(p1==='전체' && p2==='전체' && p3==='전체') byDate[date].total=row;
+    else byDate[date].paths.push(row);
+  });
+  Object.values(byDate).forEach(d=>{
+    if(!d.total){
+      const t={visits:0,cnt:0,amt:0};
+      d.paths.forEach(p=>{ t.visits+=p.visits; t.cnt+=p.cnt; t.amt+=p.amt; });
+      d.total=t;
+    }
+  });
+  return Object.keys(byDate).length ? byDate : null;
+}
+function ssaParseCustomerSheet(ws){
+  const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(!json.length) return null;
+  const head=json[0].map(h=>String(h).trim());
+  const ix=n=>ssaIx(head,n);
+  const dI=ix('날짜'), catI=ix('고객분류'), vI=ix('방문고객수'), pI=ix('결제고객수'),
+        convI=ix('구매전환율(고객)'), amtI=ix('판매금액(총)'), aovI=ix('객단가');
+  if(dI<0 || catI<0 || vI<0) return null;
+  const byWeek={};
+  json.slice(1).forEach(r=>{
+    if(!r || !r.length) return;
+    const raw=String(r[dI]||'').trim(); if(!raw) return;
+    const m=raw.match(/(\d{4}-\d{2}-\d{2})/); if(!m) return;
+    const week=m[1];
+    const cat=String(r[catI]||'').trim();
+    const row={visitors:rgnNum(r[vI]), payers:pI>=0?rgnNum(r[pI]):0,
+      conv:convI>=0?rgnNum(r[convI]):0, amt:amtI>=0?rgnNum(r[amtI]):0, aov:aovI>=0?rgnNum(r[aovI]):0};
+    (byWeek[week] ||= {});
+    if(cat==='전체합산') byWeek[week].total=row;
+    else if(cat==='신규') byWeek[week].newC=row;
+    else if(cat==='재구매') byWeek[week].repeat=row;
+  });
+  return Object.keys(byWeek).length ? byWeek : null;
+}
+
+// ── 저장소 로드/업로드 ──
+async function ssaLoadIndex(kind){
+  if(_ssaLoaded[kind]) return;
+  if(kind==='customer'){
+    let obj=null; try{ obj=await cloudKvLoad(SSA_CUST_KEY); }catch{ obj=null; }
+    _ssaCustomer = obj || {};
+    _ssaLoaded.customer = true;
+    return;
+  }
+  let idx=null; try{ idx=await cloudKvLoad(SSA_IDX_KEY(kind)); }catch{ idx=null; }
+  if(!idx || !Array.isArray(idx.months)) idx = {months:[]};
+  _ssaIdx[kind] = idx;
+  _ssaLoaded[kind]=true;
+}
+async function ssaLoadMonth(kind,m){
+  _ssaMonths[kind] ||= {};
+  if(_ssaMonths[kind][m]) return _ssaMonths[kind][m];
+  let obj=null; try{ obj=await cloudKvLoad(ssaMKey(kind,m)); }catch{ obj=null; }
+  _ssaMonths[kind][m]=obj||{};
+  return _ssaMonths[kind][m];
+}
+async function ssaCollectDates(kind){
+  await ssaLoadIndex(kind);
+  const months = _ssaMonthSel[kind]==='ALL' ? _ssaIdx[kind].months.slice() : (_ssaIdx[kind].months.includes(_ssaMonthSel[kind])?[_ssaMonthSel[kind]]:[]);
+  for(const m of months) await ssaLoadMonth(kind,m);
+  const dates={};
+  months.forEach(m=>{ const shard=_ssaMonths[kind][m]||{}; Object.entries(shard).forEach(([d,obj])=>{ dates[d]=obj; }); });
+  return dates;
+}
+
+async function ssaHandleFiles(kind, files){
+  if(kind==='customer'){
+    await ssaLoadIndex('customer');
+    _ssaCustomer ||= {};
+    let ok=0, lastKey='';
+    for(const file of files){
+      try{
+        const buf=await file.arrayBuffer();
+        const wb=XLSX.read(buf,{type:'array'});
+        const byWeek=ssaParseCustomerSheet(wb.Sheets[wb.SheetNames[0]]);
+        if(!byWeek){ toast(`❌ ${file.name}: 고객분석 형식이 아닙니다`); continue; }
+        Object.entries(byWeek).forEach(([wk,obj])=>{ _ssaCustomer[wk]={...(_ssaCustomer[wk]||{}), ...obj}; lastKey=wk; });
+        ok++;
+      }catch(e){ toast(`❌ ${file.name}: ${e.message}`); }
+    }
+    if(ok){
+      await cloudKvSave(SSA_CUST_KEY, _ssaCustomer);
+      toast(`✅ 고객분석 ${ok}개 파일 저장 완료 (최근 주 ${lastKey})`);
+      addHistory({menu:'매출관리',type:'edit',code:'SSA_CUSTOMER',name:'고객분석 데이터',desc:`${ok}개 파일 업로드`,before:'-',after:'등록',user:'수동'});
+      renderSsaCustomer();
+    }
+    return;
+  }
+  await ssaLoadIndex(kind);
+  let ok=0, lastKey='';
+  const touched=new Set();
+  for(const file of files){
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      const byDate = kind==='sales' ? ssaParseSalesSheet(wb.Sheets[wb.SheetNames[0]]) : ssaParseVisitSheet(wb.Sheets[wb.SheetNames[0]]);
+      if(!byDate){ toast(`❌ ${file.name}: ${kind==='sales'?'판매분석':'방문분석'} 형식이 아닙니다`); continue; }
+      for(const [date,obj] of Object.entries(byDate)){
+        const m=date.slice(0,7);
+        await ssaLoadMonth(kind,m);
+        _ssaMonths[kind][m][date]=obj;
+        if(!_ssaIdx[kind].months.includes(m)) _ssaIdx[kind].months.push(m);
+        touched.add(m); lastKey=date;
+      }
+      ok++;
+    }catch(e){ toast(`❌ ${file.name}: ${e.message}`); }
+  }
+  if(ok){
+    _ssaIdx[kind].months.sort();
+    for(const m of touched) await cloudKvSave(ssaMKey(kind,m), _ssaMonths[kind][m]);
+    await cloudKvSave(SSA_IDX_KEY(kind), _ssaIdx[kind]);
+    const label = kind==='sales'?'판매분석':'방문분석';
+    toast(`✅ ${label} ${lastKey} 저장 완료`);
+    addHistory({menu:'매출관리',type:'edit',code:kind==='sales'?'SSA_SALES':'SSA_VISIT',name:label+' 데이터',desc:`${lastKey} 누적저장`,before:'-',after:'등록',user:'수동'});
+    _ssaMonthSel[kind] = lastKey.slice(0,7);
+    if(kind==='sales') renderSsaSales(); else renderSsaVisit();
+  }
+}
+function ssaDropFiles(e, kind){ e.preventDefault(); e.currentTarget.classList.remove('drag-over'); const fs=[...e.dataTransfer.files].filter(f=>/\.xlsx?$/i.test(f.name)); if(fs.length) ssaHandleFiles(kind, fs); }
+function ssaPickFiles(e, kind){ const fs=[...e.target.files]; if(fs.length) ssaHandleFiles(kind, fs); e.target.value=''; }
+
+// ── 탭 전환 / 필터 ──
+function ssaGoSub(sub){
+  _ssaSub = sub;
+  document.querySelectorAll('#rpage-ssa .ssa-sni').forEach(el=>el.classList.remove('active'));
+  document.getElementById('ssa-sni-'+sub)?.classList.add('active');
+  document.querySelectorAll('#rpage-ssa .ssa-sub').forEach(el=>el.classList.remove('active'));
+  document.getElementById('ssaSub-'+sub)?.classList.add('active');
+  renderSsaPage();
+}
+async function renderSsaPage(){
+  if(_ssaSub==='sales') await renderSsaSales();
+  else if(_ssaSub==='visit') await renderSsaVisit();
+  else await renderSsaCustomer();
+}
+function ssaFillMonthSelect(kind){
+  const sel=document.getElementById(kind==='sales'?'ssaSalesMonthSel':'ssaVisitMonthSel'); if(!sel) return;
+  const months=_ssaIdx[kind].months.slice().sort();
+  sel.innerHTML = `<option value="ALL">전체 누적</option>` + months.map(m=>{const[y,mo]=m.split('-');return `<option value="${m}">${y}년 ${mo}월</option>`;}).join('');
+  sel.value = (_ssaMonthSel[kind]==='ALL' || months.includes(_ssaMonthSel[kind])) ? _ssaMonthSel[kind] : 'ALL';
+}
+function ssaSetMonth(kind, v){ _ssaMonthSel[kind]=v; if(kind==='sales') renderSsaSales(); else renderSsaVisit(); }
+function ssaSetTrendMode(kind, m){
+  _ssaTrendMode[kind]=m;
+  const btnsId = kind==='sales'?'ssaSalesTrendBtns':kind==='visit'?'ssaVisitTrendBtns':'ssaCustTrendBtns';
+  document.querySelectorAll('#'+btnsId+' .rfbtn').forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
+  if(kind==='sales') ssaRenderSalesTrend();
+  else if(kind==='visit') ssaRenderVisitTrend();
+  else ssaRenderCustTrend();
+}
+function ssaSetVisitMetric(m){
+  _ssaVisitMetric=m;
+  document.querySelectorAll('#ssaVisitMetricBtns .rfbtn').forEach(b=>b.classList.toggle('active', b.dataset.metric===m));
+  ssaRenderVisitTrend();
+}
+function _ssaKill(k){ if(_ssaCharts[k]){ _ssaCharts[k].destroy(); _ssaCharts[k]=null; } }
+// 일/주/월 추이 시리즈 생성 (day/visit 등 kind 공용)
+function ssaTrendSeries(datesMap, mode, valFn){
+  const days=Object.keys(datesMap).sort();
+  if(mode==='month'){
+    const byM={}; days.forEach(d=>{ const m=d.slice(0,7); (byM[m] ||= []).push(d); });
+    const ks=Object.keys(byM).sort();
+    const labels=ks.map(m=>{const[y,mo]=m.split('-');return `${y.slice(2)}.${mo}`;});
+    const data=ks.map(m=>byM[m].reduce((s,d)=>s+valFn(datesMap[d]),0));
+    const tips=ks.map(m=>{const[y,mo]=m.split('-');return `${y}년 ${mo}월`;});
+    return {labels,data,tips,keys:ks};
+  }
+  if(mode==='week'){
+    const wk={}; days.forEach(d=>{ const ws=rgnWeekStart(d); (wk[ws] ||= []).push(d); });
+    const wkeys=Object.keys(wk).sort();
+    const labels=wkeys.map(ws=>{ const e=new Date(ws+'T00:00:00'); e.setDate(e.getDate()+6); return `${_mdLabel(ws)}~${_mdLabel(_ymd(e))}`; });
+    const data=wkeys.map(w=>wk[w].reduce((s,d)=>s+valFn(datesMap[d]),0));
+    const tips=labels.map(l=>l+' (주)');
+    return {labels,data,tips,keys:wkeys};
+  }
+  const labels=days.map(_mdLabel);
+  const data=days.map(d=>valFn(datesMap[d]));
+  const tips=days.slice();
+  return {labels,data,tips,keys:days};
+}
+
+// ══ 판매분석 ══
+async function renderSsaSales(){
+  await ssaLoadIndex('sales');
+  ssaFillMonthSelect('sales');
+  const empty=document.getElementById('ssaSalesEmpty'), body=document.getElementById('ssaSalesBody');
+  if(!_ssaIdx.sales.months.length){
+    _ssaCur.sales=null; empty.style.display='block'; empty.innerHTML='아직 등록된 판매분석 데이터가 없습니다.<br>스마트스토어에서 매일 내려받은 <b>판매분석</b> 엑셀을 우측 상단에 업로드하세요.';
+    body.style.display='none'; document.getElementById('ssaSalesPeriod').textContent='기간: —'; return;
+  }
+  const dates = await ssaCollectDates('sales');
+  const dkeys = Object.keys(dates);
+  if(!dkeys.length){
+    _ssaCur.sales=null; empty.style.display='block'; empty.innerHTML='선택한 월에 데이터가 없습니다. 다른 월을 선택하거나 업로드하세요.'; body.style.display='none'; return;
+  }
+  empty.style.display='none'; body.style.display='flex';
+
+  const totals={amtG:0,amtN:0,cnt:0,rCnt:0,refund:0,qty:0,visits:0};
+  const byCatL={}, catFullMap={};
+  dkeys.forEach(d=>{
+    const day=dates[d]; const t=day.total;
+    totals.amtG+=t.amtG; totals.amtN+=t.amtN; totals.cnt+=t.cnt; totals.rCnt+=t.rCnt; totals.refund+=t.refund; totals.qty+=t.qty; totals.visits+=t.visits||0;
+    day.cats.forEach(c=>{
+      (byCatL[c.catL] ||= {amtG:0,rCnt:0,refund:0,cnt:0}); const bl=byCatL[c.catL]; bl.amtG+=c.amtG; bl.rCnt+=c.rCnt; bl.refund+=c.refund; bl.cnt+=c.cnt;
+      const key=`${c.catL}>${c.catM}>${c.catS}`;
+      (catFullMap[key] ||= {catL:c.catL,catM:c.catM,catS:c.catS,amtG:0,rCnt:0,refund:0,cnt:0}); const f=catFullMap[key]; f.amtG+=c.amtG; f.rCnt+=c.rCnt; f.refund+=c.refund; f.cnt+=c.cnt;
+    });
+  });
+  const ds=dkeys.slice().sort(); const dateRange = ds[0]===ds[ds.length-1]?ds[0]:`${ds[0]} ~ ${ds[ds.length-1]}`;
+  const monthTxt = _ssaMonthSel.sales==='ALL' ? '전체 누적' : _ssaMonthSel.sales.replace('-','년 ')+'월';
+  document.getElementById('ssaSalesPeriod').textContent = `${monthTxt} (${dateRange})`;
+
+  _ssaCur.sales = {dates, totals, byCatL, catFullMap};
+
+  document.getElementById('ssaSK0').textContent = rgnWon(totals.amtG);
+  document.getElementById('ssaSK0s').textContent = rgnWonFull(totals.amtG);
+  document.getElementById('ssaSK1').textContent = rgnWon(totals.amtN);
+  document.getElementById('ssaSK1s').textContent = rgnWonFull(totals.amtN);
+  document.getElementById('ssaSK2').textContent = totals.cnt.toLocaleString()+'건';
+  document.getElementById('ssaSK2s').textContent = '객단가 '+rgnWonFull(totals.cnt?totals.amtG/totals.cnt:0);
+  const rRate = totals.amtG? totals.refund/totals.amtG*100:0;
+  document.getElementById('ssaSK3').textContent = rRate.toFixed(1)+'%';
+  document.getElementById('ssaSK3s').textContent = '환불 '+rgnWon(totals.refund)+' · '+totals.rCnt.toLocaleString()+'건';
+
+  ssaRenderSalesTrend();
+  ssaRenderSalesCat();
+  ssaRenderSalesSubTable();
+}
+function ssaRenderSalesTrend(){
+  const ctx=document.getElementById('ssaSalesTrendChart'); if(!ctx) return; _ssaKill('salesTrend');
+  const totalEl=document.getElementById('ssaSalesTrendTotal');
+  const cur=_ssaCur.sales; const emptyEl=document.getElementById('ssaSalesTrendEmpty');
+  if(!cur){ emptyEl.style.display='block'; ctx.style.display='none'; if(totalEl)totalEl.textContent=''; return; }
+  emptyEl.style.display='none'; ctx.style.display='';
+  const mode=_ssaTrendMode.sales;
+  const s = ssaTrendSeries(cur.dates, mode, d=>d.total.amtG);
+  const total = s.data.reduce((a,b)=>a+b,0);
+  if(totalEl) totalEl.textContent = s.data.length?`합계 ${rgnWonFull(total)}`:'';
+  const colors = s.keys.map(k=> mode==='month' ? (k===_ssaMonthSel.sales?'#3182F6':'#AECBFA') : '#3182F6');
+  _ssaCharts.salesTrend = new Chart(ctx,{
+    data:{labels:s.labels,datasets:[{type:'bar',data:s.data.map(Math.round),backgroundColor:colors,borderRadius:5,maxBarThickness:mode==='month'?54:30}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover,
+      onClick:(e,els)=>{ if(mode==='month' && els.length){ ssaSetMonth('sales', s.keys[els[0].index]); } },
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>s.tips[items[0].dataIndex]||'',label:c=>`매출 ${rgnWonFull(c.parsed.y)}`}}},
+      scales:{y:{ticks:{callback:rgnAxis,font:{size:10}}},x:{ticks:{font:{size:10},autoSkip:s.labels.length>14,maxRotation:s.labels.length>8?50:0}}}}});
+  ctx.ondblclick = (ev)=>{
+    if(mode==='month') return; // 월별 모드는 단일클릭으로 이미 드릴다운(해당 월로 스코프 이동)
+    const pts = _ssaCharts.salesTrend.getElementsAtEventForMode(ev, 'nearest', {intersect:true}, true);
+    if(pts.length){ const idx=pts[0].index; ssaOpenDetail('salesTrendPoint', {mode, key:s.keys[idx], label:s.tips[idx]}); }
+  };
+}
+function ssaRenderSalesCat(){
+  const ctx=document.getElementById('ssaSalesCatChart'); _ssaKill('salesCat');
+  const cur=_ssaCur.sales; const emptyEl=document.getElementById('ssaSalesCatEmpty');
+  const entries = cur? Object.entries(cur.byCatL).sort((a,b)=>b[1].amtG-a[1].amtG) : [];
+  if(!entries.length){ emptyEl.style.display='block'; ctx.style.display='none'; return; } emptyEl.style.display='none'; ctx.style.display='';
+  const labels=entries.map(([k])=>k), data=entries.map(([,v])=>Math.round(v.amtG));
+  _ssaCharts.salesCat = new Chart(ctx,{type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:'#3182F6',borderRadius:5,maxBarThickness:28}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>rgnWonFull(c.parsed.x)}}},
+      scales:{x:{ticks:{callback:rgnAxis,font:{size:10}}},y:{ticks:{font:{size:10.5}}}}}});
+  ctx.ondblclick=(ev)=>{
+    const pts=_ssaCharts.salesCat.getElementsAtEventForMode(ev,'nearest',{intersect:true},true);
+    if(pts.length){ const idx=pts[0].index; ssaOpenDetail('salesCat', labels[idx]); }
+  };
+}
+function ssaRenderSalesSubTable(){
+  const tb=document.getElementById('ssaSalesSubTbody'); const cur=_ssaCur.sales;
+  if(!cur){ tb.innerHTML=''; return; }
+  const rows=Object.values(cur.catFullMap).sort((a,b)=>b.amtG-a.amtG).slice(0,15);
+  tb.innerHTML = rows.map((r,i)=>{
+    const key=`${r.catL}>${r.catM}>${r.catS}`;
+    const rr = r.amtG? (r.refund/r.amtG*100):0;
+    return `<tr ondblclick="ssaOpenDetail('salesSub','${rgnEsc(key).replace(/'/g,"\\'")}')" style="cursor:pointer;">
+      <td style="text-align:center;color:var(--tx2);">${i+1}</td>
+      <td style="white-space:normal;word-break:break-all;line-height:1.3;">${rgnEsc(r.catL)} &rsaquo; ${rgnEsc(r.catM)} &rsaquo; ${rgnEsc(r.catS)}</td>
+      <td style="text-align:right;font-weight:600;">${rgnWonFull(r.amtG)}</td>
+      <td style="text-align:right;color:${rr>10?'#DC2626':'var(--tx2)'};">${rr.toFixed(1)}%</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--tx2);padding:14px;">데이터 없음</td></tr>';
+}
+
+// ══ 방문분석 ══
+async function renderSsaVisit(){
+  await ssaLoadIndex('visit');
+  ssaFillMonthSelect('visit');
+  const empty=document.getElementById('ssaVisitEmpty'), body=document.getElementById('ssaVisitBody');
+  if(!_ssaIdx.visit.months.length){
+    _ssaCur.visit=null; empty.style.display='block'; empty.innerHTML='아직 등록된 방문분석 데이터가 없습니다.<br>스마트스토어에서 매일 내려받은 <b>방문분석</b> 엑셀을 우측 상단에 업로드하세요.';
+    body.style.display='none'; document.getElementById('ssaVisitPeriod').textContent='기간: —'; return;
+  }
+  const dates = await ssaCollectDates('visit');
+  const dkeys=Object.keys(dates);
+  if(!dkeys.length){
+    _ssaCur.visit=null; empty.style.display='block'; empty.innerHTML='선택한 월에 데이터가 없습니다. 다른 월을 선택하거나 업로드하세요.'; body.style.display='none'; return;
+  }
+  empty.style.display='none'; body.style.display='flex';
+
+  const totals={visits:0,cnt:0,amt:0};
+  const byP1={}, fullMap={};
+  dkeys.forEach(d=>{
+    const day=dates[d]; const t=day.total;
+    totals.visits+=t.visits; totals.cnt+=t.cnt; totals.amt+=t.amt;
+    day.paths.forEach(p=>{
+      (byP1[p.p1] ||= {visits:0,cnt:0,amt:0}); const b=byP1[p.p1]; b.visits+=p.visits; b.cnt+=p.cnt; b.amt+=p.amt;
+      const key=`${p.p1}>${p.p2}>${p.p3}`;
+      (fullMap[key] ||= {p1:p.p1,p2:p.p2,p3:p.p3,visits:0,cnt:0,amt:0}); const f=fullMap[key]; f.visits+=p.visits; f.cnt+=p.cnt; f.amt+=p.amt;
+    });
+  });
+  const ds=dkeys.slice().sort(); const dateRange=ds[0]===ds[ds.length-1]?ds[0]:`${ds[0]} ~ ${ds[ds.length-1]}`;
+  const monthTxt=_ssaMonthSel.visit==='ALL'?'전체 누적':_ssaMonthSel.visit.replace('-','년 ')+'월';
+  document.getElementById('ssaVisitPeriod').textContent=`${monthTxt} (${dateRange})`;
+
+  _ssaCur.visit = {dates, totals, byP1, fullMap};
+
+  document.getElementById('ssaVK0').textContent = totals.visits.toLocaleString();
+  document.getElementById('ssaVK0s').textContent = '';
+  document.getElementById('ssaVK1').textContent = totals.cnt.toLocaleString()+'건';
+  document.getElementById('ssaVK1s').textContent = '';
+  const conv = totals.visits? totals.cnt/totals.visits*100:0;
+  document.getElementById('ssaVK2').textContent = conv.toFixed(1)+'%';
+  document.getElementById('ssaVK2s').textContent = '';
+  document.getElementById('ssaVK3').textContent = rgnWon(totals.amt);
+  document.getElementById('ssaVK3s').textContent = rgnWonFull(totals.amt);
+
+  ssaRenderVisitTrend();
+  ssaRenderVisitPath();
+  ssaRenderVisitSubTable();
+}
+function ssaRenderVisitTrend(){
+  const ctx=document.getElementById('ssaVisitTrendChart'); if(!ctx) return; _ssaKill('visitTrend');
+  const totalEl=document.getElementById('ssaVisitTrendTotal');
+  const cur=_ssaCur.visit; const emptyEl=document.getElementById('ssaVisitTrendEmpty');
+  if(!cur){ emptyEl.style.display='block'; ctx.style.display='none'; if(totalEl)totalEl.textContent=''; return; }
+  emptyEl.style.display='none'; ctx.style.display='';
+  const mode=_ssaTrendMode.visit;
+  const isAmt = _ssaVisitMetric==='amt';
+  const valFn = isAmt ? d=>d.total.amt : d=>d.total.visits;
+  const s = ssaTrendSeries(cur.dates, mode, valFn);
+  const total = s.data.reduce((a,b)=>a+b,0);
+  if(totalEl) totalEl.textContent = s.data.length? `합계 ${isAmt?rgnWonFull(total):total.toLocaleString()+'회'}` : '';
+  const colors = s.keys.map(k=> mode==='month' ? (k===_ssaMonthSel.visit?'#3182F6':'#AECBFA') : '#3182F6');
+  _ssaCharts.visitTrend = new Chart(ctx,{
+    data:{labels:s.labels,datasets:[{type:'bar',data:s.data.map(Math.round),backgroundColor:colors,borderRadius:5,maxBarThickness:mode==='month'?54:30}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover,
+      onClick:(e,els)=>{ if(mode==='month' && els.length){ ssaSetMonth('visit', s.keys[els[0].index]); } },
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>s.tips[items[0].dataIndex]||'',label:c=> isAmt?`매출 ${rgnWonFull(c.parsed.y)}`:`방문수 ${c.parsed.y.toLocaleString()}`}}},
+      scales:{y:{ticks:{callback: isAmt?rgnAxis:(v=>v.toLocaleString()),font:{size:10}}},x:{ticks:{font:{size:10},autoSkip:s.labels.length>14,maxRotation:s.labels.length>8?50:0}}}}});
+  ctx.ondblclick=(ev)=>{
+    if(mode==='month') return;
+    const pts=_ssaCharts.visitTrend.getElementsAtEventForMode(ev,'nearest',{intersect:true},true);
+    if(pts.length){ const idx=pts[0].index; ssaOpenDetail('visitTrendPoint',{mode,key:s.keys[idx],label:s.tips[idx]}); }
+  };
+}
+function ssaRenderVisitPath(){
+  const ctx=document.getElementById('ssaVisitPathChart'); _ssaKill('visitPath');
+  const cur=_ssaCur.visit; const emptyEl=document.getElementById('ssaVisitPathEmpty');
+  const entries = cur? Object.entries(cur.byP1).map(([k,v])=>[k,v.visits]).sort((a,b)=>b[1]-a[1]) : [];
+  if(!entries.length){ emptyEl.style.display='block'; ctx.style.display='none'; return; } emptyEl.style.display='none'; ctx.style.display='';
+  const top=entries.slice(0,8); const rest=entries.slice(8);
+  if(rest.length) top.push(['기타', rest.reduce((s,[,v])=>s+v,0)]);
+  const labels=top.map(([k])=>k), data=top.map(([,v])=>Math.round(v));
+  const palette=['#3182F6','#059669','#F59E0B','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#94A3B8'];
+  const grand = entries.reduce((s,[,v])=>s+v,0)||1;
+  _ssaCharts.visitPath = new Chart(ctx,{type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:palette.slice(0,labels.length),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'56%',
+      onHover:_rgnHover,
+      plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:6}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}회 (${(c.parsed/grand*100).toFixed(1)}%)`}}}}});
+  ctx.ondblclick=(ev)=>{
+    const pts=_ssaCharts.visitPath.getElementsAtEventForMode(ev,'nearest',{intersect:true},true);
+    if(pts.length){ const idx=pts[0].index; const l=labels[idx]; if(l!=='기타') ssaOpenDetail('visitPath', l); }
+  };
+}
+function ssaRenderVisitSubTable(){
+  const tb=document.getElementById('ssaVisitSubTbody'); const cur=_ssaCur.visit;
+  if(!cur){ tb.innerHTML=''; return; }
+  const rows=Object.values(cur.fullMap).sort((a,b)=>b.visits-a.visits).slice(0,15);
+  tb.innerHTML = rows.map((r,i)=>{
+    const key=`${r.p1}>${r.p2}>${r.p3}`;
+    const conv = r.visits? r.cnt/r.visits*100:0;
+    return `<tr ondblclick="ssaOpenDetail('visitSub','${rgnEsc(key).replace(/'/g,"\\'")}')" style="cursor:pointer;">
+      <td style="text-align:center;color:var(--tx2);">${i+1}</td>
+      <td style="white-space:normal;word-break:break-all;line-height:1.3;">${rgnEsc(r.p1)} &rsaquo; ${rgnEsc(r.p2)} &rsaquo; ${rgnEsc(r.p3)}</td>
+      <td style="text-align:right;font-weight:600;">${r.visits.toLocaleString()}</td>
+      <td style="text-align:right;color:var(--tx2);">${conv.toFixed(1)}%</td>
+      <td style="text-align:right;color:var(--tx2);">${rgnWon(r.amt)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--tx2);padding:14px;">데이터 없음</td></tr>';
+}
+
+// ══ 고객분석 (주간) ══
+async function renderSsaCustomer(){
+  await ssaLoadIndex('customer');
+  const empty=document.getElementById('ssaCustEmpty'), body=document.getElementById('ssaCustBody');
+  const weeks = _ssaCustomer || {};
+  const wkeys = Object.keys(weeks).sort();
+  if(!wkeys.length){
+    _ssaCur.customer=null; empty.style.display='block'; body.style.display='none'; document.getElementById('ssaCustPeriod').textContent='기간: —'; return;
+  }
+  empty.style.display='none'; body.style.display='flex';
+
+  const dateRange = wkeys[0]===wkeys[wkeys.length-1]?wkeys[0]:`${wkeys[0]} ~ ${wkeys[wkeys.length-1]}`;
+  document.getElementById('ssaCustPeriod').textContent = `누적 ${wkeys.length}주 (${dateRange})`;
+
+  _ssaCur.customer = {weeks};
+
+  const lastW = wkeys[wkeys.length-1];
+  const lastTotal = weeks[lastW].total || {};
+  document.getElementById('ssaCK0').textContent = (lastTotal.visitors||0).toLocaleString();
+  document.getElementById('ssaCK0s').textContent = lastW+' 주';
+  document.getElementById('ssaCK1').textContent = (lastTotal.payers||0).toLocaleString();
+  document.getElementById('ssaCK1s').textContent = '';
+  document.getElementById('ssaCK2').textContent = (lastTotal.conv||0).toFixed(1)+'%';
+  document.getElementById('ssaCK2s').textContent = '';
+  document.getElementById('ssaCK3').textContent = rgnWon(lastTotal.aov||0);
+  document.getElementById('ssaCK3s').textContent = rgnWonFull(lastTotal.aov||0);
+
+  ssaRenderCustTrend();
+  ssaRenderCustSeg();
+  ssaRenderCustTable();
+}
+function ssaRenderCustTrend(){
+  const ctx=document.getElementById('ssaCustTrendChart'); if(!ctx) return; _ssaKill('custTrend');
+  const totalEl=document.getElementById('ssaCustTrendTotal');
+  const cur=_ssaCur.customer; const emptyEl=document.getElementById('ssaCustTrendEmpty');
+  if(!cur){ emptyEl.style.display='block'; ctx.style.display='none'; if(totalEl)totalEl.textContent=''; return; }
+  emptyEl.style.display='none'; ctx.style.display='';
+  const mode=_ssaTrendMode.customer;
+  const wkeys=Object.keys(cur.weeks).sort();
+  let labels, newData, repData, tips, keys;
+  if(mode==='month'){
+    const byM={}; wkeys.forEach(w=>{ const m=w.slice(0,7); (byM[m] ||= []).push(w); });
+    keys=Object.keys(byM).sort();
+    labels=keys.map(m=>{const[y,mo]=m.split('-');return `${y.slice(2)}.${mo}`;});
+    newData=keys.map(m=>byM[m].reduce((s,w)=>s+((cur.weeks[w].newC||{}).amt||0),0));
+    repData=keys.map(m=>byM[m].reduce((s,w)=>s+((cur.weeks[w].repeat||{}).amt||0),0));
+    tips=keys.map(m=>{const[y,mo]=m.split('-');return `${y}년 ${mo}월`;});
+  } else {
+    keys=wkeys;
+    labels=wkeys.map(ws=>{ const e=new Date(ws+'T00:00:00'); e.setDate(e.getDate()+6); return `${_mdLabel(ws)}~${_mdLabel(_ymd(e))}`; });
+    newData=wkeys.map(w=>(cur.weeks[w].newC||{}).amt||0);
+    repData=wkeys.map(w=>(cur.weeks[w].repeat||{}).amt||0);
+    tips=labels.map(l=>l+' (주)');
+  }
+  const total = newData.reduce((a,b)=>a+b,0)+repData.reduce((a,b)=>a+b,0);
+  if(totalEl) totalEl.textContent = labels.length?`합계 ${rgnWonFull(total)}`:'';
+  _ssaCharts.custTrend = new Chart(ctx,{
+    data:{labels, datasets:[
+      {type:'bar',label:'신규',data:newData.map(Math.round),backgroundColor:'#3182F6',stack:'s',borderRadius:4,maxBarThickness:mode==='month'?54:30},
+      {type:'bar',label:'재구매',data:repData.map(Math.round),backgroundColor:'#F59E0B',stack:'s',borderRadius:4,maxBarThickness:mode==='month'?54:30}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      onHover:_rgnHover,
+      plugins:{legend:{display:true,position:'top',labels:{font:{size:10.5},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{title:items=>tips[items[0].dataIndex]||'',label:c=>`${c.dataset.label} ${rgnWonFull(c.parsed.y)}`}}},
+      scales:{y:{stacked:true,ticks:{callback:rgnAxis,font:{size:10}}},x:{stacked:true,ticks:{font:{size:10},autoSkip:labels.length>14,maxRotation:labels.length>8?50:0}}}}});
+  ctx.ondblclick=(ev)=>{
+    const pts=_ssaCharts.custTrend.getElementsAtEventForMode(ev,'nearest',{intersect:true},true);
+    if(pts.length){ const idx=pts[0].index; ssaOpenDetail(mode==='month'?'custMonth':'custWeek', keys[idx]); }
+  };
+}
+function ssaRenderCustSeg(){
+  const ctx=document.getElementById('ssaCustSegChart'); _ssaKill('custSeg');
+  const cur=_ssaCur.customer; const emptyEl=document.getElementById('ssaCustSegEmpty');
+  if(!cur){ emptyEl.style.display='block'; ctx.style.display='none'; return; }
+  const wkeys=Object.keys(cur.weeks);
+  const newAmt=wkeys.reduce((s,w)=>s+((cur.weeks[w].newC||{}).amt||0),0);
+  const repAmt=wkeys.reduce((s,w)=>s+((cur.weeks[w].repeat||{}).amt||0),0);
+  if(!newAmt && !repAmt){ emptyEl.style.display='block'; ctx.style.display='none'; return; }
+  emptyEl.style.display='none'; ctx.style.display='';
+  const total=newAmt+repAmt||1;
+  _ssaCharts.custSeg=new Chart(ctx,{type:'doughnut',
+    data:{labels:['신규','재구매'],datasets:[{data:[Math.round(newAmt),Math.round(repAmt)],backgroundColor:['#3182F6','#F59E0B'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      onHover:_rgnHover,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:10}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${rgnWonFull(c.parsed)} (${(c.parsed/total*100).toFixed(1)}%)`}}}}});
+}
+function ssaRenderCustTable(){
+  const tb=document.getElementById('ssaCustWeekTbody'); const cur=_ssaCur.customer;
+  if(!cur){ tb.innerHTML=''; return; }
+  const wkeys=Object.keys(cur.weeks).sort().reverse();
+  tb.innerHTML = wkeys.map(w=>{
+    const t=cur.weeks[w].total||{};
+    const e=new Date(w+'T00:00:00'); e.setDate(e.getDate()+6);
+    return `<tr onclick="ssaOpenDetail('custWeek','${w}')" style="cursor:pointer;">
+      <td>${w} ~ ${_mdLabel(_ymd(e))}</td>
+      <td style="text-align:right;">${(t.visitors||0).toLocaleString()}</td>
+      <td style="text-align:right;">${(t.payers||0).toLocaleString()}</td>
+      <td style="text-align:right;">${(t.conv||0).toFixed(1)}%</td>
+      <td style="text-align:right;font-weight:600;">${rgnWon(t.amt||0)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--tx2);padding:14px;">데이터 없음</td></tr>';
+}
+
+// ── 드릴다운 상세 모달 (공용) ──
+function _ssaKpiRow(items){
+  const cell=(l,v,c)=>`<div style="background:var(--bg2);border-radius:8px;padding:8px 10px;"><div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">${l}</div><div style="font-size:13.5px;font-weight:700;${c?`color:${c};`:''}">${v}</div></div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(${items.length},1fr);gap:8px;">${items.map(([l,v,c])=>cell(l,v,c)).join('')}</div>`;
+}
+function _ssaCountRows(pairs, total, withRank){
+  return pairs.map(([k,v],i)=>`<tr>${withRank?`<td style="text-align:center;color:var(--tx2);">${i+1}</td>`:''}<td style="white-space:normal;word-break:break-all;line-height:1.3;">${rgnEsc(k)}</td><td style="text-align:right;font-weight:600;">${v.toLocaleString()}</td><td style="text-align:right;color:var(--pr);">${(v/(total||1)*100).toFixed(1)}%</td></tr>`).join('');
+}
+function ssaCloseDetail(){ const m=document.getElementById('ssaModal'); if(m) m.style.display='none'; }
+function ssaShowModal(title, html){
+  document.getElementById('ssaModalTitle').textContent = title;
+  document.getElementById('ssaModalBody').innerHTML = html;
+  document.getElementById('ssaModal').style.display = 'flex';
+}
+function ssaOpenDetail(type, arg){
+  if(type==='salesTrendPoint'){
+    const cur=_ssaCur.sales; if(!cur) return;
+    const {mode,key,label} = arg;
+    let days;
+    if(mode==='day') days=[key];
+    else if(mode==='week') days=Object.keys(cur.dates).filter(d=>rgnWeekStart(d)===key);
+    else days=Object.keys(cur.dates).filter(d=>d.slice(0,7)===key);
+    const cats={}; let amtG=0,amtN=0,cnt=0,refund=0;
+    days.forEach(d=>{ const day=cur.dates[d]; const t=day.total; amtG+=t.amtG; amtN+=t.amtN; cnt+=t.cnt; refund+=t.refund;
+      day.cats.forEach(c=>{ (cats[c.catL] ||= 0); cats[c.catL]+=c.amtG; }); });
+    const pairs=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+    const html = _ssaKpiRow([
+        ['판매금액(총)', rgnWonFull(amtG)],
+        ['판매금액(순)', rgnWonFull(amtN)],
+        ['결제건수', cnt.toLocaleString()+'건'],
+        ['환불율', (amtG?(refund/amtG*100).toFixed(1):'0.0')+'%', '#D97706']
+      ]) + _rgnGrid(_rgnMini('대카테고리별 매출', `<th>카테고리</th>`+_RGN_VH, _rgnRankRows(pairs, amtG, false)));
+    ssaShowModal(`판매분석 · ${label}`, html);
+  }
+  else if(type==='salesCat'){
+    const cur=_ssaCur.sales; if(!cur) return;
+    const catL = arg;
+    const sub = Object.values(cur.catFullMap).filter(r=>r.catL===catL);
+    const amtG = sub.reduce((s,r)=>s+r.amtG,0), refund = sub.reduce((s,r)=>s+r.refund,0), cnt = sub.reduce((s,r)=>s+r.cnt,0);
+    const pairs = sub.map(r=>[`${r.catM} › ${r.catS}`, r.amtG]).sort((a,b)=>b[1]-a[1]).slice(0,20);
+    const html = _ssaKpiRow([
+        ['판매금액(총)', rgnWonFull(amtG)],
+        ['결제건수', cnt.toLocaleString()+'건'],
+        ['환불율', (amtG?(refund/amtG*100).toFixed(1):'0.0')+'%', '#D97706'],
+        ['전체 비중', (amtG/(cur.totals.amtG||1)*100).toFixed(1)+'%', 'var(--pr)']
+      ]) + _rgnGrid(_rgnMini('중·소카테고리 매출', `<th>카테고리</th>`+_RGN_VH, _rgnRankRows(pairs, amtG, false)));
+    ssaShowModal(`판매분석 · ${rgnEsc(catL)}`, html);
+  }
+  else if(type==='salesSub'){
+    const cur=_ssaCur.sales; if(!cur) return;
+    const info = cur.catFullMap[arg]; if(!info) return;
+    const days = Object.keys(cur.dates).sort();
+    const pairs = [];
+    days.forEach(d=>{ const row=cur.dates[d].cats.find(c=>c.catL===info.catL&&c.catM===info.catM&&c.catS===info.catS); if(row && row.amtG) pairs.push([d, row.amtG]); });
+    const html = _ssaKpiRow([
+        ['판매금액(총)', rgnWonFull(info.amtG)],
+        ['결제건수', info.cnt.toLocaleString()+'건'],
+        ['환불금액', rgnWonFull(info.refund)],
+        ['전체 비중', (info.amtG/(cur.totals.amtG||1)*100).toFixed(1)+'%', 'var(--pr)']
+      ]) + _rgnGrid(_rgnMini('일자별 매출', `<th>날짜</th>`+_RGN_VH, _rgnRankRows(pairs, info.amtG, false)));
+    ssaShowModal(`판매분석 · ${rgnEsc(info.catL)} › ${rgnEsc(info.catM)} › ${rgnEsc(info.catS)}`, html);
+  }
+  else if(type==='visitTrendPoint'){
+    const cur=_ssaCur.visit; if(!cur) return;
+    const {mode,key,label}=arg;
+    let days;
+    if(mode==='day') days=[key];
+    else if(mode==='week') days=Object.keys(cur.dates).filter(d=>rgnWeekStart(d)===key);
+    else days=Object.keys(cur.dates).filter(d=>d.slice(0,7)===key);
+    const p1s={}; let visits=0,cnt=0,amt=0;
+    days.forEach(d=>{ const day=cur.dates[d]; const t=day.total; visits+=t.visits; cnt+=t.cnt; amt+=t.amt;
+      day.paths.forEach(p=>{ (p1s[p.p1] ||= 0); p1s[p.p1]+=p.visits; }); });
+    const pairs=Object.entries(p1s).sort((a,b)=>b[1]-a[1]);
+    const conv = visits? cnt/visits*100:0;
+    const html = _ssaKpiRow([
+        ['방문수', visits.toLocaleString()],
+        ['결제건수', cnt.toLocaleString()+'건'],
+        ['구매전환율', conv.toFixed(1)+'%'],
+        ['판매금액', rgnWonFull(amt)]
+      ]) + _rgnGrid(_rgnMini('유입경로(1단계)별 방문수', `<th>경로</th><th style="width:96px;text-align:right;">방문수</th><th style="width:56px;text-align:right;">비중</th>`, _ssaCountRows(pairs, visits, false)));
+    ssaShowModal(`방문분석 · ${label}`, html);
+  }
+  else if(type==='visitPath'){
+    const cur=_ssaCur.visit; if(!cur) return;
+    const p1 = arg;
+    const sub = Object.values(cur.fullMap).filter(r=>r.p1===p1);
+    const visits = sub.reduce((s,r)=>s+r.visits,0), cnt = sub.reduce((s,r)=>s+r.cnt,0), amt = sub.reduce((s,r)=>s+r.amt,0);
+    const pairs = sub.map(r=>[`${r.p2} › ${r.p3}`, r.visits]).sort((a,b)=>b[1]-a[1]).slice(0,20);
+    const conv = visits? cnt/visits*100:0;
+    const html = _ssaKpiRow([
+        ['방문수', visits.toLocaleString()],
+        ['결제건수', cnt.toLocaleString()+'건'],
+        ['구매전환율', conv.toFixed(1)+'%'],
+        ['판매금액', rgnWonFull(amt)]
+      ]) + _rgnGrid(_rgnMini('세부경로별 방문수', `<th>경로</th><th style="width:96px;text-align:right;">방문수</th><th style="width:56px;text-align:right;">비중</th>`, _ssaCountRows(pairs, visits, false)));
+    ssaShowModal(`방문분석 · ${rgnEsc(p1)}`, html);
+  }
+  else if(type==='visitSub'){
+    const cur=_ssaCur.visit; if(!cur) return;
+    const info = cur.fullMap[arg]; if(!info) return;
+    const days=Object.keys(cur.dates).sort();
+    const pairs=[];
+    days.forEach(d=>{ const row=cur.dates[d].paths.find(p=>p.p1===info.p1&&p.p2===info.p2&&p.p3===info.p3); if(row && row.visits) pairs.push([d,row.visits]); });
+    const conv = info.visits? info.cnt/info.visits*100:0;
+    const html = _ssaKpiRow([
+        ['방문수', info.visits.toLocaleString()],
+        ['결제건수', info.cnt.toLocaleString()+'건'],
+        ['구매전환율', conv.toFixed(1)+'%'],
+        ['판매금액', rgnWonFull(info.amt)]
+      ]) + _rgnGrid(_rgnMini('일자별 방문수', `<th>날짜</th><th style="width:96px;text-align:right;">방문수</th><th style="width:56px;text-align:right;">비중</th>`, _ssaCountRows(pairs, info.visits, false)));
+    ssaShowModal(`방문분석 · ${rgnEsc(info.p1)} › ${rgnEsc(info.p2)} › ${rgnEsc(info.p3)}`, html);
+  }
+  else if(type==='custWeek'){
+    const cur=_ssaCur.customer; if(!cur) return;
+    const w = arg; const rec = cur.weeks[w]; if(!rec) return;
+    const rowsHtml = ['total','newC','repeat'].map(k=>{
+      const r=rec[k]||{}; const lbl = k==='total'?'전체합산':k==='newC'?'신규':'재구매';
+      return `<tr><td style="font-weight:600;">${lbl}</td>
+        <td style="text-align:right;">${(r.visitors||0).toLocaleString()}</td>
+        <td style="text-align:right;">${(r.payers||0).toLocaleString()}</td>
+        <td style="text-align:right;">${(r.conv||0).toFixed(1)}%</td>
+        <td style="text-align:right;font-weight:600;">${rgnWonFull(r.amt||0)}</td>
+        <td style="text-align:right;color:var(--tx2);">${rgnWon(r.aov||0)}</td></tr>`;
+    }).join('');
+    const e=new Date(w+'T00:00:00'); e.setDate(e.getDate()+6);
+    const html = `<table class="dt" style="width:100%;"><thead><tr><th>구분</th><th style="text-align:right;">방문고객수</th><th style="text-align:right;">결제고객수</th><th style="text-align:right;">전환율</th><th style="text-align:right;">매출</th><th style="text-align:right;">객단가</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+    ssaShowModal(`고객분석 · ${w} ~ ${_ymd(e)}`, html);
+  }
+  else if(type==='custMonth'){
+    const cur=_ssaCur.customer; if(!cur) return;
+    const m = arg;
+    const wkeys = Object.keys(cur.weeks).filter(w=>w.slice(0,7)===m).sort();
+    const sum=(k)=>{ const t={visitors:0,payers:0,amt:0}; wkeys.forEach(w=>{ const r=(cur.weeks[w][k])||{}; t.visitors+=r.visitors||0; t.payers+=r.payers||0; t.amt+=r.amt||0; }); return t; };
+    const tot=sum('total'), nw=sum('newC'), rp=sum('repeat');
+    const row=(lbl,r)=>`<tr><td style="font-weight:600;">${lbl}</td><td style="text-align:right;">${r.visitors.toLocaleString()}</td><td style="text-align:right;">${r.payers.toLocaleString()}</td><td style="text-align:right;">${r.visitors?(r.payers/r.visitors*100).toFixed(1):'0.0'}%</td><td style="text-align:right;font-weight:600;">${rgnWonFull(r.amt)}</td></tr>`;
+    const html = `<div style="font-size:11px;color:var(--tx2);margin-bottom:6px;">${wkeys.length}개 주 합계</div>`
+      + `<table class="dt" style="width:100%;"><thead><tr><th>구분</th><th style="text-align:right;">방문고객수</th><th style="text-align:right;">결제고객수</th><th style="text-align:right;">전환율</th><th style="text-align:right;">매출</th></tr></thead><tbody>${row('전체합산',tot)}${row('신규',nw)}${row('재구매',rp)}</tbody></table>`;
+    const [y,mo]=m.split('-');
+    ssaShowModal(`고객분석 · ${y}년 ${mo}월`, html);
+  }
 }
 
 // 만 단위 값 → 1억(=10000만) 이상이면 억 표기
