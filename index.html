@@ -1500,6 +1500,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서</div>
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-consign" onclick="goMenu('consign')">🚚 위탁 배송건</div>
+  <div class="ni" id="nav-cost3day" onclick="goMenu('cost3day')">📦 3일 비용계산</div>
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
   <div class="ni" id="nav-rpt_yuhyun" onclick="goMenu('rpt_yuhyun')" style="display:none;">📝 유현</div>
@@ -2719,6 +2720,47 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- ═══ 3일 비용 계산 (CX팀) ═══ -->
+<div class="page" id="page-cost3day">
+  <style>
+  #page-cost3day .c3-wrap{max-width:640px;margin:0 auto;padding:20px 0;}
+  #page-cost3day .c3-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:14px;padding:24px;margin-bottom:18px;box-shadow:0 4px 16px rgba(0,0,0,.04);}
+  #page-cost3day .c3-card h2{margin:0 0 20px;font-size:20px;font-weight:800;letter-spacing:-.5px;color:var(--tx);}
+  #page-cost3day label{display:block;font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:6px;}
+  #page-cost3day input{width:100%;height:44px;border:1px solid var(--bd);border-radius:9px;padding:0 13px;margin-bottom:16px;font-size:15px;outline:none;background:var(--bg);color:var(--tx);font-family:inherit;}
+  #page-cost3day input:focus{border-color:var(--pr);}
+  #page-cost3day .c3-btn{width:100%;height:48px;border:0;border-radius:10px;background:var(--pr);color:#fff;font-size:15px;font-weight:700;cursor:pointer;}
+  #page-cost3day .c3-row{display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid var(--bd);padding:11px 0;font-size:14px;color:var(--tx);gap:14px;}
+  #page-cost3day .c3-row .c3-value{font-weight:700;text-align:right;white-space:nowrap;}
+  #page-cost3day .c3-total{display:flex;justify-content:space-between;align-items:center;padding-top:14px;font-size:19px;font-weight:800;letter-spacing:-.3px;color:var(--pr);gap:14px;}
+  #page-cost3day .c3-total span:last-child{text-align:right;white-space:nowrap;}
+  #page-cost3day .c3-memo{margin-top:12px;color:var(--tx2);font-size:12.5px;line-height:1.5;}
+  #page-cost3day .c3-standard{color:var(--tx2);font-size:13px;line-height:1.7;}
+  #page-cost3day .c3-standard-title{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:4px;}
+  </style>
+  <div class="c3-wrap">
+    <div class="c3-card">
+      <h2>📦 3일 비용 계산</h2>
+      <label for="c3Cbm">1BOX당 CBM</label>
+      <input id="c3Cbm" type="number" step="0.0001" placeholder="예: 0.05" autocomplete="off">
+      <label for="c3BoxCount">총 박스수</label>
+      <input id="c3BoxCount" type="number" placeholder="예: 100" autocomplete="off">
+      <button class="c3-btn" onclick="c3Calc()">계산하기</button>
+    </div>
+    <div class="c3-card">
+      <h2>예상 비용</h2>
+      <div id="c3Output"></div>
+    </div>
+    <div class="c3-card c3-standard">
+      <div class="c3-standard-title">기준 비용</div>
+      중국 현지수출비용: CBM당 5,000원<br>
+      중국 → 인천 물류비: CBM당 45,000원<br>
+      인천 → 부산 물류비: CBM당 50,000원<br>
+      통관비용: 건당 15,000원
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-family">
   <!-- 서브탭 -->
   <div class="fo-subtabs">
@@ -3458,7 +3500,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="search-box">
           <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <input type="text" id="revUniSrch" placeholder="주문번호, 상품번호, 상품명, 구매자..." oninput="_uniPage=0;renderUnifiedTable()">
+          <input type="text" id="revUniSrch" placeholder="주문번호, 상품번호, 상품명, 구매자, 수취인, 연락처..." oninput="_uniPage=0;renderUnifiedTable()">
         </div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniCount">0건</span>
         <span style="flex:1;"></span>
@@ -4478,7 +4520,7 @@ function logout(){
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'cost3day',label:'3일 비용계산'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'moeum',label:'🧮 모음전 계산기'},
@@ -4496,7 +4538,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','cost3day'] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
@@ -6713,7 +6755,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','cost3day','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -6748,6 +6790,7 @@ function goPage(p){
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
+  if(p==='cost3day') c3Init();
   if(p==='moeum') moeumInit();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
@@ -6756,6 +6799,44 @@ function goPage(p){
   _applyWriteLockUI();
   // 캘린더 페이지에서는 상단 엑셀 업로드 버튼 숨김 (해당 없음) — _applyWriteLockUI 이후 적용
   if(_pageId==='calendar'||_pageId==='collab'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logistatus'||_pageId==='coupangad'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
+}
+
+// ══════════════════════════════════════════════
+// 3일 비용 계산 (CX팀) — CBM 기반 중국→인천→부산 물류비 계산기
+// ══════════════════════════════════════════════
+function c3Won(n){ return Math.round(n).toLocaleString()+'원'; }
+function c3FormatNumber(n, maxDigits){ return n.toLocaleString(undefined,{maximumFractionDigits:maxDigits}); }
+function c3DisplayCbm(n){ return Number.isInteger(n) ? n.toLocaleString() : c3FormatNumber(n,4); }
+function c3BillingCbm(rawCbm){ return Math.ceil(rawCbm*10)/10; }
+function c3Calc(){
+  const cbmPerBox = Number(document.getElementById('c3Cbm').value) || 0;
+  const boxCount = Number(document.getElementById('c3BoxCount').value) || 0;
+  const rawTotalCbm = cbmPerBox * boxCount;
+  const chargedCbm = c3BillingCbm(rawTotalCbm);
+  const chinaExport = chargedCbm * 5000;
+  const chinaToIncheon = chargedCbm * 45000;
+  const incheonToBusan = chargedCbm * 50000;
+  const customsFee = 15000;
+  const totalCost = chinaExport + chinaToIncheon + incheonToBusan + customsFee;
+  document.getElementById('c3Output').innerHTML = `
+    <div class="c3-row"><span>중국 현지수출비용</span><span class="c3-value">${c3Won(chinaExport)}</span></div>
+    <div class="c3-row"><span>중국 → 인천 물류비</span><span class="c3-value">${c3Won(chinaToIncheon)}</span></div>
+    <div class="c3-row"><span>인천 → 부산 물류비</span><span class="c3-value">${c3Won(incheonToBusan)}</span></div>
+    <div class="c3-row"><span>통관비용</span><span class="c3-value">${c3Won(customsFee)}</span></div>
+    <div class="c3-total"><span>총 3일 비용</span><span>${c3Won(totalCost)}</span></div>
+    <div class="c3-memo">
+      총 박스수 : ${boxCount.toLocaleString()}BOX<br>
+      총 CBM : ${c3DisplayCbm(chargedCbm)} (${c3DisplayCbm(rawTotalCbm)})
+    </div>`;
+}
+function c3Init(){
+  const cbmEl=document.getElementById('c3Cbm'), boxEl=document.getElementById('c3BoxCount');
+  if(cbmEl && !cbmEl._c3Bound){
+    cbmEl._c3Bound=true;
+    cbmEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); boxEl.focus(); } });
+    boxEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); c3Calc(); } });
+  }
+  c3Calc();
 }
 
 // ══════════════════════════════════════════════
@@ -11449,7 +11530,7 @@ function renderUnifiedTable(){
     if(_uniFilter.months.size>0&&!_uniFilter.months.has(r.month)) return false;
     if(_uniFilter.chs.size>0&&!_uniFilter.chs.has(r.ch)) return false;
     if(srch){
-      const hay=`${r.year}${r.date}${r.ch}${r.orderNo}${r.buyer}${r.modelName}${r.itemCode}${r.itemNo}`.toLowerCase();
+      const hay=`${r.year}${r.date}${r.ch}${r.orderNo}${r.buyer}${r.receiver}${r.phone1}${r.phone2}${r.modelName}${r.itemCode}${r.itemNo}`.toLowerCase();
       if(!hay.includes(srch)) return false;
     }
     return true;
