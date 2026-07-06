@@ -1324,7 +1324,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="topbar-title">📦 재고관리 시스템</span>
     <span class="topbar-time" id="topTime"></span>
-    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.06b</span>
+    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.06c</span>
   </div>
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -1344,7 +1344,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <input type="password" id="delPwInput" placeholder="비밀번호" onkeydown="if(event.key==='Enter')confirmDelPw()"
       style="width:100%;height:42px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;" />
     <div id="delPwMsg" style="color:#DC2626;font-size:12px;min-height:16px;margin-top:6px;"></div>
-    <div class="ma"><button class="btn" onclick="closeModal('delPwModal')">취소</button>
+    <div class="ma"><button class="btn" onclick="cancelDelPw()">취소</button>
       <button class="btn btn-da" onclick="confirmDelPw()">삭제</button></div>
   </div>
 </div>
@@ -3505,6 +3505,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div id="revUniSumInline" style="flex:1;"></div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniSelCount"></span>
         <button class="btn btn-sm" id="revUniDelBtn" onclick="deleteSelectedUni()" style="background:#DC2626;color:#fff;border:none;display:none;">🗑 선택 삭제</button>
+        <button class="btn btn-sm" id="revUniFilterDelBtn" onclick="deleteFilteredUni()" title="현재 적용된 연도·월·판매처 필터와 검색어(날짜 등)로 걸러진 결과를 통째로 영구 삭제합니다. 잘못 등록된 업로드분을 날짜·판매처로 좁혀 한 번에 지울 때 사용하세요." style="background:#B91C1C;color:#fff;border:none;display:none;">🗑 필터결과 전체삭제</button>
       </div>
       <!-- 테이블 -->
       <div class="rev-tbl-card">
@@ -11433,6 +11434,8 @@ function buildUniFilterBtns(){
 const UNI_PAGE_SIZE = 300;
 let _uniPage = 0; // 현재 페이지 (0-based)
 let _uniSel = new Set(); // 통합 탭 선택된 행 id
+let _uniFilteredRows = []; // 현재 연도·월·판매처·검색어 필터가 적용된 전체 행(페이지네이션 전)
+let _uniBatchDelIds = null; // 필터결과 전체삭제 대기 중인 id 목록(비번 확인 모달 공용)
 
 function toggleUniSel(id, checked){
   if(checked) _uniSel.add(id); else _uniSel.delete(id);
@@ -11465,12 +11468,15 @@ function toggleUniEdit(){
   const st=document.getElementById('uniEditStatus');
   if(st){ st.textContent = _uniEditMode ? '✏️ 수정 가능' : '🔒 수정 잠금'; st.style.color = _uniEditMode ? '#16A34A' : ''; }
   document.getElementById('revUniTable')?.classList.toggle('uni-locked', !_uniEditMode);
+  const filterDelBtn=document.getElementById('revUniFilterDelBtn');
+  if(filterDelBtn) filterDelBtn.style.display = _uniEditMode ? '' : 'none';
   updateUniSelUI();
 }
 async function deleteSelectedUni(){
   if(!_uniEditMode){ toast('먼저 ✏️ 수정모드를 켜주세요 (마스킹 버튼 아래).'); return; }
   const ids=[..._uniSel];
   if(!ids.length){ alert('선택된 행이 없습니다.'); return; }
+  _uniBatchDelIds=null;
   // 비밀번호 입력 모달 열기
   const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
   const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
@@ -11478,12 +11484,29 @@ async function deleteSelectedUni(){
   openModal('delPwModal');
   setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
 }
+// 잘못 등록된 업로드분을 연도·월·판매처·검색어(날짜 등)로 좁힌 뒤 그 결과 전체를 통째로 삭제
+function deleteFilteredUni(){
+  if(!_uniEditMode){ toast('먼저 ✏️ 수정모드를 켜주세요 (마스킹 버튼 아래).'); return; }
+  const rows=_uniFilteredRows||[];
+  if(!rows.length){ alert('삭제할 데이터가 없습니다. (현재 필터·검색 결과가 비어있습니다)'); return; }
+  _uniBatchDelIds = rows.map(r=>r.id);
+  const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
+  const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
+  const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=`현재 연도·월·판매처·검색어 필터 결과 ${rows.length.toLocaleString()}건을 영구 삭제합니다. 되돌릴 수 없습니다.`;
+  openModal('delPwModal');
+  setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
+}
+function cancelDelPw(){
+  _uniBatchDelIds=null;
+  closeModal('delPwModal');
+}
 function confirmDelPw(){
   const pw=(document.getElementById('delPwInput')||{}).value||'';
   const savedPw=localStorage.getItem('rev_admin_pw')||'1234';
   if(pw!==savedPw){ const m=document.getElementById('delPwMsg'); if(m) m.textContent='비밀번호가 올바르지 않습니다.'; return; }
   closeModal('delPwModal');
-  _doDeleteSelectedUni();
+  if(_uniBatchDelIds) _doDeleteBatchUni();
+  else _doDeleteSelectedUni();
 }
 async function _doDeleteSelectedUni(){
   const ids=[..._uniSel];
@@ -11502,6 +11525,24 @@ async function _doDeleteSelectedUni(){
     alert(`${ids.length}건 삭제 완료`);
   }catch(e){ alert('삭제 실패: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='🗑 선택 삭제'; } }
+}
+async function _doDeleteBatchUni(){
+  const ids=_uniBatchDelIds||[];
+  _uniBatchDelIds=null;
+  if(!ids.length) return;
+  const btn=document.getElementById('revUniFilterDelBtn');
+  if(btn){ btn.disabled=true; btn.textContent='삭제 중...'; }
+  try{
+    for(let i=0;i<ids.length;i+=200){
+      const {error}=await sb.from('revenue').delete().in('id',ids.slice(i,i+200));
+      if(error) throw error;
+    }
+    await reloadRevLoadedYears();
+    addHistory({menu:'매출관리',type:'edit',code:'MULTI',name:`통합 필터삭제 ${ids.length}건`,desc:'날짜·판매처 필터 결과 일괄 삭제',before:`${ids.length}건`,after:'삭제',user:'수동'});
+    goRevPage('unified');
+    alert(`${ids.length}건 삭제 완료`);
+  }catch(e){ alert('삭제 실패: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; } }
 }
 
 function renderUnifiedTable(){
@@ -11558,6 +11599,9 @@ function renderUnifiedTable(){
 
   const total=rows.length;
   document.getElementById('revUniCount').textContent=`${total.toLocaleString()}건`;
+  _uniFilteredRows = rows;
+  const filterDelBtn=document.getElementById('revUniFilterDelBtn');
+  if(filterDelBtn) filterDelBtn.textContent = `🗑 필터결과 전체삭제 (${total.toLocaleString()}건)`;
 
   if(total===0){
     if(empty) empty.style.display='block';
