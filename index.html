@@ -695,15 +695,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-empty{text-align:center;padding:40px;color:var(--tx2);font-size:13px;}
 #page-revenue .rev-uni-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 300px);}
 #page-revenue .rev-uni-scroll thead th{position:sticky;top:0;z-index:5;background:var(--bg2);}
-/* 합계 행: 스크롤해도 하단 고정, 흰 바탕, 컬럼 정렬 */
-#page-revenue .rev-uni-scroll tfoot td{position:sticky;bottom:0;left:0;z-index:7;background:#fff;border-top:2px solid #1E293B;padding:11px 16px;color:#0f172a;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;position:sticky;left:16px;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-total{font-size:13px;font-weight:700;color:#1E293B;background:#F1F5F9;border-radius:6px;padding:3px 10px;white-space:nowrap;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-item{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-item .lbl{font-size:12px;font-weight:600;color:#64748B;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-item .val{font-size:14px;font-weight:700;color:#0f172a;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-pos{color:#059669!important;}
-#page-revenue .rev-uni-scroll tfoot .uni-sum-neg{color:#DC2626!important;}
+/* 합계: 검색창 옆 인라인 표시 */
+#page-revenue #revUniSumInline .uni-sum-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;}
+#page-revenue #revUniSumInline .uni-sum-total{font-size:12px;font-weight:700;color:#1E293B;background:#F1F5F9;border-radius:6px;padding:3px 10px;white-space:nowrap;}
+#page-revenue #revUniSumInline .uni-sum-item{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap;}
+#page-revenue #revUniSumInline .uni-sum-item .lbl{font-size:11px;font-weight:600;color:#64748B;}
+#page-revenue #revUniSumInline .uni-sum-item .val{font-size:12px;font-weight:700;color:#0f172a;}
+#page-revenue #revUniSumInline .uni-sum-pos{color:#059669!important;}
+#page-revenue #revUniSumInline .uni-sum-neg{color:#DC2626!important;}
 /* 헤더 클릭 정렬 */
 #page-revenue .rev-uni-scroll .uni-sort-th{user-select:none;}
 #page-revenue .rev-uni-scroll .uni-sort-th:hover{color:#2563EB;}
@@ -1325,7 +1324,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="topbar-title">📦 재고관리 시스템</span>
     <span class="topbar-time" id="topTime"></span>
-    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.03b</span>
+    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.06a</span>
   </div>
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -3503,7 +3502,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <input type="text" id="revUniSrch" placeholder="주문번호, 상품번호, 상품명, 구매자, 수취인, 연락처..." oninput="_uniPage=0;renderUnifiedTable()">
         </div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniCount">0건</span>
-        <span style="flex:1;"></span>
+        <div id="revUniSumInline" style="flex:1;"></div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniSelCount"></span>
         <button class="btn btn-sm" id="revUniDelBtn" onclick="deleteSelectedUni()" style="background:#DC2626;color:#fff;border:none;display:none;">🗑 선택 삭제</button>
       </div>
@@ -3551,11 +3550,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <th></th>
             </tr></thead>
             <tbody id="revUniTbody"></tbody>
-            <tfoot id="revUniFoot" style="display:none;">
-              <tr>
-                <td colspan="25" id="revUniSumCell"></td>
-              </tr>
-            </tfoot>
           </table>
         </div>
         <div class="rev-empty" id="revUniEmpty">업로드된 데이터가 없습니다<br><span style="font-size:12px;">데이터 업로드 탭에서 판매 데이터를 업로드하세요</span></div>
@@ -11667,20 +11661,18 @@ function renderUnifiedTable(){
       </div>`;
   }
 
-  // 합계 행 (테이블 하단 고정, 라벨형 — 금액 잘림 없음)
-  const foot = document.getElementById('revUniFoot');
-  const sumCell = document.getElementById('revUniSumCell');
-  if(foot && sumCell){
+  // 합계 (검색창 옆 인라인 표시)
+  const sumCell = document.getElementById('revUniSumInline');
+  if(sumCell){
     const tSale   = rows.reduce((s,r)=>s+(r.salePrice||0),0);
     const tSettle = rows.reduce((s,r)=>s+(r.settlement||0),0);
     const tCost   = rows.reduce((s,r)=>s+(r.costPrice||0),0);
     const tMargin = rows.reduce((s,r)=>s+(r.margin||0),0);
     const tRate   = tSettle>0?(tMargin/tSettle*100):0;
     const f = n=>n.toLocaleString('ko-KR');
-    foot.style.display = rows.length ? '' : 'none';
     const mgCls = tMargin>=0?'uni-sum-pos':'uni-sum-neg';
     const mrCls = tRate>=0?'uni-sum-pos':'uni-sum-neg';
-    sumCell.innerHTML = `
+    sumCell.innerHTML = rows.length ? `
       <div class="uni-sum-wrap">
         <span class="uni-sum-total">📊 합계 ${rows.length.toLocaleString()}건</span>
         <span class="uni-sum-item"><span class="lbl">판매가</span><span class="val">${f(tSale)}원</span></span>
@@ -11688,7 +11680,7 @@ function renderUnifiedTable(){
         <span class="uni-sum-item"><span class="lbl">매입</span><span class="val">${f(tCost)}원</span></span>
         <span class="uni-sum-item"><span class="lbl">마진</span><span class="val ${mgCls}">${f(tMargin)}원</span></span>
         <span class="uni-sum-item"><span class="lbl">마진율</span><span class="val ${mrCls}">${tRate.toFixed(1)}%</span></span>
-      </div>`;
+      </div>` : '';
   }
 }
 
