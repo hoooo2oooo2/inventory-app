@@ -1324,7 +1324,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="topbar-title">📦 재고관리 시스템</span>
     <span class="topbar-time" id="topTime"></span>
-    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.06c</span>
+    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.06d</span>
   </div>
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -1333,6 +1333,37 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <span id="viewBadge" style="display:none;font-size:10px;color:#F59E0B;border:1px solid #F59E0B66;border-radius:5px;padding:2px 6px;white-space:nowrap;">열람전용</span>
     <span id="whoami" onclick="openMyPage()" title="마이페이지" style="font-size:11px;color:var(--tx2);padding:3px 8px;white-space:nowrap;cursor:pointer;border-radius:6px;border:1px solid var(--bd);"></span>
     <button class="btn btn-sm" onclick="logout()" title="로그아웃">로그아웃</button>
+  </div>
+</div>
+
+<!-- ═══ 통합 업로드분 삭제(판매처·날짜 선택) 모달 ═══ -->
+<div class="modal-overlay" id="revBatchDelModal">
+  <div class="modal" style="max-width:360px;">
+    <h3>🗑 업로드분 삭제</h3>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:12px;">특정 판매처의 특정 날짜(월,일) 업로드분 전체를 삭제합니다. 일별 업로드에서 잘못 등록된 건을 되돌릴 때 사용하세요.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">년도</div>
+        <select id="bdelYear" onchange="updateBatchDelPickCount()" style="width:100%;height:38px;border:1.5px solid var(--bd);border-radius:8px;padding:0 8px;font-size:13px;"></select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">판매처</div>
+        <select id="bdelCh" onchange="updateBatchDelPickCount()" style="width:100%;height:38px;border:1.5px solid var(--bd);border-radius:8px;padding:0 8px;font-size:13px;"></select>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">월</div>
+          <select id="bdelMonth" onchange="updateBatchDelPickCount()" style="width:100%;height:38px;border:1.5px solid var(--bd);border-radius:8px;padding:0 8px;font-size:13px;"></select>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--tx2);margin-bottom:4px;">일</div>
+          <select id="bdelDay" onchange="updateBatchDelPickCount()" style="width:100%;height:38px;border:1.5px solid var(--bd);border-radius:8px;padding:0 8px;font-size:13px;"></select>
+        </div>
+      </div>
+    </div>
+    <div id="bdelCount" style="font-size:13px;margin-top:12px;"></div>
+    <div class="ma"><button class="btn" onclick="closeBatchDelPicker()">취소</button>
+      <button class="btn btn-da" onclick="confirmBatchDelPick()">삭제</button></div>
   </div>
 </div>
 
@@ -3505,7 +3536,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div id="revUniSumInline" style="flex:1;"></div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniSelCount"></span>
         <button class="btn btn-sm" id="revUniDelBtn" onclick="deleteSelectedUni()" style="background:#DC2626;color:#fff;border:none;display:none;">🗑 선택 삭제</button>
-        <button class="btn btn-sm" id="revUniFilterDelBtn" onclick="deleteFilteredUni()" title="현재 적용된 연도·월·판매처 필터와 검색어(날짜 등)로 걸러진 결과를 통째로 영구 삭제합니다. 잘못 등록된 업로드분을 날짜·판매처로 좁혀 한 번에 지울 때 사용하세요." style="background:#B91C1C;color:#fff;border:none;display:none;">🗑 필터결과 전체삭제</button>
+        <button class="btn btn-sm" id="revUniFilterDelBtn" onclick="openBatchDelPicker()" title="특정 판매처의 특정 날짜(월,일) 업로드분을 통째로 영구 삭제합니다. 일별 업로드에서 실수한 건을 되돌릴 때 사용하세요." style="background:#B91C1C;color:#fff;border:none;display:none;">🗑 업로드분 삭제</button>
       </div>
       <!-- 테이블 -->
       <div class="rev-tbl-card">
@@ -11434,8 +11465,7 @@ function buildUniFilterBtns(){
 const UNI_PAGE_SIZE = 300;
 let _uniPage = 0; // 현재 페이지 (0-based)
 let _uniSel = new Set(); // 통합 탭 선택된 행 id
-let _uniFilteredRows = []; // 현재 연도·월·판매처·검색어 필터가 적용된 전체 행(페이지네이션 전)
-let _uniBatchDelIds = null; // 필터결과 전체삭제 대기 중인 id 목록(비번 확인 모달 공용)
+let _uniBatchDelIds = null; // 업로드분 삭제(판매처·날짜 선택) 대기 중인 id 목록(비번 확인 모달 공용)
 
 function toggleUniSel(id, checked){
   if(checked) _uniSel.add(id); else _uniSel.delete(id);
@@ -11484,15 +11514,52 @@ async function deleteSelectedUni(){
   openModal('delPwModal');
   setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
 }
-// 잘못 등록된 업로드분을 연도·월·판매처·검색어(날짜 등)로 좁힌 뒤 그 결과 전체를 통째로 삭제
-function deleteFilteredUni(){
+// 잘못 등록된 업로드분을 판매처·날짜(월,일)로 직접 지정해 그 업로드건 전체를 통째로 삭제
+function openBatchDelPicker(){
   if(!_uniEditMode){ toast('먼저 ✏️ 수정모드를 켜주세요 (마스킹 버튼 아래).'); return; }
-  const rows=_uniFilteredRows||[];
-  if(!rows.length){ alert('삭제할 데이터가 없습니다. (현재 필터·검색 결과가 비어있습니다)'); return; }
-  _uniBatchDelIds = rows.map(r=>r.id);
+  const years=_revYears().slice().sort((a,b)=>b-a);
+  const chs=sortCh([...new Set(_revData.map(r=>r.ch).filter(Boolean))]);
+  const yEl=document.getElementById('bdelYear');
+  if(yEl) yEl.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const chEl=document.getElementById('bdelCh');
+  if(chEl) chEl.innerHTML = chs.map(c=>`<option value="${escAttr(c)}">${c}</option>`).join('');
+  const mEl=document.getElementById('bdelMonth');
+  if(mEl) mEl.innerHTML = Array.from({length:12},(_,i)=>i+1).map(m=>`<option value="${m}">${m}월</option>`).join('');
+  const dEl=document.getElementById('bdelDay');
+  if(dEl) dEl.innerHTML = Array.from({length:31},(_,i)=>i+1).map(d=>`<option value="${d}">${d}일</option>`).join('');
+  // 현재 화면 필터에 연도·판매처가 하나로 좁혀져 있으면 기본값으로 반영
+  if(yEl && _uniFilter.year && _uniFilter.year!=='ALL') yEl.value=String(_uniFilter.year);
+  if(chEl && _uniFilter.chs.size===1) chEl.value=[..._uniFilter.chs][0];
+  updateBatchDelPickCount();
+  openModal('revBatchDelModal');
+}
+function _bdelMatches(){
+  const y=Number(document.getElementById('bdelYear').value);
+  const ch=document.getElementById('bdelCh').value;
+  const m=Number(document.getElementById('bdelMonth').value);
+  const d=Number(document.getElementById('bdelDay').value);
+  const dateStr=`${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  return (_revData||[]).filter(r=>r.year===y && r.ch===ch && r.date===dateStr);
+}
+function updateBatchDelPickCount(){
+  const el=document.getElementById('bdelCount');
+  if(!el) return;
+  const n=_bdelMatches().length;
+  el.innerHTML = n
+    ? `이 조건에 해당하는 <b style="color:#DC2626;">${n.toLocaleString()}건</b>을 삭제합니다.`
+    : `<span style="color:var(--tx2);">해당 조건의 데이터가 없습니다.</span>`;
+}
+function closeBatchDelPicker(){ closeModal('revBatchDelModal'); }
+function confirmBatchDelPick(){
+  const matches=_bdelMatches();
+  if(!matches.length){ alert('해당 판매처·날짜에 데이터가 없습니다.'); return; }
+  const y=document.getElementById('bdelYear').value, ch=document.getElementById('bdelCh').value;
+  const m=document.getElementById('bdelMonth').value, d=document.getElementById('bdelDay').value;
+  _uniBatchDelIds = matches.map(r=>r.id);
+  closeModal('revBatchDelModal');
   const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
   const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
-  const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=`현재 연도·월·판매처·검색어 필터 결과 ${rows.length.toLocaleString()}건을 영구 삭제합니다. 되돌릴 수 없습니다.`;
+  const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=`${y}년 ${m}월 ${d}일 · ${ch} 업로드분 ${matches.length.toLocaleString()}건을 영구 삭제합니다. 되돌릴 수 없습니다.`;
   openModal('delPwModal');
   setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
 }
@@ -11599,9 +11666,6 @@ function renderUnifiedTable(){
 
   const total=rows.length;
   document.getElementById('revUniCount').textContent=`${total.toLocaleString()}건`;
-  _uniFilteredRows = rows;
-  const filterDelBtn=document.getElementById('revUniFilterDelBtn');
-  if(filterDelBtn) filterDelBtn.textContent = `🗑 필터결과 전체삭제 (${total.toLocaleString()}건)`;
 
   if(total===0){
     if(empty) empty.style.display='block';
