@@ -1675,6 +1675,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <span class="rp-date-label" id="rpDateLabel">—</span>
           <button class="rp-nav-btn" onclick="reportNextDay()">›</button>
         </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span id="rpSaveStatus" style="font-size:11px;color:var(--tx2);white-space:nowrap;"></span>
+          <button class="rp-nav-btn" onclick="reportManualSave()" title="지금 바로 저장">💾 저장</button>
+        </div>
       </div>
       <div class="rp-person-tabs" id="rpPersonTabs" style="display:none;"></div>
       <div class="rp-body">
@@ -15094,11 +15098,58 @@ async function loadReport(){
   _reportLoaded = true;
   _reportInjectCalDots();
 }
+let _reportDirty = false;
+let _reportSaveInFlight = false;
+function _reportSetSaveStatus(text){
+  const el=document.getElementById('rpSaveStatus');
+  if(el) el.textContent = text;
+}
+// 저장 직전 서버 최신본을 다시 받아서 지금 편집 중인 담당자(날짜항목+고정핀)만 덮어써 병합 후 저장.
+// 예전엔 로컬에 들고 있던 _reportAllData 전체를 그대로 덮어써서, 다른 탭/기기가 먼저 저장한 다른 담당자의
+// 새 내용이 이 세션의 오래된 로컬 스냅샷으로 통째로 지워지는 사고 위험이 있었음(공유 단일 JSON 저장 구조).
 async function _reportFlushSave(){
-  await cloudKvSave(REPORT_KIND, _reportAllData);
+  if(_reportSaveInFlight) return; // 저장 진행 중이면 다음 타이머/주기에서 재시도
+  _reportSaveInFlight = true;
+  _reportSetSaveStatus('저장 중...');
+  try{
+    const myKey = _reportKey();
+    const myPinsKey = '__pins__'+(_reportPerson||'전체');
+    const myEntry = _reportAllData[myKey];
+    const myPins = _reportAllData[myPinsKey];
+    const fresh = await cloudKvLoad(REPORT_KIND);
+    const merged = (fresh && typeof fresh==='object' && !Array.isArray(fresh)) ? fresh : {};
+    if(myEntry !== undefined) merged[myKey] = myEntry;
+    if(myPins !== undefined) merged[myPinsKey] = myPins;
+    _reportAllData = merged;
+    await cloudKvSave(REPORT_KIND, _reportAllData);
+    _reportDirty = false;
+    _reportSetSaveStatus('저장됨 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){
+    console.warn('업무보고서 저장 실패', e);
+    _reportSetSaveStatus('⚠ 저장 실패 — 잠시 후 재시도');
+  }finally{
+    _reportSaveInFlight = false;
+  }
   _reportInjectCalDots();
   renderCatPanel();
 }
+// 저장 버튼 클릭 — 디바운스(1.5초) 기다리지 않고 즉시 저장
+function reportManualSave(){
+  if(_reportSaveTimer){ clearTimeout(_reportSaveTimer); _reportSaveTimer=null; }
+  _reportFlushSave().then(()=>toast('💾 저장했습니다'));
+}
+// 주기적 안전망 저장 — 쉬지 않고 계속 타이핑하면 디바운스가 영영 안 걸려서(매 입력마다 1.5초 뒤로 밀림)
+// 저장이 미뤄지는 문제가 있었음. 변경사항이 있으면 10초마다 무조건 한 번 저장해 유실 폭을 최소화.
+setInterval(()=>{
+  if(_reportDirty){
+    if(_reportSaveTimer){ clearTimeout(_reportSaveTimer); _reportSaveTimer=null; }
+    _reportFlushSave();
+  }
+}, 10000);
+// 저장 안 된 변경사항이 있는 채로 탭을 닫거나 새로고침하면 브라우저 경고를 띄움
+window.addEventListener('beforeunload', (e)=>{
+  if(_reportDirty){ e.preventDefault(); e.returnValue=''; }
+});
 
 // 업무보고서 데이터가 있는 날짜를 캘린더 iframe에 주입 (주황 점 동기화)
 function _reportInjectCalDots(){
@@ -15118,6 +15169,8 @@ function _reportInjectCalDots(){
   f.contentWindow.__injectNewReportDots(dots);
 }
 function _reportAutoSave(){
+  _reportDirty = true;
+  _reportSetSaveStatus('저장 대기중…');
   if(_reportSaveTimer) clearTimeout(_reportSaveTimer);
   _reportSaveTimer = setTimeout(_reportFlushSave, 1500);
 }
