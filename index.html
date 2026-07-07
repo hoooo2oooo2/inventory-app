@@ -599,12 +599,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 @media(max-width:700px){.sum-row{grid-template-columns:repeat(2,1fr)!important;}.main{padding:8px;gap:8px;}}
 @media(max-width:500px){.period-row .ptab{padding:2px 5px;font-size:10px;}}
 
-/* ── 오늘 주문 체크 박스 ── */
+/* ── 재고관리 메인 3단 레이아웃: 재고목록(넓게) | 판매·로켓그로스·진행중발주(중간) | 오늘 주문 체크리스트(우측, 전체높이) ── */
+.inv-main-layout{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;align-items:start;width:100%;}
+@media(max-width:1100px){.inv-main-layout{grid-template-columns:1fr;}}
 #ocb-section{display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:10px;}
-#orderCheckBox{margin-bottom:0;}
-.ocb-outer{display:flex;gap:14px;align-items:stretch;width:100%;}
-/* 왼쪽: 체크리스트 */
-.ocb-wrap{flex:1.5 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
+/* 오늘 주문 체크리스트 (우측 컬럼) */
+.ocb-wrap{min-width:0;max-height:76vh;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
 .ocb-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:0.5px solid var(--bd);cursor:pointer;user-select:none;}
 .ocb-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
 .ocb-toggle{font-size:11px;color:var(--tx2);}
@@ -618,22 +618,22 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .ocb-qty{text-align:right;font-weight:700;}
 .ocb-btn{text-align:right;}
 .ocb-empty{padding:14px;text-align:center;font-size:12px;color:var(--tx2);}
-/* 가운데: TOP6 + RG TOP10 세로스택 */
-.ocb-mid{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px;}
+/* 중간 컬럼: 판매TOP6 + 로켓그로스 + 진행중발주 세로스택 */
+.ocb-mid{min-width:0;display:flex;flex-direction:column;gap:8px;}
 .ocb-top6,.ocb-rg10{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;width:auto;}
 .ocb-top6-head,.ocb-rg10-head{font-size:12px;font-weight:600;padding:8px 12px;border-bottom:0.5px solid var(--bd);color:var(--tx);}
 .ocb-t6body{max-height:200px;overflow-y:auto;}
-.ocb-rg-body{max-height:280px;overflow-y:auto;}
+.ocb-rg-body{max-height:220px;overflow-y:auto;}
 .ocb-t6row,.ocb-rg-row{display:grid;grid-template-columns:18px 1fr 72px;gap:5px;padding:6px 12px;border-bottom:0.5px solid var(--bd);font-size:12px;align-items:center;}
 .ocb-t6row:last-child,.ocb-rg-row:last-child{border:none;}
 .ocb-t6rank,.ocb-rg-rank{font-size:11px;font-weight:700;text-align:center;}
 .ocb-t6name,.ocb-rg-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ocb-t6val{font-weight:700;color:var(--pr);white-space:nowrap;font-size:11px;text-align:center;}
 .ocb-rg-val{font-weight:700;color:#7C3AED;white-space:nowrap;font-size:11px;text-align:center;}
-/* 오른쪽: 진행중 발주 */
-.ocb-right{flex:1.1 1 0;min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
+/* 진행중 발주 (중간 컬럼 하단) */
+.ocb-right{min-width:0;background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
 .ocb-right-head{font-size:12px;font-weight:600;padding:9px 14px;border-bottom:0.5px solid var(--bd);color:var(--tx);display:flex;align-items:center;gap:6px;}
-.ocb-pend-body{flex:1 1 0;min-height:0;overflow-y:auto;}
+.ocb-pend-body{max-height:220px;overflow-y:auto;}
 .ocb-pend-row{display:grid;grid-template-columns:1fr auto;gap:16px;padding:6px 14px;border-bottom:0.5px solid var(--bd);font-size:11px;align-items:center;}
 .ocb-pend-row>div:first-child{min-width:0;}
 .ocb-pend-row:last-child{border:none;}
@@ -645,7 +645,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .ocb-body::-webkit-scrollbar,.ocb-t6body::-webkit-scrollbar,.ocb-rg-body::-webkit-scrollbar,.ocb-pend-body::-webkit-scrollbar{width:3px;}
 .ocb-body::-webkit-scrollbar-track,.ocb-t6body::-webkit-scrollbar-track,.ocb-rg-body::-webkit-scrollbar-track,.ocb-pend-body::-webkit-scrollbar-track{background:transparent;}
 .ocb-body::-webkit-scrollbar-thumb,.ocb-t6body::-webkit-scrollbar-thumb,.ocb-rg-body::-webkit-scrollbar-thumb,.ocb-pend-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.18);border-radius:2px;}
-@media(max-width:700px){.ocb-outer{flex-direction:column;}.ocb-mid,.ocb-right,.ocb-wrap{width:100%!important;}}
 
 /* ── 보고 탭 ── */
 #page-report .rep-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
@@ -2024,40 +2023,44 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ord-kpi" id="invKpi"></div>
     <div style="padding:2px 14px 0;font-size:11px;font-weight:600;color:var(--tx2);">📂 구분별 보기 — 클릭하면 해당 구분 제품만 아래 목록에 표시됩니다</div>
     <div class="inv-cat-grid" id="invCatCards"></div>
-    <!-- 오늘 주문 체크 -->
-    <div id="orderCheckBox"></div>
   </div>
-  <div class="card" id="invListCard">
-    <div class="ch">
-      <span class="ct">재고 목록</span>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-        <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="invSrch" placeholder="상품명, 코드..." oninput="renderInv()"></div>
-        <select class="sel" id="invStF" onchange="renderInv()"><option value="">전체상태</option><option>정상</option><option>임박</option><option>긴급</option><option>부족</option></select>
-        <select class="sel" id="invTyF" onchange="renderInv()"><option value="">전체구분</option></select>
-        <select class="sel" id="invSortSel" onchange="onInvSortSel(this.value)">
-          <option value="code">코드순</option>
-          <option value="name">상품명순</option>
-          <option value="stock_asc">재고 적은순</option>
-          <option value="stock_desc">재고 많은순</option>
-          <option value="status">상태순</option>
-        </select>
-        <div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--bd);border-radius:7px;padding:3px 7px;font-size:11px;background:var(--bg2);">
-          <span style="color:var(--tx2);white-space:nowrap;">📦 주문주기</span>
-          <select id="orderCycleSel" onchange="saveOrderCycle(this.value)" style="border:none;background:transparent;font-size:11px;padding:0;color:var(--tx);cursor:pointer;">
-            <option value="1">1개월</option>
-            <option value="1.5">1.5개월</option>
-            <option value="2">2개월</option>
-            <option value="2.5">2.5개월</option>
-            <option value="3">3개월</option>
-            <option value="3.5">3.5개월</option>
+  <div class="inv-main-layout">
+    <div class="card" id="invListCard">
+      <div class="ch">
+        <span class="ct">재고 목록</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="invSrch" placeholder="상품명, 코드..." oninput="renderInv()"></div>
+          <select class="sel" id="invStF" onchange="renderInv()"><option value="">전체상태</option><option>정상</option><option>임박</option><option>긴급</option><option>부족</option></select>
+          <select class="sel" id="invTyF" onchange="renderInv()"><option value="">전체구분</option></select>
+          <select class="sel" id="invSortSel" onchange="onInvSortSel(this.value)">
+            <option value="code">코드순</option>
+            <option value="name">상품명순</option>
+            <option value="stock_asc">재고 적은순</option>
+            <option value="stock_desc">재고 많은순</option>
+            <option value="status">상태순</option>
           </select>
+          <div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--bd);border-radius:7px;padding:3px 7px;font-size:11px;background:var(--bg2);">
+            <span style="color:var(--tx2);white-space:nowrap;">📦 주문주기</span>
+            <select id="orderCycleSel" onchange="saveOrderCycle(this.value)" style="border:none;background:transparent;font-size:11px;padding:0;color:var(--tx);cursor:pointer;">
+              <option value="1">1개월</option>
+              <option value="1.5">1.5개월</option>
+              <option value="2">2개월</option>
+              <option value="2.5">2.5개월</option>
+              <option value="3">3개월</option>
+              <option value="3.5">3.5개월</option>
+            </select>
+          </div>
+          <button class="btn btn-sm" id="invShowAllBtn" onclick="toggleInvShowAll()" style="color:var(--tx2);">📋 전체 목록 보기</button>
+          <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨긴제품만 보기</button>
+          <button class="btn btn-sm" onclick="openDataDiagModal()" style="color:#D97706;border-color:#D97706;" title="월별집계가 하루치로 등록된 오류 데이터를 찾아 정상화">🔍 데이터 진단</button>
         </div>
-        <button class="btn btn-sm" id="invShowAllBtn" onclick="toggleInvShowAll()" style="color:var(--tx2);">📋 전체 목록 보기</button>
-        <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨긴제품만 보기</button>
-        <button class="btn btn-sm" onclick="openDataDiagModal()" style="color:#D97706;border-color:#D97706;" title="월별집계가 하루치로 등록된 오류 데이터를 찾아 정상화">🔍 데이터 진단</button>
       </div>
+      <div class="inv-gallery" id="invGallery"><div class="inv-gallery-empty"><div class="loading"><div class="spinner"></div>데이터 로딩 중...</div></div></div>
     </div>
-    <div class="inv-gallery" id="invGallery"><div class="inv-gallery-empty"><div class="loading"><div class="spinner"></div>데이터 로딩 중...</div></div></div>
+    <!-- 중간: 이번달 판매 TOP6 · 로켓그로스 · 진행중 발주 -->
+    <div id="ocbMidCol"></div>
+    <!-- 우측: 오늘 주문 체크리스트 -->
+    <div id="ocbRightCol"></div>
   </div>
 </div>
 </div>
@@ -8275,8 +8278,8 @@ function _invProdCard(p,pendingByCode){
 // ── 오늘 주문 체크 박스 ──────────────────────────
 let _ocbOpen = true;
 function renderOrderCheck(){
-  const el = document.getElementById('orderCheckBox');
-  if(!el) return;
+  const midCol=document.getElementById('ocbMidCol'), rightCol=document.getElementById('ocbRightCol');
+  if(!midCol||!rightCol) return;
 
   // ── 진행중 발주 코드별 합산 ──
   const pendingByCode = {};
@@ -8361,8 +8364,7 @@ function renderOrderCheck(){
     </div>
   </div>`;
 
-  const midHTML = `<div class="ocb-mid">
-    <div class="ocb-top6">
+  const top6HTML = `<div class="ocb-top6">
       <div class="ocb-top6-head">📊 이번달 판매 TOP6</div>
       <div class="ocb-t6body">
         ${top6.length===0?'<div class="ocb-empty">데이터 없음</div>'
@@ -8372,8 +8374,9 @@ function renderOrderCheck(){
             <span class="ocb-t6val">${x.total.toLocaleString()}개</span>
           </div>`).join('')}
       </div>
-    </div>
-    <div class="ocb-rg10">
+    </div>`;
+
+  const rg10HTML = `<div class="ocb-rg10">
       <div class="ocb-rg10-head">🚀 로켓그로스 TOP10</div>
       <div class="ocb-rg-body">
         ${rg10.length===0?'<div class="ocb-empty">이번달 데이터 없음</div>'
@@ -8383,10 +8386,9 @@ function renderOrderCheck(){
             <span class="ocb-rg-val">${x.total.toLocaleString()}개</span>
           </div>`).join('')}
       </div>
-    </div>
-  </div>`;
+    </div>`;
 
-  const rightHTML = `<div class="ocb-right">
+  const pendHTML = `<div class="ocb-right">
     <div class="ocb-right-head">📦 진행중 발주
       <span style="background:var(--pr);color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;">${activePend.length}건</span>
     </div>
@@ -8409,7 +8411,11 @@ function renderOrderCheck(){
     </div>
   </div>`;
 
-  el.innerHTML=`<div class="ocb-outer">${checkHTML}${midHTML}${rightHTML}</div>`;
+  // 중간 컬럼: 판매TOP6 → 로켓그로스 → 진행중발주 순서로 세로 스택
+  midCol.className='ocb-mid';
+  midCol.innerHTML = top6HTML + rg10HTML + pendHTML;
+  // 우측 컬럼: 오늘 주문 체크리스트 (전체 높이)
+  rightCol.innerHTML = checkHTML;
 }
 function toggleOcb(){
   _ocbOpen=!_ocbOpen;
