@@ -446,7 +446,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .grade-A{background:#DCFCE7;color:#15803D;}
 .grade-B{background:#FEF3C7;color:#92400E;}
 .grade-C{background:#F1F5F9;color:#64748B;}
-.badge-gap{display:block;font-size:9px;color:#DC2626;font-weight:700;margin-top:2px;cursor:help;}
+.badge-gap{display:block;font-size:9px;color:#DC2626;font-weight:700;margin-top:2px;cursor:pointer;text-decoration:underline dotted;}
+.badge-gap:hover{color:#9333EA;}
 /* 재고관리 노션 스타일 갤러리 (구분별 그룹 + 카드) */
 .inv-gallery-empty{text-align:center;padding:32px 12px;color:var(--tx2);}
 .inv-gallery-group{margin-bottom:20px;}
@@ -7850,6 +7851,17 @@ function getReorderGap(p){
   if(ratio>=1.5) return {autoEr, ratio:Math.round(ratio*10)/10};
   return null;
 }
+// 발주시점 재검토 배지 클릭 → 자동계산값으로 즉시 반영
+async function applyReorderGap(id,autoEr){
+  const p=products.find(x=>x.id===id); if(!p) return;
+  if(!confirm(`"${p.name}" 발주시점을 ${p.reorderPoint.toLocaleString()} → ${autoEr.toLocaleString()}(자동계산값)로 변경할까요?`)) return;
+  const before=p.reorderPoint;
+  await sb.from('products').update({reorder_point:autoEr}).eq('id',id);
+  await _bumpProducts();
+  await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:'발주시점 재검토 적용',before:String(before),after:String(autoEr),user:'수동'});
+  await loadProducts(true);
+  renderInv(); updateFloat();
+}
 function calcNeeded(p){
   // 월소진 고정값이 설정된 경우 데이터 계산 생략
   const _fixedExpM = getFixedExpM(p.code);
@@ -8262,7 +8274,7 @@ function _invProdCard(p,pendingByCode){
     <div class="ipc-stats">
       <div class="ipc-stat"><span class="ipc-stat-label">현재고</span><span class="ipc-stat-val" style="color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':r<=1?'#D97706':'var(--tx)'};">${p.stock.toLocaleString()}</span></div>
       <div class="ipc-stat"><span class="ipc-stat-label">박스/수량</span><span class="ipc-stat-val" style="font-size:12px;color:var(--tx2);">${p.boxQty}개</span></div>
-      <div class="ipc-stat"><span class="ipc-stat-label">발주시점</span><span class="ipc-stat-val" style="font-size:12px;${p.reorderPoint===0&&er>0?'color:#9333EA;':''}" title="${p.reorderPoint===0&&er>0?'발주시점 미설정 → expM×리드타임으로 자동계산':''}">${erLabel}${p.reorderPoint===0&&er>0?'<small style="font-size:8px;">(자동)</small>':''}</span>${gap?`<span class="badge-gap" title="최근 실제수요 기준 자동계산 발주시점은 ${gap.autoEr.toLocaleString()}개(현재 설정의 ${gap.ratio}배) — 재검토 권장">⚠재검토</span>`:''}</div>
+      <div class="ipc-stat"><span class="ipc-stat-label">발주시점</span><span class="ipc-stat-val" style="font-size:12px;${p.reorderPoint===0&&er>0?'color:#9333EA;':''}" title="${p.reorderPoint===0&&er>0?'발주시점 미설정 → expM×리드타임으로 자동계산':''}">${erLabel}${p.reorderPoint===0&&er>0?'<small style="font-size:8px;">(자동)</small>':''}</span>${gap?`<span class="badge-gap" onclick="applyReorderGap(${p.id},${gap.autoEr})" title="클릭하면 발주시점을 자동계산값 ${gap.autoEr.toLocaleString()}개(현재 설정의 ${gap.ratio}배)로 즉시 반영합니다">⚠재검토 → ${gap.autoEr.toLocaleString()}개 적용</span>`:''}</div>
     </div>
     <div class="ipc-order">${_invOrderCellHtml(p,ord,st,show,pendingByCode)}</div>
     <div class="ipc-io" id="iotd-${p.id}">${io}</div>
