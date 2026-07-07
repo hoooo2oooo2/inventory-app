@@ -13986,6 +13986,7 @@ function _detectMonthlyBatch(){
 
 async function applyMonthlyBatchFix(selected){
   let fixed=0,failed=0;
+  const todayStr=fmtDate(new Date()); // 아직 발생하지 않은 미래 날짜에는 판매 데이터를 채우면 안 됨
   for(const issue of selected){
     const {code,date,qty,daysInMonth,ym}=issue;
     const [yr,mo]=ym.split('-').map(Number);
@@ -13994,13 +13995,14 @@ async function applyMonthlyBatchFix(selected){
       // 기존 집계 행 삭제
       await sb.from('daily_sales').delete()
         .eq('code',code).eq('sale_date',date).eq('is_rg',false);
-      // 해당 월 전체에 일별 분산 삽입
+      // 해당 월 중 "오늘까지"만 일별 분산 삽입 (미래 날짜는 제외 — 아직 안 일어난 판매를 기록할 수 없음)
       const rows=[];
       for(let day=1;day<=daysInMonth;day++){
         const ds=`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        if(ds>todayStr) continue;
         rows.push({code,sale_date:ds,qty:dailyQty,is_rg:false});
       }
-      await sb.from('daily_sales').upsert(rows,{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
+      if(rows.length) await sb.from('daily_sales').upsert(rows,{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
       // _dCache 인메모리 갱신
       delete _dCache[code][date];
       rows.forEach(r=>{ _dCache[code][r.sale_date]=((_dCache[code][r.sale_date]||0)+r.qty); });
