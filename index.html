@@ -447,6 +447,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .grade-B{background:#FEF3C7;color:#92400E;}
 .grade-C{background:#F1F5F9;color:#64748B;}
 .badge-gap{display:block;font-size:9px;color:#DC2626;font-weight:700;margin-top:2px;cursor:help;}
+/* 재고관리 노션 스타일 갤러리 (구분별 그룹 + 카드) */
+.inv-gallery-empty{text-align:center;padding:32px 12px;color:var(--tx2);}
+.inv-gallery-group{margin-bottom:20px;}
+.inv-gallery-group-h{display:flex;align-items:center;gap:8px;padding:4px 6px 10px;font-size:13px;font-weight:700;color:var(--tx);}
+.inv-gallery-group-h .ig-count{font-size:11px;font-weight:600;color:var(--tx2);background:var(--bg2);border-radius:10px;padding:1px 9px;}
+.inv-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;}
+.inv-prod-card{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s,border-color .15s;min-width:0;}
+.inv-prod-card:hover{box-shadow:0 4px 14px rgba(16,24,40,.08);border-color:var(--pr);}
+.ipc-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.ipc-name{font-size:13px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.ipc-tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.ipc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 0;border-top:1px dashed var(--bd);border-bottom:1px dashed var(--bd);}
+.ipc-stat{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.ipc-stat-label{font-size:9px;color:var(--tx2);}
+.ipc-stat-val{font-size:13px;font-weight:700;color:var(--tx);}
+.ipc-order{font-size:11px;line-height:1.5;background:var(--bg2);border-radius:8px;padding:7px 9px;}
+.ipc-io{display:flex;gap:4px;align-items:center;}
+.ipc-actions{display:flex;gap:4px;justify-content:flex-end;}
 /* 재고관리 한 줄 인사이트 */
 .inv-insight{margin:2px 0 12px;padding:12px 15px;border-radius:10px;background:var(--prl);border:0.5px solid rgba(49,130,246,0.25);font-size:13px;line-height:1.55;color:var(--tx);display:flex;align-items:flex-start;gap:9px;}
 .inv-insight .ii-ico{font-size:17px;flex-shrink:0;line-height:1.4;}
@@ -2016,6 +2034,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="invSrch" placeholder="상품명, 코드..." oninput="renderInv()"></div>
         <select class="sel" id="invStF" onchange="renderInv()"><option value="">전체상태</option><option>정상</option><option>임박</option><option>긴급</option><option>부족</option></select>
         <select class="sel" id="invTyF" onchange="renderInv()"><option value="">전체구분</option><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select>
+        <select class="sel" id="invSortSel" onchange="onInvSortSel(this.value)">
+          <option value="code">코드순</option>
+          <option value="name">상품명순</option>
+          <option value="stock_asc">재고 적은순</option>
+          <option value="stock_desc">재고 많은순</option>
+          <option value="status">상태순</option>
+        </select>
         <div style="display:flex;align-items:center;gap:4px;border:0.5px solid var(--bd);border-radius:7px;padding:3px 7px;font-size:11px;background:var(--bg2);">
           <span style="color:var(--tx2);white-space:nowrap;">📦 주문주기</span>
           <select id="orderCycleSel" onchange="saveOrderCycle(this.value)" style="border:none;background:transparent;font-size:11px;padding:0;color:var(--tx);cursor:pointer;">
@@ -2032,22 +2057,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <button class="btn btn-sm" onclick="openDataDiagModal()" style="color:#D97706;border-color:#D97706;" title="월별집계가 하루치로 등록된 오류 데이터를 찾아 정상화">🔍 데이터 진단</button>
       </div>
     </div>
-    <div class="tw-scroll"><table>
-      <thead><tr>
-        <th onclick="sortInv('code')">코드 <span id="is_code">⇅</span></th>
-        <th onclick="sortInv('name')">상품명 <span id="is_name">⇅</span></th>
-        <th onclick="sortInv('type')">구분 <span id="is_type">⇅</span></th>
-        <th onclick="sortInv('stock')" style="text-align:right;">현재고 <span id="is_stock">⇅</span></th>
-        <th class="ns">상태</th>
-        <th class="ns" style="text-align:right;">박스/수량</th>
-        <th class="ns">리드타임</th>
-        <th class="ns" style="text-align:right;">발주시점</th>
-        <th class="ns" style="text-align:right;">필요발주(박스)</th>
-        <th class="ns">입출고</th>
-        <th class="ns">관리</th>
-      </tr></thead>
-      <tbody id="invBody"><tr><td colspan="11" class="empty-row"><div class="loading"><div class="spinner"></div>데이터 로딩 중...</div></td></tr></tbody>
-    </table></div>
+    <div class="inv-gallery" id="invGallery"><div class="inv-gallery-empty"><div class="loading"><div class="spinner"></div>데이터 로딩 중...</div></div></div>
   </div>
 </div>
 </div>
@@ -8154,72 +8164,103 @@ function renderInv(){
   renderInvInsight(act,cnt);
   renderInvCatCards(act);
   renderOrderCheck();
+  const gallery=document.getElementById('invGallery');
   // 필터/검색/전체보기 중 아무것도 선택 안 하면 전체 나열 대신 안내만 표시 (가시성 확보)
   const hasFilter=!!srch||!!sf||!!tf||_invShowAll||_showHidden;
   if(!hasFilter){
-    document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:32px 12px;color:var(--tx2);">
+    gallery.innerHTML=`<div class="inv-gallery-empty">
       <div style="font-size:13px;margin-bottom:10px;">위 상태·구분 카드를 클릭하면 해당 제품 목록이 여기 표시됩니다.</div>
       <button class="btn btn-sm" onclick="toggleInvShowAll()">📋 전체 ${act.length}개 한번에 보기</button>
-    </td></tr>`;
+    </div>`;
     return;
   }
-  if(!data.length){document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--tx2);">상품이 없습니다.</td></tr>`;return;}
+  if(!data.length){ gallery.innerHTML=`<div class="inv-gallery-empty">상품이 없습니다.</div>`; return; }
   // 코드별 진행중 주문 합산 (재고목록 필요발주 셀용)
   const pendingByCode={};
   receiveList.forEach(r=>{
     const miss=Math.max(0,r.orderQty-(r.in1+r.in2));
     if(miss>0) pendingByCode[r.code]=(pendingByCode[r.code]||0)+miss;
   });
-  document.getElementById('invBody').innerHTML=data.map(p=>{
-    const ord=calcNeeded(p);
-    const er=p.reorderPoint>0?p.reorderPoint:(ord.noData?0:Math.round(ord.expM*p.leadTime));
-    const st=p.disc?'단종':er<=0?'정상':(()=>{const r=p.stock/er;return r<=0.3?'부족':r<=0.6?'긴급':r<=1?'임박':'정상';})();
-    const r=er>0?p.stock/er:99;
-    const show=st!=='정상'&&st!=='단종';
-    const erLabel=er>0?er.toLocaleString():'-';
-    const erStyle=p.reorderPoint===0&&er>0?'color:#9333EA;font-size:10px;':''; // 자동계산 표시
-    return `<tr>
-      <td><span class="code-chip">${p.code}</span></td>
-      <td style="font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;">${p.name}</td>
-      <td><span class="badge b-gy">${p.type}</span><span class="badge-grade grade-${ord.grade||'C'}" title="ABC 등급(매출기여도 파레토 분석) — A는 안전재고를 두텁게, C는 얇게 적용">${ord.grade||'C'}</span></td>
-      <td style="text-align:right;font-weight:500;color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':r<=1?'#D97706':'var(--tx)'};">${p.stock.toLocaleString()}</td>
-      <td><span class="badge ${SBADGE[st]}">${st}</span></td>
-      <td style="text-align:right;color:var(--tx2);">${p.boxQty}개</td>
-      <td><span class="badge b-gy">${Math.round(p.leadTime*30)}일</span></td>
-      <td style="text-align:right;${erStyle}" title="${p.reorderPoint===0&&er>0?'발주시점 미설정 → expM×리드타임으로 자동계산':''}">
-        ${erLabel}${p.reorderPoint===0&&er>0?'<span style="font-size:9px;color:#9333EA;margin-left:2px;">(자동)</span>':''}${(()=>{const gap=getReorderGap(p);return gap?`<span class="badge-gap" title="최근 실제수요 기준 자동계산 발주시점은 ${gap.autoEr.toLocaleString()}개(현재 설정의 ${gap.ratio}배) — 수동설정값이 낮게 방치된 것으로 보여 재검토 권장">⚠재검토</span>`:'';})()}</td>
-      <td style="text-align:right;font-size:11px;">${(()=>{
-        if(st==='단종') return '<span style="color:var(--tx2);">-</span>';
-        if(ord.noData) return '<span style="color:#94A3B8;font-size:10px;">데이터 쌓는 중</span>';
-        if(!show) return '<span style="color:var(--tx2);">-</span>';
-        const pending=pendingByCode[p.code]||0;
-        const days=calcOrderDeadlineDays(p);
-        const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
-        const seasonBadge=ord.corrLabel&&ord.corrLabel!=='보정없음'&&ord.corrLabel!=='작년 데이터 없음'?` <span style="font-size:9px;color:${ord.sr>1.05?'#DC2626':'#059669'}">${ord.corrLabel}</span>`:'';
-        const _sad=Math.max(0,p.stock-ord.expM*p.leadTime);
-        const cycleTip=`title="계산식: 예상월소진${ord.expM}개 × (주문주기${ord.orderCycle}+안전${ord.safetyM}개월[${ord.grade}등급]) - 도착시잔여${_sad}개\n※현재고${p.stock}개는 리드타임${Math.round(p.leadTime*30)}일내 소진→도착시${_sad}개 예상\n근거: 최근30일 데이터 ${ord.dataPoints30}일치 / 일평균 ${ord.avgDay}개"`;
-        const suspectBadge=ord.suspect?`<span style="font-size:9px;color:#F59E0B;display:block;">⚠ 데이터 확인필요</span>`:'';
-        const diagLine=ord.fixedExpM
-          ? `<span style="font-size:9px;color:#9333EA;display:block;">📌 월소진 고정값 ${ord.expM}개 적용중</span>`
-          : `<span style="font-size:9px;color:var(--tx2);display:block;">일평균 ${ord.avgDay}개 · ${ord.dataPoints30}일치</span>`;
-        // 진행중 주문이 필요량을 충족하는 경우
-        if(pending>0&&pending>=ord.needed){
-          return `<span style="color:#059669;font-weight:600;">✓ 주문진행 중</span><span style="font-size:9px;color:#059669;display:block;">${pending.toLocaleString()}개 입고예정</span>${diagLine}`;
-        }
-        // 진행중 주문이 있지만 추가발주 필요한 경우
-        if(pending>0){
-          const addNeeded=ord.needed-pending;
-          const addBoxes=Math.ceil(addNeeded/(p.boxQty||1));
-          return `<span style="color:#9333EA;font-weight:600;" ${cycleTip}>추가 ${addNeeded.toLocaleString()}개 (${addBoxes}박스)</span>${dlStr}<span style="font-size:9px;color:#9333EA;display:block;">진행중 ${pending.toLocaleString()}개 포함 총 ${ord.needed.toLocaleString()}개</span>${seasonBadge}${suspectBadge}${diagLine}`;
-        }
-        return `<span style="color:#EA580C;" ${cycleTip}>${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}${suspectBadge}${diagLine}`;
-      })()}</td>
-      <td id="iotd-${p.id}">${ioTarget===p.id?`<div style="display:flex;gap:3px;align-items:center;"><input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button></div>`:`<button class="btn btn-sm" onclick="startIO(${p.id})">입출고</button>`}</td>
-      <td><div style="display:flex;gap:3px;"><button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button><button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button><button class="btn btn-sm ${p.disc?'btn-or':'btn-gy'}" onclick="discProd(${p.id})" title="${p.disc?'단종 해제':'단종 처리'}">${p.disc?'↩단종':'단종'}</button><button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button></div></td>
-    </tr>`;
-  }).join('');
+  // 구분별 그룹 (노션 보드 스타일) — 정렬된 data 순서를 그대로 유지한 채 묶음
+  const catOrder=['의류','잡화','식품','전자','기타'];
+  const groups={};
+  data.forEach(p=>{ const t=p.type||'기타'; (groups[t]=groups[t]||[]).push(p); });
+  const types=Object.keys(groups).sort((a,b)=>{const ia=catOrder.indexOf(a),ib=catOrder.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
+  gallery.innerHTML=types.map(t=>`<div class="inv-gallery-group">
+    <div class="inv-gallery-group-h">${t}<span class="ig-count">${groups[t].length}개</span></div>
+    <div class="inv-gallery-grid">${groups[t].map(p=>_invProdCard(p,pendingByCode)).join('')}</div>
+  </div>`).join('');
 }
 function sortInv(c){invSort===c?invDir*=-1:(invSort=c,invDir=1);renderInv();}
+function onInvSortSel(v){
+  const map={code:['code',1],name:['name',1],stock_asc:['stock',1],stock_desc:['stock',-1],status:['status',1]};
+  const [col,dir]=map[v]||['code',1];
+  invSort=col; invDir=dir; renderInv();
+}
+// 발주 필요량 셀 — 기존 테이블 렌더 로직을 그대로 이관
+function _invOrderCellHtml(p,ord,st,show,pendingByCode){
+  if(st==='단종') return '<span style="color:var(--tx2);">-</span>';
+  if(ord.noData) return '<span style="color:#94A3B8;font-size:10px;">데이터 쌓는 중</span>';
+  if(!show) return '<span style="color:var(--tx2);">-</span>';
+  const pending=pendingByCode[p.code]||0;
+  const days=calcOrderDeadlineDays(p);
+  const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
+  const seasonBadge=ord.corrLabel&&ord.corrLabel!=='보정없음'&&ord.corrLabel!=='작년 데이터 없음'?` <span style="font-size:9px;color:${ord.sr>1.05?'#DC2626':'#059669'}">${ord.corrLabel}</span>`:'';
+  const _sad=Math.max(0,p.stock-ord.expM*p.leadTime);
+  const cycleTip=`title="계산식: 예상월소진${ord.expM}개 × (주문주기${ord.orderCycle}+안전${ord.safetyM}개월[${ord.grade}등급]) - 도착시잔여${_sad}개\n※현재고${p.stock}개는 리드타임${Math.round(p.leadTime*30)}일내 소진→도착시${_sad}개 예상\n근거: 최근30일 데이터 ${ord.dataPoints30}일치 / 일평균 ${ord.avgDay}개"`;
+  const suspectBadge=ord.suspect?`<span style="font-size:9px;color:#F59E0B;display:block;">⚠ 데이터 확인필요</span>`:'';
+  const diagLine=ord.fixedExpM
+    ? `<span style="font-size:9px;color:#9333EA;display:block;">📌 월소진 고정값 ${ord.expM}개 적용중</span>`
+    : `<span style="font-size:9px;color:var(--tx2);display:block;">일평균 ${ord.avgDay}개 · ${ord.dataPoints30}일치</span>`;
+  if(pending>0&&pending>=ord.needed){
+    return `<span style="color:#059669;font-weight:600;">✓ 주문진행 중</span><span style="font-size:9px;color:#059669;display:block;">${pending.toLocaleString()}개 입고예정</span>${diagLine}`;
+  }
+  if(pending>0){
+    const addNeeded=ord.needed-pending;
+    const addBoxes=Math.ceil(addNeeded/(p.boxQty||1));
+    return `<span style="color:#9333EA;font-weight:600;" ${cycleTip}>추가 ${addNeeded.toLocaleString()}개 (${addBoxes}박스)</span>${dlStr}<span style="font-size:9px;color:#9333EA;display:block;">진행중 ${pending.toLocaleString()}개 포함 총 ${ord.needed.toLocaleString()}개</span>${seasonBadge}${suspectBadge}${diagLine}`;
+  }
+  return `<span style="color:#EA580C;" ${cycleTip}>${ord.needed.toLocaleString()}개 (${ord.boxes}박스)</span>${dlStr}${seasonBadge}${suspectBadge}${diagLine}`;
+}
+// 재고 목록 카드 (노션 갤러리 스타일) — 정렬/필터된 상품 1개를 카드 하나로 렌더
+function _invProdCard(p,pendingByCode){
+  const ord=calcNeeded(p);
+  const er=p.reorderPoint>0?p.reorderPoint:(ord.noData?0:Math.round(ord.expM*p.leadTime));
+  const st=p.disc?'단종':er<=0?'정상':(()=>{const r=p.stock/er;return r<=0.3?'부족':r<=0.6?'긴급':r<=1?'임박':'정상';})();
+  const r=er>0?p.stock/er:99;
+  const show=st!=='정상'&&st!=='단종';
+  const erLabel=er>0?er.toLocaleString():'-';
+  const grade=ord.grade||'C';
+  const gap=getReorderGap(p);
+  const io=ioTarget===p.id
+    ?`<input class="inp" id="ioin-${p.id}" type="number" placeholder="입고" style="width:52px;"><input class="inp" id="ioout-${p.id}" type="number" placeholder="출고" style="width:52px;"><button class="btn btn-sm btn-pr" onclick="applyIO(${p.id})">확인</button>`
+    :`<button class="btn btn-sm" onclick="startIO(${p.id})">📦 입출고</button>`;
+  return `<div class="inv-prod-card">
+    <div class="ipc-top">
+      <span class="code-chip">${p.code}</span>
+      <span class="badge ${SBADGE[st]}">${st}</span>
+    </div>
+    <div class="ipc-name" title="${p.name}">${p.name}</div>
+    <div class="ipc-tags">
+      <span class="badge b-gy">${p.type}</span>
+      <span class="badge-grade grade-${grade}" title="ABC 등급(매출기여도 파레토 분석) — A는 안전재고를 두텁게, C는 얇게 적용">${grade}</span>
+      <span class="badge b-gy">⏱${Math.round(p.leadTime*30)}일</span>
+    </div>
+    <div class="ipc-stats">
+      <div class="ipc-stat"><span class="ipc-stat-label">현재고</span><span class="ipc-stat-val" style="color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':r<=1?'#D97706':'var(--tx)'};">${p.stock.toLocaleString()}</span></div>
+      <div class="ipc-stat"><span class="ipc-stat-label">박스/수량</span><span class="ipc-stat-val" style="font-size:12px;color:var(--tx2);">${p.boxQty}개</span></div>
+      <div class="ipc-stat"><span class="ipc-stat-label">발주시점</span><span class="ipc-stat-val" style="font-size:12px;${p.reorderPoint===0&&er>0?'color:#9333EA;':''}" title="${p.reorderPoint===0&&er>0?'발주시점 미설정 → expM×리드타임으로 자동계산':''}">${erLabel}${p.reorderPoint===0&&er>0?'<small style="font-size:8px;">(자동)</small>':''}</span>${gap?`<span class="badge-gap" title="최근 실제수요 기준 자동계산 발주시점은 ${gap.autoEr.toLocaleString()}개(현재 설정의 ${gap.ratio}배) — 재검토 권장">⚠재검토</span>`:''}</div>
+    </div>
+    <div class="ipc-order">${_invOrderCellHtml(p,ord,st,show,pendingByCode)}</div>
+    <div class="ipc-io" id="iotd-${p.id}">${io}</div>
+    <div class="ipc-actions">
+      <button class="btn btn-sm" onclick="openEditProd(${p.id})">✏</button>
+      <button class="btn btn-sm" onclick="hideProd(${p.id})" style="color:var(--tx2);">🙈</button>
+      <button class="btn btn-sm ${p.disc?'btn-or':'btn-gy'}" onclick="discProd(${p.id})" title="${p.disc?'단종 해제':'단종 처리'}">${p.disc?'↩단종':'단종'}</button>
+      <button class="btn btn-sm btn-da" onclick="deleteProd(${p.id})">🗑</button>
+    </div>
+  </div>`;
+}
 
 // ── 오늘 주문 체크 박스 ──────────────────────────
 let _ocbOpen = true;
