@@ -4460,15 +4460,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 // ══════════════════════════════════════════════
 const SUPABASE_URL = 'https://ywbekolvslixidpugepr.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// 로그인 세션(Supabase Auth JWT) 저장소 — "기억하기" 체크 여부에 따라 localStorage(영구)/sessionStorage(탭 종료 시 소멸)로 라우팅
+const _rememberFlagKey = 'inv_remember_flag';
+function _shouldRemember(){ try{ return localStorage.getItem(_rememberFlagKey)!=='0'; }catch{ return true; } }
+const _authStorage = {
+  getItem:(k)=>{ try{ return (_shouldRemember()?localStorage:sessionStorage).getItem(k); }catch{ return null; } },
+  setItem:(k,v)=>{ try{ (_shouldRemember()?localStorage:sessionStorage).setItem(k,v); }catch{} },
+  removeItem:(k)=>{ try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch{} },
+};
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ storage:_authStorage, persistSession:true, autoRefreshToken:true } });
 
 // ══════════════════════════════════════════════
-// 로그인 / 인증  (1단계: 클라이언트 측 검증)
-//  · 마스터 계정은 코드에 내장 → 어느 PC에서도 즉시 로그인 가능
-//  · 추가 직원 계정은 localStorage('inv_users')에 저장(2단계에서 확장)
+// 로그인 / 인증 — Supabase Auth 기반 (2026-07-07 전환)
+//  · 비밀번호는 Supabase Auth가 안전하게 보관 (평문 하드코딩/DB 저장 아님)
+//  · 아이디→이메일 변환은 RPC(email_for_username, SECURITY DEFINER)로 처리해
+//    로그인 UX는 기존과 동일하게 "아이디"만 입력받음
+//  · 메뉴별 권한(perms)/마스터 여부는 별도 테이블 app_profiles(user_id, username, name, is_master, perms)에 저장
 // ══════════════════════════════════════════════
 let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인증부보다 먼저 선언)
-const MASTER_ACCOUNT = { username:'admin', password:'1q2w3e4r!', role:'master', name:'관리자' };
 
 // ══════════════════════════════════════════════
 //  팀 프리셋 — 마이페이지에서 계정 만들 때 권한을 한 번에 채워주는 용도
@@ -4482,28 +4491,16 @@ const TEAM_PRESETS = {
 };
 
 // ══════════════════════════════════════════════
-//  직원 계정 — Supabase(work_calendar KV, kind='app_users')에 저장 → 모든 PC 동기화
-//   계정 객체: { username, password, name, perms:{ 메뉴키: 'none'|'view'|'edit' } }
+//  직원 계정 — Supabase Auth(auth.users) + app_profiles(user_id, username, name, is_master, perms)
+//   비밀번호는 이제 앱/DB 어디에도 평문으로 없음 — Supabase Auth가 전담
 // ══════════════════════════════════════════════
-let APP_USERS = [];
-async function loadAppUsers(){ try{ APP_USERS = (await cloudKvLoad('app_users')) || []; }catch{ APP_USERS = []; } return APP_USERS; }
-async function saveAppUsers(){ await cloudKvSave('app_users', APP_USERS); }
-const _appUsersLoaded = loadAppUsers();   // 페이지 로드 즉시 계정목록 가져오기 시작
-
-function _findUser(id,pw){
-  if(id===MASTER_ACCOUNT.username && pw===MASTER_ACCOUNT.password) return { ...MASTER_ACCOUNT };
-  const a = APP_USERS.find(u=>u.username===id && u.password===pw);
-  if(a){
-    // 조신성 = 대표(마스터계정) — 마스터와 동일한 권한, 모든 메뉴 활성화
-    const isRep = (a.name||'').includes('조신성') || (a.username||'').includes('조신성');
-    return { username:a.username, name:a.name||a.username, role: isRep?'master':'staff', perms:a.perms||{} };
-  }
-  return null;
-}
-function _getSession_legacyNoop(){}
-function _getSession(){
-  try{ return JSON.parse(localStorage.getItem('inv_session')||sessionStorage.getItem('inv_session')||'null'); }
-  catch{ return null; }
+let APP_PROFILES = [];
+async function loadAppProfiles(){
+  try{
+    const { data, error } = await sb.from('app_profiles').select('user_id,username,name,is_master,perms').order('username');
+    APP_PROFILES = error ? [] : (data||[]);
+  }catch{ APP_PROFILES = []; }
+  return APP_PROFILES;
 }
 window.__CURRENT_USER = null;
 
@@ -4554,30 +4551,33 @@ async function doLogin(e){
   const pw = document.getElementById('lgPw').value;
   const remember = document.getElementById('lgRemember').checked;
   const err = document.getElementById('lgErr');
-  let u = _findUser(id, pw);
-  if(!u && id!=='admin'){ try{ await _appUsersLoaded; }catch{} u = _findUser(id, pw); }  // 계정목록 로드 보장 후 재시도
-  if(!u){
-    err.style.display = 'block';
-    err.textContent = '아이디 또는 비밀번호가 올바르지 않습니다.';
-    return;
-  }
   err.style.display = 'none';
-  const sess = { username:u.username, role:u.role, name:u.name||u.username, perms:u.perms||{}, ts:Date.now() };
-  if(remember){
-    localStorage.setItem('inv_session', JSON.stringify(sess));
-    localStorage.setItem('inv_remember', JSON.stringify({ id, pw }));
-    sessionStorage.removeItem('inv_session');
-  }else{
-    sessionStorage.setItem('inv_session', JSON.stringify(sess));
-    localStorage.removeItem('inv_session');
-    localStorage.removeItem('inv_remember');
+  // signInWithPassword가 세션을 저장하기 전에 먼저 라우팅 플래그를 정해둠 (localStorage vs sessionStorage)
+  try{ localStorage.setItem(_rememberFlagKey, remember?'1':'0'); }catch{}
+  try{
+    const { data: email, error: emailErr } = await sb.rpc('email_for_username', { p_username:id });
+    if(emailErr || !email){ err.style.display='block'; err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.'; return; }
+    const { data: authData, error: authErr } = await sb.auth.signInWithPassword({ email, password:pw });
+    if(authErr || !authData?.user){ err.style.display='block'; err.textContent='아이디 또는 비밀번호가 올바르지 않습니다.'; return; }
+    const { data: profile, error: profErr } = await sb.from('app_profiles').select('username,name,is_master,perms').eq('user_id', authData.user.id).maybeSingle();
+    if(profErr || !profile){
+      err.style.display='block'; err.textContent='계정 권한 정보를 찾을 수 없습니다. 관리자에게 문의하세요.';
+      await sb.auth.signOut();
+      return;
+    }
+    if(remember){ try{ localStorage.setItem('inv_remember_id', id); }catch{} }
+    else { try{ localStorage.removeItem('inv_remember_id'); }catch{} }
+    const sess = { username:profile.username, role:profile.is_master?'master':'staff', name:profile.name||profile.username, perms:profile.perms||{}, ts:Date.now() };
+    _revealApp(sess);
+  }catch(e){
+    err.style.display='block'; err.textContent='로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    console.warn('로그인 실패', e);
   }
-  _revealApp(sess);
 }
 
-function logout(){
-  localStorage.removeItem('inv_session');
-  sessionStorage.removeItem('inv_session');
+async function logout(){
+  try{ await sb.auth.signOut(); }catch{}
+  try{ localStorage.removeItem('inv_remember_id'); }catch{}
   location.reload();
 }
 
@@ -4793,7 +4793,7 @@ const _lvlTag = v => v==='edit' ? '<span style="color:#05C072;font-weight:700;">
 async function openMyPage(){
   if(!window.__CURRENT_USER) return;
   document.getElementById('myPageModal').classList.add('open');
-  if(window.__CURRENT_USER.role==='master'){ try{ await loadAppUsers(); }catch{} }
+  if(window.__CURRENT_USER.role==='master'){ try{ await loadAppProfiles(); }catch{} }
   renderMyPage();
 }
 function closeMyPage(){ document.getElementById('myPageModal').classList.remove('open'); _mpEditing=null; }
@@ -4803,8 +4803,8 @@ function renderMyPage(){
   const body = document.getElementById('mpBody');
   if(u.role==='master'){
     body.innerHTML =
-      `<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">계정은 서버(Supabase)에 저장되어 <b>모든 PC에서 동일하게 로그인</b>됩니다.<br><span style="color:#05C072;">수정</span>=추가·수정·삭제 가능 · <span style="color:#3182F6;">열람</span>=보기만 · —=메뉴 숨김</div>
-       <div style="margin-bottom:8px;"><button class="btn btn-pr btn-sm" onclick="mpOpenForm()">+ 새 계정 만들기</button></div>
+      `<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">계정은 Supabase Auth로 로그인됩니다 — <b>비밀번호는 여기서 설정할 수 없고</b>, 새 직원은 Supabase 대시보드(Authentication → Users → Create new user)에서 먼저 계정을 만든 뒤 그 UID로 여기서 권한을 지정하세요.<br><span style="color:#05C072;">수정</span>=권한 변경 가능 · <span style="color:#3182F6;">열람</span>=보기만 · —=메뉴 숨김</div>
+       <div style="margin-bottom:8px;"><button class="btn btn-pr btn-sm" onclick="mpOpenForm()">+ 새 직원 권한 등록</button></div>
        <div id="mpList" style="overflow-x:auto;"></div>
        <div id="mpForm" style="display:none;margin-top:10px;"></div>`;
     renderMpList();
@@ -4823,12 +4823,12 @@ function renderMpList(){
   const keys = permKeyRows().filter(r=>r.key);
   let h = '<table class="um-table"><thead><tr><th>아이디</th><th>이름</th>'
     + keys.map(r=>`<th>${r.label.replace('└ ','')}</th>`).join('') + '<th>관리</th></tr></thead><tbody>';
-  if(!APP_USERS.length){
-    h += `<tr><td colspan="${keys.length+3}" style="text-align:center;color:var(--tx2);padding:18px;">아직 만든 계정이 없습니다. ‘+ 새 계정 만들기’로 추가하세요.</td></tr>`;
+  if(!APP_PROFILES.length){
+    h += `<tr><td colspan="${keys.length+3}" style="text-align:center;color:var(--tx2);padding:18px;">등록된 직원이 없습니다. ‘+ 새 직원 권한 등록’으로 추가하세요.</td></tr>`;
   } else {
-    h += APP_USERS.map(u=>{
+    h += APP_PROFILES.map(u=>{
       const cells = keys.map(r=>`<td>${_lvlTag((u.perms&&u.perms[r.key])||'none')}</td>`).join('');
-      return `<tr><td><b>${u.username}</b></td><td>${u.name||'-'}</td>${cells}`
+      return `<tr><td><b>${u.username}</b>${u.is_master?' <span style="color:#D97706;font-size:10px;">★마스터</span>':''}</td><td>${u.name||'-'}</td>${cells}`
         + `<td style="white-space:nowrap;"><button class="btn btn-sm" onclick="mpOpenForm('${u.username}')">수정</button> `
         + `<button class="btn btn-da btn-sm" onclick="mpDeleteAccount('${u.username}')">삭제</button></td></tr>`;
     }).join('');
@@ -4852,17 +4852,18 @@ function _mpPermGrid(perms){
 }
 
 function mpOpenForm(username){
-  const editing = username ? APP_USERS.find(u=>u.username===username) : null;
+  const editing = username ? APP_PROFILES.find(u=>u.username===username) : null;
   _mpEditing = editing ? editing.username : null;
   const f = document.getElementById('mpForm');
   document.getElementById('mpList').style.display = 'none';
   f.style.display = '';
   f.innerHTML =
-    `<h4 style="margin:0 0 8px;">${editing ? '계정 수정 — '+editing.username : '새 계정 만들기'}</h4>
+    `<h4 style="margin:0 0 8px;">${editing ? '권한 수정 — '+editing.username : '새 직원 권한 등록'}</h4>
+     ${editing?'':'<div style="font-size:12px;color:#D97706;margin-bottom:6px;">Supabase 대시보드(Authentication → Users)에서 먼저 계정을 만들고, 그 User UID를 아래에 입력하세요.</div>'}
      <div class="um-add">
+       <input id="mpUid" placeholder="Supabase User UID" value="${editing?editing.user_id:''}" ${editing?'disabled':''}/>
        <input id="mpId" placeholder="아이디" value="${editing?editing.username:''}" ${editing?'disabled':''}/>
        <input id="mpName" placeholder="이름" value="${editing?(editing.name||''):''}"/>
-       <input id="mpPw" type="text" placeholder="비밀번호" value="${editing?editing.password:''}"/>
      </div>
      <div style="margin:8px 0;font-size:12px;color:var(--tx2);display:flex;gap:4px;flex-wrap:wrap;align-items:center;">빠른 채움:
        <button class="btn btn-sm" onclick="mpApplyPreset('cx')">CX팀</button>
@@ -4874,7 +4875,7 @@ function mpOpenForm(username){
      </div>
      <div id="mpGrid">${_mpPermGrid(editing?editing.perms:{})}</div>
      <div class="ma"><button class="btn" onclick="mpCancelForm()">취소</button>
-       <button class="btn btn-pr" onclick="mpSaveAccount()">${editing?'저장':'계정 생성'}</button></div>`;
+       <button class="btn btn-pr" onclick="mpSaveAccount()">${editing?'저장':'등록'}</button></div>`;
 }
 function mpCancelForm(){
   _mpEditing = null;
@@ -4890,59 +4891,66 @@ function mpApplyPreset(id){
 }
 async function mpSaveAccount(){
   const editing = _mpEditing;
+  const uid = editing ? APP_PROFILES.find(u=>u.username===editing)?.user_id : document.getElementById('mpUid').value.trim();
   const id = editing || document.getElementById('mpId').value.trim();
   const name = document.getElementById('mpName').value.trim();
-  const pw = document.getElementById('mpPw').value;
-  if(!id || !pw){ toast('아이디와 비밀번호를 입력하세요.'); return; }
-  if(id==='admin'){ toast('admin은 마스터 예약 아이디입니다.'); return; }
-  if(!editing && APP_USERS.some(u=>u.username===id)){ toast('이미 존재하는 아이디입니다.'); return; }
+  if(!uid || !id){ toast('User UID와 아이디를 입력하세요.'); return; }
+  if(!editing && APP_PROFILES.some(u=>u.username===id)){ toast('이미 존재하는 아이디입니다.'); return; }
   const perms = {};
   document.querySelectorAll('#mpGrid select[data-permkey]').forEach(sel=>{ if(sel.value!=='none') perms[sel.dataset.permkey]=sel.value; });
-  if(editing){ const u=APP_USERS.find(x=>x.username===editing); u.name=name; u.password=pw; u.perms=perms; }
-  else { APP_USERS.push({ username:id, name, password:pw, perms }); }
-  try{ await saveAppUsers(); }catch(e){ toast('저장 실패: '+(e.message||e)); return; }
-  toast(editing ? '계정이 수정되었습니다.' : '계정이 생성되었습니다.');
-  mpCancelForm(); renderMpList();
+  try{
+    const { error } = await sb.from('app_profiles').upsert(
+      { user_id:uid, username:id, name, perms, updated_at:new Date().toISOString() },
+      { onConflict:'user_id' });
+    if(error) throw error;
+  }catch(e){ toast('저장 실패: '+(e.message||e)); return; }
+  toast(editing ? '권한이 수정되었습니다.' : '직원이 등록되었습니다.');
+  mpCancelForm(); await loadAppProfiles(); renderMpList();
 }
 async function mpDeleteAccount(username){
-  if(!confirm(username+' 계정을 삭제할까요?')) return;
-  APP_USERS = APP_USERS.filter(u=>u.username!==username);
-  try{ await saveAppUsers(); }catch(e){ toast('삭제 실패: '+(e.message||e)); return; }
-  toast('삭제되었습니다.'); renderMpList();
+  if(!confirm(username+' 계정 권한을 삭제할까요? (Supabase Auth 로그인 계정 자체는 대시보드에서 별도로 삭제해야 합니다)')) return;
+  const target = APP_PROFILES.find(u=>u.username===username);
+  if(!target) return;
+  try{
+    const { error } = await sb.from('app_profiles').delete().eq('user_id', target.user_id);
+    if(error) throw error;
+  }catch(e){ toast('삭제 실패: '+(e.message||e)); return; }
+  toast('삭제되었습니다.'); await loadAppProfiles(); renderMpList();
 }
 
-// 페이지 로드 즉시 인증 게이트 실행
-(function _initAuthGate(){
+// 페이지 로드 즉시 인증 게이트 실행 — Supabase Auth 세션 확인 (기존 localStorage 수동 세션 대신)
+(async function _initAuthGate(){
   // 폼 핸들러 연결
   const form = document.getElementById('loginForm');
   if(form) form.addEventListener('submit', doLogin);
 
-  // '기억하기'로 저장된 아이디/비밀번호 자동 채움
+  // '기억하기'로 저장된 아이디 자동 채움 (비밀번호는 더 이상 평문 저장 안 함)
   try{
-    const rem = JSON.parse(localStorage.getItem('inv_remember')||'null');
-    if(rem){
-      document.getElementById('lgId').value = rem.id || '';
-      document.getElementById('lgPw').value = rem.pw || '';
+    const remId = localStorage.getItem('inv_remember_id');
+    if(remId){
+      document.getElementById('lgId').value = remId;
       document.getElementById('lgRemember').checked = true;
     }
   }catch{}
 
-  // 기존 세션이 있으면 앱 바로 표시, 없으면 로그인 화면 유지
-  const sess = _getSession();
-  // _revealApp는 뒤에 선언된 모듈 변수(_logiWatchStarted 등)를 사용하므로,
-  // 스크립트가 끝까지 실행돼 모든 선언이 초기화된 뒤(마이크로태스크) 호출 — TDZ 오류 방지
-  if(sess) queueMicrotask(()=>_revealApp(sess));
-  else { const f=document.getElementById('lgId'); if(f) f.focus(); }
+  // Supabase Auth 세션이 남아있으면(리프레시 토큰 유효) 자동 로그인, 없으면 로그인 화면 유지
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session?.user){
+      const { data: profile, error } = await sb.from('app_profiles').select('username,name,is_master,perms').eq('user_id', session.user.id).maybeSingle();
+      if(!error && profile){
+        const sess = { username:profile.username, role:profile.is_master?'master':'staff', name:profile.name||profile.username, perms:profile.perms||{}, ts:Date.now() };
+        // _revealApp는 뒤에 선언된 모듈 변수를 사용하므로, 스크립트가 끝까지 실행돼
+        // 모든 선언이 초기화된 뒤(마이크로태스크) 호출 — TDZ 오류 방지
+        queueMicrotask(()=>_revealApp(sess));
+        return;
+      }
+      // 세션은 있는데 프로필이 없으면(계정 삭제됨 등) 로그아웃 처리
+      await sb.auth.signOut();
+    }
+  }catch(e){ console.warn('세션 복원 실패', e); }
+  const f=document.getElementById('lgId'); if(f) f.focus();
 })();
-
-// 계정목록 로드 완료 후, 자동 로그인된 직원의 권한을 최신으로 갱신
-_appUsersLoaded.then(()=>{
-  const cu = window.__CURRENT_USER;
-  if(cu && cu.role!=='master'){
-    const fresh = APP_USERS.find(u=>u.username===cu.username);
-    if(fresh){ cu.perms = fresh.perms || {}; cu.name = fresh.name || cu.name; window.__ACTOR = cu.name; applyPermissions(); }
-  }
-}).catch(()=>{});
 
 // ── 단가계산기 견적 / 견적서 클라우드 공유 (work_calendar 테이블 재사용, person='__app__') ──
 //    캘린더처럼 다른 컴퓨터에서도 동일하게 보이도록 저장
