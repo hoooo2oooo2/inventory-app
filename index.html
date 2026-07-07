@@ -428,6 +428,25 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .ord-kpi-box{font-size:12px;font-weight:700;color:var(--pr);white-space:nowrap;}
 .ord-kpi-sub{font-size:10px;color:var(--tx2);margin-top:3px;min-height:13px;}
 .ord-kpi-sub.urg{color:#DC2626;font-weight:600;}
+/* 재고관리 구분별 드릴다운 카드 */
+.inv-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:0 14px 10px;}
+.inv-cat-card{min-width:0;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px 13px;cursor:pointer;transition:all .15s;}
+.inv-cat-card:hover{border-color:var(--pr);box-shadow:0 2px 8px rgba(16,24,40,.06);}
+.inv-cat-card.active{background:var(--prl);border-color:var(--pr);box-shadow:0 2px 8px rgba(49,130,246,.22);}
+.inv-cat-card .ic-head{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.inv-cat-card .ic-ico{font-size:15px;}
+.inv-cat-card .ic-name{font-size:12px;font-weight:600;color:var(--tx);flex:1;}
+.inv-cat-card .ic-dot{width:7px;height:7px;border-radius:50%;background:#DC2626;flex-shrink:0;}
+.inv-cat-card .ic-cnt{font-size:20px;font-weight:800;letter-spacing:-0.5px;color:var(--tx);}
+.inv-cat-card .ic-cnt small{font-size:11px;font-weight:600;color:var(--tx2);margin-left:1px;}
+.inv-cat-card .ic-sub{font-size:10px;margin-top:3px;color:var(--tx2);}
+.inv-cat-card .ic-top{font-size:10px;color:#DC2626;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* ABC 등급 배지 · 발주시점 재검토 경고 */
+.badge-grade{display:inline-block;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;margin-left:3px;vertical-align:middle;}
+.grade-A{background:#DCFCE7;color:#15803D;}
+.grade-B{background:#FEF3C7;color:#92400E;}
+.grade-C{background:#F1F5F9;color:#64748B;}
+.badge-gap{display:block;font-size:9px;color:#DC2626;font-weight:700;margin-top:2px;cursor:help;}
 /* 재고관리 한 줄 인사이트 */
 .inv-insight{margin:2px 0 12px;padding:12px 15px;border-radius:10px;background:var(--prl);border:0.5px solid rgba(49,130,246,0.25);font-size:13px;line-height:1.55;color:var(--tx);display:flex;align-items:flex-start;gap:9px;}
 .inv-insight .ii-ico{font-size:17px;flex-shrink:0;line-height:1.4;}
@@ -436,6 +455,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .inv-insight .ii-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:14px;white-space:nowrap;cursor:default;}
 .inv-insight .ii-badge.crit{background:#FEE2E2;color:#B91C1C;}
 .inv-insight .ii-badge.new{background:#E0EDFF;color:#1D4ED8;}
+.inv-insight .ii-badge.gap{background:#FEF3C7;color:#92400E;}
 .inv-insight .ii-badge.up{background:#DCFCE7;color:#15803D;}
 /* AI 발주 브리핑 */
 #orderBriefing{margin:0 0 4px;}
@@ -1984,6 +2004,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div id="ocb-section">
     <div id="invInsight"></div>
     <div class="ord-kpi" id="invKpi"></div>
+    <div style="padding:2px 14px 0;font-size:11px;font-weight:600;color:var(--tx2);">📂 구분별 보기 — 클릭하면 해당 구분 제품만 아래 목록에 표시됩니다</div>
+    <div class="inv-cat-grid" id="invCatCards"></div>
     <!-- 오늘 주문 체크 -->
     <div id="orderCheckBox"></div>
   </div>
@@ -2005,6 +2027,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <option value="3.5">3.5개월</option>
           </select>
         </div>
+        <button class="btn btn-sm" id="invShowAllBtn" onclick="toggleInvShowAll()" style="color:var(--tx2);">📋 전체 목록 보기</button>
         <button class="btn btn-sm" id="showHiddenBtn" onclick="toggleShowHidden()" style="color:var(--tx2);">🙈 숨긴제품만 보기</button>
         <button class="btn btn-sm" onclick="openDataDiagModal()" style="color:#D97706;border-color:#D97706;" title="월별집계가 하루치로 등록된 오류 데이터를 찾아 정상화">🔍 데이터 진단</button>
       </div>
@@ -6183,7 +6206,7 @@ function _initOrderCycleSel(){
 // 상태
 // ══════════════════════════════════════════════
 let products=[], receiveList=[], doneList=[], rgProducts=[], historyLog=[];
-let invSort='code', invDir=1, ioTarget=null, _showHidden=false, editProdId=null;
+let invSort='code', invDir=1, ioTarget=null, _showHidden=false, editProdId=null, _invShowAll=false;
 let recvSort='orderDate', recvDir=-1; // 발주관리 정렬 (기본: 주문날짜 최신순)
 let recvSortMode='date_desc';   // 카드형 입고체크 정렬 모드
 let orderSortMode='urgency';    // 카드형 발주 필요 목록 정렬 모드
@@ -6216,6 +6239,28 @@ function getYearData(p, yr){
   const by = getBestYear(p);
   return {data:getTotalM(p,by), year:by};
 }
+
+// ── ABC 등급 (매출기여도 파레토 분석, 최근 2개년 판매량 누적 기준) ──
+// products 배열이 재로드(참조 교체)될 때만 재계산 — 매 렌더마다 재계산 방지
+let _abcGrades={}, _abcGradesFor=null;
+function ensureAbcGrades(){
+  if(_abcGradesFor===products) return;
+  _abcGradesFor=products;
+  _abcGrades={};
+  const rows=products.filter(p=>!p.hidden&&!p.disc).map(p=>({
+    code:p.code,
+    vol:getTotalM(p,CUR_YEAR-1).reduce((a,b)=>a+b,0)+getTotalM(p,CUR_YEAR).reduce((a,b)=>a+b,0)
+  })).filter(x=>x.vol>0).sort((a,b)=>b.vol-a.vol);
+  const total=rows.reduce((s,x)=>s+x.vol,0);
+  if(total<=0) return;
+  let cum=0;
+  // 각 제품 "포함 전" 누적비중 기준으로 등급 판정 → 단일 제품이 80%를 넘겨도 그 제품 자체는 A로 분류됨
+  rows.forEach(x=>{ const share=cum/total; _abcGrades[x.code]=share<0.8?'A':share<0.95?'B':'C'; cum+=x.vol; });
+}
+function getAbcGrade(p){ ensureAbcGrades(); return _abcGrades[p.code]||'C'; }
+// 등급별 안전재고 개월수 — 매출기여도 높은 제품(A)일수록 품절 리스크가 크므로 안전재고를 더 두텁게,
+// 롱테일(C)은 재고비용 절감을 위해 얇게. 기존엔 전 제품 동일 0.5개월 고정이었음.
+function safetyMonthsFor(p){ const g=getAbcGrade(p); return g==='A'?0.75:g==='C'?0.3:0.5; }
 
 function detectSeason(m){
   const sA=(m[5]+m[6]+m[7])/3, wA=(m[11]+m[0]+m[1])/3;
@@ -7780,17 +7825,29 @@ function getStatus(p){
   const r=p.stock/er;
   if(r<=0.3) return '부족'; if(r<=0.6) return '긴급'; if(r<=1) return '임박'; return '정상';
 }
+// 수동 발주시점(reorderPoint) 설정이 최근 실제 수요 대비 너무 낮게 방치된 경우 감지
+// (suspect 플래그의 반대 방향 — 데이터 부풀림이 아니라 "판매가 늘었는데 발주시점을 안 올린" 케이스)
+function getReorderGap(p){
+  if(!(p.reorderPoint>0)) return null;
+  const c=calcNeeded(p);
+  if(c.noData || c.dataPoints30<10) return null; // 데이터 불충분하면 판단 보류
+  const autoEr=Math.round(c.expM*p.leadTime);
+  if(autoEr<=0) return null;
+  const ratio=autoEr/p.reorderPoint;
+  if(ratio>=1.5) return {autoEr, ratio:Math.round(ratio*10)/10};
+  return null;
+}
 function calcNeeded(p){
   // 월소진 고정값이 설정된 경우 데이터 계산 생략
   const _fixedExpM = getFixedExpM(p.code);
   if(_fixedExpM > 0){
     const orderCycle = getOrderCycle();
     const stockAtDelivery = Math.max(0, p.stock - _fixedExpM * p.leadTime);
-    const needed = Math.max(0, Math.round(_fixedExpM * (orderCycle + 0.5) - stockAtDelivery));
+    const needed = Math.max(0, Math.round(_fixedExpM * (orderCycle + safetyMonthsFor(p)) - stockAtDelivery));
     const boxes = Math.ceil(needed / (p.boxQty||1));
     const avgDay = Math.round(_fixedExpM/30*10)/10;
     return {needed, boxes, expM:_fixedExpM, sr:1, corrLabel:'📌고정값', noData:false,
-            orderCycle, avgDay, dataPoints30:0, suspect:false, fixedExpM:true};
+            orderCycle, avgDay, dataPoints30:0, suspect:false, fixedExpM:true, grade:getAbcGrade(p)};
   }
 
   const dayData = _dCache[p.code]||{};
@@ -7798,7 +7855,7 @@ function calcNeeded(p){
   // 일별 데이터 없거나 판매 실적 없으면 → 데이터 쌓는 중
   const totalSales = entries.reduce((s,[,q])=>s+q,0);
   if(entries.length < 3 || totalSales === 0)
-    return {needed:0,boxes:0,expM:0,sr:1,corrLabel:'',noData:true};
+    return {needed:0,boxes:0,expM:0,sr:1,corrLabel:'',noData:true,grade:getAbcGrade(p)};
 
   const dates = entries.map(([d])=>d);
   let base = 0;
@@ -7918,7 +7975,7 @@ function calcNeeded(p){
   }
 
   // 일별 데이터로 base 0이면 → 미산출 (월별 폴백 제거)
-  if(base<=0) return {needed:0,boxes:0,expM:0,sr:1,corrLabel:'',noData:true};
+  if(base<=0) return {needed:0,boxes:0,expM:0,sr:1,corrLabel:'',noData:true,grade:getAbcGrade(p)};
   base=Math.max(base,1);
 
   // 시즌 보정: 전년도(CUR_YEAR-1) 데이터 있는 제품만 적용
@@ -7941,15 +7998,16 @@ function calcNeeded(p){
   // 도착 시점 잔여재고 추정: 재고가 리드타임 소진량 미만이면 도착 때 0
   const orderCycle = getOrderCycle();
   const stockAtDelivery = Math.max(0, p.stock - expM * p.leadTime);
-  // 목표재고 = 다음 주문주기 + 안전재고(0.5개월) 분량
-  const needed=Math.max(0,Math.round(expM*(orderCycle+0.5)-stockAtDelivery));
+  // 목표재고 = 다음 주문주기 + 안전재고(ABC 등급별 차등) 분량
+  const safetyM = safetyMonthsFor(p);
+  const needed=Math.max(0,Math.round(expM*(orderCycle+safetyM)-stockAtDelivery));
   const boxes=Math.ceil(needed/(p.boxQty||1));
   // 진단용: 데이터 일수, 일평균, 의심 여부
   const avgDay = Math.round(expM/30*10)/10;
   // 데이터 일수 적은데 expM이 reorderPoint 기반 예상치보다 2.5배 이상 → 배치/집계 데이터 의심
   const impliedExpM = p.reorderPoint > 0 ? p.reorderPoint / Math.max(p.leadTime + 0.5, 1) : 0;
   const suspect = _dataPoints30 < 10 && impliedExpM > 0 && expM > impliedExpM * 2.5;
-  return {needed,boxes,expM,sr,corrLabel,noData:false,orderCycle,avgDay,dataPoints30:_dataPoints30,suspect};
+  return {needed,boxes,expM,sr,corrLabel,noData:false,orderCycle,avgDay,dataPoints30:_dataPoints30,suspect,grade:getAbcGrade(p),safetyM};
 }
 // ── 일별 데이터 부족 여부 판단 (calcNeeded 진입 전 사전 체크용)
 function _hasEnoughDailyData(p){
@@ -7974,11 +8032,58 @@ function renderInvKpi(total,cnt){
     card('부족','부족',cnt.부족,'#DC2626','즉시발주');
 }
 function setInvStatus(s){
-  const sel=document.getElementById('invStF'); if(sel) sel.value=s; renderInv();
+  const sel=document.getElementById('invStF'); if(sel) sel.value=s;
+  // '전체' 카드는 상태 필터 해제와 동시에 전체 목록 펼침/접힘을 토글
+  if(s===''){ _invShowAll=!_invShowAll; syncInvShowAllBtn(); }
+  renderInv();
   // 특정 상태 선택 시 재고 목록으로 스크롤 (오늘 주문체크 등에 가려 안 보이는 문제 해소)
-  if(s){ const card=document.getElementById('invListCard'); if(card) card.scrollIntoView({behavior:'smooth',block:'start'}); }
+  if(s||_invShowAll){ const card=document.getElementById('invListCard'); if(card) card.scrollIntoView({behavior:'smooth',block:'start'}); }
   else window.scrollTo({top:0,behavior:'smooth'});
 }
+// 재고관리 구분별 드릴다운 카드 — 구분(의류/잡화/식품/전자/기타)별 개수·발주검토 필요 수 요약
+function renderInvCatCards(act){
+  const el=document.getElementById('invCatCards'); if(!el) return;
+  const cur=document.getElementById('invTyF')?.value||'';
+  const order=['의류','잡화','식품','전자','기타'];
+  const icon={의류:'👕',잡화:'🎒',식품:'🍱',전자:'🔌',기타:'📦'};
+  const groups={};
+  act.forEach(p=>{
+    const t=p.type||'기타';
+    const g=groups[t]||(groups[t]={total:0,risk:0,top:null,topRatio:99});
+    g.total++;
+    const st=getStatus(p);
+    if(st==='부족'||st==='긴급'||st==='임박'){
+      g.risk++;
+      const er=getEffectiveReorder(p); const ratio=er>0?p.stock/er:99;
+      if(ratio<g.topRatio){ g.topRatio=ratio; g.top=p; }
+    }
+  });
+  const types=Object.keys(groups).sort((a,b)=>{const ia=order.indexOf(a),ib=order.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
+  if(!types.length){ el.innerHTML=''; return; }
+  el.innerHTML=types.map(t=>{
+    const g=groups[t], active=cur===t;
+    const sub=g.risk>0?`<span style="color:#DC2626;font-weight:600;">발주검토 ${g.risk}개</span>`:'<span style="color:#059669;">재고 안정</span>';
+    const top=g.top?`<div class="ic-top" title="구분 내 가장 위험한 제품">⚠ ${g.top.name}</div>`:'';
+    return `<div class="inv-cat-card ${active?'active':''}" onclick="setInvType('${t}')">
+      <div class="ic-head"><span class="ic-ico">${icon[t]||'📦'}</span><span class="ic-name">${t}</span>${g.risk>0?'<span class="ic-dot"></span>':''}</div>
+      <div class="ic-cnt">${g.total}<small>개</small></div>
+      <div class="ic-sub">${sub}</div>
+      ${top}
+    </div>`;
+  }).join('');
+}
+function setInvType(t){
+  const sel=document.getElementById('invTyF'); if(!sel) return;
+  sel.value = sel.value===t ? '' : t; // 같은 구분 다시 클릭하면 해제
+  renderInv();
+  const card=document.getElementById('invListCard'); if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function syncInvShowAllBtn(){
+  const b=document.getElementById('invShowAllBtn'); if(!b) return;
+  b.textContent=_invShowAll?'🔼 전체 목록 접기':'📋 전체 목록 보기';
+  b.style.color=_invShowAll?'var(--pr)':'var(--tx2)';
+}
+function toggleInvShowAll(){ _invShowAll=!_invShowAll; syncInvShowAllBtn(); renderInv(); }
 // 이번주(월요일 기준) 키 — '신규 진입' 비교 기준
 function invWeekKey(){ const d=new Date(); const day=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-day); mon.setHours(0,0,0,0); return fmtDate(mon); }
 // 이번주 위험권 베이스라인과 비교 → 신규 진입 코드 (베이스라인은 주 1회만 갱신, localStorage)
@@ -8008,8 +8113,11 @@ function renderInvInsight(act,cnt){
       return {p,ratio:er>0?p.stock/er:99,days,willStockout};})
     .sort((a,b)=>a.ratio-b.ratio);
   const newCodes=getInvRiskDiff(risky.map(x=>x.p.code));
+  // 수동 발주시점이 실제 수요 대비 낮게 방치된 제품 수 (상태와 무관하게 항상 체크)
+  const gapCount=act.filter(p=>getReorderGap(p)).length;
   if(need===0){
-    el.innerHTML=`<div class="inv-insight ok"><span class="ii-ico">✅</span><span>현재 발주가 시급한 제품은 없습니다. 전체 <strong>${act.length}개</strong> 모두 안정권입니다.</span></div>`;
+    const gapBadge=gapCount>0?`<div class="ii-badges"><span class="ii-badge gap" title="수동 설정된 발주시점이 최근 실제 수요보다 한참 낮게 방치된 제품 — 재검토 권장">🔧 발주시점 재검토 ${gapCount}개</span></div>`:'';
+    el.innerHTML=`<div class="inv-insight ok"><span class="ii-ico">✅</span><div class="ii-body"><div>현재 발주가 시급한 제품은 없습니다. 전체 <strong>${act.length}개</strong> 모두 안정권입니다.</div>${gapBadge}</div></div>`;
     return;
   }
   const top=risky[0];
@@ -8021,6 +8129,7 @@ function renderInvInsight(act,cnt){
   const badges=[];
   if(stockout>0) badges.push(`<span class="ii-badge crit" title="지금 발주해도 도착(리드타임) 전에 재고가 바닥나는 제품 — 가장 시급">🚨 도착 전 소진 위험 ${stockout}개</span>`);
   if(newCodes.length>0) badges.push(`<span class="ii-badge new" title="이번주(월요일 기준) 들어 새로 위험권에 진입한 제품">🆕 이번주 신규 진입 ${newCodes.length}개</span>`);
+  if(gapCount>0) badges.push(`<span class="ii-badge gap" title="수동 설정된 발주시점이 최근 실제 수요보다 한참 낮게 방치된 제품 — 재검토 권장">🔧 발주시점 재검토 ${gapCount}개</span>`);
   el.innerHTML=`<div class="inv-insight"><span class="ii-ico">📊</span><div class="ii-body"><div>전체 ${act.length}개 중 <strong>${need}개</strong>가 발주 검토 필요 — ${parts.join(', ')}.${topTxt?' '+topTxt:''}</div>${badges.length?`<div class="ii-badges">${badges.join('')}</div>`:''}</div></div>`;
 }
 function renderInv(){
@@ -8043,7 +8152,17 @@ function renderInv(){
   act.forEach(p=>{const s=getStatus(p); if(cnt[s]!==undefined) cnt[s]++;});
   renderInvKpi(act.length,cnt);
   renderInvInsight(act,cnt);
+  renderInvCatCards(act);
   renderOrderCheck();
+  // 필터/검색/전체보기 중 아무것도 선택 안 하면 전체 나열 대신 안내만 표시 (가시성 확보)
+  const hasFilter=!!srch||!!sf||!!tf||_invShowAll||_showHidden;
+  if(!hasFilter){
+    document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:32px 12px;color:var(--tx2);">
+      <div style="font-size:13px;margin-bottom:10px;">위 상태·구분 카드를 클릭하면 해당 제품 목록이 여기 표시됩니다.</div>
+      <button class="btn btn-sm" onclick="toggleInvShowAll()">📋 전체 ${act.length}개 한번에 보기</button>
+    </td></tr>`;
+    return;
+  }
   if(!data.length){document.getElementById('invBody').innerHTML=`<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--tx2);">상품이 없습니다.</td></tr>`;return;}
   // 코드별 진행중 주문 합산 (재고목록 필요발주 셀용)
   const pendingByCode={};
@@ -8062,13 +8181,13 @@ function renderInv(){
     return `<tr>
       <td><span class="code-chip">${p.code}</span></td>
       <td style="font-weight:500;max-width:130px;overflow:hidden;text-overflow:ellipsis;">${p.name}</td>
-      <td><span class="badge b-gy">${p.type}</span></td>
+      <td><span class="badge b-gy">${p.type}</span><span class="badge-grade grade-${ord.grade||'C'}" title="ABC 등급(매출기여도 파레토 분석) — A는 안전재고를 두텁게, C는 얇게 적용">${ord.grade||'C'}</span></td>
       <td style="text-align:right;font-weight:500;color:${r<=0.3?'#DC2626':r<=0.6?'#EA580C':r<=1?'#D97706':'var(--tx)'};">${p.stock.toLocaleString()}</td>
       <td><span class="badge ${SBADGE[st]}">${st}</span></td>
       <td style="text-align:right;color:var(--tx2);">${p.boxQty}개</td>
       <td><span class="badge b-gy">${Math.round(p.leadTime*30)}일</span></td>
       <td style="text-align:right;${erStyle}" title="${p.reorderPoint===0&&er>0?'발주시점 미설정 → expM×리드타임으로 자동계산':''}">
-        ${erLabel}${p.reorderPoint===0&&er>0?'<span style="font-size:9px;color:#9333EA;margin-left:2px;">(자동)</span>':''}</td>
+        ${erLabel}${p.reorderPoint===0&&er>0?'<span style="font-size:9px;color:#9333EA;margin-left:2px;">(자동)</span>':''}${(()=>{const gap=getReorderGap(p);return gap?`<span class="badge-gap" title="최근 실제수요 기준 자동계산 발주시점은 ${gap.autoEr.toLocaleString()}개(현재 설정의 ${gap.ratio}배) — 수동설정값이 낮게 방치된 것으로 보여 재검토 권장">⚠재검토</span>`:'';})()}</td>
       <td style="text-align:right;font-size:11px;">${(()=>{
         if(st==='단종') return '<span style="color:var(--tx2);">-</span>';
         if(ord.noData) return '<span style="color:#94A3B8;font-size:10px;">데이터 쌓는 중</span>';
@@ -8078,7 +8197,7 @@ function renderInv(){
         const dlStr=days===null?'':(days<=0?' <span style="color:#DC2626;font-weight:600;">⚠즉시</span>':(days<=7?` <span style="color:#DC2626;">(${days}일내)</span>`:` <span style="color:#D97706;">(${days}일내)</span>`));
         const seasonBadge=ord.corrLabel&&ord.corrLabel!=='보정없음'&&ord.corrLabel!=='작년 데이터 없음'?` <span style="font-size:9px;color:${ord.sr>1.05?'#DC2626':'#059669'}">${ord.corrLabel}</span>`:'';
         const _sad=Math.max(0,p.stock-ord.expM*p.leadTime);
-        const cycleTip=`title="계산식: 예상월소진${ord.expM}개 × (주문주기${ord.orderCycle}+안전0.5개월) - 도착시잔여${_sad}개\n※현재고${p.stock}개는 리드타임${Math.round(p.leadTime*30)}일내 소진→도착시${_sad}개 예상\n근거: 최근30일 데이터 ${ord.dataPoints30}일치 / 일평균 ${ord.avgDay}개"`;
+        const cycleTip=`title="계산식: 예상월소진${ord.expM}개 × (주문주기${ord.orderCycle}+안전${ord.safetyM}개월[${ord.grade}등급]) - 도착시잔여${_sad}개\n※현재고${p.stock}개는 리드타임${Math.round(p.leadTime*30)}일내 소진→도착시${_sad}개 예상\n근거: 최근30일 데이터 ${ord.dataPoints30}일치 / 일평균 ${ord.avgDay}개"`;
         const suspectBadge=ord.suspect?`<span style="font-size:9px;color:#F59E0B;display:block;">⚠ 데이터 확인필요</span>`:'';
         const diagLine=ord.fixedExpM
           ? `<span style="font-size:9px;color:#9333EA;display:block;">📌 월소진 고정값 ${ord.expM}개 적용중</span>`
