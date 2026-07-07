@@ -12928,18 +12928,12 @@ function renderSalesPeriod(){
     const rng=getDateRange(salesYear,salesPeriod);
     if(salesChart) salesChart.destroy();
     loadDailySales(sel.length===1?sel[0].code:null,rng.start,rng.end).then(dd=>{
-      const has=Object.keys(dd).length>0&&Object.values(dd).some(v=>Object.values(v).some(x=>x>0));
       const def=getPeriodDef(salesYear,salesPeriod);
-      if(has){
-        const ds=sel.map((p,i)=>{const pd=dd[p.code]||{};return{label:p.name,data:rng.days.map(d=>pd[d]||0),borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};});
-        if(salesChart) salesChart.destroy();
-        salesChart=makeChart('salesChart',def.labels,ds);updateSalesSummary(ds);
-      } else {
-        const dInM=new Date(new Date().getFullYear(),MONTH+1,0).getDate();
-        const ds=sel.map((p,i)=>{const m=getTotalM(p,salesYear);const v=Math.round((m[MONTH]||0)/dInM);return{label:p.name,data:def.labels.map(()=>v),borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};});
-        if(salesChart) salesChart.destroy();
-        salesChart=makeChart('salesChart',def.labels,ds);updateSalesSummary(ds);
-      }
+      // 실제 일별 기록만 표시 — 일별 데이터가 없는 상품을 "월합계÷일수" 가짜 평균으로 채우던 로직 제거
+      // (미래/미입력 날짜까지 동일한 값이 찍혀 마치 실제 판매가 있는 것처럼 보이던 문제)
+      const ds=sel.map((p,i)=>{const pd=dd[p.code]||{};return{label:p.name,data:rng.days.map(d=>pd[d]||0),borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};});
+      if(salesChart) salesChart.destroy();
+      salesChart=makeChart('salesChart',def.labels,ds);updateSalesSummary(ds);
     }).catch(()=>{});
     return;
   }
@@ -12971,23 +12965,17 @@ function renderSalesPeriod(){
     const labels=weeks.map(w=>w.label);
     if(salesChart) salesChart.destroy();
     loadDailySales(sel.length===1?sel[0].code:null,weeks[0].start,weeks[weeks.length-1].end).then(dd=>{
+      // 실제 일별 기록만 합산 — 일별 데이터가 없는 상품을 "월합계÷일수×7" 가짜 평균으로 채우던 로직 제거
       const ds=sel.map((p,i)=>{
         const dayData=dd[p.code]||{};
-        const hasDays=Object.keys(dayData).length>0;
-        let data;
-        if(hasDays){
-          data=weeks.map(w=>{
-            let sum=0;
-            const s=new Date(w.start),e=new Date(w.end);
-            for(let dt=new Date(s);dt<=e;dt.setDate(dt.getDate()+1)){
-              sum+=dayData[dt.toISOString().slice(0,10)]||0;
-            }
-            return sum;
-          });
-        } else {
-          const m=getTotalM(p,salesYear);
-          data=weeks.map(w=>{const mi=new Date(w.start).getMonth();const dim=new Date(new Date(w.start).getFullYear(),mi+1,0).getDate();return Math.round((m[mi]||0)/dim*7);});
-        }
+        const data=weeks.map(w=>{
+          let sum=0;
+          const s=new Date(w.start),e=new Date(w.end);
+          for(let dt=new Date(s);dt<=e;dt.setDate(dt.getDate()+1)){
+            sum+=dayData[dt.toISOString().slice(0,10)]||0;
+          }
+          return sum;
+        });
         return{label:p.name,data,borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2.5,pointRadius:5,pointHoverRadius:7,tension:.3,fill:false,borderDash:DASHES[i%8]||[]};
       });
       if(salesChart) salesChart.destroy();
