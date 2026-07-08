@@ -1362,7 +1362,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="topbar-title">📦 재고관리 시스템</span>
     <span class="topbar-time" id="topTime"></span>
-    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.06d</span>
+    <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.08a</span>
   </div>
   <div class="tbr">
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -7026,6 +7026,13 @@ function pcApplySur(){
   pcCalc();
 }
 
+// 할인 적용 개당 판매가 반올림 — 1만원 미만은 10원 단위, 1만원 이상은 100원 단위로 반올림
+// (100원 단위 고정 시 저가 상품은 반올림 오차가 할인액을 상쇄해버리는 문제가 있어 가격대별로 단위를 다르게 적용)
+function pcRoundDisc(price){
+  const step=price<10000?10:100;
+  return Math.round(price/step)*step;
+}
+
 function pcCalc(){
   const unit   =parseFloat(document.getElementById('pc-unit').value)||0;
   const qty    =parseFloat(document.getElementById('pc-qty').value)||0;
@@ -7034,9 +7041,8 @@ function pcCalc(){
   const shipPr =parseFloat(document.getElementById('pc-ship').value)||0;
   const shipQty=parseFloat(document.getElementById('pc-ship-qty').value)||0;
   const costTotal =Math.round(unit*qty);
-  // 할인 적용 개당 단가 — 1~999원 단위는 올림하여 1,000원 단위로 맞춤
-  const unitDisc  =Math.ceil(sale*(1-disc/100)/1000)*1000;
-  // 판매가합계: 할인 시 '올림된 개당단가' 기준, 할인 없으면 원판매가 기준
+  const unitDisc  =pcRoundDisc(sale*(1-disc/100));
+  // 판매가합계: 할인 시 '반올림된 개당단가' 기준, 할인 없으면 원판매가 기준
   const saleAfDisc=disc>0 ? unitDisc : Math.round(sale);
   const saleTotal =Math.round(saleAfDisc*qty);
   const discUnitEl=document.getElementById('pc-disc-unit');
@@ -7048,7 +7054,7 @@ function pcCalc(){
   const s=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   s('pc-cost-total', unit>0&&qty>0?fmt(costTotal):'—');
   s('pc-sale-total', sale>0&&qty>0?fmt(saleTotal):'—');
-  document.getElementById('pc-sale-note').textContent=sale>0&&disc>0&&qty>0?`개당 ${fmt(saleAfDisc)}(올림) × ${qty}개 = ${fmt(saleTotal)}`:'';
+  document.getElementById('pc-sale-note').textContent=sale>0&&disc>0&&qty>0?`개당 ${fmt(saleAfDisc)}(반올림) × ${qty}개 = ${fmt(saleTotal)}`:'';
   s('pc-ship-total', shipPr>0&&shipQty>0?fmt(shipTotal):'—');
   s('pc-m-cost', unit>0&&qty>0?fmt(costTotal):'—');
   s('pc-m-sale', sale>0&&qty>0?fmt(saleTotal):'—');
@@ -7077,8 +7083,8 @@ function pcGetData(){
   if(qty<=0){alert('수량을 입력하세요.');return null;}
   if(unit<=0&&sale<=0){alert('개당단가 또는 판매가를 입력하세요.');return null;}
   const costTotal =Math.round(unit*qty);
-  // 할인 적용 개당단가(1,000원 올림) 기준으로 판매가합계 산출 (pcCalc와 동일 규칙)
-  const unitDisc  =Math.ceil(sale*(1-disc/100)/1000)*1000;
+  // 할인 적용 개당단가(반올림) 기준으로 판매가합계 산출 (pcCalc와 동일 규칙)
+  const unitDisc  =pcRoundDisc(sale*(1-disc/100));
   const saleAfDisc=disc>0 ? unitDisc : Math.round(sale);
   const saleTotal =Math.round(saleAfDisc*qty);
   const shipTotal =Math.round(shipPr*shipQty);
