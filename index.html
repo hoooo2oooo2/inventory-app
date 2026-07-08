@@ -4803,7 +4803,7 @@ function _mpPwBlock(){
   return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bd);max-width:360px;">
     <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🔑 내 비밀번호 변경</div>
     <div class="um-add">
-      <input id="mpNewPw" type="password" placeholder="새 비밀번호 (6자 이상)" autocomplete="new-password"/>
+      <input id="mpNewPw" type="password" placeholder="새 비밀번호 (4자 이상)" autocomplete="new-password"/>
       <input id="mpNewPw2" type="password" placeholder="새 비밀번호 확인" autocomplete="new-password"/>
       <button class="btn btn-pr btn-sm" onclick="mpChangePassword()">변경</button>
     </div>
@@ -4812,7 +4812,7 @@ function _mpPwBlock(){
 async function mpChangePassword(){
   const pw1 = document.getElementById('mpNewPw').value;
   const pw2 = document.getElementById('mpNewPw2').value;
-  if(!pw1 || pw1.length<6){ toast('비밀번호는 6자 이상이어야 합니다.'); return; }
+  if(!pw1 || pw1.length<4){ toast('비밀번호는 4자 이상이어야 합니다.'); return; }
   if(pw1!==pw2){ toast('비밀번호 확인이 일치하지 않습니다.'); return; }
   try{
     const { error } = await sb.auth.updateUser({ password: pw1 });
