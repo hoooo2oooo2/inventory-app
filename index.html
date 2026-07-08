@@ -1569,6 +1569,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-consign" onclick="goMenu('consign')">🚚 위탁 배송건</div>
   <div class="ni" id="nav-cost3day" onclick="goMenu('cost3day')">📦 3일 비용계산</div>
+  <div class="ni" id="nav-review" onclick="goMenu('review')">⭐ 리뷰관리</div>
   <div class="ni" id="nav-collab" onclick="goMenu('collab')" style="display:none;">🤝 협업업무</div>
   <div class="ni" id="nav-calendar" onclick="goMenu('calendar')" style="display:none;">📋 업무보고</div>
   <div class="ni" id="nav-rpt_yuhyun" onclick="goMenu('rpt_yuhyun')" style="display:none;">📝 유현</div>
@@ -2828,6 +2829,104 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       중국 → 인천 물류비: CBM당 45,000원<br>
       인천 → 부산 물류비: CBM당 50,000원<br>
       통관비용: 건당 15,000원
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 리뷰관리 (CX팀) ═══ -->
+<div class="page" id="page-review">
+  <style>
+  .rvw-wrap{padding:14px 18px 40px;max-width:1280px;margin:0 auto;}
+  .rvw-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
+  .rvw-kpi-card{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;}
+  .rvw-kpi-label{font-size:11.5px;color:var(--tx2);font-weight:600;margin-bottom:4px;}
+  .rvw-kpi-value{font-size:22px;font-weight:800;color:var(--tx);}
+  .rvw-kpi-value.star{color:#F59E0B;}
+  .rvw-chart-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .rvw-chart-card{background:var(--bg);border:1px solid var(--bd);border-radius:14px;padding:16px;flex:1;min-width:280px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:18px;}
+  .rvw-chart-title{font-size:13.5px;font-weight:800;color:var(--tx);margin-bottom:10px;}
+  .rvw-chart-box{position:relative;height:220px;}
+  .rvw-donut-box{position:relative;height:200px;}
+  .rvw-filter-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;}
+  .rvw-sel{border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:12.5px;background:var(--bg);color:var(--tx);font-family:inherit;}
+  .rvw-search{border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:12.5px;background:var(--bg);color:var(--tx);font-family:inherit;flex:1;min-width:160px;}
+  .rvw-chip{font-size:11.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--bd);background:var(--bg);color:var(--tx2);cursor:pointer;user-select:none;white-space:nowrap;font-family:inherit;}
+  .rvw-chip.on{background:#F59E0B;border-color:#F59E0B;color:#fff;font-weight:700;}
+  .rvw-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .rvw-tbl th,.rvw-tbl td{border-bottom:1px solid var(--bd);padding:8px 10px;text-align:left;color:var(--tx);vertical-align:top;}
+  .rvw-tbl th{font-size:11px;color:var(--tx2);background:rgba(127,127,127,.04);}
+  .rvw-star{color:#F59E0B;font-weight:700;white-space:nowrap;}
+  .rvw-content-cell{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rvw-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(220,38,38,.1);color:#DC2626;}
+  .rvw-empty{color:var(--tx2);font-size:13px;text-align:center;padding:30px 0;}
+  </style>
+
+  <div class="fo-subtabs">
+    <button class="fo-stab active" id="rvwStab-analysis" onclick="rvwSwitchTab('analysis')">📊 리뷰분석</button>
+    <button class="fo-stab" id="rvwStab-data" onclick="rvwSwitchTab('data')">📝 리뷰데이터</button>
+  </div>
+
+  <div id="rvwTab-analysis">
+    <div class="rvw-wrap">
+      <div class="rvw-filter-bar">
+        <select class="rvw-sel" id="rvwAnMonthSel" onchange="rvwAnalysisMonthChange()"></select>
+        <div id="rvwAnTrendBtns" style="display:flex;gap:4px;">
+          <button class="rvw-chip on" data-mode="week" onclick="rvwSetTrendMode('week')">주별</button>
+          <button class="rvw-chip" data-mode="month" onclick="rvwSetTrendMode('month')">월별</button>
+        </div>
+      </div>
+      <div class="rvw-kpi-row" id="rvwKpiRow"></div>
+      <div class="rvw-chart-row">
+        <div class="rvw-chart-card" style="max-width:320px;">
+          <div class="rvw-chart-title">평점 비율</div>
+          <div class="rvw-donut-box"><canvas id="rvwDonutChart"></canvas></div>
+        </div>
+        <div class="rvw-chart-card">
+          <div class="rvw-chart-title">평균 평점 추이</div>
+          <div class="rvw-chart-box"><canvas id="rvwTrendChart"></canvas></div>
+        </div>
+      </div>
+      <div class="rvw-chart-card">
+        <div class="rvw-chart-title">제품별 평균 평점 (리뷰 10건 이상, 낮은 순)</div>
+        <div class="rvw-chart-box" style="height:280px;"><canvas id="rvwProductChart"></canvas></div>
+      </div>
+      <div class="rvw-chart-card">
+        <div class="rvw-chart-title">⭐ 저평점(1~4점)인데 내용은 긍정적인 리뷰 <span style="font-weight:400;color:var(--tx2);font-size:11.5px;">(키워드 기반 자동 추정 · 참고용)</span></div>
+        <div style="overflow-x:auto;">
+          <table class="rvw-tbl">
+            <thead><tr><th>상품명</th><th>평점</th><th>리뷰내용</th><th>등록일</th></tr></thead>
+            <tbody id="rvwSentimentTbody"></tbody>
+          </table>
+        </div>
+        <div class="rvw-empty" id="rvwSentimentEmpty" style="display:none;">해당하는 리뷰가 없습니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="rvwTab-data" style="display:none;">
+    <div class="rvw-wrap">
+      <div class="lod-drop" id="rvwDrop">
+        <input type="file" id="rvwFile" accept=".xlsx,.xls" multiple style="display:none;" onchange="rvwPickFiles(this.files)">
+        <div class="lod-drop-inner">
+          <div style="font-size:32px;">⭐</div>
+          <div class="lod-drop-t">리뷰 엑셀을 여기에 끌어다 놓으세요</div>
+          <div class="lod-drop-s">또는 <button class="btn btn-pr btn-sm" onclick="document.getElementById('rvwFile').click()">파일 선택</button> · 매일 업로드해서 데이터를 누적할 수 있습니다 (중복 리뷰는 리뷰글번호 기준 자동 갱신)</div>
+        </div>
+      </div>
+      <div class="rvw-filter-bar" style="margin-top:16px;">
+        <select class="rvw-sel" id="rvwDataMonthSel" onchange="rvwLoadDataMonth()"></select>
+        <input class="rvw-search" id="rvwSearchInput" placeholder="상품명·리뷰내용 검색" oninput="rvwRenderData()">
+        <div id="rvwRatingChips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+        <div id="rvwStatusChips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+      </div>
+      <div style="font-size:12px;color:var(--tx2);margin-bottom:8px;" id="rvwDataCount"></div>
+      <div style="overflow-x:auto;">
+        <table class="rvw-tbl">
+          <thead><tr><th>상품명</th><th>구분</th><th>평점</th><th>리뷰내용</th><th>등록자</th><th>등록일</th><th>전시상태</th><th>주문번호</th></tr></thead>
+          <tbody id="rvwDataTbody"></tbody>
+        </table>
+      </div>
+      <div class="rvw-empty" id="rvwDataEmpty" style="display:none;">업로드된 리뷰가 없습니다.</div>
     </div>
   </div>
 </div>
@@ -4484,7 +4583,7 @@ let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인
 //   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
-  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit' } },
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', review:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit', moeum:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit', logistatus:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit', coupangad:'edit' } },
@@ -4587,7 +4686,7 @@ async function logout(){
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'cost3day',label:'3일 비용계산'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'moeum',label:'🧮 모음전 계산기'},
@@ -4605,7 +4704,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','cost3day'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','cost3day','review'] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
@@ -6877,7 +6976,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','cost3day','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -6913,6 +7012,7 @@ function goPage(p){
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
   if(p==='cost3day') c3Init();
+  if(p==='review') reviewInit();
   if(p==='moeum') moeumInit();
   // 매출관리/단가계산기/견적서 탭에서는 사이렌 버튼 숨김 (다른 탭에서는 updateFloat로 자동 복원)
   const fw=document.getElementById('floatWrap');
@@ -6959,6 +7059,342 @@ function c3Init(){
     boxEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); c3Calc(); } });
   }
   c3Calc();
+}
+
+// ══════════════════════════════════════════════
+// ⭐ 리뷰관리 (CX팀) — 리뷰 엑셀 일별 누적 업로드 + 분석
+//  · 인덱스 키 'review_idx' = { months:['YYYY-MM'...] }
+//  · 월별 키 'review_m_YYYY-MM' = { [리뷰글번호]: {상품번호,상품명,평점,...} }  (리뷰글번호 키 → 재업로드 시 자동 갱신, 중복 없음)
+// ══════════════════════════════════════════════
+const RVW_IDX_KEY = 'review_idx';
+const rvwMKey = m => 'review_m_'+m;
+let _rvwIdx = {months:[]};
+let _rvwMonths = {};
+let _rvwIdxLoaded = false;
+let _rvwTab = 'analysis';
+let _rvwTrendMode = 'week';
+let _rvwRatingFilter = 'ALL';
+let _rvwStatusFilter = 'ALL';
+let _rvwCharts = {};
+let _rvwDropBound = false;
+
+async function rvwLoadIndex(){
+  if(_rvwIdxLoaded) return;
+  let idx=null; try{ idx=await cloudKvLoad(RVW_IDX_KEY); }catch{ idx=null; }
+  if(!idx || !Array.isArray(idx.months)) idx = {months:[]};
+  _rvwIdx = idx;
+  _rvwIdxLoaded = true;
+}
+async function rvwLoadMonth(m){
+  if(_rvwMonths[m]) return _rvwMonths[m];
+  let obj=null; try{ obj=await cloudKvLoad(rvwMKey(m)); }catch{ obj=null; }
+  _rvwMonths[m] = obj || {};
+  return _rvwMonths[m];
+}
+async function rvwCollectRows(monthSelId){
+  const sel = document.getElementById(monthSelId)?.value || 'ALL';
+  const months = sel==='ALL' ? _rvwIdx.months.slice() : (_rvwIdx.months.includes(sel)?[sel]:[]);
+  let rows=[];
+  for(const m of months){ await rvwLoadMonth(m); rows = rows.concat(Object.values(_rvwMonths[m])); }
+  return rows;
+}
+function rvwEsc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function reviewInit(){
+  await rvwLoadIndex();
+  rvwBuildMonthSelects();
+  rvwBuildFilterChips();
+  _rvwInitDrop();
+  if(_rvwTab==='analysis') await rvwRenderAnalysis(); else await rvwRenderData();
+}
+function rvwSwitchTab(tab){
+  _rvwTab = tab;
+  document.getElementById('rvwTab-analysis').style.display = tab==='analysis' ? '' : 'none';
+  document.getElementById('rvwTab-data').style.display = tab==='data' ? '' : 'none';
+  document.getElementById('rvwStab-analysis').classList.toggle('active', tab==='analysis');
+  document.getElementById('rvwStab-data').classList.toggle('active', tab==='data');
+  if(tab==='analysis') rvwRenderAnalysis(); else rvwRenderData();
+}
+function rvwBuildMonthSelects(){
+  const months = _rvwIdx.months.slice().sort().reverse();
+  const opts = ['<option value="ALL">전체 기간</option>'].concat(months.map(m=>`<option value="${m}">${m}</option>`)).join('');
+  const anSel = document.getElementById('rvwAnMonthSel');
+  if(anSel){ const cur=anSel.value; anSel.innerHTML=opts; anSel.value = (cur && (cur==='ALL'||months.includes(cur))) ? cur : (months[0]||'ALL'); }
+  const dtSel = document.getElementById('rvwDataMonthSel');
+  if(dtSel){ const cur=dtSel.value; dtSel.innerHTML=opts; dtSel.value = (cur && (cur==='ALL'||months.includes(cur))) ? cur : (months[0]||'ALL'); }
+}
+function rvwBuildFilterChips(){
+  const rc=document.getElementById('rvwRatingChips');
+  if(rc && !rc._built){
+    rc.innerHTML = ['ALL','5','4','3','2','1'].map(v=>`<button class="rvw-chip${v===_rvwRatingFilter?' on':''}" data-v="${v}" onclick="rvwSetRatingFilter('${v}')">${v==='ALL'?'전체':'★'+v}</button>`).join('');
+    rc._built = true;
+  }
+  const sc=document.getElementById('rvwStatusChips');
+  if(sc && !sc._built){
+    sc.innerHTML = ['ALL','정상','숨김'].map(v=>`<button class="rvw-chip${v===_rvwStatusFilter?' on':''}" data-v="${v}" onclick="rvwSetStatusFilter('${v}')">${v==='ALL'?'전시:전체':v}</button>`).join('');
+    sc._built = true;
+  }
+}
+function rvwSetRatingFilter(v){ _rvwRatingFilter=v; document.querySelectorAll('#rvwRatingChips .rvw-chip').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); rvwRenderData(); }
+function rvwSetStatusFilter(v){ _rvwStatusFilter=v; document.querySelectorAll('#rvwStatusChips .rvw-chip').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); rvwRenderData(); }
+function rvwSetTrendMode(m){ _rvwTrendMode=m; document.querySelectorAll('#rvwAnTrendBtns .rvw-chip').forEach(b=>b.classList.toggle('on', b.dataset.mode===m)); rvwRenderAnalysis(); }
+function rvwAnalysisMonthChange(){ rvwRenderAnalysis(); }
+function rvwLoadDataMonth(){ rvwRenderData(); }
+
+let _rvwDataLoadSeq = 0;
+async function rvwRenderData(){
+  const seq = ++_rvwDataLoadSeq;
+  rvwBuildFilterChips();
+  const rows = await rvwCollectRows('rvwDataMonthSel');
+  if(seq!==_rvwDataLoadSeq) return;   // 더 최신 요청이 있으면 이전 결과는 버림
+  const kw = (document.getElementById('rvwSearchInput')?.value||'').trim().toLowerCase();
+  let filtered = rows.filter(r=>{
+    if(_rvwRatingFilter!=='ALL' && String(r.rating)!==_rvwRatingFilter) return false;
+    if(_rvwStatusFilter!=='ALL' && r.displayStatus!==_rvwStatusFilter) return false;
+    if(kw && !((r.productName||'').toLowerCase().includes(kw) || (r.content||'').toLowerCase().includes(kw))) return false;
+    return true;
+  });
+  filtered.sort((a,b)=> (b.reviewDate||'').localeCompare(a.reviewDate||''));
+  const tb=document.getElementById('rvwDataTbody');
+  const cntEl=document.getElementById('rvwDataCount');
+  const emptyEl=document.getElementById('rvwDataEmpty');
+  if(cntEl) cntEl.textContent = `총 ${filtered.length.toLocaleString()}건`;
+  if(!filtered.length){ tb.innerHTML=''; emptyEl.style.display='block'; return; }
+  emptyEl.style.display='none';
+  const MAX_ROWS = 500;
+  const shown = filtered.slice(0, MAX_ROWS);
+  let html = shown.map(r=>`
+    <tr>
+      <td>${rvwEsc(r.productName)}</td>
+      <td>${rvwEsc(r.reviewType)}</td>
+      <td class="rvw-star">${'★'.repeat(r.rating)}${'☆'.repeat(Math.max(0,5-r.rating))}</td>
+      <td class="rvw-content-cell" title="${rvwEsc(r.content)}">${rvwEsc(r.content)}</td>
+      <td>${rvwEsc(r.writer)}</td>
+      <td>${rvwEsc(r.reviewDate)}</td>
+      <td>${r.displayStatus==='정상' ? '정상' : `<span class="rvw-badge">${rvwEsc(r.displayStatus||'-')}</span>`}</td>
+      <td>${rvwEsc(r.orderNo)}</td>
+    </tr>`).join('');
+  if(filtered.length>MAX_ROWS) html += `<tr><td colspan="8" style="text-align:center;color:var(--tx2);padding:10px;">...외 ${(filtered.length-MAX_ROWS).toLocaleString()}건 (검색으로 좁혀보세요)</td></tr>`;
+  tb.innerHTML = html;
+}
+
+let _rvwAnLoadSeq = 0;
+async function rvwRenderAnalysis(){
+  const seq = ++_rvwAnLoadSeq;
+  const rows = await rvwCollectRows('rvwAnMonthSel');
+  if(seq!==_rvwAnLoadSeq) return;
+  const total = rows.length;
+  const avg = total ? rows.reduce((s,r)=>s+r.rating,0)/total : 0;
+  const d30 = new Date(Date.now()-30*86400000);
+  const recentRows = rows.filter(r=>{ const dt=new Date(String(r.reviewDate).replace(' ','T')); return !isNaN(dt) && dt>=d30; });
+  const avg30 = recentRows.length ? recentRows.reduce((s,r)=>s+r.rating,0)/recentRows.length : 0;
+  const kpiEl = document.getElementById('rvwKpiRow');
+  if(kpiEl) kpiEl.innerHTML = `
+    <div class="rvw-kpi-card"><div class="rvw-kpi-label">전체 리뷰수</div><div class="rvw-kpi-value">${total.toLocaleString()}건</div></div>
+    <div class="rvw-kpi-card"><div class="rvw-kpi-label">평균 평점</div><div class="rvw-kpi-value star">${total?avg.toFixed(2)+'⭐':'-'}</div></div>
+    <div class="rvw-kpi-card"><div class="rvw-kpi-label">최근 30일 평균 평점</div><div class="rvw-kpi-value star">${recentRows.length?avg30.toFixed(2)+'⭐':'-'}</div></div>
+    <div class="rvw-kpi-card"><div class="rvw-kpi-label">최근 30일 리뷰수</div><div class="rvw-kpi-value">${recentRows.length.toLocaleString()}건</div></div>`;
+  rvwRenderDonut(rows);
+  rvwRenderTrend(rows);
+  rvwRenderProductChart(rows);
+  rvwRenderSentiment(rows);
+}
+function _rvwKill(k){ if(_rvwCharts[k]){ _rvwCharts[k].destroy(); _rvwCharts[k]=null; } }
+function rvwRenderDonut(rows){
+  const ctx = document.getElementById('rvwDonutChart'); if(!ctx) return;
+  _rvwKill('donut');
+  const counts=[1,2,3,4,5].map(v=>rows.filter(r=>r.rating===v).length);
+  const total = counts.reduce((a,b)=>a+b,0)||1;
+  _rvwCharts.donut = new Chart(ctx.getContext('2d'),{
+    type:'doughnut',
+    data:{labels:['1점','2점','3점','4점','5점'],datasets:[{data:counts,backgroundColor:['#DC2626','#F97316','#F59E0B','#84CC16','#059669'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed}건 (${(c.parsed/total*100).toFixed(1)}%)`}}}}
+  });
+}
+function rvwRenderTrend(rows){
+  const ctx = document.getElementById('rvwTrendChart'); if(!ctx) return;
+  _rvwKill('trend');
+  const byDate = {};
+  rows.forEach(r=>{ const d=String(r.reviewDate||'').slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(d)) (byDate[d] ||= []).push(r.rating); });
+  const days = Object.keys(byDate).sort();
+  let labels=[], data=[];
+  if(_rvwTrendMode==='month'){
+    const byM={}; days.forEach(d=>{ const m=d.slice(0,7); (byM[m] ||= []).push(...byDate[d]); });
+    const ks=Object.keys(byM).sort();
+    labels = ks.map(m=>{const[y,mo]=m.split('-');return `${y.slice(2)}.${mo}`;});
+    data = ks.map(m=>byM[m].reduce((s,v)=>s+v,0)/byM[m].length);
+  } else {
+    const wk={}; days.forEach(d=>{ const ws=rgnWeekStart(d); (wk[ws] ||= []).push(...byDate[d]); });
+    const wkeys=Object.keys(wk).sort();
+    labels = wkeys.map(ws=>{ const e=new Date(ws+'T00:00:00'); e.setDate(e.getDate()+6); return `${_mdLabel(ws)}~${_mdLabel(_ymd(e))}`; });
+    data = wkeys.map(ws=>wk[ws].reduce((s,v)=>s+v,0)/wk[ws].length);
+  }
+  _rvwCharts.trend = new Chart(ctx.getContext('2d'),{
+    type:'line',
+    data:{labels, datasets:[{label:'평균 평점', data:data.map(v=>+v.toFixed(2)), borderColor:'#F59E0B', backgroundColor:'rgba(245,158,11,.15)', tension:.3, pointRadius:4, fill:true}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{y:{min:0,max:5,ticks:{stepSize:1}}},
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`평균 ${c.parsed.y}⭐`}}}}
+  });
+}
+function rvwRenderProductChart(rows){
+  const ctx = document.getElementById('rvwProductChart'); if(!ctx) return;
+  _rvwKill('product');
+  const byProd = {};
+  rows.forEach(r=>{ const key=r.productName||r.productId; (byProd[key] ||= []).push(r.rating); });
+  let entries = Object.entries(byProd).filter(([,arr])=>arr.length>=10)
+    .map(([name,arr])=>[name, arr.reduce((s,v)=>s+v,0)/arr.length, arr.length])
+    .sort((a,b)=>a[1]-b[1]).slice(0,15);
+  if(!entries.length){ ctx.style.display='none'; return; }
+  ctx.style.display='';
+  _rvwCharts.product = new Chart(ctx.getContext('2d'),{
+    type:'bar',
+    data:{labels:entries.map(e=>e[0].length>18?e[0].slice(0,18)+'…':e[0]),
+      datasets:[{label:'평균 평점', data:entries.map(e=>+e[1].toFixed(2)),
+        backgroundColor:entries.map(e=>e[1]<4?'#DC2626':e[1]<4.5?'#F59E0B':'#059669'), borderRadius:5}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{x:{min:0,max:5}},
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>{ const e=entries[c.dataIndex]; return `평균 ${c.parsed.x}⭐ (리뷰 ${e[2]}건)`; }}}}}
+  });
+}
+// ── 저평점(1~4점)인데 내용은 긍정적인 리뷰 추정 — 키워드 기반 휴리스틱(참고용, 정밀 NLP 아님) ──
+const RVW_POS_KW = ['좋아요','좋습니다','좋네요','좋은','만족','편해요','편리','편합니다','예뻐요','예쁘네요','예쁩니다','튼튼','밝아요','밝네요','밝습니다','빠른배송','빠르게','빠릅니다','친절','재구매','최고','가성비','완벽','추천','괜찮','만족스러워요','잘쓰고','잘 쓰고','잘사용','잘 사용','굿','감사'];
+const RVW_NEG_KW = ['별로','불량','고장','환불','실망','불편','어둡','약하','파손','찢어','작동이 안','작동 안','안돼요','안 돼요','불친절','최악','비추','아쉬워요','아쉽','흠집','속았','사기','반품','짜증','엉망','냄새'];
+function rvwSentimentScore(text){
+  const s = String(text||'');
+  let pos=0, neg=0;
+  // 긍정 키워드라도 앞뒤 근처에 부정어(안/못/없/않/아니/불가)가 있으면 부정으로 취급 ("추천 할 수 없는" 오탐 방지)
+  RVW_POS_KW.forEach(k=>{
+    const idx = s.indexOf(k); if(idx<0) return;
+    const win = s.slice(Math.max(0,idx-4), idx) + s.slice(idx+k.length, idx+k.length+8);
+    if(/안|못|없|않|아니|불가/.test(win)) neg++; else pos++;
+  });
+  RVW_NEG_KW.forEach(k=>{ if(s.includes(k)) neg++; });
+  return {pos, neg};
+}
+function rvwIsLowRatingPositive(row){
+  if(!row.content || row.rating>=5 || row.rating<1) return false;
+  const {pos,neg} = rvwSentimentScore(row.content);
+  return pos>0 && pos>neg;
+}
+function rvwRenderSentiment(rows){
+  const flagged = rows.filter(rvwIsLowRatingPositive).sort((a,b)=>(b.reviewDate||'').localeCompare(a.reviewDate||'')).slice(0,50);
+  const tb=document.getElementById('rvwSentimentTbody');
+  const emptyEl=document.getElementById('rvwSentimentEmpty');
+  if(!flagged.length){ tb.innerHTML=''; emptyEl.style.display='block'; return; }
+  emptyEl.style.display='none';
+  tb.innerHTML = flagged.map(r=>`
+    <tr>
+      <td>${rvwEsc(r.productName)}</td>
+      <td class="rvw-star">${'★'.repeat(r.rating)}${'☆'.repeat(Math.max(0,5-r.rating))}</td>
+      <td class="rvw-content-cell" title="${rvwEsc(r.content)}">${rvwEsc(r.content)}</td>
+      <td>${rvwEsc(r.reviewDate)}</td>
+    </tr>`).join('');
+}
+
+// ── 엑셀 업로드: 드래그앤드롭 + 파싱 + 월별 샤딩 저장(리뷰글번호 키로 자동 중복갱신) ──
+function _rvwInitDrop(){
+  if(_rvwDropBound) return;
+  const dz = document.getElementById('rvwDrop'); if(!dz) return;
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', e=>{ const f=e.dataTransfer && e.dataTransfer.files; if(f && f.length) rvwPickFiles(f); });
+  _rvwDropBound = true;
+}
+function rvwNormDateTime(v){
+  if(v instanceof Date) return _ymd(v) + ' ' + v.toTimeString().slice(0,8);
+  const s = String(v??'').trim();
+  let m = s.match(/(\d{4})\.(\d{2})\.(\d{2})\.?\s*(\d{2}):(\d{2}):(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
+  m = s.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
+  m = s.match(/(\d{4})[.\-](\d{2})[.\-](\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]} 00:00:00`;
+  return s;
+}
+function rvwParseSheet(ws){
+  const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  if(!json.length) return null;
+  const head = json[0].map(h=>String(h).trim());
+  const ix = n=>ssaIx(head,n);
+  const pidI=ix('상품번호'), pnameI=ix('상품명'), typeI=ix('리뷰구분'), ratingI=ix('구매자평점'),
+        photoI=ix('포토/영상'), contentI=ix('리뷰상세내용'), helpI=ix('리뷰도움수'), writerI=ix('등록자'),
+        dateI=ix('리뷰등록일'), editI=ix('최종수정일'), ridI=ix('리뷰글번호'), relIdI=ix('관련리뷰글번호'),
+        relContentI=ix('관련리뷰상세내용'), statusI=ix('전시상태'), replyYnI=ix('답글여부'), replyDateI=ix('답글등록일시'),
+        bestI=ix('베스트리뷰'), bestDateI=ix('베스트리뷰선정일시'), eventI=ix('이벤트번호'), benefitYnI=ix('혜택지급'),
+        benefitDateI=ix('혜택지급일시'), userInfoI=ix('유저정보 등록 항목'), orderI=ix('상품주문번호'),
+        fulfillI=ix('풀필먼트사'), moveI=ix('리뷰이동일');
+  if(pidI<0 || ridI<0 || ratingI<0 || dateI<0) return null;
+  const rows=[];
+  json.slice(1).forEach(r=>{
+    if(!r || !r.length) return;
+    const reviewId = String(r[ridI]??'').trim();
+    if(!reviewId) return;
+    rows.push({
+      productId: String(r[pidI]??'').trim(),
+      productName: String(r[pnameI]??'').trim(),
+      reviewType: String(r[typeI]??'').trim(),
+      rating: Number(r[ratingI])||0,
+      photoUrl: String(r[photoI]??'').trim(),
+      content: String(r[contentI]??'').trim(),
+      helpfulCount: Number(r[helpI])||0,
+      writer: String(r[writerI]??'').trim(),
+      reviewDate: rvwNormDateTime(r[dateI]),
+      lastEditDate: editI>=0 ? rvwNormDateTime(r[editI]) : '',
+      reviewId,
+      relatedReviewId: relIdI>=0 ? String(r[relIdI]??'').trim() : '',
+      relatedContent: relContentI>=0 ? String(r[relContentI]??'').trim() : '',
+      displayStatus: statusI>=0 ? String(r[statusI]??'').trim() : '',
+      replyYn: replyYnI>=0 ? String(r[replyYnI]??'').trim() : '',
+      replyDate: replyDateI>=0 ? String(r[replyDateI]??'').trim() : '',
+      bestReview: bestI>=0 ? String(r[bestI]??'').trim() : '',
+      bestReviewDate: bestDateI>=0 ? String(r[bestDateI]??'').trim() : '',
+      eventNo: eventI>=0 ? String(r[eventI]??'').trim() : '',
+      benefitYn: benefitYnI>=0 ? String(r[benefitYnI]??'').trim() : '',
+      benefitDate: benefitDateI>=0 ? String(r[benefitDateI]??'').trim() : '',
+      userInfoFields: userInfoI>=0 ? String(r[userInfoI]??'').trim() : '',
+      orderNo: orderI>=0 ? String(r[orderI]??'').trim() : '',
+      fulfillment: fulfillI>=0 ? String(r[fulfillI]??'').trim() : '',
+      reviewMoveDate: moveI>=0 ? String(r[moveI]??'').trim() : '',
+    });
+  });
+  return rows;
+}
+async function rvwPickFiles(fileList){
+  const files=[...fileList].filter(f=>/\.xlsx?$/i.test(f.name));
+  if(!files.length){ toast('엑셀(.xlsx) 파일만 업로드할 수 있습니다.'); return; }
+  await rvwLoadIndex();
+  let ok=0, totalNew=0, totalDup=0;
+  const touched = new Set();
+  for(const file of files){
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const rows = rvwParseSheet(wb.Sheets[wb.SheetNames[0]]);
+      if(!rows || !rows.length){ toast(`❌ ${file.name}: 리뷰 엑셀 형식을 인식하지 못했습니다`); continue; }
+      for(const row of rows){
+        const m = row.reviewDate.slice(0,7);
+        if(!/^\d{4}-\d{2}$/.test(m)) continue;
+        await rvwLoadMonth(m);
+        if(_rvwMonths[m][row.reviewId]) totalDup++; else totalNew++;
+        _rvwMonths[m][row.reviewId] = row;
+        if(!_rvwIdx.months.includes(m)) _rvwIdx.months.push(m);
+        touched.add(m);
+      }
+      ok++;
+    }catch(e){ console.warn('리뷰 업로드 실패', file.name, e); toast(`❌ ${file.name}: ${e.message}`); }
+  }
+  if(ok){
+    _rvwIdx.months.sort();
+    for(const m of touched) await cloudKvSave(rvwMKey(m), _rvwMonths[m]);
+    await cloudKvSave(RVW_IDX_KEY, _rvwIdx);
+    rvwBuildMonthSelects();
+    toast(`✅ 리뷰 ${totalNew}건 신규 저장 (중복 갱신 ${totalDup}건)`);
+    if(_rvwTab==='data') rvwRenderData(); else rvwRenderAnalysis();
+  }
+  const fi=document.getElementById('rvwFile'); if(fi) fi.value='';
 }
 
 // ══════════════════════════════════════════════
