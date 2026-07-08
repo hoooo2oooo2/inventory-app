@@ -4798,15 +4798,39 @@ async function openMyPage(){
 }
 function closeMyPage(){ document.getElementById('myPageModal').classList.remove('open'); _mpEditing=null; }
 
+// 로그인한 본인 비밀번호 변경 — 마스터/직원 공통 (마이페이지 하단에 붙임)
+function _mpPwBlock(){
+  return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bd);max-width:360px;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🔑 내 비밀번호 변경</div>
+    <div class="um-add">
+      <input id="mpNewPw" type="password" placeholder="새 비밀번호 (6자 이상)" autocomplete="new-password"/>
+      <input id="mpNewPw2" type="password" placeholder="새 비밀번호 확인" autocomplete="new-password"/>
+      <button class="btn btn-pr btn-sm" onclick="mpChangePassword()">변경</button>
+    </div>
+  </div>`;
+}
+async function mpChangePassword(){
+  const pw1 = document.getElementById('mpNewPw').value;
+  const pw2 = document.getElementById('mpNewPw2').value;
+  if(!pw1 || pw1.length<6){ toast('비밀번호는 6자 이상이어야 합니다.'); return; }
+  if(pw1!==pw2){ toast('비밀번호 확인이 일치하지 않습니다.'); return; }
+  try{
+    const { error } = await sb.auth.updateUser({ password: pw1 });
+    if(error) throw error;
+    toast('비밀번호가 변경되었습니다.');
+    document.getElementById('mpNewPw').value=''; document.getElementById('mpNewPw2').value='';
+  }catch(e){ toast('변경 실패: '+(e.message||e)); }
+}
 function renderMyPage(){
   const u = window.__CURRENT_USER; if(!u) return;
   const body = document.getElementById('mpBody');
   if(u.role==='master'){
     body.innerHTML =
-      `<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">계정은 Supabase Auth로 로그인됩니다 — <b>비밀번호는 여기서 설정할 수 없고</b>, 새 직원은 Supabase 대시보드(Authentication → Users → Create new user)에서 먼저 계정을 만든 뒤 그 UID로 여기서 권한을 지정하세요.<br><span style="color:#05C072;">수정</span>=권한 변경 가능 · <span style="color:#3182F6;">열람</span>=보기만 · —=메뉴 숨김</div>
+      `<div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">계정은 Supabase Auth로 로그인됩니다 — 새 직원은 Supabase 대시보드(Authentication → Users → Create new user)에서 먼저 계정을 만든 뒤 그 UID로 여기서 권한을 지정하세요.<br><span style="color:#05C072;">수정</span>=권한 변경 가능 · <span style="color:#3182F6;">열람</span>=보기만 · —=메뉴 숨김</div>
        <div style="margin-bottom:8px;"><button class="btn btn-pr btn-sm" onclick="mpOpenForm()">+ 새 직원 권한 등록</button></div>
        <div id="mpList" style="overflow-x:auto;"></div>
-       <div id="mpForm" style="display:none;margin-top:10px;"></div>`;
+       <div id="mpForm" style="display:none;margin-top:10px;"></div>
+       ${_mpPwBlock()}`;
     renderMpList();
   } else {
     let rows = permKeyRows().map(r => r.header
@@ -4815,7 +4839,8 @@ function renderMyPage(){
     body.innerHTML =
       `<div style="font-size:14px;margin-bottom:4px;"><b>${u.name||u.username}</b> <span style="color:var(--tx2);">(${u.username}) · 직원</span></div>
        <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">내 메뉴 권한입니다. 변경이 필요하면 관리자에게 요청하세요.</div>
-       <table class="um-table" style="max-width:360px;"><tbody>${rows}</tbody></table>`;
+       <table class="um-table" style="max-width:360px;"><tbody>${rows}</tbody></table>
+       ${_mpPwBlock()}`;
   }
 }
 
