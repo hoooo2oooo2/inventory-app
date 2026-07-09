@@ -999,7 +999,7 @@ async function refreshCurrentFromCloud() {
   if (document.querySelector('.overlay.open')) return; // 모달 편집 중이면 건드리지 않음
   const p = S.person;
   const cloud = await cloudLoad(p);
-  if (!cloud || S.person !== p) return;
+  if (!cloud || cloud._empty || S.person !== p) return;   // 클라우드에 아직 데이터가 없을 뿐인데 undefined로 덮어써 S.tasks가 깨지는 것 방지
   const changed = JSON.stringify(cloud.tasks) !== JSON.stringify(S.tasks)
                || JSON.stringify(cloud.notes) !== JSON.stringify(N.notes)
                || JSON.stringify(cloud.reports) !== JSON.stringify(N.reports);
