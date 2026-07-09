@@ -7254,7 +7254,7 @@ async function rvwLoadManage(){
   _rvwManage = obj || {};
   _rvwManageLoaded = true;
 }
-function rvwManageDefaults(){ return {status:'진행전', progressNote:'', managerNote:'', productAmount:'', costAmount:'', lossAmount:'', assignee:''}; }
+function rvwManageDefaults(){ return {status:'진행전', progressNote:'', managerNote:'', productAmount:'', costAmount:'', lossAmount:'', assignee:'', manualName:'', manualPhone:''}; }
 function rvwGetManage(reviewId){ return _rvwManage[reviewId] ? {...rvwManageDefaults(), ..._rvwManage[reviewId]} : rvwManageDefaults(); }
 function rvwSetManage(reviewId, patch){
   const cur = _rvwManage[reviewId] ? {..._rvwManage[reviewId]} : rvwManageDefaults();
@@ -7376,13 +7376,18 @@ function rvwLoadDataMonth(){ rvwRenderData(); }
 // review row + 매칭된 주문정보 + 관리필드를 합쳐 렌더링용 객체로 만듦 (팝업 조회용으로 _rvwRowCache에도 저장)
 function rvwEnrichRow(r){
   const match = rvwMatchOrder(r.orderNo);
+  const manage = rvwGetManage(r.reviewId);
+  const matchName = match ? (match.receiver||match.buyer||'') : '';
+  const matchPhone = match ? (match.phone1||match.phone2||'') : '';
   const er = {
     ...r,
-    matchName: match ? (match.receiver||match.buyer||'') : '',
-    matchPhone: match ? (match.phone1||match.phone2||'') : '',
+    matchName, matchPhone,
     matchProduct: match ? (match.modelName||'') : (r.productName||''),
     matchQty: match ? (match.orderQty??'') : '',
-    manage: rvwGetManage(r.reviewId)
+    // 매출관리 자동매칭이 안 될 때를 위한 수기입력 값이 있으면 그걸 우선 표시
+    displayName: manage.manualName || matchName,
+    displayPhone: manage.manualPhone || matchPhone,
+    manage
   };
   _rvwRowCache[r.reviewId] = er;
   return er;
@@ -7392,7 +7397,7 @@ function rvwPassesCommonFilter(r, kw){
   if(_rvwStatusFilter!=='ALL' && r.displayStatus!==_rvwStatusFilter) return false;
   if(kw){
     const hit = (r.productName||'').toLowerCase().includes(kw) || (r.content||'').toLowerCase().includes(kw)
-      || String(r.reviewId||'').toLowerCase().includes(kw) || (r.matchName||'').toLowerCase().includes(kw);
+      || String(r.reviewId||'').toLowerCase().includes(kw) || (r.displayName||'').toLowerCase().includes(kw);
     if(!hit) return false;
   }
   return true;
@@ -7407,8 +7412,8 @@ function rvwRowHtml(er){
     <td>${rvwEsc(er.reviewId)}</td>
     <td>${rvwEsc(er.orderNo)}</td>
     <td>${rvwEsc(er.writer)}</td>
-    <td>${rvwEsc(er.matchName)||'-'}</td>
-    <td>${rvwEsc(er.matchPhone)||'-'}</td>
+    <td><input type="text" class="rvw-amt-inp" placeholder="이름" value="${rvwEsc(er.displayName)}" onchange="rvwOnTextChange('${er.reviewId}','manualName',this.value)"></td>
+    <td><input type="text" class="rvw-amt-inp" placeholder="전화번호" value="${rvwEsc(er.displayPhone)}" onchange="rvwOnTextChange('${er.reviewId}','manualPhone',this.value)"></td>
     <td>${rvwEsc(er.matchProduct)||'-'}</td>
     <td class="num">${(er.matchQty!==''&&er.matchQty!=null)?er.matchQty:'-'}</td>
     <td class="rvw-content-cell rvw-clickable" ondblclick="rvwOpenDetail('${er.reviewId}')" title="더블클릭: 전체보기">${rvwEsc(er.content)}</td>
@@ -7432,14 +7437,15 @@ function rvwOnStatusChange(reviewId, val){
 }
 function rvwOnAmountChange(reviewId, field, val){ rvwSetManage(reviewId, {[field]: val===''?'':Number(val)}); }
 function rvwOnAssigneeChange(reviewId, val){ rvwSetManage(reviewId, {assignee:val}); }
+function rvwOnTextChange(reviewId, field, val){ rvwSetManage(reviewId, {[field]: val.trim()}); }
 function rvwOpenDetail(reviewId){
   const er = _rvwRowCache[reviewId]; if(!er) return;
   document.getElementById('rvwDetDate').textContent = er.reviewDate;
   document.getElementById('rvwDetStar').textContent = '★'.repeat(er.rating)+'☆'.repeat(Math.max(0,5-er.rating));
   document.getElementById('rvwDetId').textContent = er.reviewId;
   document.getElementById('rvwDetOrder').textContent = er.orderNo;
-  document.getElementById('rvwDetName').textContent = er.matchName || '-';
-  document.getElementById('rvwDetPhone').textContent = er.matchPhone || '-';
+  document.getElementById('rvwDetName').textContent = er.displayName || '-';
+  document.getElementById('rvwDetPhone').textContent = er.displayPhone || '-';
   document.getElementById('rvwDetProduct').textContent = er.matchProduct || '-';
   document.getElementById('rvwDetQty').textContent = (er.matchQty!==''&&er.matchQty!=null) ? er.matchQty : '-';
   document.getElementById('rvwDetContent').textContent = er.content;
