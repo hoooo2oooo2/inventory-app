@@ -2019,13 +2019,37 @@ function fmtKorDate(dateStr){
   return dateStr;
 }
 
-function saveLeaveData(){
+async function saveLeaveData(){
   try{
     localStorage.setItem(LEAVE_KEY, JSON.stringify(employees));
     localStorage.setItem(LEAVE_REC_KEY, JSON.stringify(leaveRecords));
     localStorage.setItem(LEAVE_SEQ_KEY, String(leaveIdSeq));
     localStorage.setItem(EMP_SEQ_KEY,   String(empIdSeq));
   }catch(e){ console.warn('localStorage 저장 실패:', e); }
+  // 저장 직전 클라우드 최신본을 다시 확인 — 이 화면(로컬)에 직원이 없는데 클라우드엔 있다면
+  // 명백히 로컬이 비어있는 상태(새 PC/캐시삭제 등)이므로, 그대로 덮어써서 다른 PC의 데이터를
+  // 지우는 대신 클라우드 최신본으로 이 화면을 복원한다. (여러 PC 동시저장 레이스 방지)
+  try{
+    const latest = await cpCloudLoad('coupang_leave');
+    if(latest && typeof latest==='object'){
+      const latestEmpCount = Array.isArray(latest.employees) ? latest.employees.length : 0;
+      if(latestEmpCount > 0 && employees.length === 0){
+        employees    = latest.employees;
+        leaveRecords = Array.isArray(latest.leaveRecords) ? latest.leaveRecords : [];
+        leaveIdSeq   = latest.leaveIdSeq || leaveIdSeq;
+        empIdSeq     = latest.empIdSeq   || empIdSeq;
+        employees.forEach(emp=>{ if(emp.birth)emp.birth=normalizeToISO(emp.birth); if(emp.joinDate)emp.joinDate=normalizeToISO(emp.joinDate); });
+        leaveRecords.forEach(rec=>{ if(rec.date)rec.date=normalizeToISO(rec.date); });
+        localStorage.setItem(LEAVE_KEY, JSON.stringify(employees));
+        localStorage.setItem(LEAVE_REC_KEY, JSON.stringify(leaveRecords));
+        localStorage.setItem(LEAVE_SEQ_KEY, String(leaveIdSeq));
+        localStorage.setItem(EMP_SEQ_KEY,   String(empIdSeq));
+        renderEmployeeList(); renderLeaveTable();
+        toast('⚠️ 이 화면에 직원 데이터가 없어 클라우드 최신본으로 복원했습니다. 다시 시도해주세요.');
+        return;
+      }
+    }
+  }catch(e){ console.warn('클라우드 최신본 확인 실패:', e); }
   // 클라우드 저장(다른 PC와 공유)
   cpCloudSave('coupang_leave',{employees,leaveRecords,leaveIdSeq,empIdSeq});
 }
