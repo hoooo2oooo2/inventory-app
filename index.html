@@ -2935,7 +2935,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="lod-drop-inner">
           <div style="font-size:32px;">⭐</div>
           <div class="lod-drop-t">리뷰 엑셀을 여기에 끌어다 놓으세요</div>
-          <div class="lod-drop-s">또는 <button class="btn btn-pr btn-sm" onclick="document.getElementById('rvwFile').click()">파일 선택</button> · 매일 업로드해서 데이터를 누적할 수 있습니다 (중복 리뷰는 리뷰글번호 기준 자동 갱신)</div>
+          <div class="lod-drop-s">또는 <button class="btn btn-pr btn-sm" onclick="document.getElementById('rvwFile').click()">파일 선택</button> · 매일 업로드해서 데이터를 누적할 수 있습니다 (리뷰글번호 기준 중복은 기존 데이터를 보존하고 건너뜀)</div>
         </div>
       </div>
       <div class="rvw-filter-bar" style="margin-top:16px;">
@@ -7222,7 +7222,7 @@ function c3Init(){
 // ══════════════════════════════════════════════
 // ⭐ 리뷰관리 (CX팀) — 리뷰 엑셀 일별 누적 업로드 + 분석
 //  · 인덱스 키 'review_idx' = { months:['YYYY-MM'...] }
-//  · 월별 키 'review_m_YYYY-MM' = { [리뷰글번호]: {상품번호,상품명,평점,...} }  (리뷰글번호 키 → 재업로드 시 자동 갱신, 중복 없음)
+//  · 월별 키 'review_m_YYYY-MM' = { [리뷰글번호]: {상품번호,상품명,평점,...} }  (리뷰글번호 키 → 재업로드 시 기존 데이터 보존, 중복 행은 무시)
 // ══════════════════════════════════════════════
 const RVW_IDX_KEY = 'review_idx';
 const rvwMKey = m => 'review_m_'+m;
@@ -7721,7 +7721,11 @@ async function rvwPickFiles(fileList){
         const m = row.reviewDate.slice(0,7);
         if(!/^\d{4}-\d{2}$/.test(m)) continue;
         await rvwLoadMonth(m);
-        if(_rvwMonths[m][row.reviewId]) totalDup++; else totalNew++;
+        if(_rvwMonths[m][row.reviewId]){
+          totalDup++;
+          continue;   // 기존에 저장된 데이터를 보존 — 새로 업로드된 중복 리뷰는 버림
+        }
+        totalNew++;
         _rvwMonths[m][row.reviewId] = row;
         if(!_rvwIdx.months.includes(m)) _rvwIdx.months.push(m);
         touched.add(m);
@@ -7734,7 +7738,7 @@ async function rvwPickFiles(fileList){
     for(const m of touched) await cloudKvSave(rvwMKey(m), _rvwMonths[m]);
     await cloudKvSave(RVW_IDX_KEY, _rvwIdx);
     rvwBuildMonthSelects();
-    toast(`✅ 리뷰 ${totalNew}건 신규 저장 (중복 갱신 ${totalDup}건)`);
+    toast(`✅ 리뷰 ${totalNew}건 신규 저장 (기존 데이터 보존, 중복 ${totalDup}건 제외)`);
     if(_rvwTab==='data') rvwRenderData(); else rvwRenderAnalysis();
   }
   const fi=document.getElementById('rvwFile'); if(fi) fi.value='';
