@@ -4710,6 +4710,7 @@ function _startAppData(){
         setTimeout(()=>n.remove(),5000);
       }
     }
+    runDailyKvBackupIfNeeded();   // 하루 1회 전체 데이터 스냅샷 백업(비동기, 실패해도 앱 동작엔 영향 없음)
   });
 }
 
@@ -5169,6 +5170,57 @@ async function cloudKvVersion(kind){
     if(error) return undefined;
     return data ? data.updated_at : null;
   }catch{ return undefined; }
+}
+
+// ── 일일 자동 백업: 하루 1회 work_calendar(person='__app__') 전체를 kv_backup_YYYY-MM-DD 로 스냅샷 저장 ──
+//    기존 기능 데이터는 읽기만 하고 절대 건드리지 않음 — 인증/저장 버그 등으로 데이터가 사라져 보일 때 복구용 참고 자료.
+//    30일치만 로테이션 보관(그보다 오래된 kv_backup_* 만 정리, 그 외 kind는 대상 아님).
+const KV_BACKUP_MARKER = 'kv_backup_marker';
+const KV_BACKUP_KEEP_DAYS = 30;
+async function runDailyKvBackupIfNeeded(){
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const marker = await cloudKvLoad(KV_BACKUP_MARKER);
+    if(marker && marker.lastDate === today) return;   // 오늘 이미 백업함
+
+    const { data, error } = await sb.from('work_calendar')
+      .select('kind,data,updated_at')
+      .eq('person','__app__')
+      .not('kind','like','kv_backup_%');
+    if(error || !data){ console.warn('일일 백업 실패(조회)', error?.message); return; }
+
+    const snapshot = {};
+    data.forEach(row=>{ snapshot[row.kind] = { data: row.data, updated_at: row.updated_at }; });
+    await cloudKvSave('kv_backup_'+today, snapshot);
+    await cloudKvSave(KV_BACKUP_MARKER, { lastDate: today });
+    console.log(`✅ 일일 백업 완료: kv_backup_${today} (${Object.keys(snapshot).length}개 항목)`);
+
+    // 오래된 백업 정리 — kv_backup_YYYY-MM-DD 형태이면서 보관기간 지난 것만 삭제 (다른 kind는 절대 대상 아님)
+    const cutoff = new Date(Date.now() - KV_BACKUP_KEEP_DAYS*86400000).toISOString().slice(0,10);
+    const { data: backupRows } = await sb.from('work_calendar')
+      .select('kind').eq('person','__app__').like('kind','kv_backup_2%');
+    if(backupRows){
+      const stale = backupRows.map(r=>r.kind).filter(k=>{
+        const m = k.match(/^kv_backup_(\d{4}-\d{2}-\d{2})$/);
+        return m && m[1] < cutoff;
+      });
+      for(const k of stale){
+        try{ await sb.from('work_calendar').delete().eq('person','__app__').eq('kind',k); }
+        catch(e){ console.warn('오래된 백업 삭제 실패', k, e); }
+      }
+    }
+  }catch(e){ console.warn('일일 백업 실패', e); }
+}
+// 마스터 전용 수동 조회 도구 — 콘솔에서 listKvBackups() / previewKvBackup('2026-07-09') 로 확인 가능
+async function listKvBackups(){
+  const { data } = await sb.from('work_calendar').select('kind,updated_at').eq('person','__app__').like('kind','kv_backup_2%');
+  return (data||[]).map(r=>({date:r.kind.replace('kv_backup_',''), savedAt:r.updated_at})).sort((a,b)=>b.date.localeCompare(a.date));
+}
+async function previewKvBackup(dateStr){
+  const snap = await cloudKvLoad('kv_backup_'+dateStr);
+  if(!snap){ console.log('해당 날짜 백업 없음:', dateStr); return null; }
+  console.log(`kv_backup_${dateStr} 포함 kind 목록:`, Object.keys(snap));
+  return snap;
 }
 
 // ══════════════════════════════════════════════
