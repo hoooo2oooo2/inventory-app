@@ -2852,18 +2852,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   .rvw-search{border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:12.5px;background:var(--bg);color:var(--tx);font-family:inherit;flex:1;min-width:160px;}
   .rvw-chip{font-size:11.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--bd);background:var(--bg);color:var(--tx2);cursor:pointer;user-select:none;white-space:nowrap;font-family:inherit;}
   .rvw-chip.on{background:#F59E0B;border-color:#F59E0B;color:#fff;font-weight:700;}
-  .rvw-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
-  .rvw-tbl th,.rvw-tbl td{border-bottom:1px solid var(--bd);padding:8px 10px;text-align:left;color:var(--tx);vertical-align:top;}
-  .rvw-tbl th{font-size:11px;color:var(--tx2);background:rgba(127,127,127,.04);}
+  .rvw-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11.5px;}
+  .rvw-tbl th,.rvw-tbl td{border-bottom:1px solid var(--bd);padding:6px 5px;text-align:left;color:var(--tx);vertical-align:top;overflow:hidden;}
+  .rvw-tbl th{font-size:10.5px;color:var(--tx2);background:rgba(127,127,127,.04);white-space:nowrap;text-overflow:ellipsis;}
   .rvw-star{color:#F59E0B;font-weight:700;white-space:nowrap;}
-  .rvw-content-cell{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rvw-content-cell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .rvw-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(220,38,38,.1);color:#DC2626;}
   .rvw-empty{color:var(--tx2);font-size:13px;text-align:center;padding:30px 0;}
-  .rvw-tbl{min-width:1500px;}
   .rvw-tbl td.rvw-clickable{cursor:pointer;}
   .rvw-tbl td.rvw-clickable:hover{background:rgba(49,130,246,.06);}
-  .rvw-status-sel,.rvw-assignee-sel{border:1px solid var(--bd);border-radius:7px;padding:4px 6px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;}
-  .rvw-amt-inp{width:84px;border:1px solid var(--bd);border-radius:7px;padding:4px 6px;font-size:12px;background:var(--bg);color:var(--tx);font-family:inherit;}
+  .rvw-status-sel,.rvw-assignee-sel{width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:7px;padding:4px 2px;font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer;}
+  .rvw-amt-inp{width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:7px;padding:4px 3px;font-size:11px;background:var(--bg);color:var(--tx);font-family:inherit;}
+  /* 리뷰데이터/처리완료 테이블 — 17개 컬럼이 가로 스크롤 없이 한 화면에 들어오도록 비율 고정 */
+  .rvw-tbl th:nth-child(1),.rvw-tbl td:nth-child(1){width:7.5%;}   /* 리뷰작성일 */
+  .rvw-tbl th:nth-child(2),.rvw-tbl td:nth-child(2){width:4.5%;}   /* 별점 */
+  .rvw-tbl th:nth-child(3),.rvw-tbl td:nth-child(3){width:6%;}     /* 리뷰번호 */
+  .rvw-tbl th:nth-child(4),.rvw-tbl td:nth-child(4){width:6.5%;}   /* 상품주문번호 */
+  .rvw-tbl th:nth-child(5),.rvw-tbl td:nth-child(5){width:5%;}     /* 아이디 */
+  .rvw-tbl th:nth-child(6),.rvw-tbl td:nth-child(6){width:5%;}     /* 이름 */
+  .rvw-tbl th:nth-child(7),.rvw-tbl td:nth-child(7){width:6%;}     /* 전화번호 */
+  .rvw-tbl th:nth-child(8),.rvw-tbl td:nth-child(8){width:8.5%;}   /* 제품명 */
+  .rvw-tbl th:nth-child(9),.rvw-tbl td:nth-child(9){width:3%;}     /* 수량 */
+  .rvw-tbl th:nth-child(10),.rvw-tbl td:nth-child(10){width:11%;} /* 리뷰 상세내용 */
+  .rvw-tbl th:nth-child(11),.rvw-tbl td:nth-child(11){width:6.5%;} /* 처리결과 */
+  .rvw-tbl th:nth-child(12),.rvw-tbl td:nth-child(12){width:7.5%;} /* 진행내용 */
+  .rvw-tbl th:nth-child(13),.rvw-tbl td:nth-child(13){width:7.5%;} /* 실장님 오더내용 */
+  .rvw-tbl th:nth-child(14),.rvw-tbl td:nth-child(14){width:4.5%;} /* 제품금액 */
+  .rvw-tbl th:nth-child(15),.rvw-tbl td:nth-child(15){width:4.5%;} /* 원가금액 */
+  .rvw-tbl th:nth-child(16),.rvw-tbl td:nth-child(16){width:4.5%;} /* 손실금액 */
+  .rvw-tbl th:nth-child(17),.rvw-tbl td:nth-child(17){width:5%;}   /* 담당자 */
   </style>
 
   <div class="fo-subtabs">
@@ -7194,7 +7211,7 @@ let _rvwMonths = {};
 let _rvwIdxLoaded = false;
 let _rvwTab = 'analysis';
 let _rvwTrendMode = 'week';
-let _rvwRatingFilter = 'ALL';
+let _rvwRatingFilter = new Set();   // 빈 Set = 전체(필터 없음). 여러 평점 동시 선택 가능.
 let _rvwStatusFilter = 'ALL';
 let _rvwCharts = {};
 let _rvwDropBound = false;
@@ -7301,7 +7318,10 @@ function rvwBuildMonthSelects(){
 function rvwBuildFilterChips(){
   const rc=document.getElementById('rvwRatingChips');
   if(rc && !rc._built){
-    rc.innerHTML = ['ALL','5','4','3','2','1'].map(v=>`<button class="rvw-chip${v===_rvwRatingFilter?' on':''}" data-v="${v}" onclick="rvwSetRatingFilter('${v}')">${v==='ALL'?'전체':'★'+v}</button>`).join('');
+    rc.innerHTML = ['ALL','5','4','3','2','1'].map(v=>{
+      const on = v==='ALL' ? _rvwRatingFilter.size===0 : _rvwRatingFilter.has(Number(v));
+      return `<button class="rvw-chip${on?' on':''}" data-v="${v}" onclick="rvwSetRatingFilter('${v}')">${v==='ALL'?'전체':'★'+v}</button>`;
+    }).join('');
     rc._built = true;
   }
   const sc=document.getElementById('rvwStatusChips');
@@ -7315,7 +7335,18 @@ function rvwBuildFilterChips(){
     mc._built = true;
   }
 }
-function rvwSetRatingFilter(v){ _rvwRatingFilter=v; document.querySelectorAll('#rvwRatingChips .rvw-chip').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); rvwRenderData(); }
+function rvwSetRatingFilter(v){
+  if(v==='ALL'){ _rvwRatingFilter.clear(); }
+  else{
+    const n = Number(v);
+    if(_rvwRatingFilter.has(n)) _rvwRatingFilter.delete(n); else _rvwRatingFilter.add(n);
+  }
+  document.querySelectorAll('#rvwRatingChips .rvw-chip').forEach(b=>{
+    const bv=b.dataset.v;
+    b.classList.toggle('on', bv==='ALL' ? _rvwRatingFilter.size===0 : _rvwRatingFilter.has(Number(bv)));
+  });
+  rvwRenderData();
+}
 function rvwSetStatusFilter(v){ _rvwStatusFilter=v; document.querySelectorAll('#rvwStatusChips .rvw-chip').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); rvwRenderData(); }
 function rvwSetMgStatusFilter(v){ _rvwMgStatusFilter=v; document.querySelectorAll('#rvwMgStatusChips .rvw-chip').forEach(b=>b.classList.toggle('on', b.dataset.v===v)); rvwRenderData(); }
 function rvwSetTrendMode(m){ _rvwTrendMode=m; document.querySelectorAll('#rvwAnTrendBtns .rvw-chip').forEach(b=>b.classList.toggle('on', b.dataset.mode===m)); rvwRenderAnalysis(); }
@@ -7337,7 +7368,7 @@ function rvwEnrichRow(r){
   return er;
 }
 function rvwPassesCommonFilter(r, kw){
-  if(_rvwRatingFilter!=='ALL' && String(r.rating)!==_rvwRatingFilter) return false;
+  if(_rvwRatingFilter.size>0 && !_rvwRatingFilter.has(r.rating)) return false;
   if(_rvwStatusFilter!=='ALL' && r.displayStatus!==_rvwStatusFilter) return false;
   if(kw){
     const hit = (r.productName||'').toLowerCase().includes(kw) || (r.content||'').toLowerCase().includes(kw)
