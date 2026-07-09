@@ -928,10 +928,20 @@ let goalRevenue = 0;
 
 // ═══ Supabase 연동 — 데이터 클라우드 저장/공유 (운영관리 통합) ═══
 //    메인 앱(index.html)과 동일한 work_calendar KV 패턴 사용 (person='__app__', kind별 JSON)
+//    2026-07-07 로그인이 Supabase Auth로 전환되며 세션이 "기억하기" 여부에 따라
+//    localStorage/sessionStorage에 나뉘어 저장됨 — 이 iframe도 index.html과 동일한
+//    커스텀 storage를 써야 부모 창의 로그인 세션을 그대로 읽어 인증된 상태로 조회/저장할 수 있음.
+//    (이걸 안 맞춰주면 RLS에 막혀 조회가 조용히 빈 값만 반환 — 데이터가 사라진 것처럼 보이는 원인이었음)
+const _cpAuthStorage = {
+  getItem:(k)=>{ try{ return (localStorage.getItem('inv_remember_flag')!=='0'?localStorage:sessionStorage).getItem(k); }catch{ return null; } },
+  setItem:(k,v)=>{ try{ (localStorage.getItem('inv_remember_flag')!=='0'?localStorage:sessionStorage).setItem(k,v); }catch{} },
+  removeItem:(k)=>{ try{ localStorage.removeItem(k); sessionStorage.removeItem(k); }catch{} },
+};
 const CP_SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(
       'https://ywbekolvslixidpugepr.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs')
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs',
+      { auth:{ storage:_cpAuthStorage, persistSession:true, autoRefreshToken:true } })
   : null;
 async function cpCloudSave(kind,obj){
   if(!CP_SB) return;
