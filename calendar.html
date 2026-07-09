@@ -943,10 +943,27 @@ let sbCal = null;
 try { if (window.supabase) sbCal = window.supabase.createClient(SB_URL, SB_KEY, { auth:{ storage:_calAuthStorage, persistSession:true, autoRefreshToken:true } }); } catch(e) { console.warn('supabase init 실패', e); }
 let _calReady = false; // 최초 클라우드 로드 완료 전엔 클라우드 저장 보류(빈 데이터 덮어쓰기 방지)
 
+// 기존 값보다 새 값이 급격히 작아지면(여러 PC 동시저장 레이스 등) 의도치 않은 덮어쓰기로 의심 —
+// 원래 값이 어느 정도 규모가 있었을 때만 검사. 의도된 대량삭제면 {force:true}로 건너뛸 수 있음.
+function _calLooksLikeAccidentalWipe(oldData, newData) {
+  try {
+    const oldLen = JSON.stringify(oldData ?? null).length;
+    const newLen = JSON.stringify(newData ?? null).length;
+    if (oldLen < 200) return false;
+    return newLen < oldLen * 0.1;
+  } catch { return false; }
+}
 // 특정 종류 데이터를 클라우드에 저장(담당자 행 단위 upsert)
-async function cloudSave(kind, dataObj) {
+async function cloudSave(kind, dataObj, opts = {}) {
   if (!sbCal || !_calReady) return;
   try {
+    if (!opts.force) {
+      const { data: prevRow } = await sbCal.from('work_calendar').select('data').eq('person', S.person).eq('kind', kind).maybeSingle();
+      if (_calLooksLikeAccidentalWipe(prevRow?.data, dataObj)) {
+        console.warn(`⚠️ cloudSave 안전장치: '${kind}' 저장을 건너뜀 — 기존 데이터보다 급격히 작아져 의도치 않은 덮어쓰기로 의심됩니다. 의도된 것이면 cloudSave(kind, data, {force:true})로 호출하세요.`);
+        return;
+      }
+    }
     await sbCal.from('work_calendar').upsert(
       { person: S.person, kind, data: dataObj, updated_at: new Date().toISOString() },
       { onConflict: 'person,kind' }

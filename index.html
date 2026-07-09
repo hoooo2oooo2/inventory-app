@@ -5165,8 +5165,26 @@ async function mpDeleteAccount(username){
 
 // ── 단가계산기 견적 / 견적서 클라우드 공유 (work_calendar 테이블 재사용, person='__app__') ──
 //    캘린더처럼 다른 컴퓨터에서도 동일하게 보이도록 저장
-async function cloudKvSave(kind, dataArr){
+// 기존 값보다 새 값이 급격히 작아지면(여러 PC 동시저장 레이스 등으로 빈 값이 실수로 올라오는 경우)
+// 의도치 않은 덮어쓰기로 의심 — 원래 값이 어느 정도 규모가 있었을 때만 검사(마커/카운터 등 원래 작은
+// 값은 제외). 정말 의도된 대량삭제라면 호출부에서 {force:true}로 이 검사를 건너뛸 수 있음.
+function _kvLooksLikeAccidentalWipe(oldData, newData){
   try{
+    const oldLen = JSON.stringify(oldData ?? null).length;
+    const newLen = JSON.stringify(newData ?? null).length;
+    if(oldLen < 200) return false;
+    return newLen < oldLen * 0.1;
+  }catch{ return false; }
+}
+async function cloudKvSave(kind, dataArr, opts={}){
+  try{
+    if(!opts.force){
+      const { data: prevRow } = await sb.from('work_calendar').select('data').eq('person','__app__').eq('kind',kind).maybeSingle();
+      if(_kvLooksLikeAccidentalWipe(prevRow?.data, dataArr)){
+        console.warn(`⚠️ cloudKvSave 안전장치: '${kind}' 저장을 건너뜀 — 기존 데이터보다 급격히 작아져 의도치 않은 덮어쓰기로 의심됩니다. 의도된 것이면 cloudKvSave(kind, data, {force:true})로 호출하세요.`);
+        return;
+      }
+    }
     await sb.from('work_calendar').upsert(
       { person:'__app__', kind, data:dataArr, updated_at:new Date().toISOString() },
       { onConflict:'person,kind' });

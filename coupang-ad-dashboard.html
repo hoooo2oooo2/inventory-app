@@ -943,9 +943,28 @@ const CP_SB = (window.supabase && window.supabase.createClient)
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3YmVrb2x2c2xpeGlkcHVnZXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTk5ODAsImV4cCI6MjA5MTU3NTk4MH0.gPp4ZNC-uoVuSG0bmfwJyNDZ5MPMArg81aK4wdxAYfs',
       { auth:{ storage:_cpAuthStorage, persistSession:true, autoRefreshToken:true } })
   : null;
-async function cpCloudSave(kind,obj){
+// 기존 값보다 새 값이 급격히 작아지면(여러 PC 동시저장 레이스 등) 의도치 않은 덮어쓰기로 의심 —
+// 원래 값이 어느 정도 규모가 있었을 때만 검사. 의도된 대량삭제면 {force:true}로 건너뛸 수 있음.
+function _cpLooksLikeAccidentalWipe(oldData, newData){
+  try{
+    const oldLen = JSON.stringify(oldData ?? null).length;
+    const newLen = JSON.stringify(newData ?? null).length;
+    if(oldLen < 200) return false;
+    return newLen < oldLen * 0.1;
+  }catch{ return false; }
+}
+async function cpCloudSave(kind,obj,opts={}){
   if(!CP_SB) return;
-  try{ await CP_SB.from('work_calendar').upsert({person:'__app__',kind,data:obj,updated_at:new Date().toISOString()},{onConflict:'person,kind'}); }
+  try{
+    if(!opts.force){
+      const { data: prevRow } = await CP_SB.from('work_calendar').select('data').eq('person','__app__').eq('kind',kind).maybeSingle();
+      if(_cpLooksLikeAccidentalWipe(prevRow?.data, obj)){
+        console.warn(`⚠️ cpCloudSave 안전장치: '${kind}' 저장을 건너뜀 — 기존 데이터보다 급격히 작아져 의도치 않은 덮어쓰기로 의심됩니다. 의도된 것이면 cpCloudSave(kind, obj, {force:true})로 호출하세요.`);
+        return;
+      }
+    }
+    await CP_SB.from('work_calendar').upsert({person:'__app__',kind,data:obj,updated_at:new Date().toISOString()},{onConflict:'person,kind'});
+  }
   catch(e){ console.warn('cpCloudSave 실패',kind,e); }
 }
 async function cpCloudLoad(kind){
