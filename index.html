@@ -1070,13 +1070,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <style>
 /* ═══ 물류팀 홈 ═══ */
 /* ═══ 물류팀 홈 — 세로 레이아웃 리디자인 ═══ */
-.lh2-wrap{height:calc(100vh - 110px);overflow:hidden;background:var(--bg2);box-sizing:border-box;}
-.lh2-inner{height:100%;margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;}
-.lh2-cols{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:12px;}
-@media(max-width:1080px){.lh2-cols{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:620px){.lh2-wrap{overflow:auto;}.lh2-cols{grid-template-columns:1fr;}}
+.lh2-wrap{min-height:calc(100vh - 110px);overflow-y:auto;background:var(--bg2);box-sizing:border-box;}
+.lh2-inner{margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;}
+.lh2-cols{display:grid;grid-template-columns:1.4fr 1fr;align-items:start;gap:14px;}
+@media(max-width:900px){.lh2-cols{grid-template-columns:1fr;}}
+.lh2-side{display:flex;flex-direction:column;gap:14px;min-width:0;}
 .lh2-alertbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:14px;background:#FEF3E2;border:1px solid #F6C77A;border-radius:12px;padding:10px 16px;font-size:13px;color:#92560A;font-weight:600;flex-wrap:wrap;}
-.lh2-card{background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);padding:12px 18px;display:flex;flex-direction:column;min-height:0;flex:1;}
+.lh2-card{background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);padding:14px 20px 18px;display:flex;flex-direction:column;min-width:0;max-height:min(34vh,360px);overflow:hidden;}
+/* 소장재고 체크리스트 — 실무자가 가장 많이 쓰는 메인 영역: 스크롤 없이 한눈에 보이도록 크게 */
+.lh2-main{max-height:calc(100vh - 160px);}
 .lh2-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;gap:10px;}
 .lh2-title{font-size:17px;font-weight:800;color:var(--tx);letter-spacing:-0.01em;}
 .lh2-add{padding:7px 14px;border:none;border-radius:9px;background:var(--pr);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;}
@@ -1086,7 +1088,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .logi-empty{color:var(--tx2);font-size:13px;text-align:center;padding:26px 0;}
 .logi-notice-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--bg2);border-radius:12px;border:1px solid var(--bd);}
 .logi-notice-body{flex:1;min-width:0;}
-.logi-notice-text{font-size:18px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.logi-notice-text{font-size:18px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:keep-all;overflow-wrap:break-word;line-height:1.5;}
 .logi-notice-meta{font-size:12px;color:var(--tx2);margin-top:7px;}
 .logi-notice-del{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:3px 6px;border-radius:6px;flex-shrink:0;}
 .logi-notice-del:hover{background:#FEE2E2;color:#EF4444;}
@@ -1095,7 +1097,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lh2-handover-item.done{background:#F0FDF4;border-color:#BBE9C9;}
 .lh2-handover-item input[type=checkbox]{width:21px;height:21px;margin-top:2px;flex-shrink:0;cursor:pointer;}
 .lh2-handover-body{flex:1;min-width:0;}
-.lh2-handover-text{font-size:17px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.lh2-handover-text{font-size:17px;font-weight:700;color:var(--tx);white-space:pre-wrap;word-break:keep-all;overflow-wrap:break-word;line-height:1.5;}
 .lh2-handover-item.done .lh2-handover-text{text-decoration:line-through;color:var(--tx2);}
 .lh2-handover-meta{font-size:12px;color:var(--tx2);margin-top:7px;}
 .lh2-confirm{display:inline-block;color:#15803D;font-weight:700;margin-left:2px;}
@@ -1141,7 +1143,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcd-man{background:#05C072;}
 /* 메모장 (글씨 크게) */
 .lh2-memo-status{font-size:11px;color:var(--tx2);font-weight:600;}
-.lh2-memo{flex:1;min-height:60px;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:18px;line-height:1.7;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;}
+.lh2-memo{flex:1;min-height:140px;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:18px;line-height:1.7;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;word-break:keep-all;overflow-wrap:break-word;}
 .lh2-memo:focus{outline:none;border-color:var(--pr);background:var(--bg);}
 /* ═══ 택배박스 ═══ */
 .lbx-wrap{padding:16px;height:calc(100vh - 110px);box-sizing:border-box;display:flex;flex-direction:column;}
@@ -1707,26 +1709,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
 
       <div class="lh2-cols">
-      <!-- 공지사항 -->
-      <section class="lh2-card">
-        <div class="lh2-head">
-          <span class="lh2-title">📢 공지사항</span>
-          <button class="lh2-add" onclick="logiNoticeAdd()">＋ 공지 등록</button>
-        </div>
-        <div class="lh2-notice-list" id="logiNoticeList"></div>
-      </section>
-
-      <!-- 전달사항 -->
-      <section class="lh2-card">
-        <div class="lh2-head">
-          <span class="lh2-title">📋 전달사항</span>
-          <button class="lh2-add" onclick="logiHandoverAdd()">＋ 전달사항 등록</button>
-        </div>
-        <div class="lh2-handover-list" id="logiHandoverList"></div>
-      </section>
-
-      <!-- 소장재고 체크리스트 -->
-      <section class="lh2-card">
+      <!-- 소장재고 체크리스트 (메인 — 스크롤 없이 바로 보이도록 좌측 큰 영역에 배치) -->
+      <section class="lh2-card lh2-main">
         <div class="lh2-head">
           <span class="lh2-title">✅ 소장재고 체크리스트</span>
           <button class="lh2-donebtn" id="logiChkDoneBtn" onclick="logiChkDoneList()">완료목록</button>
@@ -1744,14 +1728,32 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
       </section>
 
-      <!-- 메모장 -->
-      <section class="lh2-card">
-        <div class="lh2-head">
-          <span class="lh2-title">📝 메모장</span>
-          <span class="lh2-memo-status" id="logiMemoStatus"></span>
-        </div>
-        <textarea class="lh2-memo" id="logiMemoArea" placeholder="자유롭게 메모하세요. 입력 시 자동 저장됩니다."></textarea>
-      </section>
+      <!-- 사이드: 공지사항 / 전달사항 / 메모장 -->
+      <div class="lh2-side">
+        <section class="lh2-card">
+          <div class="lh2-head">
+            <span class="lh2-title">📢 공지사항</span>
+            <button class="lh2-add" onclick="logiNoticeAdd()">＋ 공지 등록</button>
+          </div>
+          <div class="lh2-notice-list" id="logiNoticeList"></div>
+        </section>
+
+        <section class="lh2-card">
+          <div class="lh2-head">
+            <span class="lh2-title">📋 전달사항</span>
+            <button class="lh2-add" onclick="logiHandoverAdd()">＋ 전달사항 등록</button>
+          </div>
+          <div class="lh2-handover-list" id="logiHandoverList"></div>
+        </section>
+
+        <section class="lh2-card">
+          <div class="lh2-head">
+            <span class="lh2-title">📝 메모장</span>
+            <span class="lh2-memo-status" id="logiMemoStatus"></span>
+          </div>
+          <textarea class="lh2-memo" id="logiMemoArea" placeholder="자유롭게 메모하세요. 입력 시 자동 저장됩니다."></textarea>
+        </section>
+      </div>
       </div>
 
     </div>
@@ -13313,7 +13315,7 @@ function removeRevFile(ch){delete _revUpFiles[ch];renderRevUpSlots();}
 const CH_MAPS = {
   '이베이':       { orderNo:4,  buyer:16, receiver:17, phone1:18, phone2:19, zip:20, addr:21, itemNo:5,  itemCode:9,  modelName:10, orderQty:11, salePrice:14, settlement:15,  settleFn:null },
   '11번가':       { orderNo:10, buyer:11, receiver:12, phone1:13, phone2:14, zip:15, addr:16, itemNo:27, itemCode:2,  modelName:3,  orderQty:4,  salePrice:5,  settlement:6,   settleFn:null },
-  '스마트스토어': { orderNo:1,  buyer:22, receiver:23, phone1:24, phone2:25, zip:26, addr:27, itemNo:12, itemCode:17, modelName:18, orderQty:19, salePrice:20, settlement:21,  settleFn:null },
+  '스마트스토어': { orderNo:0,  buyer:22, receiver:23, phone1:24, phone2:25, zip:26, addr:27, itemNo:12, itemCode:17, modelName:18, orderQty:19, salePrice:20, settlement:21,  settleFn:null },
   '쿠팡':         { orderNo:2,  buyer:26, receiver:27, phone1:28, phone2:29, zip:30, addr:31, itemNo:14, itemCode:16, modelName:17, orderQty:23, salePrice:19, settlement:19,  settleFn:v=>v*0.88 },
   '오늘의집':     { orderNo:0,  buyer:15, receiver:16, phone1:17, phone2:18, zip:19, addr:20, itemNo:4,  itemCode:8,  modelName:9,  orderQty:10, salePrice:13, settlement:14,  settleFn:null },
   '카페24':       { orderNo:2,  buyer:14, receiver:15, phone1:16, phone2:17, zip:18, addr:19, itemNo:6,  itemCode:9,  modelName:10, orderQty:11, salePrice:5,  settlement:5,   settleFn:null },
