@@ -835,9 +835,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-kpi-bar{display:flex;gap:8px;padding:10px 12px;border-bottom:0.5px solid var(--bd);overflow-x:auto;flex-shrink:0;scrollbar-width:thin;}
 .cmb-kpi-bar::-webkit-scrollbar{height:6px;}
 .cmb-kpi-bar::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.18);border-radius:3px;}
-.cmb-kpi-card{flex-shrink:0;min-width:118px;max-width:150px;border:1px solid var(--bd);border-radius:10px;padding:8px 10px;cursor:pointer;background:var(--bg);transition:all .12s;}
+.cmb-kpi-card{position:relative;flex-shrink:0;min-width:118px;max-width:150px;border:1px solid var(--bd);border-radius:10px;padding:8px 10px;cursor:pointer;background:var(--bg);transition:all .12s;}
 .cmb-kpi-card:hover{border-color:#3182F6;background:#EEF4FF;transform:translateY(-1px);}
-.cmb-kpi-card-nm{font-size:12px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmb-kpi-del{position:absolute;top:2px;right:2px;border:none;background:none;color:var(--tx2);font-size:10px;line-height:1;padding:3px;cursor:pointer;border-radius:4px;opacity:0;transition:opacity .12s;}
+.cmb-kpi-card:hover .cmb-kpi-del{opacity:1;}
+.cmb-kpi-del:hover{color:#DC2626;background:#FEF2F2;}
+.cmb-kpi-card-nm{font-size:12px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:10px;}
 .cmb-kpi-card-meta{font-size:10px;color:var(--tx2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cmb-kpi-add{flex-shrink:0;min-width:88px;border:1px dashed var(--bd);border-radius:10px;padding:8px 10px;cursor:pointer;background:transparent;color:var(--tx2);font-size:12px;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px;}
 .cmb-kpi-add:hover{border-color:#059669;color:#059669;}
@@ -18425,6 +18428,8 @@ let _cmbState = {};      // code -> {checked:bool, qty:string}
 let _cmbSel = [];        // 선택 제품 리스트 [{code,name,basis,unit,qty,amount}]
 let _cmbSets = [];       // 저장된 세트 [{id,name,items,total,date,author,cat}]
 let _cmbSetsLoaded = false;
+let _cmbKpiCards = [];   // KPI 카드(빠른 세트) — 저장된 세트와는 별개의 독립 데이터 [{id,name,items,total,date,author}]
+let _cmbKpiCardsLoaded = false;
 let _cmbCats = [];       // 사용자 정의 구분(카테고리) 목록
 let _cmbCatsLoaded = false;
 let _cmbCatFilter = '';  // 현재 구분 필터 ('' = 전체)
@@ -18452,7 +18457,9 @@ function cmbInit(){
   cmbRenderSel();
   if(!_cmbCatsLoaded){ cmbLoadCats(); } else { cmbRenderCatBar(); }
   if(!_cmbSetsLoaded){ cmbLoadSets(); }
-  else { cmbRenderSaved(); cmbRenderKpiBar(); }
+  else { cmbRenderSaved(); }
+  if(!_cmbKpiCardsLoaded){ cmbLoadKpiCards(); }
+  else { cmbRenderKpiBar(); }
 }
 
 // ── 좌측 제품 목록 ──
@@ -18615,7 +18622,7 @@ async function cmbConfirmSave(){
   }
   document.getElementById('cmbSaveModal').style.display='none';
   _cmbEditId = null;
-  cmbRenderCatBar(); cmbRenderSel(); cmbRenderSaved(); cmbRenderKpiBar();
+  cmbRenderCatBar(); cmbRenderSel(); cmbRenderSaved();
   if(catsChanged) await cmbSaveCats();
   await cloudKvSave('combo_sets', _cmbSets);
   toast('세트를 저장했습니다.');
@@ -18672,7 +18679,6 @@ async function cmbLoadSets(){
   _cmbSets = Array.isArray(data) ? data : [];
   _cmbSetsLoaded = true;
   cmbRenderSaved();
-  cmbRenderKpiBar();
 }
 function cmbSetSearchChange(v){ _cmbSetSearch = (v||'').trim(); cmbRenderSaved(); }
 function cmbRenderSaved(){
@@ -18697,35 +18703,63 @@ function cmbRenderSaved(){
 }
 
 // ── 선택 제품 리스트 상단 KPI 카드(빠른 세트) ──
-// 클릭 한 번으로 저장된 세트의 부속들을 현재 선택 리스트에 바로 추가(병합)한다.
+// 저장된 세트(combo_sets)와는 완전히 별개의 독립 데이터(combo_kpi_cards).
+// 클릭 한 번으로 카드에 담긴 부속들을 현재 선택 리스트에 바로 추가(병합)한다.
+async function cmbLoadKpiCards(){
+  const data = await cloudKvLoad('combo_kpi_cards');
+  _cmbKpiCards = Array.isArray(data) ? data : [];
+  _cmbKpiCardsLoaded = true;
+  cmbRenderKpiBar();
+}
+async function cmbSaveKpiCards(){ await cloudKvSave('combo_kpi_cards', _cmbKpiCards); }
 function cmbRenderKpiBar(){
   const bar = document.getElementById('cmbKpiBar'); if(!bar) return;
-  const cardsHtml = _cmbSets.map(s=>`
-    <div class="cmb-kpi-card" onclick="cmbKpiAdd('${_cmbEsc(s.id)}')" title="클릭하면 이 세트의 부속이 선택 제품 리스트에 추가됩니다">
+  const cardsHtml = _cmbKpiCards.map(s=>`
+    <div class="cmb-kpi-card" onclick="cmbKpiAdd('${_cmbEsc(s.id)}')" title="클릭하면 이 카드의 부속이 선택 제품 리스트에 추가됩니다">
+      <button class="cmb-kpi-del" onclick="event.stopPropagation();cmbKpiDeleteCard('${_cmbEsc(s.id)}')" title="카드 삭제">✕</button>
       <div class="cmb-kpi-card-nm">${_cmbEsc(s.name)}</div>
       <div class="cmb-kpi-card-meta">${(s.items||[]).length}개 품목 · ${_cmbWon(s.total)}</div>
     </div>`).join('');
-  const emptyHtml = _cmbSets.length ? '' : `<span class="cmb-kpi-empty">카드를 추가하면 여기서 클릭 한 번으로 세트를 불러올 수 있어요</span>`;
+  const emptyHtml = _cmbKpiCards.length ? '' : `<span class="cmb-kpi-empty">카드를 추가하면 여기서 클릭 한 번으로 부속을 불러올 수 있어요</span>`;
   bar.innerHTML = emptyHtml + cardsHtml + `<button class="cmb-kpi-add" onclick="cmbKpiAddCard()">＋ 카드 추가</button>`;
 }
-// KPI 카드 클릭 → 해당 세트의 부속을 선택 제품 리스트에 병합 추가(기존 항목은 수량 합산)
+// KPI 카드 클릭 → 해당 카드의 부속을 선택 제품 리스트에 병합 추가(기존 항목은 수량 합산)
 function cmbKpiAdd(id){
-  const set = _cmbSets.find(x=>x.id===id); if(!set) return;
-  (set.items||[]).forEach(it=>{
+  const card = _cmbKpiCards.find(x=>x.id===id); if(!card) return;
+  (card.items||[]).forEach(it=>{
     const ix = _cmbSel.findIndex(s=>s.code===it.code);
     if(ix>=0){ _cmbSel[ix].qty += it.qty; _cmbSel[ix].amount = _cmbSel[ix].unit*_cmbSel[ix].qty; }
     else _cmbSel.push({...it});
   });
   cmbRenderSel();
-  toast(`"${set.name}" 세트의 부속 ${(set.items||[]).length}개를 추가했습니다.`);
+  toast(`"${card.name}" 카드의 부속 ${(card.items||[]).length}개를 추가했습니다.`);
 }
-// ＋ 카드 추가 — 좌측에서 제품·수량을 선택해 선택 리스트에 담은 뒤 다시 누르면 카드(세트)로 저장된다
-function cmbKpiAddCard(){
+// ＋ 카드 추가 — 좌측에서 제품·수량을 선택해 선택 리스트에 담은 뒤 다시 누르면 KPI 카드로 저장된다 (저장된 세트와는 별개)
+async function cmbKpiAddCard(){
   if(!_cmbSel.length){
     toast('먼저 좌측 제품 목록에서 제품을 체크하고 수량을 입력한 뒤 [한국단가로 계산]/[공급가로 계산]으로 담고, 다시 눌러 카드로 저장하세요.');
     return;
   }
-  cmbOpenSaveModal();
+  const name = (prompt('KPI 카드 이름을 입력하세요.')||'').trim();
+  if(!name) return;
+  const total = _cmbSel.reduce((a,s)=>a+s.amount,0);
+  const items = _cmbSel.map(s=>({...s}));
+  _cmbKpiCards.unshift({
+    id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    name, items, total, date:_cmbToday(),
+    author:(window.__CURRENT_USER&&window.__CURRENT_USER.name)||''
+  });
+  cmbRenderKpiBar();
+  await cmbSaveKpiCards();
+  toast(`'${name}' KPI 카드를 추가했습니다.`);
+}
+async function cmbKpiDeleteCard(id){
+  const card = _cmbKpiCards.find(x=>x.id===id); if(!card) return;
+  if(!confirm(`'${card.name}' KPI 카드를 삭제할까요?`)) return;
+  _cmbKpiCards = _cmbKpiCards.filter(x=>x.id!==id);
+  cmbRenderKpiBar();
+  await cmbSaveKpiCards();
+  toast('KPI 카드를 삭제했습니다.');
 }
 
 // ── 세트 상세 모달 ──
@@ -18792,7 +18826,7 @@ async function cmbDeleteFromDetail(){
   _cmbSets = _cmbSets.filter(x=>x.id!==_cmbDetailId);
   if(_cmbEditId===_cmbDetailId){ _cmbEditId=null; cmbRenderSel(); }
   document.getElementById('cmbDetailModal').style.display='none';
-  cmbRenderSaved(); cmbRenderKpiBar();
+  cmbRenderSaved();
   await cloudKvSave('combo_sets', _cmbSets);
   toast('세트를 삭제했습니다.');
 }
