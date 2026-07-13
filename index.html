@@ -12826,12 +12826,22 @@ function renderUnifiedTable(){
 }
 
 // ── 통합 탭: 고객명(구매자/수취인) 더블클릭 → 구매내역 팝업 ──
+// 동명이인 구분: 이름이 같아도 ①연락처1 일치 → 같은 사람으로 확정, ②연락처가 다르면 주소 일치 여부로 판단
+//               (연락처·주소 둘 다 다르면 동명이인으로 보고 제외)
 // 합배송 판단 기준: 날짜 + 판매처 + 고객명 + 연락처1 + 주소 가 모두 같으면 한 배송으로 묶음
 function openCustomerPopup(rowId, field){
   const r0=_revData.find(x=>x.id===rowId); if(!r0) return;
   const name=(field==='buyer'?r0.buyer:r0.receiver)||'';
   if(!name) return;
-  const rows=_revData.filter(r=>(field==='buyer'?r.buyer:r.receiver)===name);
+  const basePhone=(r0.phone1||'').trim(), baseAddr=(r0.addr||'').trim();
+  const rows=_revData.filter(r=>{
+    if((field==='buyer'?r.buyer:r.receiver)!==name) return false;
+    if(r.id===r0.id) return true;
+    const phone=(r.phone1||'').trim(), addr=(r.addr||'').trim();
+    const phoneMatch = basePhone && phone===basePhone;
+    const addrMatch = baseAddr && addr===baseAddr;
+    return phoneMatch || addrMatch;   // 연락처 일치 우선, 다르면 주소로 재확인. 둘 다 불일치면 동명이인으로 제외
+  });
   if(!rows.length) return;
   rows.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (a.ch||'').localeCompare(b.ch||''));
 
