@@ -745,7 +745,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-uni-scroll .uni-sort-th{user-select:none;}
 #page-revenue .rev-uni-scroll .uni-sort-th:hover{color:#2563EB;}
 #page-revenue .rev-uni-scroll .uni-sort-ar{font-size:9px;color:#2563EB;}
-#page-revenue .rev-mask{display:inline-block;background:#F1F5F9;color:#94A3B8;border-radius:4px;padding:0 5px;font-size:10px;letter-spacing:1px;}
+#page-revenue .rev-mask, #revCustPopupModal .rev-mask{display:inline-block;background:#F1F5F9;color:#94A3B8;border-radius:4px;padding:0 5px;font-size:10px;letter-spacing:1px;}
 #page-revenue .rev-margin-pos{color:#059669;font-weight:600;}
 #page-revenue .rev-margin-neg{color:#DC2626;font-weight:600;}
 @media(max-width:900px){#page-revenue .rev-kpi{grid-template-columns:repeat(2,1fr);}#page-revenue .rev-chart-grid{grid-template-columns:1fr;}#page-revenue .rev-up-grid{grid-template-columns:repeat(2,1fr);}}
@@ -4638,6 +4638,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ma">
       <button class="btn" onclick="closeModal('revRowEditModal')">취소</button>
       <button class="btn btn-pr" onclick="saveRevRowEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 통합 탭 — 고객 구매내역 팝업 (구매자·수취인 더블클릭) -->
+<div class="modal-overlay" id="revCustPopupModal">
+  <div class="modal" style="max-width:680px;max-height:82vh;overflow-y:auto;">
+    <h3 id="revCustPopupTitle">🧑 고객 구매내역</h3>
+    <div id="revCustPopupBody"></div>
+    <div class="ma" style="margin-top:12px;">
+      <button class="btn" onclick="closeModal('revCustPopupModal')">닫기</button>
     </div>
   </div>
 </div>
@@ -12713,8 +12724,8 @@ function renderUnifiedTable(){
       <td style="${TC}">${r.date||''}</td>
       <td style="${TC}">${r.ch||''}</td>
       <td style="font-size:10px;${TC}">${r.orderNo||''}</td>
-      <td style="${TC}" title="${r.buyer||''}">${maskName(r.buyer)}</td>
-      <td style="${TC}" title="${r.receiver||''}">${maskName(r.receiver)}</td>
+      <td style="${TC};${r.buyer?'cursor:pointer;':''}" title="${r.buyer?escAttr(r.buyer)+' — 더블클릭: 구매내역':''}" ${r.buyer?`ondblclick="openCustomerPopup(${r.id},'buyer')"`:''}>${maskName(r.buyer)}</td>
+      <td style="${TC};${r.receiver?'cursor:pointer;':''}" title="${r.receiver?escAttr(r.receiver)+' — 더블클릭: 구매내역':''}" ${r.receiver?`ondblclick="openCustomerPopup(${r.id},'receiver')"`:''}>${maskName(r.receiver)}</td>
       <td style="${TC}">${maskPhone(r.phone1)}</td>
       <td style="${TC}">${maskPhone(r.phone2)}</td>
       <td style="${TC}">${r.zip||''}</td>
@@ -12812,6 +12823,79 @@ function renderUnifiedTable(){
         <span class="uni-sum-item"><span class="lbl">마진율</span><span class="val ${mrCls}">${tRate.toFixed(1)}%</span></span>
       </div>` : '';
   }
+}
+
+// ── 통합 탭: 고객명(구매자/수취인) 더블클릭 → 구매내역 팝업 ──
+// 합배송 판단 기준: 날짜 + 판매처 + 고객명 + 연락처1 + 주소 가 모두 같으면 한 배송으로 묶음
+function openCustomerPopup(rowId, field){
+  const r0=_revData.find(x=>x.id===rowId); if(!r0) return;
+  const name=(field==='buyer'?r0.buyer:r0.receiver)||'';
+  if(!name) return;
+  const rows=_revData.filter(r=>(field==='buyer'?r.buyer:r.receiver)===name);
+  if(!rows.length) return;
+  rows.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (a.ch||'').localeCompare(b.ch||''));
+
+  const groups=new Map();
+  rows.forEach(r=>{
+    const key=[r.date||'', r.ch||'', name, r.phone1||'', r.addr||''].join('|');
+    if(!groups.has(key)) groups.set(key, {date:r.date, ch:r.ch, phone:r.phone1, addr:r.addr, items:[]});
+    groups.get(key).items.push(r);
+  });
+
+  const f=n=>(n||0).toLocaleString('ko-KR');
+  const mColor=n=>n>0?'color:#059669;font-weight:600;':n<0?'color:#DC2626;font-weight:600;':'';
+  let gSale=0, gSettle=0, gMargin=0;
+
+  const groupsHtml=[...groups.values()].map(g=>{
+    let sale=0, settle=0, margin=0;
+    const itemsHtml=g.items.map(it=>{
+      const mg=it.margin||0, mr=it.marginRate!=null?(it.marginRate*100).toFixed(1)+'%':'—';
+      sale+=it.salePrice||0; settle+=it.settlement||0; margin+=mg;
+      return `<tr>
+        <td style="text-align:left;white-space:normal;">${escAttr(it.modelName||'')}</td>
+        <td style="text-align:right;">${it.orderQty!=null?it.orderQty:''}</td>
+        <td style="text-align:right;">${f(it.salePrice)}</td>
+        <td style="text-align:right;">${f(it.settlement)}</td>
+        <td style="text-align:right;${mColor(mg)}">${f(mg)}</td>
+        <td style="text-align:right;">${mr}</td>
+      </tr>`;
+    }).join('');
+    const rate=settle>0?(margin/settle*100):0;
+    gSale+=sale; gSettle+=settle; gMargin+=margin;
+    return `<div style="margin-bottom:12px;border:1px solid var(--bd);border-radius:8px;overflow:hidden;">
+      <div style="background:var(--bg2);padding:6px 10px;font-size:12px;font-weight:600;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <span>${escAttr(g.date||'')} · ${escAttr(g.ch||'')}${g.items.length>1?` <span style="color:#3182F6;">(합배송 ${g.items.length}건)</span>`:''}</span>
+        <span style="color:var(--tx2);font-weight:400;">${maskPhone(g.phone)} · ${maskAddr(g.addr)}</span>
+      </div>
+      <table class="dt" style="width:100%;">
+        <thead><tr>
+          <th style="text-align:left;">상품명</th><th style="text-align:right;">수량</th>
+          <th style="text-align:right;">판매가</th><th style="text-align:right;">정산예정금액</th>
+          <th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
+        </tr></thead>
+        <tbody>${itemsHtml}</tbody>
+        ${g.items.length>1?`<tfoot><tr style="font-weight:700;background:var(--bg2);">
+          <td colspan="2" style="text-align:right;">합계</td>
+          <td style="text-align:right;">${f(sale)}</td>
+          <td style="text-align:right;">${f(settle)}</td>
+          <td style="text-align:right;${mColor(margin)}">${f(margin)}</td>
+          <td style="text-align:right;">${rate.toFixed(1)}%</td>
+        </tr></tfoot>`:''}
+      </table>
+    </div>`;
+  }).join('');
+
+  const gRate=gSettle>0?(gMargin/gSettle*100):0;
+  document.getElementById('revCustPopupTitle').innerHTML=`🧑 ${maskName(name)} 고객 구매내역 <span style="font-size:12px;color:var(--tx2);font-weight:400;">(총 ${rows.length}건)</span>`;
+  document.getElementById('revCustPopupBody').innerHTML=groupsHtml+`
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:10px 4px 2px;font-size:13px;font-weight:700;border-top:2px solid var(--bd);margin-top:2px;flex-wrap:wrap;">
+      <span style="color:var(--tx2);font-weight:400;">전체 합계</span>
+      <span>판매가 ${f(gSale)}</span>
+      <span>정산예정 ${f(gSettle)}</span>
+      <span style="${mColor(gMargin)}">마진 ${f(gMargin)}</span>
+      <span style="${mColor(gMargin)}">마진율 ${gRate.toFixed(1)}%</span>
+    </div>`;
+  openModal('revCustPopupModal');
 }
 
 // ── 통합 행 코드/모델명 수정 ──
