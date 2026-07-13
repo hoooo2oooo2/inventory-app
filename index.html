@@ -12778,8 +12778,28 @@ function renderUnifiedTable(){
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
           onblur="this.style.borderColor='transparent';this.style.background='transparent';">
       </td>
-      <td style="text-align:right;">${r.salePrice!=null?r.salePrice.toLocaleString():''}</td>
-      <td style="text-align:right;font-weight:600;">${r.settlement!=null?r.settlement.toLocaleString():''}</td>
+      <td style="text-align:right;padding:0;">
+        <input type="text" inputmode="numeric" value="${r.salePrice!=null?r.salePrice:''}"
+          onfocus="this.select()" onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){this.blur();}"
+          onchange="updateRowSalePrice(${r.id}, this.value)"
+          title="클릭하여 판매가 수정"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px;border-radius:4px;cursor:text;"
+          onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
+          onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+      </td>
+      <td style="text-align:right;padding:0;">
+        <input type="text" inputmode="numeric" value="${r.settlement!=null?r.settlement:''}"
+          onfocus="this.select()" onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){this.blur();}"
+          onchange="updateRowSettlement(${r.id}, this.value)"
+          title="클릭하여 정산예정금액 수정 (마진 자동 반영)"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;font-weight:600;color:inherit;padding:6px;border-radius:4px;cursor:text;"
+          onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
+          onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+      </td>
       <td style="text-align:right;">${r.costPrice!=null?r.costPrice.toLocaleString():''}</td>
       <td style="text-align:right;" class="${mgCls}">${mg!=null?mg.toLocaleString():''}</td>
       <td style="text-align:right;" class="${mrCls}">${mr!=null?(mr*100).toFixed(1)+'%':''}</td>
@@ -12994,6 +13014,51 @@ async function updateRowShipping(id, val){
     renderUnifiedTable();
   }catch(e){
     alert('배송비 저장 실패: '+e.message);
+    renderUnifiedTable();
+  }
+}
+
+// 통합 테이블 판매가 인라인 수정
+async function updateRowSalePrice(id, val){
+  const r=_revData.find(x=>x.id===id);
+  if(!r) return;
+  let price=parseFloat(String(val).replace(/[^0-9.\-]/g,''));
+  if(isNaN(price)) price=0;
+  price=Math.round(price);
+  if(price===(r.salePrice||0)){ renderUnifiedTable(); return; } // 변경 없음
+  try{
+    const {error}=await sb.from('revenue').update({sale_price:price}).eq('id',id);
+    if(error) throw error;
+    _bumpRev(r.year);
+    r.salePrice=price;
+    renderUnifiedTable();
+  }catch(e){
+    alert('판매가 저장 실패: '+e.message);
+    renderUnifiedTable();
+  }
+}
+
+// 통합 테이블 정산예정금액 인라인 수정 → 마진 자동 재계산
+async function updateRowSettlement(id, val){
+  const r=_revData.find(x=>x.id===id);
+  if(!r) return;
+  let settle=parseFloat(String(val).replace(/[^0-9.\-]/g,''));
+  if(isNaN(settle)) settle=0;
+  settle=Math.round(settle);
+  if(settle===(r.settlement||0)){ renderUnifiedTable(); return; } // 변경 없음
+  const costPrice=r.costPrice||0;
+  const shipping=r.shipping||0;
+  const margin=Math.round(settle-costPrice-shipping);
+  const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
+  try{
+    const {error}=await sb.from('revenue')
+      .update({settlement:settle, margin, margin_rate:marginRate}).eq('id',id);
+    if(error) throw error;
+    _bumpRev(r.year);
+    r.settlement=settle; r.margin=margin; r.marginRate=marginRate;
+    renderUnifiedTable();
+  }catch(e){
+    alert('정산예정금액 저장 실패: '+e.message);
     renderUnifiedTable();
   }
 }
