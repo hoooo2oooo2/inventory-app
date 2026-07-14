@@ -3438,6 +3438,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 변동이력 ═══ -->
 <div class="page" id="page-hist">
 <div class="main">
+  <div class="card" style="margin-bottom:14px;">
+    <div class="ch">
+      <div><div class="ct">🗑 삭제 데이터 되돌리기</div><div class="cs">판매분석·로켓그로스에서 날짜 삭제 시 자동 백업 (최근 20건)</div></div>
+      <button class="btn btn-sm" onclick="openDsManageModal()">🗓 날짜 선택 삭제/되돌리기</button>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>삭제일시</th><th>구분</th><th>날짜</th><th style="text-align:right;">행수</th><th style="text-align:center;">상태</th><th style="text-align:center;">되돌리기</th></tr></thead>
+      <tbody id="dsBackupBody"></tbody>
+    </table></div>
+    <div class="cs" id="dsBackupEmpty" style="padding:14px;display:none;">삭제된 데이터가 없습니다.</div>
+  </div>
   <div class="card">
     <div class="ch">
       <div><div class="ct">변동이력</div><div class="cs">모든 수정·업로드·입출고 자동 기록</div></div>
@@ -4690,6 +4701,41 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="revCustPopupBody"></div>
     <div class="ma" style="margin-top:12px;">
       <button class="btn" onclick="closeModal('revCustPopupModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 판매분석/로켓그로스 날짜별 삭제·되돌리기 팝업 -->
+<div class="modal-overlay" id="dsManageModal">
+  <div class="modal" style="max-width:520px;max-height:84vh;overflow-y:auto;">
+    <h3>🗓 판매데이터 삭제 / 되돌리기</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <select class="sel" id="dsMgType" onchange="dsManageLoadList()">
+        <option value="sales">판매분석</option>
+        <option value="rg">로켓그로스</option>
+      </select>
+      <span style="font-size:11px;color:var(--tx2);">최근 90일 중 데이터가 있는 날짜만 표시됩니다</span>
+    </div>
+    <div style="border:1px solid var(--bd);border-radius:8px;max-height:280px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:var(--bg2);position:sticky;top:0;">
+          <th style="text-align:left;padding:6px 10px;">날짜</th>
+          <th style="text-align:right;padding:6px 10px;">품목수</th>
+          <th style="text-align:right;padding:6px 10px;">총수량</th>
+        </tr></thead>
+        <tbody id="dsMgListBody"></tbody>
+      </table>
+      <div class="cs" id="dsMgListEmpty" style="padding:18px;text-align:center;color:var(--tx2);display:none;">최근 90일 내 데이터가 없습니다.</div>
+    </div>
+    <div id="dsMgActionPanel" style="margin-top:14px;padding:12px;background:var(--bg2);border-radius:8px;display:none;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;" id="dsMgActionLabel"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-da" onclick="dsMgConfirmDelete()">🗑 삭제</button>
+        <button class="btn" id="dsMgRestoreBtn" onclick="dsMgConfirmRestore()">↩ 이전 업로드로 되돌리기</button>
+      </div>
+    </div>
+    <div class="ma" style="margin-top:14px;">
+      <button class="btn" onclick="closeModal('dsManageModal')">닫기</button>
     </div>
   </div>
 </div>
@@ -6750,6 +6796,147 @@ async function addHistory(item){
   historyLog.unshift({id:Date.now(),time:t,actor,...item,user:userField});
   await sb.from('history_log').insert({time:t,menu:item.menu,type:item.type,code:item.code,name:item.name,description:item.desc,before_val:item.before,after_val:item.after,user_type:userField});
 }
+
+// ── 판매분석/로켓그로스 "날짜 삭제" 되돌리기용 백업 (daily_sales) ──
+// 변동이력에서 날짜 삭제를 실행하기 직전에 해당 날짜의 daily_sales 행을 통째로 백업해둔다.
+// 백업은 최근 20건만 보관(cloudKv daily_sales_del_backups).
+const DS_BACKUP_KEY = 'daily_sales_del_backups';
+const DS_BACKUP_MAX = 20;
+let _dsBackups = [];
+let _dsBackupsLoaded = false;
+async function loadDsBackups(){
+  if(_dsBackupsLoaded) return;
+  let data=null; try{ data=await cloudKvLoad(DS_BACKUP_KEY); }catch{ data=null; }
+  _dsBackups = Array.isArray(data) ? data : [];
+  _dsBackupsLoaded = true;
+}
+async function saveDsBackups(){ await cloudKvSave(DS_BACKUP_KEY, _dsBackups); }
+// 삭제 직전 호출: 해당 날짜·is_rg의 현재 행을 조회해 백업 목록 맨 앞에 추가
+async function backupDailySalesBeforeDelete(dateInput, isRg){
+  await loadDsBackups();
+  const {data, error} = await sb.from('daily_sales').select('code,name,sale_date,qty,is_rg')
+    .eq('sale_date', dateInput).eq('is_rg', isRg);
+  if(error || !data) return null;
+  const backup = {
+    id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    date: dateInput, isRg, rows: data,
+    deletedAt: fmtFull(new Date()),
+    deletedBy: (window.__CURRENT_USER&&window.__CURRENT_USER.name)||window.__ACTOR||'',
+    restored: false
+  };
+  _dsBackups.unshift(backup);
+  if(_dsBackups.length>DS_BACKUP_MAX) _dsBackups.length = DS_BACKUP_MAX;
+  await saveDsBackups();
+  return backup;
+}
+function renderDsBackups(){
+  const tb = document.getElementById('dsBackupBody');
+  const empty = document.getElementById('dsBackupEmpty');
+  if(!tb) return;
+  if(!_dsBackups.length){ tb.innerHTML=''; if(empty) empty.style.display='block'; return; }
+  if(empty) empty.style.display='none';
+  tb.innerHTML = _dsBackups.map(b=>`<tr>
+    <td style="color:var(--tx2);font-size:11px;white-space:nowrap;">${b.deletedAt}</td>
+    <td><span class="badge b-gy">${b.isRg?'로켓그로스':'판매분석'}</span></td>
+    <td>${b.date}</td>
+    <td style="text-align:right;">${b.rows.length}행</td>
+    <td style="text-align:center;">${b.restored?'<span style="color:var(--tx2);">복원됨</span>':'<span style="color:#D97706;">삭제됨</span>'}</td>
+    <td style="text-align:center;">${b.restored?'':`<button class="btn btn-sm" onclick="restoreDsBackup('${b.id}')">↩ 되돌리기</button>`}</td>
+  </tr>`).join('');
+}
+async function restoreDsBackup(backupId){
+  const b = _dsBackups.find(x=>x.id===backupId);
+  if(!b || b.restored) return;
+  if(!confirm(`${b.date} 날짜의 ${b.isRg?'로켓그로스':'판매분석'} 데이터 ${b.rows.length}행을 되돌릴까요?`)) return;
+  if(b.rows.length){
+    const {error} = await sb.from('daily_sales').upsert(b.rows, {onConflict:'code,sale_date,is_rg', ignoreDuplicates:false});
+    if(error){ alert('되돌리기 실패: '+error.message); return; }
+  }
+  b.restored = true;
+  await saveDsBackups();
+  await addHistory({menu:'변동이력',type:'upload',code:'-',name:'되돌리기',desc:`${b.date} ${b.isRg?'로켓그로스':'판매분석'} 데이터 복원`,before:'0건',after:`${b.rows.length}건`,user:'수동'});
+  if(b.isRg) await loadRgDailyCache(); else await loadDailyCache();
+  renderDsBackups();
+  renderHist();
+  alert(`완료! ${b.date} 데이터 ${b.rows.length}행을 되돌렸습니다.`);
+}
+
+// ── 판매분석/로켓그로스 날짜별 삭제·되돌리기 팝업 ──
+// 프롬프트로 날짜를 직접 입력하던 기존 방식 대신, 데이터가 있는 날짜 목록에서 골라 삭제/되돌리기할 수 있게 한다.
+let _dsMgList = [];       // [{date, isRg, rows, qty}]
+let _dsMgSelected = null; // {date, isRg}
+function openDsManageModal(){
+  openModal('dsManageModal');
+  loadDsBackups().then(dsManageLoadList);
+}
+async function dsManageLoadList(){
+  const isRg = document.getElementById('dsMgType').value==='rg';
+  const body = document.getElementById('dsMgListBody');
+  document.getElementById('dsMgActionPanel').style.display='none';
+  _dsMgSelected = null;
+  body.innerHTML = `<tr><td colspan="3" style="padding:10px;color:var(--tx2);text-align:center;">불러오는 중...</td></tr>`;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-90);
+  const cutoffStr = `${cutoff.getFullYear()}-${pad(cutoff.getMonth()+1)}-${pad(cutoff.getDate())}`;
+  const {data, error} = await sb.from('daily_sales').select('sale_date,qty')
+    .eq('is_rg', isRg).gte('sale_date', cutoffStr).order('sale_date',{ascending:false});
+  if(error){ body.innerHTML = `<tr><td colspan="3" style="padding:10px;color:#DC2626;text-align:center;">조회 실패: ${error.message}</td></tr>`; return; }
+  const byDate = {};
+  (data||[]).forEach(r=>{
+    const d=r.sale_date; if(!byDate[d]) byDate[d]={rows:0,qty:0};
+    byDate[d].rows++; byDate[d].qty+=(r.qty||0);
+  });
+  _dsMgList = Object.entries(byDate).map(([date,v])=>({date, isRg, rows:v.rows, qty:v.qty})).sort((a,b)=>b.date.localeCompare(a.date));
+  dsMgRenderList();
+}
+function dsMgRenderList(){
+  const body = document.getElementById('dsMgListBody');
+  const empty = document.getElementById('dsMgListEmpty');
+  if(!_dsMgList.length){ body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML = _dsMgList.map(d=>{
+    const sel = _dsMgSelected && _dsMgSelected.date===d.date && _dsMgSelected.isRg===d.isRg;
+    return `<tr style="cursor:pointer;${sel?'background:#EEF4FF;':''}" onclick="dsMgSelect('${d.date}')">
+      <td style="padding:6px 10px;">${d.date}</td>
+      <td style="text-align:right;padding:6px 10px;">${d.rows.toLocaleString()}개</td>
+      <td style="text-align:right;padding:6px 10px;">${d.qty.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+function dsMgSelect(date){
+  const isRg = document.getElementById('dsMgType').value==='rg';
+  _dsMgSelected = {date, isRg};
+  dsMgRenderList();
+  const found = _dsMgList.find(d=>d.date===date);
+  document.getElementById('dsMgActionLabel').textContent = `${date} ${isRg?'로켓그로스':'판매분석'} 데이터 (${found?found.rows:0}개 품목)`;
+  const hasBackup = _dsBackups.some(b=>b.date===date && b.isRg===isRg && !b.restored);
+  const restoreBtn = document.getElementById('dsMgRestoreBtn');
+  restoreBtn.disabled = !hasBackup;
+  restoreBtn.title = hasBackup ? '' : '이 날짜의 삭제 백업이 없어 되돌릴 데이터가 없습니다.';
+  document.getElementById('dsMgActionPanel').style.display='';
+}
+async function dsMgConfirmDelete(){
+  if(!_dsMgSelected) return;
+  const {date, isRg} = _dsMgSelected;
+  if(!confirm(`${date} ${isRg?'로켓그로스':'판매분석'} 데이터를 삭제할까요?\n(삭제 전 자동 백업되어 되돌릴 수 있습니다)`)) return;
+  const backup = await backupDailySalesBeforeDelete(date, isRg);
+  const {error} = await sb.from('daily_sales').delete().eq('sale_date', date).eq('is_rg', isRg);
+  if(error){ alert('삭제 실패: '+error.message); return; }
+  await addHistory({menu: isRg?'로켓그로스':'판매분석', type:'upload', code:'-', name:'삭제',
+    desc:`${date} ${isRg?'로켓그로스':'판매분석'} 데이터 삭제`, before:`${backup?backup.rows.length:0}건`, after:'0건', user:'수동'});
+  if(isRg) await loadRgDailyCache(); else await loadDailyCache();
+  renderDsBackups(); renderHist();
+  alert(`완료! ${date} 데이터가 삭제됐습니다.${backup&&backup.rows.length?' 필요하면 이 창에서 같은 날짜를 다시 선택해 되돌릴 수 있습니다.':''}`);
+  dsManageLoadList();
+}
+async function dsMgConfirmRestore(){
+  if(!_dsMgSelected) return;
+  const {date, isRg} = _dsMgSelected;
+  const backup = _dsBackups.find(b=>b.date===date && b.isRg===isRg && !b.restored);
+  if(!backup){ toast('되돌릴 백업 데이터가 없습니다.'); return; }
+  await restoreDsBackup(backup.id);
+  dsManageLoadList();
+}
+
 let _dCache={};
 let _dCacheVer=null;
 async function loadDailyCache(force){
@@ -7217,7 +7404,7 @@ function goPage(p){
     renderSalesPeriod(); renderSalesTbody(); renderProdPanel();
   }
   if(p==='rg'){ loadRgDailyCache().then(()=>{ renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
-  if(p==='hist') renderHist();
+  if(p==='hist'){ renderHist(); loadDsBackups().then(renderDsBackups); }
   if(p==='report') loadDailyCache().then(()=>renderReport());
   if(p==='revenue') loadRevenuePage().then(()=>goRevPage(_revPage));
   if(p==='price'){ pcEnsureBackdata(); pcRenderEstimates(); pcLoadEstimatesCloud(); cmbInit(); }
@@ -14807,30 +14994,34 @@ async function deleteHistUpload(histId){
     // 날짜 입력 받기
     const dateInput = prompt(`삭제할 날짜를 입력하세요 (예: 2026-04-28)\n\n업로드 시간: ${h.time}`, '');
     if(!dateInput) return;
-    const confirmDel = confirm(`${dateInput} 날짜의 일별 판매 데이터를 삭제합니다.\n계속하시겠습니까?`);
+    const confirmDel = confirm(`${dateInput} 날짜의 일별 판매 데이터를 삭제합니다.\n(삭제 전 자동 백업되어 변동이력 화면에서 되돌릴 수 있습니다)\n계속하시겠습니까?`);
     if(!confirmDel) return;
+    const backup = await backupDailySalesBeforeDelete(dateInput, false);
     const {error, count} = await sb.from('daily_sales').delete({count:'exact'}).eq('sale_date', dateInput).eq('is_rg', false);
     if(error){ alert('삭제 실패: '+error.message); return; }
     // 변동이력도 삭제
     await sb.from('history_log').delete().eq('id', histId);
     historyLog = historyLog.filter(x=>x.id!==histId);
-    await addHistory({menu:'변동이력',type:'upload',code:'-',name:'롤백',desc:`${dateInput} 판매데이터 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
-    alert(`완료! ${dateInput} 판매 데이터 삭제됨`);
+    await addHistory({menu:'변동이력',type:'upload',code:'-',name:'삭제',desc:`${dateInput} 판매데이터 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
+    alert(`완료! ${dateInput} 판매 데이터 삭제됨${backup&&backup.rows.length?` (백업 ${backup.rows.length}행 — 아래 목록에서 되돌리기 가능)`:''}`);
     await loadDailyCache();
+    renderDsBackups();
     renderHist();
 
   } else if(menu==='로켓그로스'){
     const dateInput = prompt(`삭제할 날짜를 입력하세요 (예: 2026-04-28)\n\n업로드 시간: ${h.time}`, '');
     if(!dateInput) return;
-    const confirmDel = confirm(`${dateInput} 날짜의 로켓그로스 데이터를 삭제합니다.\n계속하시겠습니까?`);
+    const confirmDel = confirm(`${dateInput} 날짜의 로켓그로스 데이터를 삭제합니다.\n(삭제 전 자동 백업되어 변동이력 화면에서 되돌릴 수 있습니다)\n계속하시겠습니까?`);
     if(!confirmDel) return;
+    const backup = await backupDailySalesBeforeDelete(dateInput, true);
     const {error} = await sb.from('daily_sales').delete().eq('sale_date', dateInput).eq('is_rg', true);
     if(error){ alert('삭제 실패: '+error.message); return; }
     await sb.from('history_log').delete().eq('id', histId);
     historyLog = historyLog.filter(x=>x.id!==histId);
-    await addHistory({menu:'변동이력',type:'upload',code:'-',name:'롤백',desc:`${dateInput} 로켓그로스 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
-    alert(`완료! ${dateInput} 로켓그로스 데이터 삭제됨`);
+    await addHistory({menu:'변동이력',type:'upload',code:'-',name:'삭제',desc:`${dateInput} 로켓그로스 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
+    alert(`완료! ${dateInput} 로켓그로스 데이터 삭제됨${backup&&backup.rows.length?` (백업 ${backup.rows.length}행 — 아래 목록에서 되돌리기 가능)`:''}`);
     await loadRgDailyCache();
+    renderDsBackups();
     renderHist();
 
   } else if(menu==='재고관리'){
