@@ -459,7 +459,7 @@ let state = {
   view: 'quick', quickFilter: 'all', catFilter: 'all', openCards: {},
   searchQuery: '', searchField: 'erp', searchDone: false,
   deletePw: '0000',
-  quickPage: 0, tablePage: 0,
+  quickPage: 0, tablePage: 0, missingSiteFilter: null,
 };
 let delTargetPid = null;
 let pendingImport = null;
@@ -1135,20 +1135,28 @@ function renderTableView(){
       renderTableView();
     });
   } else {
-    const oldest = missing.slice().sort((a,b)=> new Date(a.addedDate)-new Date(b.addedDate))[0];
     const perSite = state.sites.map(s=>({site:s, count: state.products.filter(p=> cellIsMissing(getCell(p,s.id))).length}))
       .filter(x=>x.count>0).sort((a,b)=>b.count-a.count);
     box.innerHTML = `
       미기재 상품 <b style="color:var(--red)">${missing.length}개</b>를 표시 중입니다.
-      가장 오래된 미기재 건은 <b>${escapeHtml(oldest.erpName)}</b> (등록 ${daysAgo(oldest.addedDate)}일 경과).
       <button class="btn btn-sm" id="btnBackAll" style="margin-left:10px;">전체 보기로 돌아가기</button>
-      <div>${perSite.map(x=>`<span class="chip-mini warn">${escapeHtml(x.site.name)} 누락 ${x.count}개</span>`).join('')}
+      <div style="margin-top:6px;">${perSite.map(x=>`
+        <span class="chip-mini warn" style="cursor:pointer;${state.missingSiteFilter===x.site.id?'background:var(--red);color:#fff;':''}" data-msite="${x.site.id}">${escapeHtml(x.site.name)} 누락 ${x.count}개</span>`).join('')}
       <span class="chip-mini">이번 주 신규 등록 ${newThisWeek}개</span></div>`;
     const backBtn = document.getElementById('btnBackAll');
     if(backBtn) backBtn.addEventListener('click', ()=>{
       document.getElementById('tableFilter').value = 'all';
       state.tablePage = 0;
+      state.missingSiteFilter = null;
       renderTableView();
+    });
+    box.querySelectorAll('[data-msite]').forEach(chip=>{
+      chip.addEventListener('click', ()=>{
+        const sid = chip.dataset.msite;
+        state.missingSiteFilter = state.missingSiteFilter===sid ? null : sid;
+        state.tablePage = 0;
+        renderTableView();
+      });
     });
   }
 
@@ -1159,7 +1167,12 @@ function renderTableView(){
     <th class="col-del"></th>`;
 
   let list = state.products.slice();
-  if(f==='missing') list = list.filter(isMissing);
+  if(f==='missing'){
+    list = list.filter(isMissing);
+    if(state.missingSiteFilter) list = list.filter(p=> cellIsMissing(getCell(p, state.missingSiteFilter)));
+  } else if(state.missingSiteFilter){
+    state.missingSiteFilter = null;   // 미기재 필터를 벗어나면 사이트별 세부 필터도 함께 해제
+  }
   if(f==='new') list = list.filter(isNew);
   const q = document.getElementById('tableSearch').value.trim().toLowerCase();
   if(q) list = list.filter(p=> (p.erpName||'').toLowerCase().includes(q) || (p.searchName||'').toLowerCase().includes(q));
@@ -1183,7 +1196,6 @@ function renderTableView(){
     <tr>
       <td class="col-erp">
         <div class="prod-name">${escapeHtml(p.erpName)}${isNew(p)?'<span class="badge-new">NEW</span>':''}</div>
-        <div class="prod-meta">등록 ${daysAgo(p.addedDate)}일 경과 · ${p.addedDate}</div>
       </td>
       <td class="col-search"><span class="search-name-txt">${escapeHtml(p.searchName||'')}</span></td>
       ${state.sites.map(s=>{
