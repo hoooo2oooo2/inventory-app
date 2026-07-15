@@ -294,6 +294,7 @@
     <div class="result-count" id="resultCount"></div>
     <div id="quickList"></div>
     <div class="empty" id="quickEmpty" style="display:none;">검색 결과가 없습니다.</div>
+    <div id="quickPager" style="display:flex;justify-content:center;gap:8px;align-items:center;margin-top:14px;"></div>
   </div>
 
   <div id="viewTable" style="display:none;">
@@ -322,6 +323,7 @@
         </table>
       </div>
       <div class="empty" id="tableEmpty" style="display:none;border:none;">표시할 상품이 없습니다.</div>
+      <div id="tablePager" style="display:flex;justify-content:center;gap:8px;align-items:center;padding:14px 0;"></div>
     </div>
   </div>
 
@@ -457,9 +459,13 @@ let state = {
   view: 'quick', quickFilter: 'all', catFilter: 'all', openCards: {},
   searchQuery: '', searchField: 'erp', searchDone: false,
   deletePw: '0000',
+  quickPage: 0, tablePage: 0,
 };
 let delTargetPid = null;
 let pendingImport = null;
+// 상품 수가 많아지면(수백~수천 개) 전체를 한 번에 DOM에 그릴 경우 브라우저가 버벅이므로 페이지네이션 적용
+const QUICK_PAGE_SIZE = 30;
+const TABLE_PAGE_SIZE = 50;
 
 const DEFAULT_SITES = ['네이버','카페24','이베이','11번가','쿠팡','오늘의집','오너클랜','카카오톡스토어','에이블리','올웨이즈'];
 const CATEGORY_ORDER = ['모든상품','전기상품','호박등&구슬등','가로등&기둥','비츠온'];
@@ -595,6 +601,23 @@ function showToast(msg){
   clearTimeout(showToast._t);
   showToast._t = setTimeout(()=>t.classList.remove('show'), 2000);
 }
+// 목록 페이지네이션 공용 렌더러 (품절·해제 처리 / 상품번호 관리 둘 다 사용)
+function renderPager(containerId, total, pageSize, page, gotoFn){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  if(total <= pageSize){ el.innerHTML=''; return; }
+  const maxPage = Math.max(0, Math.ceil(total/pageSize)-1);
+  el.innerHTML = `
+    <button class="btn btn-sm" data-pg="first" ${page===0?'disabled':''}>처음</button>
+    <button class="btn btn-sm" data-pg="prev" ${page===0?'disabled':''}>◀</button>
+    <span style="font-size:12.5px;color:var(--ink-soft);padding:0 6px;">${page+1} / ${maxPage+1} 페이지</span>
+    <button class="btn btn-sm" data-pg="next" ${page>=maxPage?'disabled':''}>▶</button>
+    <button class="btn btn-sm" data-pg="last" ${page>=maxPage?'disabled':''}>끝</button>`;
+  const dest = { first:0, prev:Math.max(0,page-1), next:Math.min(maxPage,page+1), last:maxPage };
+  el.querySelectorAll('[data-pg]').forEach(btn=>{
+    btn.addEventListener('click', ()=> gotoFn(dest[btn.dataset.pg]));
+  });
+}
 function firstLine(s){ return String(s||'').split('\n')[0].trim(); }
 function extraLineCount(s){ return Math.max(0, String(s||'').split('\n').map(l=>l.trim()).filter(Boolean).length - 1); }
 function escapeHtml(s){
@@ -712,6 +735,7 @@ function renderCatFilters(){
     btn.addEventListener('click', ()=>{
       state.catFilter = state.catFilter === btn.dataset.cat ? 'all' : btn.dataset.cat;
       state.searchDone = true;
+      state.quickPage = 0;
       renderQuick();
     });
   });
@@ -741,8 +765,15 @@ function renderQuick(){
   emptyEl.style.display = list.length? 'none':'block';
   emptyEl.textContent = '검색 결과가 없습니다.';
 
+  // 상품 수가 많을 때 전체를 한 번에 그리면 버벅이므로 페이지 단위로 표시
+  const maxQuickPage = Math.max(0, Math.ceil(list.length/QUICK_PAGE_SIZE)-1);
+  if(state.quickPage > maxQuickPage) state.quickPage = maxQuickPage;
+  const quickStart = state.quickPage * QUICK_PAGE_SIZE;
+  const pageList = list.slice(quickStart, quickStart + QUICK_PAGE_SIZE);
+  renderPager('quickPager', list.length, QUICK_PAGE_SIZE, state.quickPage, (p)=>{ state.quickPage = p; renderQuick(); });
+
   const container = document.getElementById('quickList');
-  container.innerHTML = list.map(p=>{
+  container.innerHTML = pageList.map(p=>{
     const st = productSaleStatus(p);
     const act = activeSites(p);
     const so = soldoutSites(p);
@@ -1100,6 +1131,7 @@ function renderTableView(){
     const goBtn = document.getElementById('btnGoMissing');
     if(goBtn) goBtn.addEventListener('click', ()=>{
       document.getElementById('tableFilter').value = 'missing';
+      state.tablePage = 0;
       renderTableView();
     });
   } else {
@@ -1115,6 +1147,7 @@ function renderTableView(){
     const backBtn = document.getElementById('btnBackAll');
     if(backBtn) backBtn.addEventListener('click', ()=>{
       document.getElementById('tableFilter').value = 'all';
+      state.tablePage = 0;
       renderTableView();
     });
   }
@@ -1135,8 +1168,15 @@ function renderTableView(){
   document.getElementById('panelTitle').textContent = `상품 목록 (${list.length})`;
   document.getElementById('tableEmpty').style.display = list.length?'none':'block';
 
+  // 상품 수가 많을 때 전체를 한 번에 그리면 버벅이므로 페이지 단위로 표시
+  const maxTablePage = Math.max(0, Math.ceil(list.length/TABLE_PAGE_SIZE)-1);
+  if(state.tablePage > maxTablePage) state.tablePage = maxTablePage;
+  const tableStart = state.tablePage * TABLE_PAGE_SIZE;
+  const pageList = list.slice(tableStart, tableStart + TABLE_PAGE_SIZE);
+  renderPager('tablePager', list.length, TABLE_PAGE_SIZE, state.tablePage, (p)=>{ state.tablePage = p; renderTableView(); });
+
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML = list.map(p=>{
+  tbody.innerHTML = pageList.map(p=>{
     const missing = isMissing(p);
     const missCount = productMissingSites(p).length;
     return `
@@ -1425,6 +1465,7 @@ async function init(){
     state.searchQuery = document.getElementById('quickSearch').value;
     state.searchField = document.getElementById('searchField').value;
     state.searchDone = true;
+    state.quickPage = 0;
     renderQuick();
   }
   document.getElementById('btnQuickSearch').addEventListener('click', doQuickSearch);
@@ -1433,6 +1474,7 @@ async function init(){
     const btn = e.target.closest('.qf'); if(!btn) return;
     state.quickFilter = btn.dataset.qf;
     state.searchDone = true;
+    state.quickPage = 0;
     document.querySelectorAll('.qf').forEach(b=>b.classList.toggle('active', b===btn));
     renderQuick();
   });
@@ -1482,8 +1524,8 @@ async function init(){
   document.getElementById('closeHist').addEventListener('click', ()=> document.getElementById('histOverlay').classList.remove('show'));
   document.getElementById('histOverlay').addEventListener('click', (e)=>{ if(e.target.id==='histOverlay') document.getElementById('histOverlay').classList.remove('show'); });
 
-  document.getElementById('tableSearch').addEventListener('input', renderTableView);
-  document.getElementById('tableFilter').addEventListener('change', renderTableView);
+  document.getElementById('tableSearch').addEventListener('input', ()=>{ state.tablePage = 0; renderTableView(); });
+  document.getElementById('tableFilter').addEventListener('change', ()=>{ state.tablePage = 0; renderTableView(); });
 
 
   // 삭제 플로우
