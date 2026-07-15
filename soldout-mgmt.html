@@ -148,6 +148,13 @@
   .prod-meta{font-size:11px;color:var(--ink-soft);margin-top:2px;}
   .badge-new{background:var(--orange-light);color:var(--orange);font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px;margin-left:4px;}
   .search-name-txt{color:var(--ink-soft);font-size:12.5px;word-break:break-all;white-space:pre-line;}
+  .prod-name-edit{width:100%;border:1px dashed transparent;border-radius:6px;background:transparent;resize:none;
+    font-family:inherit;font-weight:700;line-height:1.45;font-size:13px;color:var(--ink);padding:2px 4px;margin:-2px -4px;
+    outline:none;word-break:break-all;}
+  .prod-name-edit:hover, .prod-name-edit:focus{border-color:var(--blue);background:#fff;}
+  .search-name-edit{width:100%;border:1px dashed transparent;border-radius:6px;background:transparent;
+    font-family:inherit;font-size:12.5px;color:var(--ink-soft);padding:2px 4px;margin:-2px -4px;outline:none;}
+  .search-name-edit:hover, .search-name-edit:focus{border-color:var(--blue);background:#fff;color:var(--ink);}
 
   .site-cell{}
   .cell-box{border-radius:8px;border:1px solid transparent;padding:6px 7px;min-height:33px;}
@@ -1195,9 +1202,9 @@ function renderTableView(){
     return `
     <tr>
       <td class="col-erp">
-        <div class="prod-name">${escapeHtml(p.erpName)}${isNew(p)?'<span class="badge-new">NEW</span>':''}</div>
+        <textarea class="prod-name-edit" data-pid="${p.id}" rows="${Math.max(1, String(p.erpName||'').split('\n').length)}" placeholder="ERP 상품명">${escapeHtml(p.erpName)}</textarea>${isNew(p)?'<span class="badge-new">NEW</span>':''}
       </td>
-      <td class="col-search"><span class="search-name-txt">${escapeHtml(p.searchName||'')}</span></td>
+      <td class="col-search"><input type="text" class="search-name-edit" data-pid="${p.id}" value="${escapeHtml(p.searchName||'')}" placeholder="상품명찾기"></td>
       ${state.sites.map(s=>{
         const cell = getCell(p, s.id);
         const cls = cell.x ? 'xstate' : (cellIsFilled(cell) ? 'filled' : 'missing');
@@ -1236,6 +1243,37 @@ function renderTableView(){
   tbody.querySelectorAll('[data-del]').forEach(btn=>{
     btn.addEventListener('click', ()=> openDeleteFlow(btn.dataset.del));
   });
+  tbody.querySelectorAll('.prod-name-edit').forEach(area=>{
+    area.addEventListener('input', ()=>{ area.rows = Math.max(1, area.value.split('\n').length); });
+    area.addEventListener('blur', async (e)=> updateProdErpName(e.target.dataset.pid, e.target.value));
+  });
+  tbody.querySelectorAll('.search-name-edit').forEach(inp=>{
+    inp.addEventListener('blur', async (e)=> updateProdSearchName(e.target.dataset.pid, e.target.value));
+    inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter') e.target.blur(); });
+  });
+}
+async function updateProdErpName(pid, val){
+  const p = state.products.find(x=>x.id===pid);
+  if(!p) return;
+  const name = String(val||'').split('\n').map(l=>l.trim()).filter(Boolean).join('\n');
+  if(!name){ showToast('ERP 상품명은 비울 수 없습니다.'); render(); return; }
+  if(name === p.erpName) return;
+  if(state.products.some(x=>x.id!==pid && x.erpName===name)){
+    showToast('이미 등록된 상품명입니다.'); render(); return;
+  }
+  p.erpName = name;
+  await saveState();
+  render();
+  showToast('상품명이 수정되었습니다.');
+}
+async function updateProdSearchName(pid, val){
+  const p = state.products.find(x=>x.id===pid);
+  if(!p) return;
+  const name = String(val||'').trim();
+  if(name === (p.searchName||'')) return;
+  p.searchName = name;
+  await saveState();
+  render();
 }
 
 /* ---------- 삭제 플로우 (비밀번호 → 예/아니오) ---------- */
