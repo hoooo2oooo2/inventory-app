@@ -260,6 +260,7 @@
     </div>
     <div class="h-right">
       <button class="btn" id="btnUpload">📂 엑셀 업로드</button>
+      <button class="btn btn-red" id="btnDeleteAll">🗑 데이터 전체삭제</button>
       <button class="btn" id="btnSites">⚙ 사이트 설정</button>
       <button class="btn btn-primary" id="btnAdd">＋ 신규 상품 등록</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;">
@@ -431,6 +432,18 @@
         <button class="btn btn-red" id="delYes" style="min-width:100px;justify-content:center;">예</button>
         <button class="btn" id="delNo" style="min-width:100px;justify-content:center;">아니오</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 전체 삭제 확인 모달 -->
+<div class="overlay" id="deleteAllOverlay">
+  <div class="modal" style="width:380px;text-align:center;">
+    <h3 style="margin-bottom:10px;color:var(--red);">정말 삭제하시겠습니까?</h3>
+    <p class="sub" style="margin-bottom:18px;">등록된 모든 상품번호 관리 데이터(상품 <span id="deleteAllCount">0</span>개)가<br>영구 삭제됩니다. 되돌릴 수 없습니다.</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-red" id="deleteAllYes" style="min-width:100px;justify-content:center;">예</button>
+      <button class="btn" id="deleteAllNo" style="min-width:100px;justify-content:center;">아니오</button>
     </div>
   </div>
 </div>
@@ -1052,6 +1065,20 @@ function openUploadModal(){
 }
 function closeUploadModal(){ document.getElementById('uploadOverlay').classList.remove('show'); }
 
+/* ---------- 데이터 전체삭제 ---------- */
+function openDeleteAllModal(){
+  document.getElementById('deleteAllCount').textContent = state.products.length;
+  document.getElementById('deleteAllOverlay').classList.add('show');
+}
+function closeDeleteAllModal(){ document.getElementById('deleteAllOverlay').classList.remove('show'); }
+async function confirmDeleteAllYes(){
+  state.products = [];
+  await saveState();
+  closeDeleteAllModal();
+  render();
+  showToast('전체 데이터가 삭제되었습니다.');
+}
+
 /* ---------- 표 뷰 ---------- */
 function renderTableView(){
   const total = state.products.length;
@@ -1446,6 +1473,11 @@ async function init(){
   document.getElementById('cancelUpload').addEventListener('click', closeUploadModal);
   document.getElementById('confirmUpload').addEventListener('click', runImport);
   document.getElementById('uploadOverlay').addEventListener('click', (e)=>{ if(e.target.id==='uploadOverlay') closeUploadModal(); });
+
+  document.getElementById('btnDeleteAll').addEventListener('click', openDeleteAllModal);
+  document.getElementById('deleteAllYes').addEventListener('click', confirmDeleteAllYes);
+  document.getElementById('deleteAllNo').addEventListener('click', closeDeleteAllModal);
+  document.getElementById('deleteAllOverlay').addEventListener('click', (e)=>{ if(e.target.id==='deleteAllOverlay') closeDeleteAllModal(); });
 
   document.getElementById('closeHist').addEventListener('click', ()=> document.getElementById('histOverlay').classList.remove('show'));
   document.getElementById('histOverlay').addEventListener('click', (e)=>{ if(e.target.id==='histOverlay') document.getElementById('histOverlay').classList.remove('show'); });
