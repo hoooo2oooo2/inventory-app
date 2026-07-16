@@ -3737,11 +3737,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <span style="font-size:14px;font-weight:600;">🚚 택배비</span>
             <span style="font-size:11px;color:var(--tx2);margin-left:8px;">판매처·상품번호별 택배비 (통합 배송비/마진 반영)</span>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <div class="search-box">
               <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               <input type="text" id="shipSrch" placeholder="상품번호, 상품명..." oninput="renderShipTable()">
             </div>
+            <div class="rev-filter-group" id="shipChBtns"></div>
             <button class="btn btn-sm" onclick="applyAllShipping()" style="background:#7C3AED;color:#fff;border:none;">↻ 전체 재적용</button>
             <button class="btn btn-pr btn-sm" onclick="openShipAdd()">+ 칸 추가</button>
           </div>
@@ -9843,12 +9844,28 @@ async function loadShippingFees(){
   _shipLoaded=true;
 }
 
+let _shipChFilter='ALL';
+function renderShipChBtns(){
+  const el=document.getElementById('shipChBtns'); if(!el) return;
+  const chs=[...new Set(_shipData.map(r=>r.channel).filter(Boolean))].sort();
+  if(!chs.includes(_shipChFilter)) _shipChFilter='ALL';
+  el.innerHTML=`<button class="rfbtn ${_shipChFilter==='ALL'?'active':''}" onclick="setShipCh(this,'ALL')">전체</button>`
+    +chs.map(c=>`<button class="rfbtn ${_shipChFilter===c?'active':''}" onclick="setShipCh(this,'${c}')">${c}</button>`).join('');
+}
+function setShipCh(btn, val){
+  _shipChFilter=val;
+  document.querySelectorAll('#shipChBtns .rfbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderShipTable();
+}
+
 function renderShipTable(){
   const tb=document.getElementById('shipTbody');
   const empty=document.getElementById('shipEmpty');
   if(!tb) return;
+  renderShipChBtns();
   const srch=(document.getElementById('shipSrch')?.value||'').toLowerCase();
-  const rows=_shipData.filter(r=>!srch||`${r.channel}${r.item_no}${r.item_name||''}`.toLowerCase().includes(srch));
+  const rows=_shipData.filter(r=>(_shipChFilter==='ALL'||r.channel===_shipChFilter) && (!srch||`${r.channel}${r.item_no}${r.item_name||''}`.toLowerCase().includes(srch)));
   if(!rows.length){ if(empty)empty.style.display='block'; tb.innerHTML=''; return; }
   if(empty) empty.style.display='none';
   tb.innerHTML=rows.map(r=>`<tr>
