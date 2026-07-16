@@ -13988,25 +13988,36 @@ async function parseChannelFile(file, channelName){
   // ── 합배송 처리(출고건수 + 배송비 통합) ──
   // 기준: 판매일+판매처+수취인+연락처1+주소 동일 → 같은 배송(합배송)으로 간주.
   //  주문번호는 기준에서 제외 — 주문번호가 달라도(같은 날 같은 사람·주소로 여러 건 주문 시
-  //  창고에서 합배송 처리되는 경우 포함) 같은 그룹으로 묶어, 첫 행만 ship_qty=1·배송비를 부과하고
-  //  나머지는 ship_qty=0·배송비 0으로 처리한다. (기존엔 주문번호까지 키에 포함돼 있어 주문번호가
-  //  다르면 이름·연락처·주소가 같아도 합배송으로 묶이지 않던 버그가 있었음)
-  //  단, 택배비 설정에서 "수량비례(perUnit)"로 지정된 상품은 수량당 실비가 그대로 발생하므로
-  //  다른 상품과 합배송으로 묶여도 배송비를 0으로 깎지 않고 그대로 유지한다.
-  const seenShip = new Set();
+  //  창고에서 합배송 처리되는 경우 포함) 같은 그룹으로 묶는다.
+  //  한 그룹(=한 번의 배송) 안에서는 배송비를 무조건 딱 1건만 부과한다:
+  //   - 그룹의 첫 행이 대표로 ship_qty=1·배송비를 부과받고, 나머지는 ship_qty=0·배송비 0.
+  //   - 단, 택배비 설정에서 "수량비례(perUnit)"인 상품이 그룹에 섞여 있으면 그 실비 상품의
+  //     배송비가 대표 배송비가 된다(무료/정액 상품 뒤에 묶여 실비가 그냥 0으로 사라지는 것을 방지).
+  //     대표가 이미 perUnit 상품이면 이후 다른 perUnit 상품이 더 있어도 배송비를 중복 부과하지 않는다.
+  const shipGroups = new Map();   // key → { holder: row, holderIsPerUnit: bool }
   for(const row of rows){
     const key = `${row.year}|${row.sale_date}|${row.channel}|${row.receiver}|${row.phone1}|${row.address}`;
     const isPerUnitFee = !!(_shipMap[`${row.channel}|${row.item_no}`]||{}).perUnit;
-    if(!seenShip.has(key)){
-      seenShip.add(key);
+    const g = shipGroups.get(key);
+    if(!g){
       row.ship_qty = 1;
-    } else {
-      row.ship_qty = 0;
-      if(row.shipping_fee>0 && !isPerUnitFee){
-        row.shipping_fee = 0;
-        row.margin = Math.round(row.settlement - row.cost_price);
-        row.margin_rate = row.settlement>0 ? Math.round(row.margin/row.settlement*10000)/10000 : 0;
+      shipGroups.set(key, { holder: row, holderIsPerUnit: isPerUnitFee });
+      continue;
+    }
+    row.ship_qty = 0;
+    if(isPerUnitFee && !g.holderIsPerUnit){
+      // 지금까지의 대표 배송비는 실비가 아닌데 이 상품은 실비 → 대표를 이 상품으로 교체
+      if(g.holder.shipping_fee>0){
+        g.holder.shipping_fee = 0;
+        g.holder.margin = Math.round(g.holder.settlement - g.holder.cost_price);
+        g.holder.margin_rate = g.holder.settlement>0 ? Math.round(g.holder.margin/g.holder.settlement*10000)/10000 : 0;
       }
+      g.holder = row;
+      g.holderIsPerUnit = true;
+    } else if(row.shipping_fee>0){
+      row.shipping_fee = 0;
+      row.margin = Math.round(row.settlement - row.cost_price);
+      row.margin_rate = row.settlement>0 ? Math.round(row.margin/row.settlement*10000)/10000 : 0;
     }
   }
 
