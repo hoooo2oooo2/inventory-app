@@ -964,9 +964,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .rgm-bar-track{height:8px;background:var(--bg2);border-radius:5px;overflow:hidden;}
 .rgm-bar-fill{height:100%;border-radius:5px;background:var(--pr);}
 .rgm-bar-val{font-size:10.5px;color:var(--tx2);text-align:right;font-variant-numeric:tabular-nums;}
-.rgm-trend-meta{display:flex;gap:16px;padding:0 14px 8px;flex-wrap:wrap;}
-.rgm-trend-meta-item{font-size:10.5px;color:var(--tx2);}
-.rgm-trend-meta-item b{display:block;font-size:14px;font-weight:800;color:var(--tx);font-variant-numeric:tabular-nums;}
+.rgm-trend-meta{display:flex;gap:22px;padding:12px 16px;flex-wrap:wrap;border-bottom:0.5px solid var(--bd);background:var(--bg2);}
+.rgm-trend-meta-item{font-size:11px;font-weight:600;color:var(--tx2);}
+.rgm-trend-meta-item b{display:block;font-size:22px;font-weight:800;color:var(--tx);font-variant-numeric:tabular-nums;margin-top:2px;}
 .rgm-urgency-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 .rgm-filter-chip{font:inherit;font-size:11px;font-weight:600;color:var(--tx2);background:var(--bg2);border:0.5px solid var(--bd);border-radius:99px;padding:4px 11px;cursor:pointer;transition:all .12s;}
 .rgm-filter-chip:hover{color:var(--tx);}
@@ -977,6 +977,28 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .rgm-kpi-click:hover{border-color:var(--pr);}
 .rgm-kpi-click.active{border-color:var(--pr);background:var(--prl);}
 @keyframes rgmHl{0%{background:var(--prl);}100%{background:transparent;}}
+/* KPI 카드 리스타일 — 좌측 컬러 액센트 + 호버 (보고용 대시보드 느낌) */
+#page-rgmgmt .sum-row{gap:10px;}
+#page-rgmgmt .sc{position:relative;overflow:hidden;background:var(--bg);border:1px solid var(--bd);padding:11px 14px 11px 16px;transition:box-shadow .15s,transform .15s;}
+#page-rgmgmt .sc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--bd);}
+#page-rgmgmt .sc.rgm-ac-red::before{background:#DC2626;}
+#page-rgmgmt .sc.rgm-ac-orange::before{background:#EA580C;}
+#page-rgmgmt .sc.rgm-ac-blue::before{background:#3182F6;}
+#page-rgmgmt .sc.rgm-ac-green::before{background:#059669;}
+#page-rgmgmt .sc.rgm-ac-purple::before{background:#534AB7;}
+#page-rgmgmt .sc.rgm-kpi-click:hover{box-shadow:0 3px 11px rgba(16,24,40,.09);transform:translateY(-1px);border-color:var(--bd);}
+#page-rgmgmt .sc.rgm-kpi-click.active{box-shadow:0 3px 11px rgba(16,24,40,.09);}
+#page-rgmgmt .sl{font-size:11px;font-weight:600;color:var(--tx2);letter-spacing:.1px;margin-bottom:3px;}
+#page-rgmgmt .sv{font-size:21px;font-weight:800;letter-spacing:-.5px;}
+#page-rgmgmt .sv-sub{font-size:11px;font-weight:600;margin-top:2px;}
+/* 2열 바 리스트 — 입고 리드타임 · 상품별 반품건수/반품률 등 긴 목록을 절반 높이로 */
+.rgm-bar-2col{display:grid;grid-template-columns:1fr 1fr;column-gap:22px;}
+.rgm-bar-2col .rgm-bar-row{margin-bottom:8px;}
+@media(max-width:900px){.rgm-bar-2col{grid-template-columns:1fr;}}
+.rgm-pager-sm{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:9px;border-top:0.5px solid var(--bd);}
+.rgm-hint{font-size:11px;color:var(--tx2);line-height:1.6;padding:9px 14px;background:var(--bg2);border-radius:8px;margin-top:8px;}
+.rgm-hint b{color:var(--tx);}
+.rgm-section-title{font-size:13px;font-weight:700;color:var(--tx);margin:18px 0 10px;display:flex;align-items:center;gap:6px;}
 @media(max-width:1000px){
   .rgm-log-layout,.rgm-g2,.rgm-returns-layout{grid-template-columns:1fr;}
   .rgm-add-grid{grid-template-columns:1fr 1fr;}
@@ -2701,7 +2723,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <div class="rgm-fld"><label for="rgmFOut">출고수량</label><input type="number" id="rgmFOut" placeholder="12" min="0"></div>
               <button class="btn btn-pr" onclick="rgmAddBatch()">출고 등록</button>
             </div>
-            <div class="cs" style="margin-top:7px;">등록 직후 상태는 <b style="color:var(--tx2);">입고대기</b>가 되고, 목록에서 "입고 처리" 버튼으로 정상입고수량·진열일을 확정합니다.</div>
+            <div class="rgm-hint">등록 직후 상태는 <b>입고대기</b> → 아래 목록의 "입고 처리" 버튼을 눌러 <b>정상입고수량 · 진열일</b>을 확정하면 <b>판매중</b>으로 바뀝니다.<br>
+            ⚠️ <b>입고오류는 이 단계에서 별도로 입력하는 항목이 아니라</b>, 입고 처리 시 입력한 정상입고수량이 출고수량보다 적으면 그 차이만큼 <b>자동으로 계산</b>되어 배치 이력에 "입고오류 N개" 배지로 표시됩니다.</div>
           </div>
         </div>
         <div class="card">
@@ -2725,11 +2748,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rgm-cal-legend"><span class="rgm-cal-dot"></span>입고요청일이 있는 날</div>
           <div class="rgm-cal-list" id="rgmCalList"></div>
         </div>
-        <div class="card">
-          <div class="ch"><div class="ct" style="font-size:12.5px;">입고 리드타임</div></div>
-          <div style="padding:13px 14px;" id="rgmLeadtimeChart"></div>
-        </div>
       </aside>
+    </div>
+    <div class="card" style="margin-top:12px;">
+      <div class="ch"><div><div class="ct">입고 리드타임</div><div class="cs">입고요청일 → 진열일까지 걸린 평균 일수 · 짧을수록 좋음</div></div></div>
+      <div class="rgm-bar-2col" style="padding:13px 14px;" id="rgmLeadtimeChart"></div>
+      <div class="rgm-pager-sm" style="padding:0 14px 13px;" id="rgmLeadtimePager"></div>
     </div>
   </div>
 
@@ -2748,8 +2772,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div style="padding:2px 14px 13px;" id="rgmTrendSvg"></div>
       </div>
     </div>
-    <div class="card" style="margin:12px 0;">
-      <div class="ch"><div><div class="ct">재입고 타이밍 추천</div><div class="cs">최근 배치의 평균 판매속도 기준 · 리드타임 7일 가정</div></div></div>
+    <div class="card" style="margin:12px 0;" id="rgmReorderCard">
+      <div class="ch"><div><div class="ct">재입고 타이밍 추천</div><div class="cs">최근 배치의 평균 판매속도 기준 · 리드타임 7일 가정 · 빨간 행=긴급(7일 이내 소진), 노란 행=주의(14일 이내)</div></div></div>
       <div class="tw">
         <table>
           <thead><tr><th class="ns">상품</th><th class="ns" style="text-align:right;">현재 실재고</th><th class="ns" style="text-align:right;">일평균 판매</th><th class="ns">예상 소진일</th><th class="ns">추천 재입고일</th><th class="ns">긴급도</th></tr></thead>
@@ -2801,36 +2825,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <!-- ─── 고객반품 관리 ─── -->
   <div class="rgm-tabcontent" id="rgmTab-returns" style="display:none;">
     <div class="sum-row" id="rgmReturnsKpis"></div>
-    <div class="rgm-returns-layout">
-      <div class="card">
-        <div class="ch">
-          <div><div class="ct">반품 처리 내역</div><div class="cs" id="rgmReturnsCount"></div></div>
-          <button class="btn btn-pr btn-sm" onclick="rgmOpenReturnModal()">＋ 반품 등록</button>
-        </div>
-        <div style="display:flex;gap:6px;padding:10px 14px;border-bottom:0.5px solid var(--bd);" id="rgmReturnsFilter"></div>
-        <div class="tw">
-          <table>
-            <thead><tr><th class="ns">반출접수일</th><th class="ns">송장번호</th><th class="ns">상품</th><th class="ns" style="text-align:right;">수량</th><th class="ns">상태</th><th class="ns">처리현황</th><th class="ns" style="text-align:right;">보상금액</th></tr></thead>
-            <tbody id="rgmReturnsTbody"></tbody>
-          </table>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:0.5px solid var(--bd);" id="rgmReturnsPager"></div>
+    <div class="card">
+      <div class="ch">
+        <div><div class="ct">반품 처리 내역</div><div class="cs" id="rgmReturnsCount"></div></div>
+        <button class="btn btn-pr btn-sm" onclick="rgmOpenReturnModal()">＋ 반품 등록</button>
       </div>
-      <aside class="rgm-side">
-        <div class="card" style="padding:13px 14px;">
-          <div class="ct" style="font-size:12.5px;margin-bottom:9px;">상품별 반품 건수</div>
-          <div id="rgmReturnsBarChart"></div>
-        </div>
-        <div class="card" style="padding:13px 14px;">
-          <div class="ct" style="font-size:12.5px;margin-bottom:2px;">상품별 반품률</div>
-          <div class="cs" style="margin-bottom:7px;">반품건수 ÷ 누적 정상입고수량</div>
-          <div id="rgmReturnRateChart"></div>
-        </div>
-        <div class="card" style="padding:13px 14px;">
-          <div class="ct" style="font-size:12.5px;margin-bottom:9px;">반품 사유 Top</div>
-          <div id="rgmReasonChart"></div>
-        </div>
-      </aside>
+      <div style="display:flex;gap:6px;padding:10px 14px;border-bottom:0.5px solid var(--bd);" id="rgmReturnsFilter"></div>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="ns">반출접수일</th><th class="ns">송장번호</th><th class="ns">상품</th><th class="ns" style="text-align:right;">수량</th><th class="ns">상태</th><th class="ns">처리현황</th><th class="ns" style="text-align:right;">보상금액</th></tr></thead>
+          <tbody id="rgmReturnsTbody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:0.5px solid var(--bd);" id="rgmReturnsPager"></div>
+    </div>
+    <div class="rgm-g2" style="margin-top:12px;">
+      <div class="card">
+        <div class="ch"><div><div class="ct">상품별 반품 건수</div><div class="cs">누적 반품 건수가 많은 상품 순</div></div></div>
+        <div class="rgm-bar-2col" style="padding:13px 14px;" id="rgmReturnsBarChart"></div>
+        <div class="rgm-pager-sm" style="padding:0 14px 13px;" id="rgmReturnsBarPager"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div><div class="ct">상품별 반품률</div><div class="cs">반품건수 ÷ 누적 정상입고수량</div></div></div>
+        <div class="rgm-bar-2col" style="padding:13px 14px;" id="rgmReturnRateChart"></div>
+        <div class="rgm-pager-sm" style="padding:0 14px 13px;" id="rgmReturnRatePager"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px;">
+      <div class="ch"><div class="ct">반품 사유 Top</div></div>
+      <div style="padding:13px 14px;" id="rgmReasonChart"></div>
     </div>
   </div>
  </div>
@@ -20149,18 +20172,23 @@ function rgmRenderLogKpis(){
   const avg = withDays.length ? Math.round(withDays.reduce((a,b)=>a+b,0)/withDays.length) : 0;
   const pending = _rgmBatches.filter(b=>b.status==='pending').length;
   const selling = _rgmBatches.filter(b=>b.status==='selling').length;
+  const urgent = _rgmComputeReorderRows().filter(r=>r.urgency==='crit').length;
   const el = document.getElementById('rgmLogKpis');
   if(!el) return;
   el.innerHTML = `
     <div class="sc"><div class="sl">전체 배치 이력</div><div class="sv">${_rgmBatches.length}건</div></div>
-    <div class="sc rgm-kpi-click ${_rgmLogFilter==='pending'?'active':''}" id="rgmKpiPending"><div class="sl">입고 처리 대기</div><div class="sv" style="color:${pending?'#D97706':'var(--tx)'};">${pending}건</div></div>
-    <div class="sc"><div class="sl">현재 판매중</div><div class="sv">${selling}건</div></div>
-    <div class="sc"><div class="sl">평균 완판기간</div><div class="sv">${avg}일</div></div>
+    <div class="sc rgm-kpi-click rgm-ac-orange ${_rgmLogFilter==='pending'?'active':''}" id="rgmKpiPending"><div class="sl">입고 처리 대기</div><div class="sv" style="color:${pending?'#D97706':'var(--tx)'};">${pending}건</div></div>
+    <div class="sc rgm-ac-blue"><div class="sl">현재 판매중</div><div class="sv">${selling}건</div></div>
+    <div class="sc rgm-kpi-click rgm-ac-red" id="rgmKpiUrgent"><div class="sl">🚨 긴급 재입고 필요</div><div class="sv" style="color:${urgent?'#DC2626':'var(--tx)'};">${urgent}건</div><div class="sv-sub" style="color:var(--tx2);">7일 내 품절 예상 · 클릭하면 재입고 추천 목록으로</div></div>
   `;
   document.getElementById('rgmKpiPending').addEventListener('click', function(){
     _rgmLogFilter = _rgmLogFilter==='pending' ? null : 'pending';
     _rgmLogPage = 0;
     rgmRenderLogKpis(); rgmRenderLogTable();
+  });
+  document.getElementById('rgmKpiUrgent').addEventListener('click', function(){
+    rgmSwitchTab('analytics');
+    setTimeout(()=>{ document.getElementById('rgmReorderCard')?.scrollIntoView({behavior:'smooth', block:'start'}); }, 30);
   });
 }
 
@@ -20227,6 +20255,15 @@ function rgmRenderCalList(byDay, mm, today){
   }
 }
 
+const RGM_LEAD_PAGE_SIZE = 16;
+let _rgmLeadPage = 0;
+function rgmLeadGoPage(p){
+  const total = _rgmLeadtimeRowsCache.length;
+  const maxP = Math.max(1, Math.ceil(total/RGM_LEAD_PAGE_SIZE));
+  _rgmLeadPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderLeadtimeChart();
+}
+let _rgmLeadtimeRowsCache = [];
 function rgmRenderLeadtimeChart(){
   const byProd = {};
   _rgmBatches.forEach(b=>{ const ld=_rgmLeadDays(b); if(ld!==null) (byProd[b.code]=byProd[b.code]||[]).push(ld); });
@@ -20235,16 +20272,22 @@ function rgmRenderLeadtimeChart(){
     const avg = arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
     return {name:p.name, avg};
   }).filter(r=>r.avg!==null).sort((a,b)=>a.avg-b.avg);
+  _rgmLeadtimeRowsCache = rows;
   const el = document.getElementById('rgmLeadtimeChart');
+  const pagerEl = document.getElementById('rgmLeadtimePager');
   if(!el) return;
-  if(!rows.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">데이터 없음</div>`; return; }
+  if(!rows.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">데이터 없음</div>`; if(pagerEl) pagerEl.innerHTML=''; return; }
   const max = Math.max(...rows.map(r=>r.avg));
-  el.innerHTML = rows.map(r=>`
+  const maxP = Math.max(1, Math.ceil(rows.length/RGM_LEAD_PAGE_SIZE));
+  if(_rgmLeadPage > maxP-1) _rgmLeadPage = maxP-1;
+  const pageRows = rows.slice(_rgmLeadPage*RGM_LEAD_PAGE_SIZE, (_rgmLeadPage+1)*RGM_LEAD_PAGE_SIZE);
+  el.innerHTML = pageRows.map(r=>`
     <div class="rgm-bar-row" style="grid-template-columns:1fr 60px 34px;">
       <div class="rgm-bar-label" title="${_rgmEsc(r.name)}">${_rgmEsc(r.name)}</div>
       <div class="rgm-bar-track"><div class="rgm-bar-fill" style="width:${Math.max(4,Math.round(r.avg/max*100))}%;"></div></div>
       <div class="rgm-bar-val">${r.avg}일</div>
     </div>`).join('');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmLeadPage, RGM_LEAD_PAGE_SIZE, rows.length, 'rgmLeadGoPage');
 }
 
 function rgmAddBatch(){
@@ -20344,8 +20387,8 @@ function rgmRenderAnaKpis(){
   const selling = _rgmBatches.filter(b=>b.status==='selling');
   if(!stats.length){
     el.innerHTML = `
-      <div class="sc"><div class="sl">현재 판매중 상품</div><div class="sv">${selling.length}개 배치</div></div>
-      <div class="sc"><div class="sl">분석 대상 배치</div><div class="sv">${_rgmBatches.length}건 누적</div></div>
+      <div class="sc rgm-ac-blue"><div class="sl">현재 판매중 상품</div><div class="sv">${selling.length}개 배치</div></div>
+      <div class="sc rgm-ac-purple"><div class="sl">분석 대상 배치</div><div class="sv">${_rgmBatches.length}건 누적</div></div>
       <div class="sc" style="grid-column:span 2;"><div class="sl">완판 데이터</div><div class="sv" style="font-size:13px;color:var(--tx2);">완판 처리된 배치가 쌓이면 순위가 표시됩니다</div></div>
     `;
     return;
@@ -20353,10 +20396,10 @@ function rgmRenderAnaKpis(){
   const fastest = [...stats].sort((a,b)=>a.avg-b.avg)[0];
   const slowest = [...stats].sort((a,b)=>b.avg-a.avg)[0];
   el.innerHTML = `
-    <div class="sc"><div class="sl">가장 빠른 완판</div><div class="sv" style="font-size:14px;">${_rgmEsc(fastest.name)}</div><div style="font-size:11px;margin-top:3px;font-weight:600;color:#059669;">평균 ${fastest.avg}일</div></div>
-    <div class="sc"><div class="sl">가장 느린 완판</div><div class="sv" style="font-size:14px;">${_rgmEsc(slowest.name)}</div><div style="font-size:11px;margin-top:3px;font-weight:600;color:#DC2626;">평균 ${slowest.avg}일</div></div>
-    <div class="sc"><div class="sl">현재 판매중 상품</div><div class="sv">${selling.length}개 배치</div></div>
-    <div class="sc"><div class="sl">분석 대상 배치</div><div class="sv">${_rgmBatches.length}건 누적</div></div>
+    <div class="sc rgm-ac-green"><div class="sl">🏆 가장 빠른 완판</div><div class="sv" style="font-size:14px;">${_rgmEsc(fastest.name)}</div><div class="sv-sub" style="color:#059669;">평균 ${fastest.avg}일</div></div>
+    <div class="sc rgm-ac-red"><div class="sl">🐌 가장 느린 완판</div><div class="sv" style="font-size:14px;">${_rgmEsc(slowest.name)}</div><div class="sv-sub" style="color:#DC2626;">평균 ${slowest.avg}일</div></div>
+    <div class="sc rgm-ac-blue"><div class="sl">현재 판매중 상품</div><div class="sv">${selling.length}개 배치</div></div>
+    <div class="sc rgm-ac-purple"><div class="sl">분석 대상 배치</div><div class="sv">${_rgmBatches.length}건 누적</div></div>
   `;
 }
 const RGM_BAR_PAGE_SIZE = 10;
@@ -20396,17 +20439,24 @@ function rgmRenderTrend(code){
   const s = _rgmPerProductStats().find(x=>x.code===code);
   if(!s) return;
   const days = s.done.map(_rgmSellDays);
-  const w=460, h=130, pad=26;
+  const w=560, h=260, padL=40, padR=20, padY=24;
   const max = Math.max(...days), min = Math.min(...days);
   const range = Math.max(1, max-min);
-  const stepX = days.length>1 ? (w-pad*2)/(days.length-1) : 0;
-  const pts = days.map((v,i)=>[pad + i*stepX, h-pad - ((v-min)/range)*(h-pad*2)]);
+  const stepX = days.length>1 ? (w-padL-padR)/(days.length-1) : 0;
+  const yOf = v => (h-padY) - ((v-min)/range)*(h-padY*2);
+  const pts = days.map((v,i)=>[padL + i*stepX, yOf(v)]);
   const poly = pts.map(p=>p.join(',')).join(' ');
-  const dots = pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===pts.length-1?4.5:3}" fill="${i===pts.length-1?'var(--pr)':'var(--bg)'}" stroke="var(--pr)" stroke-width="1.6"/>`).join('');
-  const gridLines = [0.25,0.5,0.75].map(f=>`<line x1="${pad}" y1="${h-pad-f*(h-pad*2)}" x2="${w-pad}" y2="${h-pad-f*(h-pad*2)}" stroke="var(--bd)" stroke-width="1"/>`).join('');
+  const areaPoly = `${padL},${h-padY} ${poly} ${padL+(days.length-1)*stepX},${h-padY}`;
+  const dots = pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===pts.length-1?5.5:3.5}" fill="${i===pts.length-1?'var(--pr)':'var(--bg)'}" stroke="var(--pr)" stroke-width="2"/>`).join('');
+  const valLabels = pts.map((p,i)=>`<text x="${p[0]}" y="${p[1]-11}" font-size="11" font-weight="700" fill="var(--tx)" text-anchor="middle">${days[i]}일</text>`).join('');
+  const gridVals = [min, (min+max)/2, max];
+  const gridLines = gridVals.map(v=>`<line x1="${padL}" y1="${yOf(v)}" x2="${w-padR}" y2="${yOf(v)}" stroke="var(--bd)" stroke-width="1" stroke-dasharray="3,3"/><text x="${padL-8}" y="${yOf(v)+4}" font-size="10.5" fill="var(--tx2)" text-anchor="end">${Math.round(v)}일</text>`).join('');
   document.getElementById('rgmTrendSvg').innerHTML = `
     <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="완판기간 추이">
-      ${gridLines}<polyline points="${poly}" fill="none" stroke="var(--pr)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}
+      ${gridLines}
+      <polygon points="${areaPoly}" fill="var(--pr)" opacity="0.07"/>
+      <polyline points="${poly}" fill="none" stroke="var(--pr)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}${valLabels}
     </svg>`;
   const first = days[0], last = days[days.length-1], delta = last-first;
   document.getElementById('rgmTrendMeta').innerHTML = `
@@ -20422,11 +20472,9 @@ function rgmReorderGoPage(p){
   rgmRenderReorder();
 }
 let _rgmReorderRowsCache = [];
-function rgmRenderReorder(){
-  const tbody = document.getElementById('rgmReorderTbody');
-  if(!tbody) return;
+function _rgmComputeReorderRows(){
   const now = new Date();
-  const rows = _rgmRgList().filter(p=>!p.discontinued).map(p=>{
+  return _rgmRgList().filter(p=>!p.discontinued).map(p=>{
     const bs = _rgmBatches.filter(b=>b.code===p.code).sort((a,b)=>_rgmD(a.req)-_rgmD(b.req));
     const sellingBatch = [...bs].reverse().find(b=>b.status==='selling');
     if(!sellingBatch) return null;
@@ -20443,14 +20491,20 @@ function rgmRenderReorder(){
     if(daysLeft!==null){ if(daysLeft<=7) urgency='crit'; else if(daysLeft<=14) urgency='warn'; }
     return {p, stock, avgRate, stockoutDate, reorderDate, urgency, daysLeft};
   }).filter(Boolean).sort((a,b)=> (a.daysLeft??999) - (b.daysLeft??999));
+}
+function rgmRenderReorder(){
+  const tbody = document.getElementById('rgmReorderTbody');
+  if(!tbody) return;
+  const rows = _rgmComputeReorderRows();
   _rgmReorderRowsCache = rows;
   const fmtD = dt => dt ? `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}` : '-';
   const ucolor = {crit:'#DC2626',warn:'#D97706',ok:'#059669'};
+  const ubg = {crit:'#FEF2F2',warn:'#FFFBEB',ok:'transparent'};
   const maxP = Math.max(1, Math.ceil(rows.length/RGM_PAGE_SIZE));
   if(_rgmReorderPage > maxP-1) _rgmReorderPage = maxP-1;
   const pageRows = rows.slice(_rgmReorderPage*RGM_PAGE_SIZE, (_rgmReorderPage+1)*RGM_PAGE_SIZE);
   tbody.innerHTML = pageRows.length ? pageRows.map(r=>`
-    <tr>
+    <tr style="background:${ubg[r.urgency]};">
       <td style="font-weight:600;">${_rgmEsc(r.p.name)}<span class="rgm-prod-sub">${_rgmEsc(r.p.code)}</span></td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${r.stock.toLocaleString()}개</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${r.avgRate? r.avgRate.toFixed(1):'-'}개/일</td>
@@ -20503,10 +20557,10 @@ function rgmRenderMarginKpis(){
   const best = [...rows].sort((a,b)=>b.rate-a.rate)[0];
   const worst = [...rows].sort((a,b)=>a.rate-b.rate)[0];
   el.innerHTML = `
-    <div class="sc"><div class="sl">전체 평균 마진율</div><div class="sv">${(avgRate*100).toFixed(1)}%</div></div>
-    <div class="sc"><div class="sl">마진율 최고</div><div class="sv" style="font-size:14px;">${_rgmEsc(best.name)}</div><div style="font-size:11px;margin-top:3px;font-weight:600;color:#059669;">${(best.rate*100).toFixed(1)}%</div></div>
-    <div class="sc"><div class="sl">마진율 최저</div><div class="sv" style="font-size:14px;">${_rgmEsc(worst.name)}</div><div style="font-size:11px;margin-top:3px;font-weight:600;color:#DC2626;">${(worst.rate*100).toFixed(1)}%</div></div>
-    <div class="sc"><div class="sl">관리 상품 수</div><div class="sv">${rows.length}개</div></div>
+    <div class="sc rgm-ac-blue"><div class="sl">전체 평균 마진율</div><div class="sv">${(avgRate*100).toFixed(1)}%</div></div>
+    <div class="sc rgm-ac-green"><div class="sl">마진율 최고</div><div class="sv" style="font-size:14px;">${_rgmEsc(best.name)}</div><div class="sv-sub" style="color:#059669;">${(best.rate*100).toFixed(1)}%</div></div>
+    <div class="sc rgm-ac-red"><div class="sl">마진율 최저</div><div class="sv" style="font-size:14px;">${_rgmEsc(worst.name)}</div><div class="sv-sub" style="color:#DC2626;">${(worst.rate*100).toFixed(1)}%</div></div>
+    <div class="sc rgm-ac-purple"><div class="sl">관리 상품 수</div><div class="sv">${rows.length}개</div></div>
   `;
 }
 function rgmMarginGoPage(p){
@@ -20768,11 +20822,12 @@ function rgmRenderReturnsKpis(){
   if(!el) return;
   const abnormal = _rgmReturns.filter(r=>r.status==='비정상');
   const totalComp = _rgmReturns.reduce((a,r)=>a+(r.comp||0),0);
+  const abnormalPct = _rgmReturns.length ? Math.round(abnormal.length/_rgmReturns.length*100) : 0;
   el.innerHTML = `
-    <div class="sc"><div class="sl">누적 반품 건수</div><div class="sv">${_rgmReturns.length}건</div></div>
-    <div class="sc"><div class="sl">정상</div><div class="sv">${_rgmReturns.length-abnormal.length}건</div></div>
-    <div class="sc"><div class="sl">비정상 비율</div><div class="sv" style="color:${abnormal.length?'#D97706':'var(--tx)'};">${_rgmReturns.length?Math.round(abnormal.length/_rgmReturns.length*100):0}%</div></div>
-    <div class="sc"><div class="sl">누적 보상금액</div><div class="sv">${_rgmWon(totalComp)}원</div></div>
+    <div class="sc rgm-ac-blue"><div class="sl">누적 반품 건수</div><div class="sv">${_rgmReturns.length}건</div></div>
+    <div class="sc rgm-ac-green"><div class="sl">정상</div><div class="sv">${_rgmReturns.length-abnormal.length}건</div></div>
+    <div class="sc ${abnormalPct>=15?'rgm-ac-red':'rgm-ac-orange'}"><div class="sl">비정상 비율</div><div class="sv" style="color:${abnormal.length?'#D97706':'var(--tx)'};">${abnormalPct}%</div></div>
+    <div class="sc rgm-ac-purple"><div class="sl">누적 보상금액</div><div class="sv">${_rgmWon(totalComp)}원</div></div>
   `;
 }
 function rgmReturnsGoPage(p){
@@ -20805,25 +20860,44 @@ function rgmRenderReturnsTable(){
   const pagerEl = document.getElementById('rgmReturnsPager');
   if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmReturnsPage, RGM_PAGE_SIZE, sorted.length, 'rgmReturnsGoPage');
 }
+let _rgmReturnsBarPage = 0, _rgmReturnRatePage = 0;
+function rgmReturnsBarGoPage(p){
+  const total = Object.keys(_rgmReturns.reduce((a,r)=>{a[r.code]=1;return a;},{})).length;
+  const maxP = Math.max(1, Math.ceil(total/RGM_LEAD_PAGE_SIZE));
+  _rgmReturnsBarPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderReturnsBarChart();
+}
 function rgmRenderReturnsBarChart(){
   const el = document.getElementById('rgmReturnsBarChart');
+  const pagerEl = document.getElementById('rgmReturnsBarPager');
   if(!el) return;
-  if(!_rgmReturns.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">데이터 없음</div>`; return; }
+  if(!_rgmReturns.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">데이터 없음</div>`; if(pagerEl) pagerEl.innerHTML=''; return; }
   const byProd = {};
   _rgmReturns.forEach(r=>{ byProd[r.code] = (byProd[r.code]||0)+1; });
   const rows = Object.entries(byProd).map(([code,cnt])=>({name:(_rgmProdOf(code)||{name:code}).name, cnt})).sort((a,b)=>b.cnt-a.cnt);
   const max = Math.max(...rows.map(r=>r.cnt));
-  el.innerHTML = rows.map(r=>`
+  const maxP = Math.max(1, Math.ceil(rows.length/RGM_LEAD_PAGE_SIZE));
+  if(_rgmReturnsBarPage > maxP-1) _rgmReturnsBarPage = maxP-1;
+  const pageRows = rows.slice(_rgmReturnsBarPage*RGM_LEAD_PAGE_SIZE, (_rgmReturnsBarPage+1)*RGM_LEAD_PAGE_SIZE);
+  el.innerHTML = pageRows.map(r=>`
     <div class="rgm-bar-row" style="grid-template-columns:1fr 60px 30px;">
       <div class="rgm-bar-label" title="${_rgmEsc(r.name)}">${_rgmEsc(r.name)}</div>
       <div class="rgm-bar-track"><div class="rgm-bar-fill" style="width:${Math.max(6,Math.round(r.cnt/max*100))}%;background:#D97706;"></div></div>
       <div class="rgm-bar-val">${r.cnt}건</div>
     </div>`).join('');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmReturnsBarPage, RGM_LEAD_PAGE_SIZE, rows.length, 'rgmReturnsBarGoPage');
+}
+function rgmReturnRateGoPage(p){
+  const total = Object.keys(_rgmReturns.reduce((a,r)=>{a[r.code]=1;return a;},{})).length;
+  const maxP = Math.max(1, Math.ceil(total/RGM_LEAD_PAGE_SIZE));
+  _rgmReturnRatePage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderReturnRateChart();
 }
 function rgmRenderReturnRateChart(){
   const el = document.getElementById('rgmReturnRateChart');
+  const pagerEl = document.getElementById('rgmReturnRatePager');
   if(!el) return;
-  if(!_rgmReturns.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">데이터 없음</div>`; return; }
+  if(!_rgmReturns.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">데이터 없음</div>`; if(pagerEl) pagerEl.innerHTML=''; return; }
   const inboundByProd = {};
   _rgmBatches.forEach(b=>{ if(b.inn!=null) inboundByProd[b.code] = (inboundByProd[b.code]||0)+b.inn; });
   const byProd = {};
@@ -20834,12 +20908,16 @@ function rgmRenderReturnRateChart(){
     return {name:(_rgmProdOf(code)||{name:code}).name, rate};
   }).sort((a,b)=>b.rate-a.rate);
   const max = Math.max(...rows.map(r=>r.rate), 0.1);
-  el.innerHTML = rows.map(r=>`
+  const maxP = Math.max(1, Math.ceil(rows.length/RGM_LEAD_PAGE_SIZE));
+  if(_rgmReturnRatePage > maxP-1) _rgmReturnRatePage = maxP-1;
+  const pageRows = rows.slice(_rgmReturnRatePage*RGM_LEAD_PAGE_SIZE, (_rgmReturnRatePage+1)*RGM_LEAD_PAGE_SIZE);
+  el.innerHTML = pageRows.map(r=>`
     <div class="rgm-bar-row" style="grid-template-columns:1fr 60px 34px;">
       <div class="rgm-bar-label" title="${_rgmEsc(r.name)}">${_rgmEsc(r.name)}</div>
       <div class="rgm-bar-track"><div class="rgm-bar-fill" style="width:${Math.max(6,Math.round(r.rate/max*100))}%;background:#DC2626;"></div></div>
       <div class="rgm-bar-val">${r.rate.toFixed(1)}%</div>
     </div>`).join('');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmReturnRatePage, RGM_LEAD_PAGE_SIZE, rows.length, 'rgmReturnRateGoPage');
 }
 function _rgmCategorize(desc){
   if(desc.includes('박스')) return '박스 누락';
