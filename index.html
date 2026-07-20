@@ -20435,34 +20435,55 @@ function rgmRenderTrendSelect(){
   if(stats.length){ sel.value = stats[0].code; rgmRenderTrend(sel.value); }
   else { document.getElementById('rgmTrendSvg').innerHTML=''; document.getElementById('rgmTrendMeta').innerHTML=''; }
 }
+function _rgmQuarterOf(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const q = Math.floor(d.getMonth()/3)+1;
+  return {key:`${d.getFullYear()}-Q${q}`, label:`'${String(d.getFullYear()).slice(2)} Q${q}`};
+}
 function rgmRenderTrend(code){
   const s = _rgmPerProductStats().find(x=>x.code===code);
   if(!s) return;
-  const days = s.done.map(_rgmSellDays);
-  const w=560, h=260, padL=40, padR=20, padY=24;
-  const max = Math.max(...days), min = Math.min(...days);
-  const range = Math.max(1, max-min);
-  const stepX = days.length>1 ? (w-padL-padR)/(days.length-1) : 0;
-  const yOf = v => (h-padY) - ((v-min)/range)*(h-padY*2);
-  const pts = days.map((v,i)=>[padL + i*stepX, yOf(v)]);
-  const poly = pts.map(p=>p.join(',')).join(' ');
-  const areaPoly = `${padL},${h-padY} ${poly} ${padL+(days.length-1)*stepX},${h-padY}`;
-  const dots = pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===pts.length-1?5.5:3.5}" fill="${i===pts.length-1?'var(--pr)':'var(--bg)'}" stroke="var(--pr)" stroke-width="2"/>`).join('');
-  const valLabels = pts.map((p,i)=>`<text x="${p[0]}" y="${p[1]-11}" font-size="11" font-weight="700" fill="var(--tx)" text-anchor="middle">${days[i]}일</text>`).join('');
-  const gridVals = [min, (min+max)/2, max];
+  // 개별 배치를 그대로 다 찍으면 수백 건이 겹쳐 안 보이므로 분기별 평균으로 묶어서 표시
+  const byQ = {};
+  s.done.forEach(b=>{
+    const days = _rgmSellDays(b);
+    const {key, label} = _rgmQuarterOf(b.sold);
+    (byQ[key] = byQ[key] || {label, vals:[]}).vals.push(days);
+  });
+  const qKeys = Object.keys(byQ).sort();
+  const bars = qKeys.map(k=>{
+    const {label, vals} = byQ[k];
+    const avg = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10;
+    return {label, avg, cnt:vals.length};
+  });
+  if(!bars.length){ document.getElementById('rgmTrendSvg').innerHTML=''; document.getElementById('rgmTrendMeta').innerHTML=''; return; }
+  const w=560, h=260, padL=40, padR=16, padT=28, padB=34;
+  const max = Math.max(...bars.map(b=>b.avg), 1);
+  const n = bars.length;
+  const slot = (w-padL-padR)/n;
+  const barW = Math.min(52, slot*0.6);
+  const yOf = v => (h-padB) - (v/max)*(h-padT-padB);
+  const gridVals = [0, max/2, max];
   const gridLines = gridVals.map(v=>`<line x1="${padL}" y1="${yOf(v)}" x2="${w-padR}" y2="${yOf(v)}" stroke="var(--bd)" stroke-width="1" stroke-dasharray="3,3"/><text x="${padL-8}" y="${yOf(v)+4}" font-size="10.5" fill="var(--tx2)" text-anchor="end">${Math.round(v)}일</text>`).join('');
+  const barsSvg = bars.map((b,i)=>{
+    const cx = padL + slot*i + slot/2;
+    const y = yOf(b.avg);
+    const isLast = i===n-1;
+    return `
+      <rect x="${cx-barW/2}" y="${y}" width="${barW}" height="${h-padB-y}" rx="4" fill="${isLast?'var(--pr)':'#93b8f5'}"/>
+      <text x="${cx}" y="${y-8}" font-size="11.5" font-weight="700" fill="var(--tx)" text-anchor="middle">${b.avg}일</text>
+      <text x="${cx}" y="${h-padB+16}" font-size="10" fill="var(--tx2)" text-anchor="middle">${_rgmEsc(b.label)}</text>`;
+  }).join('');
   document.getElementById('rgmTrendSvg').innerHTML = `
-    <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="완판기간 추이">
-      ${gridLines}
-      <polygon points="${areaPoly}" fill="var(--pr)" opacity="0.07"/>
-      <polyline points="${poly}" fill="none" stroke="var(--pr)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
-      ${dots}${valLabels}
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="분기별 평균 완판기간">
+      ${gridLines}${barsSvg}
     </svg>`;
-  const first = days[0], last = days[days.length-1], delta = last-first;
+  const lastQ = bars[bars.length-1], prevQ = bars.length>1 ? bars[bars.length-2] : null;
+  const delta = prevQ ? Math.round((lastQ.avg-prevQ.avg)*10)/10 : 0;
   document.getElementById('rgmTrendMeta').innerHTML = `
-    <div class="rgm-trend-meta-item">최근 완판기간<b>${last}일</b></div>
-    <div class="rgm-trend-meta-item">${days.length}개 배치 전<b>${first}일</b></div>
-    <div class="rgm-trend-meta-item">변화<b style="color:${delta<=0?'#059669':'#DC2626'};">${delta>0?'+':''}${delta}일</b></div>
+    <div class="rgm-trend-meta-item">이번 분기(${_rgmEsc(lastQ.label)})<b>${lastQ.avg}일</b></div>
+    <div class="rgm-trend-meta-item">${prevQ ? `직전 분기(${_rgmEsc(prevQ.label)})` : '직전 분기'}<b>${prevQ ? prevQ.avg+'일' : '-'}</b></div>
+    <div class="rgm-trend-meta-item">변화<b style="color:${delta<=0?'#059669':'#DC2626'};">${prevQ ? (delta>0?'+':'')+delta+'일' : '-'}</b></div>
   `;
 }
 let _rgmReorderPage = 0;
