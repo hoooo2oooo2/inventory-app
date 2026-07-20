@@ -944,6 +944,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .rgm-cell-in:hover{background:var(--bg2);}
 .rgm-cell-in:focus{background:var(--bg);border-color:var(--pr);}
 .rgm-cell-in.edited{background:var(--prl);}
+.rgm-row-disc{opacity:.45;}
+.rgm-row-disc td{text-decoration:line-through;}
+.rgm-row-disc td:last-child{text-decoration:none;}
 .rgm-side{display:flex;flex-direction:column;gap:12px;}
 .rgm-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:9px;}
 .rgm-cal-dow{font-size:9.5px;color:#B4B8C0;text-align:center;font-weight:700;padding-bottom:3px;}
@@ -2778,7 +2781,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <thead><tr>
             <th class="ns">상품</th><th class="ns" style="text-align:right;">현재고</th><th class="ns" style="text-align:right;">판매가</th><th class="ns" style="text-align:right;">공급가</th>
             <th class="ns" style="text-align:right;">수수료</th><th class="ns" style="text-align:right;">입출고비</th><th class="ns" style="text-align:right;">배송비</th>
-            <th class="ns" style="text-align:right;">총계(VAT포함)</th><th class="ns" style="text-align:right;">마진</th><th class="ns">마진율</th>
+            <th class="ns" style="text-align:right;">총계(VAT포함)</th><th class="ns" style="text-align:right;">마진</th><th class="ns">마진율</th><th class="ns" style="text-align:center;">단종</th>
           </tr></thead>
           <tbody id="rgmMarginTbody"></tbody>
         </table>
@@ -2786,7 +2789,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <table id="rgmMarginTblDirect" style="display:none;">
           <thead><tr>
             <th class="ns">상품</th><th class="ns" style="text-align:right;">판매가</th><th class="ns" style="text-align:right;">공급가</th>
-            <th class="ns" style="text-align:right;">최종공급가(VAT포함)</th><th class="ns" style="text-align:right;">배송비</th><th class="ns" style="text-align:right;">마진</th><th class="ns">마진율</th>
+            <th class="ns" style="text-align:right;">최종공급가(VAT포함)</th><th class="ns" style="text-align:right;">배송비</th><th class="ns" style="text-align:right;">마진</th><th class="ns">마진율</th><th class="ns" style="text-align:center;">단종</th>
           </tr></thead>
           <tbody id="rgmMarginTbodyDirect"></tbody>
         </table>
@@ -20423,7 +20426,7 @@ function rgmRenderReorder(){
   const tbody = document.getElementById('rgmReorderTbody');
   if(!tbody) return;
   const now = new Date();
-  const rows = _rgmRgList().map(p=>{
+  const rows = _rgmRgList().filter(p=>!p.discontinued).map(p=>{
     const bs = _rgmBatches.filter(b=>b.code===p.code).sort((a,b)=>_rgmD(a.req)-_rgmD(b.req));
     const sellingBatch = [...bs].reverse().find(b=>b.status==='selling');
     if(!sellingBatch) return null;
@@ -20523,38 +20526,57 @@ function rgmRenderMarginTable(){
   if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmMarginPage, RGM_PAGE_SIZE, full.length, 'rgmMarginGoPage');
   tbody.innerHTML = list.map((r,i)=>{
     const c = _rgmCalcMargin(r);
-    return `<tr data-code="${_rgmEsc(r.code)}">
+    return `<tr data-code="${_rgmEsc(r.code)}" class="${r.discontinued?'rgm-row-disc':''}">
       <td style="font-weight:600;">${_rgmEsc(r.name)}<span class="rgm-prod-sub">${_rgmEsc(r.optId)} · ${_rgmEsc(r.barcode)}</span></td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${(r.stock||0).toLocaleString()}개</td>
-      <td style="text-align:right;"><input class="rgm-cell-in" type="number" data-field="price" value="${r.price}"></td>
-      <td style="text-align:right;"><input class="rgm-cell-in" type="number" data-field="supply" value="${r.supply}"></td>
-      <td style="text-align:right;color:var(--tx2);">${_rgmWon(c.fee)}</td>
-      <td style="text-align:right;"><input class="rgm-cell-in" type="number" data-field="io" value="${r.io}"></td>
-      <td style="text-align:right;"><input class="rgm-cell-in" type="number" data-field="shipFee" value="${r.shipFee}"></td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_rgmWon(c.totalVat)}</td>
-      <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${_rgmWon(c.margin)}</td>
+      <td style="text-align:right;"><input class="rgm-cell-in" type="text" inputmode="numeric" data-field="price" value="${_rgmWon(r.price)}원"></td>
+      <td style="text-align:right;"><input class="rgm-cell-in" type="text" inputmode="numeric" data-field="supply" value="${_rgmWon(r.supply)}원"></td>
+      <td style="text-align:right;color:var(--tx2);">${_rgmWon(c.fee)}원</td>
+      <td style="text-align:right;"><input class="rgm-cell-in" type="text" inputmode="numeric" data-field="io" value="${_rgmWon(r.io)}원"></td>
+      <td style="text-align:right;"><input class="rgm-cell-in" type="text" inputmode="numeric" data-field="shipFee" value="${_rgmWon(r.shipFee)}원"></td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_rgmWon(c.totalVat)}원</td>
+      <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${_rgmWon(c.margin)}원</td>
       <td><span class="badge ${_rgmRateBadge(c.rate)}">${(c.rate*100).toFixed(1)}%</span></td>
+      <td style="text-align:center;"><input type="checkbox" class="rgm-disc-chk" ${r.discontinued?'checked':''}></td>
     </tr>`;
   }).join('');
   tbody.querySelectorAll('.rgm-cell-in').forEach(inp=>{
+    inp.addEventListener('focus', function(){ this.value = this.value.replace(/[^\d.-]/g,''); });
+    inp.addEventListener('blur', function(){
+      const tr = this.closest('tr');
+      const row = _rgmProdOf(tr.dataset.code);
+      if(row) this.value = _rgmWon(row[this.dataset.field]) + '원';
+    });
     inp.addEventListener('change', function(){
       const tr = this.closest('tr');
       const code = tr.dataset.code;
       const row = _rgmProdOf(code);
       if(!row) return;
       const field = this.dataset.field;
-      const value = parseFloat(this.value);
-      if(isNaN(value) || value<0){ this.value = row[field]; return; }
+      const value = parseFloat(String(this.value).replace(/[^\d.-]/g,''));
+      if(isNaN(value) || value<0){ this.value = _rgmWon(row[field]) + '원'; return; }
       row[field] = value;
+      this.value = _rgmWon(value) + '원';
       this.classList.add('edited');
       setTimeout(()=>this.classList.remove('edited'), 1200);
       const c = _rgmCalcMargin(row);
-      tr.children[4].textContent = _rgmWon(c.fee);
-      tr.children[7].textContent = _rgmWon(c.totalVat);
-      tr.children[8].textContent = _rgmWon(c.margin);
+      tr.children[4].textContent = _rgmWon(c.fee) + '원';
+      tr.children[7].textContent = _rgmWon(c.totalVat) + '원';
+      tr.children[8].textContent = _rgmWon(c.margin) + '원';
       tr.children[9].innerHTML = `<span class="badge ${_rgmRateBadge(c.rate)}">${(c.rate*100).toFixed(1)}%</span>`;
       rgmRenderMarginKpis();
       cloudKvSave('rgm_products', _rgmProducts);
+    });
+  });
+  tbody.querySelectorAll('.rgm-disc-chk').forEach(chk=>{
+    chk.addEventListener('change', function(){
+      const tr = this.closest('tr');
+      const row = _rgmProdOf(tr.dataset.code);
+      if(!row) return;
+      row.discontinued = this.checked;
+      tr.classList.toggle('rgm-row-disc', this.checked);
+      cloudKvSave('rgm_products', _rgmProducts);
+      rgmRenderReorder();
     });
   });
 }
@@ -20597,33 +20619,52 @@ function rgmRenderMarginTableDirect(){
   if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmMarginDirectPage, RGM_PAGE_SIZE, full.length, 'rgmMarginDirectGoPage');
   tbody.innerHTML = list.map(r=>{
     const c = _rgmCalcDirect(r);
-    return `<tr data-code="${_rgmEsc(r.code)}">
+    return `<tr data-code="${_rgmEsc(r.code)}" class="${r.discontinued?'rgm-row-disc':''}">
       <td style="font-weight:600;">${_rgmEsc(r.name)}</td>
-      <td style="text-align:right;"><input class="rgm-cell-in" type="number" data-field="price" value="${r.price}"></td>
-      <td style="text-align:right;"><input class="rgm-cell-in" type="number" data-field="supply" value="${r.supply}"></td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_rgmWon(c.finalSupply)}</td>
-      <td style="text-align:right;"><input class="rgm-cell-in" type="number" data-field="shipFee" value="${r.shipFee}"></td>
-      <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${_rgmWon(c.margin)}</td>
+      <td style="text-align:right;"><input class="rgm-cell-in" type="text" inputmode="numeric" data-field="price" value="${_rgmWon(r.price)}원"></td>
+      <td style="text-align:right;"><input class="rgm-cell-in" type="text" inputmode="numeric" data-field="supply" value="${_rgmWon(r.supply)}원"></td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_rgmWon(c.finalSupply)}원</td>
+      <td style="text-align:right;"><input class="rgm-cell-in" type="text" inputmode="numeric" data-field="shipFee" value="${_rgmWon(r.shipFee)}원"></td>
+      <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${_rgmWon(c.margin)}원</td>
       <td><span class="badge ${_rgmRateBadge(c.rate)}">${(c.rate*100).toFixed(1)}%</span></td>
+      <td style="text-align:center;"><input type="checkbox" class="rgm-disc-chk" ${r.discontinued?'checked':''}></td>
     </tr>`;
   }).join('');
   tbody.querySelectorAll('.rgm-cell-in').forEach(inp=>{
+    inp.addEventListener('focus', function(){ this.value = this.value.replace(/[^\d.-]/g,''); });
+    inp.addEventListener('blur', function(){
+      const tr = this.closest('tr');
+      const row = _rgmProdOf(tr.dataset.code);
+      if(row) this.value = _rgmWon(row[this.dataset.field]) + '원';
+    });
     inp.addEventListener('change', function(){
       const tr = this.closest('tr');
       const code = tr.dataset.code;
       const row = _rgmProdOf(code);
       if(!row) return;
       const field = this.dataset.field;
-      const value = parseFloat(this.value);
-      if(isNaN(value) || value<0){ this.value = row[field]; return; }
+      const value = parseFloat(String(this.value).replace(/[^\d.-]/g,''));
+      if(isNaN(value) || value<0){ this.value = _rgmWon(row[field]) + '원'; return; }
       row[field] = value;
+      this.value = _rgmWon(value) + '원';
       this.classList.add('edited');
       setTimeout(()=>this.classList.remove('edited'), 1200);
       const c = _rgmCalcDirect(row);
-      tr.children[3].textContent = _rgmWon(c.finalSupply);
-      tr.children[5].textContent = _rgmWon(c.margin);
+      tr.children[3].textContent = _rgmWon(c.finalSupply) + '원';
+      tr.children[5].textContent = _rgmWon(c.margin) + '원';
       tr.children[6].innerHTML = `<span class="badge ${_rgmRateBadge(c.rate)}">${(c.rate*100).toFixed(1)}%</span>`;
       cloudKvSave('rgm_products', _rgmProducts);
+    });
+  });
+  tbody.querySelectorAll('.rgm-disc-chk').forEach(chk=>{
+    chk.addEventListener('change', function(){
+      const tr = this.closest('tr');
+      const row = _rgmProdOf(tr.dataset.code);
+      if(!row) return;
+      row.discontinued = this.checked;
+      tr.classList.toggle('rgm-row-disc', this.checked);
+      cloudKvSave('rgm_products', _rgmProducts);
+      rgmRenderReorder();
     });
   });
 }
