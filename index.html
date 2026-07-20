@@ -2712,6 +2712,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <tbody id="rgmLogTbody"></tbody>
             </table>
           </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:0.5px solid var(--bd);" id="rgmLogPager"></div>
         </div>
       </div>
       <aside class="rgm-side">
@@ -2736,6 +2737,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="card">
         <div class="ch"><div><div class="ct">상품별 평균 완판기간</div><div class="cs">짧을수록 빨리 팔리는 상품</div></div></div>
         <div style="padding:13px 14px;" id="rgmBarChart"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 14px 13px;" id="rgmBarPager"></div>
       </div>
       <div class="card">
         <div class="ch"><div class="ct">완판기간 추이</div><select class="sel" id="rgmTrendSel" onchange="rgmRenderTrend(this.value)"></select></div>
@@ -2750,6 +2752,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <thead><tr><th class="ns">상품</th><th class="ns" style="text-align:right;">현재 실재고</th><th class="ns" style="text-align:right;">일평균 판매</th><th class="ns">예상 소진일</th><th class="ns">추천 재입고일</th><th class="ns">긴급도</th></tr></thead>
           <tbody id="rgmReorderTbody"></tbody>
         </table>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:0.5px solid var(--bd);" id="rgmReorderPager"></div>
       </div>
     </div>
     <div class="card">
@@ -2779,6 +2782,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </tr></thead>
           <tbody id="rgmMarginTbody"></tbody>
         </table>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:0.5px solid var(--bd);" id="rgmMarginPager"></div>
         <table id="rgmMarginTblDirect" style="display:none;">
           <thead><tr>
             <th class="ns">상품</th><th class="ns" style="text-align:right;">판매가</th><th class="ns" style="text-align:right;">공급가</th>
@@ -2786,6 +2790,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </tr></thead>
           <tbody id="rgmMarginTbodyDirect"></tbody>
         </table>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:0.5px solid var(--bd);" id="rgmMarginDirectPager"></div>
       </div>
     </div>
   </div>
@@ -2806,6 +2811,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <tbody id="rgmReturnsTbody"></tbody>
           </table>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:0.5px solid var(--bd);" id="rgmReturnsPager"></div>
       </div>
       <aside class="rgm-side">
         <div class="card" style="padding:13px 14px;">
@@ -19995,6 +20001,22 @@ let _rgmLogFilter = null;
 let _rgmSelectedCalDay = null;
 let _rgmReturnsFilter = 'all';
 const RGM_FEE_RATE = 0.108;
+const RGM_PAGE_SIZE = 30;
+let _rgmLogPage = 0, _rgmMarginPage = 0, _rgmMarginDirectPage = 0, _rgmReturnsPage = 0, _rgmBarPage = 0;
+function _rgmPagerHtml(page, pageSize, total, gotoFn){
+  const maxP = Math.max(1, Math.ceil(total/pageSize));
+  const from = total ? page*pageSize+1 : 0;
+  const to = Math.min((page+1)*pageSize, total);
+  return `
+    <span style="font-size:11px;color:var(--tx2);">${from.toLocaleString()}–${to.toLocaleString()} / 전체 ${total.toLocaleString()}건</span>
+    <div style="display:flex;gap:4px;align-items:center;">
+      <button class="btn btn-sm" onclick="${gotoFn}(0)" ${page===0?'disabled':''}>처음</button>
+      <button class="btn btn-sm" onclick="${gotoFn}(${page-1})" ${page===0?'disabled':''}>◀</button>
+      <span style="font-size:11px;padding:0 6px;">${page+1} / ${maxP}</span>
+      <button class="btn btn-sm" onclick="${gotoFn}(${page+1})" ${page>=maxP-1?'disabled':''}>▶</button>
+      <button class="btn btn-sm" onclick="${gotoFn}(${maxP-1})" ${page>=maxP-1?'disabled':''}>끝</button>
+    </div>`;
+}
 
 function _rgmEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function _rgmToday(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
@@ -20080,12 +20102,21 @@ function _rgmActionCell(b){
 }
 function _rgmSortedBatches(){ return [..._rgmBatches].sort((a,b)=> _rgmD(b.req)-_rgmD(a.req) || b.id-a.id); }
 
+function rgmLogGoPage(p){
+  const total = (_rgmLogFilter==='pending' ? _rgmBatches.filter(b=>b.status==='pending') : _rgmBatches).length;
+  const maxP = Math.max(1, Math.ceil(total/RGM_PAGE_SIZE));
+  _rgmLogPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderLogTable();
+}
 function rgmRenderLogTable(highlightId){
   const tbody = document.getElementById('rgmLogTbody');
   if(!tbody) return;
   let rows = _rgmSortedBatches();
   if(_rgmLogFilter==='pending') rows = rows.filter(b=>b.status==='pending');
-  tbody.innerHTML = rows.length ? rows.map(b=>{
+  const maxP = Math.max(1, Math.ceil(rows.length/RGM_PAGE_SIZE));
+  if(_rgmLogPage > maxP-1) _rgmLogPage = maxP-1;
+  const pageRows = rows.slice(_rgmLogPage*RGM_PAGE_SIZE, (_rgmLogPage+1)*RGM_PAGE_SIZE);
+  tbody.innerHTML = pageRows.length ? pageRows.map(b=>{
     const p = _rgmProdOf(b.code);
     const name = p ? p.name : b.code;
     return `<tr style="${b.id===highlightId?'animation:rgmHl 1.6s ease;':''}">
@@ -20102,10 +20133,12 @@ function rgmRenderLogTable(highlightId){
   const countEl = document.getElementById('rgmLogCount');
   if(_rgmLogFilter==='pending'){
     countEl.innerHTML = `입고대기 ${rows.length}건 표시 중 · <a href="#" id="rgmClearLogFilter" style="color:var(--pr);font-weight:600;text-decoration:none;">전체보기</a>`;
-    document.getElementById('rgmClearLogFilter').addEventListener('click', function(e){ e.preventDefault(); _rgmLogFilter=null; rgmRenderLogKpis(); rgmRenderLogTable(); });
+    document.getElementById('rgmClearLogFilter').addEventListener('click', function(e){ e.preventDefault(); _rgmLogFilter=null; _rgmLogPage=0; rgmRenderLogKpis(); rgmRenderLogTable(); });
   } else {
     countEl.textContent = `${rows.length}건 · ${_rgmRgList().length}개 상품`;
   }
+  const pagerEl = document.getElementById('rgmLogPager');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmLogPage, RGM_PAGE_SIZE, rows.length, 'rgmLogGoPage');
 }
 
 function rgmRenderLogKpis(){
@@ -20123,6 +20156,7 @@ function rgmRenderLogKpis(){
   `;
   document.getElementById('rgmKpiPending').addEventListener('click', function(){
     _rgmLogFilter = _rgmLogFilter==='pending' ? null : 'pending';
+    _rgmLogPage = 0;
     rgmRenderLogKpis(); rgmRenderLogTable();
   });
 }
@@ -20322,18 +20356,30 @@ function rgmRenderAnaKpis(){
     <div class="sc"><div class="sl">분석 대상 배치</div><div class="sv">${_rgmBatches.length}건 누적</div></div>
   `;
 }
+const RGM_BAR_PAGE_SIZE = 10;
+function rgmBarGoPage(p){
+  const total = _rgmPerProductStats().filter(s=>s.avg!==null).length;
+  const maxP = Math.max(1, Math.ceil(total/RGM_BAR_PAGE_SIZE));
+  _rgmBarPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderBarChart();
+}
 function rgmRenderBarChart(){
   const el = document.getElementById('rgmBarChart');
   if(!el) return;
   const stats = _rgmPerProductStats().filter(s=>s.avg!==null).sort((a,b)=>a.avg-b.avg);
-  if(!stats.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">완판된 배치가 아직 없습니다</div>`; return; }
+  const pagerEl = document.getElementById('rgmBarPager');
+  if(!stats.length){ el.innerHTML = `<div style="font-size:11px;color:#B4B8C0;">완판된 배치가 아직 없습니다</div>`; if(pagerEl) pagerEl.innerHTML=''; return; }
   const max = Math.max(...stats.map(s=>s.avg));
-  el.innerHTML = stats.map(s=>`
+  const maxP = Math.max(1, Math.ceil(stats.length/RGM_BAR_PAGE_SIZE));
+  if(_rgmBarPage > maxP-1) _rgmBarPage = maxP-1;
+  const pageStats = stats.slice(_rgmBarPage*RGM_BAR_PAGE_SIZE, (_rgmBarPage+1)*RGM_BAR_PAGE_SIZE);
+  el.innerHTML = pageStats.map(s=>`
     <div class="rgm-bar-row">
       <div class="rgm-bar-label" title="${_rgmEsc(s.name)}">${_rgmEsc(s.name)}</div>
       <div class="rgm-bar-track"><div class="rgm-bar-fill" style="width:${Math.max(4,Math.round(s.avg/max*100))}%;"></div></div>
       <div class="rgm-bar-val">${s.avg}일</div>
     </div>`).join('');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmBarPage, RGM_BAR_PAGE_SIZE, stats.length, 'rgmBarGoPage');
 }
 function rgmRenderTrendSelect(){
   const sel = document.getElementById('rgmTrendSel');
@@ -20366,6 +20412,13 @@ function rgmRenderTrend(code){
     <div class="rgm-trend-meta-item">변화<b style="color:${delta<=0?'#059669':'#DC2626'};">${delta>0?'+':''}${delta}일</b></div>
   `;
 }
+let _rgmReorderPage = 0;
+function rgmReorderGoPage(p){
+  const maxP = Math.max(1, Math.ceil(_rgmReorderRowsCache.length/RGM_PAGE_SIZE));
+  _rgmReorderPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderReorder();
+}
+let _rgmReorderRowsCache = [];
 function rgmRenderReorder(){
   const tbody = document.getElementById('rgmReorderTbody');
   if(!tbody) return;
@@ -20387,9 +20440,13 @@ function rgmRenderReorder(){
     if(daysLeft!==null){ if(daysLeft<=7) urgency='crit'; else if(daysLeft<=14) urgency='warn'; }
     return {p, stock, avgRate, stockoutDate, reorderDate, urgency, daysLeft};
   }).filter(Boolean).sort((a,b)=> (a.daysLeft??999) - (b.daysLeft??999));
+  _rgmReorderRowsCache = rows;
   const fmtD = dt => dt ? `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}` : '-';
   const ucolor = {crit:'#DC2626',warn:'#D97706',ok:'#059669'};
-  tbody.innerHTML = rows.length ? rows.map(r=>`
+  const maxP = Math.max(1, Math.ceil(rows.length/RGM_PAGE_SIZE));
+  if(_rgmReorderPage > maxP-1) _rgmReorderPage = maxP-1;
+  const pageRows = rows.slice(_rgmReorderPage*RGM_PAGE_SIZE, (_rgmReorderPage+1)*RGM_PAGE_SIZE);
+  tbody.innerHTML = pageRows.length ? pageRows.map(r=>`
     <tr>
       <td style="font-weight:600;">${_rgmEsc(r.p.name)}<span class="rgm-prod-sub">${_rgmEsc(r.p.code)}</span></td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${r.stock.toLocaleString()}개</td>
@@ -20398,6 +20455,8 @@ function rgmRenderReorder(){
       <td>${fmtD(r.reorderDate)}</td>
       <td><span class="rgm-urgency-dot" style="background:${ucolor[r.urgency]};"></span>${r.urgency==='crit'?'긴급':r.urgency==='warn'?'주의':'여유'}</td>
     </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--tx2);padding:16px;">판매중인 배치가 없습니다</td></tr>`;
+  const pagerEl = document.getElementById('rgmReorderPager');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmReorderPage, RGM_PAGE_SIZE, rows.length, 'rgmReorderGoPage');
 }
 function rgmRenderSeasonSelect(){
   const sel = document.getElementById('rgmSeasonSel');
@@ -20447,10 +20506,21 @@ function rgmRenderMarginKpis(){
     <div class="sc"><div class="sl">관리 상품 수</div><div class="sv">${rows.length}개</div></div>
   `;
 }
+function rgmMarginGoPage(p){
+  const total = _rgmRgList().length;
+  const maxP = Math.max(1, Math.ceil(total/RGM_PAGE_SIZE));
+  _rgmMarginPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderMarginTable();
+}
 function rgmRenderMarginTable(){
   const tbody = document.getElementById('rgmMarginTbody');
   if(!tbody) return;
-  const list = _rgmRgList();
+  const full = _rgmRgList();
+  const maxP = Math.max(1, Math.ceil(full.length/RGM_PAGE_SIZE));
+  if(_rgmMarginPage > maxP-1) _rgmMarginPage = maxP-1;
+  const list = full.slice(_rgmMarginPage*RGM_PAGE_SIZE, (_rgmMarginPage+1)*RGM_PAGE_SIZE);
+  const pagerEl = document.getElementById('rgmMarginPager');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmMarginPage, RGM_PAGE_SIZE, full.length, 'rgmMarginGoPage');
   tbody.innerHTML = list.map((r,i)=>{
     const c = _rgmCalcMargin(r);
     return `<tr data-code="${_rgmEsc(r.code)}">
@@ -20496,10 +20566,13 @@ function rgmRenderShipTypeFilter(){
   el.querySelectorAll('.rgm-filter-chip').forEach(btn=>{
     btn.addEventListener('click', function(){
       _rgmShipType = this.dataset.v;
+      _rgmMarginPage = 0; _rgmMarginDirectPage = 0;
       rgmRenderShipTypeFilter();
       const isRg = _rgmShipType==='rg';
       document.getElementById('rgmMarginTblRg').style.display = isRg ? '' : 'none';
       document.getElementById('rgmMarginTblDirect').style.display = isRg ? 'none' : '';
+      document.getElementById('rgmMarginPager').style.display = isRg ? '' : 'none';
+      document.getElementById('rgmMarginDirectPager').style.display = isRg ? 'none' : '';
       document.getElementById('rgmMarginKpis').style.display = isRg ? '' : 'none';
       document.getElementById('rgmMarginNote').innerHTML = isRg
         ? '<b>수수료는 판매가의 10.8%</b>로 자동 계산되고, 총계 · 마진 · 마진율은 셀을 수정하는 즉시 다시 계산됩니다.'
@@ -20507,10 +20580,21 @@ function rgmRenderShipTypeFilter(){
     });
   });
 }
+function rgmMarginDirectGoPage(p){
+  const total = _rgmDirectList().length;
+  const maxP = Math.max(1, Math.ceil(total/RGM_PAGE_SIZE));
+  _rgmMarginDirectPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderMarginTableDirect();
+}
 function rgmRenderMarginTableDirect(){
   const tbody = document.getElementById('rgmMarginTbodyDirect');
   if(!tbody) return;
-  const list = _rgmDirectList();
+  const full = _rgmDirectList();
+  const maxP = Math.max(1, Math.ceil(full.length/RGM_PAGE_SIZE));
+  if(_rgmMarginDirectPage > maxP-1) _rgmMarginDirectPage = maxP-1;
+  const list = full.slice(_rgmMarginDirectPage*RGM_PAGE_SIZE, (_rgmMarginDirectPage+1)*RGM_PAGE_SIZE);
+  const pagerEl = document.getElementById('rgmMarginDirectPager');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmMarginDirectPage, RGM_PAGE_SIZE, full.length, 'rgmMarginDirectGoPage');
   tbody.innerHTML = list.map(r=>{
     const c = _rgmCalcDirect(r);
     return `<tr data-code="${_rgmEsc(r.code)}">
@@ -20635,7 +20719,7 @@ function rgmRenderReturnsFilter(){
   const opts = [['all','전체'],['정상','정상'],['비정상','비정상']];
   el.innerHTML = opts.map(([v,l])=>`<button class="rgm-filter-chip ${_rgmReturnsFilter===v?'active':''}" data-v="${v}">${l}</button>`).join('');
   el.querySelectorAll('.rgm-filter-chip').forEach(btn=>{
-    btn.addEventListener('click', function(){ _rgmReturnsFilter = this.dataset.v; rgmRenderReturnsFilter(); rgmRenderReturnsTable(); });
+    btn.addEventListener('click', function(){ _rgmReturnsFilter = this.dataset.v; _rgmReturnsPage = 0; rgmRenderReturnsFilter(); rgmRenderReturnsTable(); });
   });
 }
 function rgmRenderReturnsKpis(){
@@ -20650,12 +20734,21 @@ function rgmRenderReturnsKpis(){
     <div class="sc"><div class="sl">누적 보상금액</div><div class="sv">${_rgmWon(totalComp)}원</div></div>
   `;
 }
+function rgmReturnsGoPage(p){
+  const rows = _rgmReturnsFilter==='all' ? _rgmReturns : _rgmReturns.filter(r=>r.status===_rgmReturnsFilter);
+  const maxP = Math.max(1, Math.ceil(rows.length/RGM_PAGE_SIZE));
+  _rgmReturnsPage = Math.min(Math.max(0,p), maxP-1);
+  rgmRenderReturnsTable();
+}
 function rgmRenderReturnsTable(){
   const tbody = document.getElementById('rgmReturnsTbody');
   if(!tbody) return;
   const rows = _rgmReturnsFilter==='all' ? _rgmReturns : _rgmReturns.filter(r=>r.status===_rgmReturnsFilter);
   const sorted = [...rows].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-  tbody.innerHTML = sorted.length ? sorted.map(r=>{
+  const maxP = Math.max(1, Math.ceil(sorted.length/RGM_PAGE_SIZE));
+  if(_rgmReturnsPage > maxP-1) _rgmReturnsPage = maxP-1;
+  const pageRows = sorted.slice(_rgmReturnsPage*RGM_PAGE_SIZE, (_rgmReturnsPage+1)*RGM_PAGE_SIZE);
+  tbody.innerHTML = pageRows.length ? pageRows.map(r=>{
     const p = _rgmProdOf(r.code);
     return `<tr>
       <td>${r.date}</td>
@@ -20668,6 +20761,8 @@ function rgmRenderReturnsTable(){
     </tr>`;
   }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--tx2);padding:16px;">등록된 반품이 없습니다</td></tr>`;
   document.getElementById('rgmReturnsCount').textContent = `${sorted.length}건 표시 중`;
+  const pagerEl = document.getElementById('rgmReturnsPager');
+  if(pagerEl) pagerEl.innerHTML = _rgmPagerHtml(_rgmReturnsPage, RGM_PAGE_SIZE, sorted.length, 'rgmReturnsGoPage');
 }
 function rgmRenderReturnsBarChart(){
   const el = document.getElementById('rgmReturnsBarChart');
