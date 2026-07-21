@@ -8033,6 +8033,9 @@ async function lodDeleteFile(id){
 function goPage(p){
   // 권한 없는 메뉴 접근 차단
   if(window.__CURRENT_USER && _menuPerm(p)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
+  // 리뷰관리 화면을 벗어나면 실시간 폴링 중단(다른 화면에서 불필요한 egress 방지) — 'review'로
+  // 다시 들어오면 reviewInit()이 _rvwStartPoll()로 재시작함
+  if(p!=='review') _rvwStopPoll();
   currentPage=p;
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
@@ -8232,6 +8235,47 @@ async function reviewInit(){
   else if(_rvwTab==='done') await rvwRenderDone();
   else if(_rvwTab==='blind') await rvwRenderBlind();
   else await rvwRenderData();
+  _rvwStartPoll();
+}
+
+// ── 다른 PC 실시간 반영 — 리뷰관리 화면이 열려있는 동안만 30초 간격으로 버전(updated_at)만
+//    가볍게 확인하고, 바뀐 게 있을 때만 실제 데이터를 다시 받아와 재렌더링한다.
+//    cloudKvVersion은 updated_at 한 줄만 읽어오는 저비용 조회라 egress 부담이 거의 없음
+//    (물류/협업 기능에서 이미 쓰는 것과 동일한 패턴).
+let _rvwPollTimer = null;
+let _rvwPollVer = {};
+function _rvwStopPoll(){
+  if(_rvwPollTimer){ clearInterval(_rvwPollTimer); _rvwPollTimer = null; }
+}
+function _rvwStartPoll(){
+  _rvwStopPoll();
+  _rvwPollVer = {};   // 새로 시작할 때 기준값 리셋 — 최초 1회는 기준만 잡고 재렌더링하지 않음
+  _rvwPollTimer = setInterval(_rvwPollTick, 30000);
+}
+async function _rvwPollTick(){
+  try{
+    let dirty = false;
+    const vMg = await cloudKvVersion(REVIEW_MANAGE_KEY);
+    if(vMg !== undefined){
+      if(_rvwPollVer.manage !== undefined && vMg !== _rvwPollVer.manage){
+        _rvwManage = (await cloudKvLoad(REVIEW_MANAGE_KEY)) || {};
+        dirty = true;
+      }
+      _rvwPollVer.manage = vMg;
+    }
+    for(const m of Object.keys(_rvwMonths)){
+      const key = 'm:'+m;
+      const v = await cloudKvVersion(rvwMKey(m));
+      if(v !== undefined){
+        if(_rvwPollVer[key] !== undefined && v !== _rvwPollVer[key]){
+          _rvwMonths[m] = (await cloudKvLoad(rvwMKey(m))) || {};
+          dirty = true;
+        }
+        _rvwPollVer[key] = v;
+      }
+    }
+    if(dirty) rvwRerenderCurrentTab();
+  }catch(e){ console.warn('리뷰관리 실시간 갱신 폴링 실패', e); }
 }
 function rvwSwitchTab(tab){
   _rvwTab = tab;
