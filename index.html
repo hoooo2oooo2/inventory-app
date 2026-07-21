@@ -10328,29 +10328,62 @@ async function applyAllShipping(){
 
 // 특정 판매처·상품번호의 revenue 배송비·마진 재계산
 // feeObj={fee,perUnit,freeship} | null(=기본 공식)
+// ★ 대상 상품 하나만 고쳐서 끝내면 안 됨 — 그 상품이 다른 상품과 합배송으로 묶여있을 수 있으므로,
+//   영향받는 (연도,판매일)의 판매처 전체 행을 같이 불러와 합배송 그룹(applyShipGroupDedup)을
+//   다시 돌려서 배송비가 그룹당 1건만 남도록 재조정한 뒤 저장한다.
 async function recalcShippingForKey(channel,item_no,feeObj){
-  let all=[],from=0;
+  let touched=[],from=0;
   while(true){
-    const {data}=await sb.from('revenue').select('id,settlement,cost_price,item_type,sale_price,shipping_fee,margin,margin_rate,order_qty')
+    const {data}=await sb.from('revenue').select('id,year,sale_date')
       .eq('channel',channel).eq('item_no',item_no).range(from,from+999);
-    if(!data||!data.length)break; all=all.concat(data); if(data.length<1000)break; from+=1000;
+    if(!data||!data.length)break; touched=touched.concat(data); if(data.length<1000)break; from+=1000;
   }
-  const upd=[];
-  for(const r of all){
-    let newFee;
-    if(feeObj!=null){
-      if(feeObj.freeship){ newFee = (r.sale_price||0) >= Number(feeObj.freeship) ? 3000 : 0; }
-      else newFee = feeObj.perUnit ? (feeObj.fee||0)*(r.order_qty||0) : (feeObj.fee||0);
+  if(!touched.length) return 0;
+
+  const byYear = new Map();
+  for(const r of touched){
+    if(!byYear.has(r.year)) byYear.set(r.year, new Set());
+    byYear.get(r.year).add(r.sale_date);
+  }
+
+  let totalChanged=0;
+  for(const [year, dateSet] of byYear){
+    const dates=[...dateSet];
+    const {data:rows}=await sb.from('revenue')
+      .select('id,item_no,sale_date,receiver,phone1,address,settlement,cost_price,item_type,sale_price,shipping_fee,margin,margin_rate,order_qty,ship_qty')
+      .eq('channel',channel).eq('year',year).in('sale_date',dates);
+    if(!rows||!rows.length) continue;
+    rows.forEach(r=>{ r.year=year; r.channel=channel; });
+
+    const before = new Map(rows.map(r=>[r.id, {shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}]));
+
+    // 대상 상품(item_no 일치) 행만 새 규칙으로 배송비 원가 재계산
+    for(const r of rows){
+      if(r.item_no!==item_no) continue;
+      let newFee;
+      if(feeObj!=null){
+        if(feeObj.freeship){ newFee = (r.sale_price||0) >= Number(feeObj.freeship) ? 3000 : 0; }
+        else newFee = feeObj.perUnit ? (feeObj.fee||0)*(r.order_qty||0) : (feeObj.fee||0);
+      }
+      else newFee = calcShippingFee(channel,r.item_type,r.sale_price||0);
+      r.shipping_fee = newFee;
+      r.margin = Math.round((r.settlement||0)-(r.cost_price||0)-newFee);
+      r.margin_rate = r.settlement>0 ? Math.round(r.margin/r.settlement*10000)/10000 : 0;
     }
-    else newFee = calcShippingFee(channel,r.item_type,r.sale_price||0);
-    const settle=r.settlement||0;
-    const newMargin = Math.round(settle-(r.cost_price||0)-newFee);
-    const newRate = settle>0 ? Math.round(newMargin/settle*10000)/10000 : 0;
-    if(newFee!==r.shipping_fee || newMargin!==r.margin || newRate!==r.margin_rate) upd.push({id:r.id,shipping_fee:newFee,margin:newMargin,margin_rate:newRate});
+
+    // 합배송 그룹 단위로 배송비 1건만 남도록 재조정
+    applyShipGroupDedup(rows);
+
+    const upd = rows.filter(r=>{
+      const b=before.get(r.id);
+      return !b || b.shipping_fee!==r.shipping_fee || b.margin!==r.margin || b.margin_rate!==r.margin_rate || b.ship_qty!==r.ship_qty;
+    }).map(r=>({id:r.id, shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}));
+
+    for(let i=0;i<upd.length;i+=500){ await sb.from('revenue').upsert(upd.slice(i,i+500)); }
+    totalChanged += upd.length;
   }
-  for(let i=0;i<upd.length;i+=500){ await sb.from('revenue').upsert(upd.slice(i,i+500)); }
-  if(upd.length){ await reloadRevLoadedYears(); }  // 메모리 갱신(적재된 연도만)
-  return upd.length;
+  if(totalChanged){ await reloadRevLoadedYears(); }  // 메모리 갱신(적재된 연도만)
+  return totalChanged;
 }
 
 // ── 백데이터 엑셀 다운로드 / 업로드 ──
@@ -14276,6 +14309,46 @@ function calcShippingFee(channel, itemType, salePrice){
   return 0;
 }
 
+// 합배송 그룹(날짜+판매처+수취인+연락처1+주소) 단위로 배송비를 1건만 부과하도록 rows를 제자리에서 보정한다.
+//  기준: 년도+판매일+판매처+수취인+연락처1+주소 가 모두 같으면 한 배송(합배송)으로 간주.
+//  한 그룹 안에서는 배송비를 무조건 딱 1건만 부과한다:
+//   - 그룹의 첫 행이 대표로 ship_qty=1·배송비를 부과받고, 나머지는 ship_qty=0·배송비 0.
+//   - 단, 택배비 설정에서 "수량비례(perUnit)"인 상품이 그룹에 섞여 있으면 그 실비 상품의
+//     배송비가 대표 배송비가 된다(무료/정액 상품 뒤에 묶여 실비가 그냥 0으로 사라지는 것을 방지).
+//     대표가 이미 perUnit 상품이면 이후 다른 perUnit 상품이 더 있어도 배송비를 중복 부과하지 않는다.
+//  rows의 각 원소는 { year, sale_date, channel, receiver, phone1, address, item_no,
+//                     shipping_fee, ship_qty, settlement, cost_price, margin, margin_rate } 형태여야 한다.
+//  업로드 파싱(parseChannelFile)과 택배비 재적용(recalcShippingForKey) 양쪽에서 공유해서 쓴다 —
+//  한쪽에만 적용하면 재적용 시 합배송 그룹이 깨져 배송비가 건별로 중복 부과되는 문제가 있었음.
+function applyShipGroupDedup(rows){
+  const shipGroups = new Map();   // key → { holder: row, holderIsPerUnit: bool }
+  for(const row of rows){
+    const key = `${row.year}|${row.sale_date}|${row.channel}|${row.receiver}|${row.phone1}|${row.address}`;
+    const isPerUnitFee = !!(_shipMap[`${row.channel}|${row.item_no}`]||{}).perUnit;
+    const g = shipGroups.get(key);
+    if(!g){
+      row.ship_qty = 1;
+      shipGroups.set(key, { holder: row, holderIsPerUnit: isPerUnitFee });
+      continue;
+    }
+    row.ship_qty = 0;
+    if(isPerUnitFee && !g.holderIsPerUnit){
+      // 지금까지의 대표 배송비는 실비가 아닌데 이 상품은 실비 → 대표를 이 상품으로 교체
+      if(g.holder.shipping_fee>0){
+        g.holder.shipping_fee = 0;
+        g.holder.margin = Math.round(g.holder.settlement - g.holder.cost_price);
+        g.holder.margin_rate = g.holder.settlement>0 ? Math.round(g.holder.margin/g.holder.settlement*10000)/10000 : 0;
+      }
+      g.holder = row;
+      g.holderIsPerUnit = true;
+    } else if(row.shipping_fee>0){
+      row.shipping_fee = 0;
+      row.margin = Math.round(row.settlement - row.cost_price);
+      row.margin_rate = row.settlement>0 ? Math.round(row.margin/row.settlement*10000)/10000 : 0;
+    }
+  }
+}
+
 // 채널 파일 파싱 → revenue 행 배열 반환
 async function parseChannelFile(file, channelName){
   const map = CH_MAPS[channelName];
@@ -14383,37 +14456,9 @@ async function parseChannelFile(file, channelName){
   // 기준: 판매일+판매처+수취인+연락처1+주소 동일 → 같은 배송(합배송)으로 간주.
   //  주문번호는 기준에서 제외 — 주문번호가 달라도(같은 날 같은 사람·주소로 여러 건 주문 시
   //  창고에서 합배송 처리되는 경우 포함) 같은 그룹으로 묶는다.
-  //  한 그룹(=한 번의 배송) 안에서는 배송비를 무조건 딱 1건만 부과한다:
-  //   - 그룹의 첫 행이 대표로 ship_qty=1·배송비를 부과받고, 나머지는 ship_qty=0·배송비 0.
-  //   - 단, 택배비 설정에서 "수량비례(perUnit)"인 상품이 그룹에 섞여 있으면 그 실비 상품의
-  //     배송비가 대표 배송비가 된다(무료/정액 상품 뒤에 묶여 실비가 그냥 0으로 사라지는 것을 방지).
-  //     대표가 이미 perUnit 상품이면 이후 다른 perUnit 상품이 더 있어도 배송비를 중복 부과하지 않는다.
-  const shipGroups = new Map();   // key → { holder: row, holderIsPerUnit: bool }
-  for(const row of rows){
-    const key = `${row.year}|${row.sale_date}|${row.channel}|${row.receiver}|${row.phone1}|${row.address}`;
-    const isPerUnitFee = !!(_shipMap[`${row.channel}|${row.item_no}`]||{}).perUnit;
-    const g = shipGroups.get(key);
-    if(!g){
-      row.ship_qty = 1;
-      shipGroups.set(key, { holder: row, holderIsPerUnit: isPerUnitFee });
-      continue;
-    }
-    row.ship_qty = 0;
-    if(isPerUnitFee && !g.holderIsPerUnit){
-      // 지금까지의 대표 배송비는 실비가 아닌데 이 상품은 실비 → 대표를 이 상품으로 교체
-      if(g.holder.shipping_fee>0){
-        g.holder.shipping_fee = 0;
-        g.holder.margin = Math.round(g.holder.settlement - g.holder.cost_price);
-        g.holder.margin_rate = g.holder.settlement>0 ? Math.round(g.holder.margin/g.holder.settlement*10000)/10000 : 0;
-      }
-      g.holder = row;
-      g.holderIsPerUnit = true;
-    } else if(row.shipping_fee>0){
-      row.shipping_fee = 0;
-      row.margin = Math.round(row.settlement - row.cost_price);
-      row.margin_rate = row.settlement>0 ? Math.round(row.margin/row.settlement*10000)/10000 : 0;
-    }
-  }
+  //  한 그룹(=한 번의 배송) 안에서는 배송비를 무조건 딱 1건만 부과한다.
+  //  (그룹핑 알고리즘 본체는 applyShipGroupDedup 참고 — 업로드 시점과 택배비 재적용 시점에서 공유)
+  applyShipGroupDedup(rows);
 
   return { rows, missing };
 }
