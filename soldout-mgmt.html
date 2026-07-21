@@ -267,6 +267,7 @@
     </div>
     <div class="h-right">
       <button class="btn" id="btnUpload">📂 엑셀 업로드</button>
+      <button class="btn" id="btnDownload">⬇ 엑셀 다운로드</button>
       <button class="btn btn-red" id="btnDeleteAll">🗑 데이터 전체삭제</button>
       <button class="btn" id="btnSites">⚙ 사이트 설정</button>
       <button class="btn btn-primary" id="btnAdd">＋ 신규 상품 등록</button>
@@ -1093,6 +1094,45 @@ async function runImport(){
   showToast(`가져오기 완료 — 신규 ${added}개${updated?`, 덮어씀 ${updated}개`:''}${skipped?`, 건너뜀 ${skipped}개`:''}`);
 }
 
+function exportExcel(){
+  if(typeof XLSX === 'undefined'){
+    showToast('엑셀 처리 모듈을 불러오지 못했습니다. 인터넷 연결 확인 후 새로고침 해주세요.');
+    return;
+  }
+  if(!state.products.length){
+    showToast('내보낼 상품이 없습니다.');
+    return;
+  }
+  const cellToText = (cell)=>{
+    if(!cell) return '';
+    if(cell.x) return 'X';
+    return (cell.numbers||[]).map(n=> n.value + (n.label? `(${n.label})`:'')).join('\n');
+  };
+
+  const byCat = new Map();
+  state.products.forEach(p=>{
+    const cat = p.category || '모든상품';
+    if(!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat).push(p);
+  });
+
+  const wb = XLSX.utils.book_new();
+  byCat.forEach((prods, cat)=>{
+    const header = ['ERP상품명', '상품명찾기', ...state.sites.map(s=>s.name)];
+    const rows = [header];
+    prods.forEach(p=>{
+      rows.push([p.erpName, p.searchName||'', ...state.sites.map(s=> cellToText(p.siteData[s.id]))]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const safeName = String(cat).replace(/[\\/*?:[\]]/g,'').slice(0,31) || 'Sheet1';
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
+  });
+
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `상품번호_품절관리_${ymd}.xlsx`);
+}
+
 function openUploadModal(){
   pendingImport = null;
   document.getElementById('previewArea').style.display = 'none';
@@ -1558,6 +1598,7 @@ async function init(){
   document.getElementById('siteOverlay').addEventListener('click', (e)=>{ if(e.target.id==='siteOverlay') document.getElementById('siteOverlay').classList.remove('show'); });
 
   document.getElementById('btnUpload').addEventListener('click', openUploadModal);
+  document.getElementById('btnDownload').addEventListener('click', exportExcel);
   document.getElementById('uploadZone').addEventListener('click', ()=> document.getElementById('fileInput').click());
   document.getElementById('fileInput').addEventListener('change', (e)=>{
     if(e.target.files && e.target.files[0]) parseWorkbook(e.target.files[0]);
