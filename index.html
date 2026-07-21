@@ -925,6 +925,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cs-pickrow-qty{width:62px;border:1px solid var(--bd);border-radius:7px;padding:6px 8px;font-size:13px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;flex-shrink:0;}
 .cs-pickrow-qty:focus{border-color:#3182F6;background:var(--bg);}
 .cs-pickrow-qty.cs-has{border-color:#3182F6;background:#EEF4FF;font-weight:700;}
+/* 전화구매건 */
+.po-cat-tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}
+.po-cat-구매{background:#F0FDF4;color:#059669;}
+.po-cat-누락{background:#EFF6FF;color:#2563EB;}
+.po-cat-불량{background:#FAF5FF;color:#9333EA;}
+.po-cat-파손{background:#FEF2F2;color:#DC2626;}
+.po-unpaid-row{background:#FFFBEB;}
+.po-unpaid-row.po-over1m{background:#FEF2F2;}
+.po-unpaid-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;background:#FEF3C7;color:#B45309;white-space:nowrap;}
+.po-unpaid-badge.po-over1m{background:#FEE2E2;color:#B91C1C;}
+/* 우측하단 커스텀 알림 카드 (카톡 PC버전 느낌) */
+.ntf-card{position:fixed;right:20px;width:320px;background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px 16px;z-index:100050;font-family:inherit;transition:bottom .15s;}
+.ntf-card-title{font-size:12.5px;font-weight:700;color:var(--tx);display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.ntf-card-close{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:0 2px;}
+.ntf-card-body{font-size:12.5px;color:var(--tx);line-height:1.6;white-space:pre-line;margin-bottom:10px;}
+.ntf-card-actions{display:flex;justify-content:flex-end;gap:8px;}
+.ntf-card-btn{padding:6px 14px;border:none;border-radius:8px;background:#3182F6;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.ntf-card-btn:hover{background:#1B64DA;}
 /* 🚀 로켓그로스 관리 */
 .rgm-wrap{max-width:1360px;margin:0 auto;}
 .rgm-tabcontent{height:calc(100vh - 140px);overflow-y:auto;padding:16px 18px;}
@@ -1662,6 +1680,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서</div>
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-consign" onclick="goMenu('consign')">🚚 위탁 배송건</div>
+  <div class="ni" id="nav-phoneorder" onclick="goMenu('phoneorder')">📞 전화구매건</div>
   <div class="ni" id="nav-rgmgmt" onclick="goMenu('rgmgmt')">🚀 로켓그로스 관리</div>
   <div class="ni" id="nav-cost3day" onclick="goMenu('cost3day')">📦 3일 비용계산</div>
   <div class="ni" id="nav-review" onclick="goMenu('review')">⭐ 리뷰관리</div>
@@ -2696,6 +2715,42 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     </div>
     <div class="cs-card" id="csOrderCard"></div>
   </div>
+ </div>
+</div>
+
+<!-- ═══ 전화구매건 (CX팀) ═══ -->
+<div class="page" id="page-phoneorder">
+ <div class="cs-wrap cs-tabcontent">
+  <div class="cs-toolbar">
+    <div class="cs-title">📞 전화구매건 <span class="cs-count" id="poCount">0</span></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select id="poStaffFilter" class="cs-search" style="width:110px;cursor:pointer;" onchange="poRenderList()"><option value="">전체 담당자</option></select>
+      <select id="poCatFilter" class="cs-search" style="width:110px;cursor:pointer;" onchange="poRenderList()">
+        <option value="">전체 구분</option><option value="구매">구매</option><option value="누락">누락</option><option value="불량">불량</option><option value="파손">파손</option>
+      </select>
+      <select id="poPaidFilter" class="cs-search" style="width:110px;cursor:pointer;" onchange="poRenderList()">
+        <option value="">입금 전체</option><option value="미입금">미입금만</option><option value="입금완료">입금완료만</option>
+      </select>
+      <input type="month" id="poMonthFilter" class="cs-search" style="width:130px;" onchange="poRenderAll()"/>
+      <input class="cs-search" id="poSearch" placeholder="고객명·연락처·상품명 검색" autocomplete="off" oninput="poRenderList()" style="width:190px;"/>
+      <button class="cs-mini-btn" onclick="poRefreshDefectRate()">⚠️ 불량률 새로고침</button>
+    </div>
+  </div>
+
+  <!-- 미입금 강조 -->
+  <div id="poUnpaidCard" style="margin-bottom:14px;"></div>
+
+  <!-- 집계 패널 -->
+  <div class="cs-summary" id="poSummary"></div>
+
+  <!-- 목록 -->
+  <div class="cs-card" id="poListCard"></div>
+
+  <!-- 상품별 불량률 -->
+  <div class="cs-toolbar" style="margin-top:18px;">
+    <div class="cs-title">⚠️ 상품별 누락·불량·파손율 <span class="cs-count" style="font-weight:400;">(패밀리상품코드 = 백데이터 매칭 · ss소장 제외)</span></div>
+  </div>
+  <div class="cs-card" id="poDefectCard"></div>
  </div>
 </div>
 
@@ -5154,6 +5209,7 @@ function _revealApp(sess){
   if(who) who.innerHTML = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원') + ' <span style="opacity:.5;">▾</span>';
   applyPermissions();
   logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
+  poStartWatch();   // 전화구매건 미입금 알림 감시 (메뉴 진입 안 해도 권한자에게 뜨도록)
   _startAppData();   // 실제 로그인 성공(또는 저장된 세션 복원) 후에만 데이터 로드 시작 — 로그인 전 방문(봇/크롤러 포함)에는 Supabase egress 발생 안 함
 }
 function _startAppData(){
@@ -5223,7 +5279,7 @@ async function logout(){
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'phoneorder',label:'📞 전화구매건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'moeum',label:'🧮 모음전 계산기'},
@@ -5242,7 +5298,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','cost3day','review','rgmgmt'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','phoneorder','cost3day','review','rgmgmt'] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
@@ -7724,7 +7780,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','phoneorder','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -7761,6 +7817,7 @@ function goPage(p){
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
+  if(p==='phoneorder') poInit();
   if(p==='rgmgmt') rgmInit();
   if(p==='cost3day') c3Init();
   if(p==='review') reviewInit();
@@ -20053,6 +20110,271 @@ function csRenderSummary(list){
   document.getElementById('csSumSettle').textContent = _csWon(setSum);
   const mEl=document.getElementById('csSumMargin'); mEl.textContent=_csWon(marginSum); mEl.className='cs-sum-val '+(marginSum>=0?'cs-pos':'cs-neg');
   const rEl=document.getElementById('csSumRate'); rEl.textContent = rate==null?'—':rate.toFixed(1)+'%'; rEl.className='cs-sum-val '+(rate==null?'':(rate>=0?'cs-pos':'cs-neg'));
+}
+
+// ══════════════════════════════════════════════
+// 📞 전화구매건 (CX팀) — 구글시트 연동, work_calendar에 건별 개별 저장(kind: po_<id>)
+//   레코드: {id,date,staff,category('구매'|'누락'|'불량'|'파손'),receiver,phone1,phone2,addr,
+//            productName,qty,shipMethod,payType,shipMemo,familyCode,amount,
+//            paidStatus('미입금'|'입금완료'),invoiceStatus,note}
+//   목록 조회는 별도 인덱스 배열 없이 kind LIKE 'po\_%' 접두어 쿼리로 직접 가져옴(레이스 방지, egress 절약)
+// ══════════════════════════════════════════════
+let _poRecords = [];
+let _poLoaded = false;
+let _poDefectStats = null;   // 상품별 불량률 캐시 (수동 새로고침 시에만 재계산 — daily_sales/backdata 조회 절약)
+let _poWatchStarted = false;
+let _poWatchTimer = null;
+let _poSeenUnpaidKey = '';   // 오늘 이미 띄운 미입금 알림 내용 서명(중복 알림 방지)
+
+const PO_STAFF_MAP = { '예진': null, '종범':'김종범', '상훈':'관리자', '규리':'김규리' };
+function _poStaffLabel(raw){
+  if(!raw) return '';
+  if(Object.prototype.hasOwnProperty.call(PO_STAFF_MAP, raw)){
+    const m = PO_STAFF_MAP[raw];
+    return m===null ? raw+'(퇴사)' : m;
+  }
+  return raw;
+}
+function _poWon(n){ return (Math.round(Number(n)||0)).toLocaleString('ko-KR')+'원'; }
+function _poDays(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr); if(isNaN(d)) return null;
+  return Math.floor((Date.now()-d.getTime())/86400000);
+}
+
+function poInit(){
+  if(!_poLoaded) poLoadAll();
+  else poRenderAll();
+  poStartWatch();
+}
+
+async function _poFetchRecords(){
+  try{
+    const {data,error} = await sb.from('work_calendar').select('kind,data,updated_at')
+      .eq('person','__app__').like('kind','po\\_%');
+    if(error){ console.warn('poFetchRecords 오류', error.message); return []; }
+    return (data||[])
+      .map(r=>({ ...(r.data||{}), _kind:r.kind, _updatedAt:r.updated_at }))
+      .filter(r=>r.id);
+  }catch(e){ console.warn('poFetchRecords 실패', e); return []; }
+}
+async function poLoadAll(){
+  _poRecords = await _poFetchRecords();
+  _poLoaded = true;
+  poRenderAll();
+}
+function _poOnPage(){ return !!document.getElementById('page-phoneorder')?.classList.contains('active'); }
+
+function poRenderAll(){
+  poFillStaffFilter();
+  poRenderUnpaid();
+  poRenderSummary();
+  poRenderList();
+  if(_poDefectStats) poRenderDefectRate(); else poRefreshDefectRate();
+}
+
+function poFillStaffFilter(){
+  const sel = document.getElementById('poStaffFilter'); if(!sel) return;
+  const cur = sel.value;
+  const labels = [...new Set(_poRecords.map(r=>_poStaffLabel(r.staff)).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">전체 담당자</option>' + labels.map(l=>`<option value="${_esc(l)}">${_esc(l)}</option>`).join('');
+  if(labels.includes(cur)) sel.value = cur;
+}
+
+function _poFiltered(){
+  const staff = document.getElementById('poStaffFilter')?.value || '';
+  const cat = document.getElementById('poCatFilter')?.value || '';
+  const paid = document.getElementById('poPaidFilter')?.value || '';
+  const month = document.getElementById('poMonthFilter')?.value || '';
+  const q = (document.getElementById('poSearch')?.value || '').trim().toLowerCase();
+  return _poRecords.filter(r=>{
+    if(staff && _poStaffLabel(r.staff)!==staff) return false;
+    if(cat && r.category!==cat) return false;
+    if(paid && r.paidStatus!==paid) return false;
+    if(month && String(r.date||'').slice(0,7)!==month) return false;
+    if(q){
+      const hay = [r.receiver,r.phone1,r.phone2,r.productName].map(x=>String(x||'').toLowerCase()).join(' ');
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a,b)=> String(b.date||'').localeCompare(String(a.date||'')));
+}
+
+function poRenderList(){
+  const list = _poFiltered();
+  const countEl = document.getElementById('poCount'); if(countEl) countEl.textContent = list.length;
+  const card = document.getElementById('poListCard'); if(!card) return;
+  if(!list.length){ card.innerHTML = '<div class="cs-empty">조건에 맞는 전화구매건이 없습니다.</div>'; return; }
+  card.innerHTML = `<table class="cs-table"><thead><tr>
+    <th class="cs-l">날짜</th><th class="cs-l">담당자</th><th>구분</th><th class="cs-l">수취인</th><th class="cs-l">연락처</th>
+    <th class="cs-l">상품명</th><th>수량</th><th>총금액</th><th>입금여부</th><th>계산서</th><th class="cs-l">비고</th>
+  </tr></thead><tbody>${list.map(r=>{
+    const days = r.paidStatus==='미입금' ? _poDays(r.date) : null;
+    const over1m = days!=null && days>=30;
+    const over2w = days!=null && days>=14;
+    const rowCls = over1m ? 'po-unpaid-row po-over1m' : (over2w ? 'po-unpaid-row' : '');
+    return `<tr class="${rowCls}">
+      <td class="cs-l">${_esc(r.date||'')}</td>
+      <td class="cs-l">${_esc(_poStaffLabel(r.staff))}</td>
+      <td><span class="po-cat-tag po-cat-${_esc(r.category||'')}">${_esc(r.category||'')}</span></td>
+      <td class="cs-l">${_esc(r.receiver||'')}</td>
+      <td class="cs-l">${_esc(r.phone1||'')}</td>
+      <td class="cs-l">${_esc(r.productName||'')}</td>
+      <td>${_esc(r.qty??'')}</td>
+      <td>${_poWon(r.amount)}</td>
+      <td>${r.paidStatus==='미입금' ? `<span class="po-unpaid-badge ${over1m?'po-over1m':''}">미입금${days!=null?' · '+days+'일':''}</span>` : _esc(r.paidStatus||'')}</td>
+      <td>${_esc(r.invoiceStatus||'')}</td>
+      <td class="cs-l">${_esc(r.note||'')}</td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function poRenderUnpaid(){
+  const card = document.getElementById('poUnpaidCard'); if(!card) return;
+  const unpaid = _poRecords.filter(r=>r.paidStatus==='미입금').map(r=>({...r, _days:_poDays(r.date)}))
+    .filter(r=>r._days!=null && r._days>=14).sort((a,b)=>b._days-a._days);
+  if(!unpaid.length){ card.innerHTML=''; return; }
+  const over1m = unpaid.filter(r=>r._days>=30).length;
+  card.innerHTML = `<div class="cs-card" style="padding:12px 16px;background:#FFFBEB;border-color:#F59E0B66;">
+    <div style="font-size:12.5px;font-weight:700;color:#B45309;margin-bottom:6px;">⏰ 미입금 2주 이상 ${unpaid.length}건${over1m?` (1개월 이상 ${over1m}건)`:''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      ${unpaid.slice(0,20).map(r=>`<span class="po-unpaid-badge ${r._days>=30?'po-over1m':''}">${_esc(r.receiver||'')} · ${r._days}일</span>`).join('')}
+      ${unpaid.length>20?`<span class="po-unpaid-badge">외 ${unpaid.length-20}건</span>`:''}
+    </div>
+  </div>`;
+}
+
+function poRenderSummary(){
+  const wrap = document.getElementById('poSummary'); if(!wrap) return;
+  const month = document.getElementById('poMonthFilter')?.value || new Date().toISOString().slice(0,7);
+  const monthList = _poRecords.filter(r=>String(r.date||'').slice(0,7)===month);
+  const totalAmount = monthList.reduce((s,r)=>s+(Number(r.amount)||0),0);
+  const byStaff = {};
+  monthList.forEach(r=>{ const k=_poStaffLabel(r.staff)||'미지정'; byStaff[k]=(byStaff[k]||0)+(Number(r.amount)||0); });
+  const staffLines = Object.entries(byStaff).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${_poWon(v)}`).join(' · ') || '—';
+  const unissued = monthList.filter(r=>!r.invoiceStatus || r.invoiceStatus==='미발행').reduce((s,r)=>s+(Number(r.amount)||0),0);
+  wrap.innerHTML = `
+    <div class="cs-sum-item"><span class="cs-sum-lbl">${_esc(month)} 총 금액</span><span class="cs-sum-val">${_poWon(totalAmount)}</span></div>
+    <div class="cs-sum-item" style="flex:2;"><span class="cs-sum-lbl">직원별 합계</span><span class="cs-sum-val" style="font-size:12.5px;font-weight:600;">${_esc(staffLines)}</span></div>
+    <div class="cs-sum-item cs-sum-hi"><span class="cs-sum-lbl">계산서·현금영수증 미발행 합계</span><span class="cs-sum-val">${_poWon(unissued)}</span></div>
+  `;
+}
+
+// ── 상품별 불량률: familyCode → backdata.code 매칭, ss소장 제외, 분모는 daily_sales 판매수량 합 ──
+async function poRefreshDefectRate(){
+  const card = document.getElementById('poDefectCard');
+  if(card) card.innerHTML = '<div class="cs-empty">불량률 계산 중…</div>';
+  const codes = [...new Set(_poRecords.map(r=>String(r.familyCode||'').trim()).filter(c=>c && c!=='ss소장'))];
+  if(!codes.length){ _poDefectStats = []; poRenderDefectRate(); return; }
+  try{
+    const [{data:bd}, {data:ds}] = await Promise.all([
+      sb.from('backdata').select('code,name,item_type').in('code', codes),
+      sb.from('daily_sales').select('code,qty').in('code', codes)
+    ]);
+    const nameOf = {}; (bd||[]).forEach(b=>{ nameOf[b.code]=b.name||b.code; });
+    const soldOf = {}; (ds||[]).forEach(d=>{ soldOf[d.code]=(soldOf[d.code]||0)+(Number(d.qty)||0); });
+    const badOf = {};
+    _poRecords.forEach(r=>{
+      const c = String(r.familyCode||'').trim();
+      if(!c || c==='ss소장') return;
+      if(['누락','불량','파손'].includes(r.category)) badOf[c]=(badOf[c]||0)+1;
+    });
+    _poDefectStats = codes.map(c=>{
+      const bad = badOf[c]||0, sold = soldOf[c]||0;
+      return { code:c, name:nameOf[c]||c, bad, sold, rate: sold>0 ? bad/sold*100 : null };
+    }).sort((a,b)=>(b.rate??-1)-(a.rate??-1));
+  }catch(e){
+    console.warn('poRefreshDefectRate 실패', e);
+    _poDefectStats = [];
+  }
+  poRenderDefectRate();
+}
+function poRenderDefectRate(){
+  const card = document.getElementById('poDefectCard'); if(!card) return;
+  const rows = _poDefectStats || [];
+  if(!rows.length){ card.innerHTML = '<div class="cs-empty">집계할 상품코드가 없습니다.</div>'; return; }
+  card.innerHTML = `<table class="cs-table"><thead><tr>
+    <th class="cs-l">상품명</th><th class="cs-l">코드</th><th>누락·불량·파손</th><th>판매수량</th><th>비율</th>
+  </tr></thead><tbody>${rows.map(r=>`<tr>
+    <td class="cs-l cs-name">${_esc(r.name)}</td>
+    <td class="cs-l" style="font-family:ui-monospace,monospace;color:var(--tx2);">${_esc(r.code)}</td>
+    <td>${r.bad}건</td>
+    <td>${r.sold}개</td>
+    <td class="${r.rate!=null && r.rate>=5 ? 'cs-neg' : ''}" style="font-weight:700;">${r.rate==null?'—':r.rate.toFixed(1)+'%'}</td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+// ── 우측하단 커스텀 알림 카드 (범용 헬퍼 — 세금계산서 발행 알림 등 다른 기능에서도 재사용) ──
+let _ntfCards = [];
+function ntfShow(id, title, bodyText, onConfirm){
+  ntfDismiss(id);
+  const el = document.createElement('div');
+  el.className = 'ntf-card';
+  el.id = 'ntf-'+id;
+  el.innerHTML = `<div class="ntf-card-title"><span>${_esc(title)}</span><button class="ntf-card-close" onclick="ntfDismiss('${id}')">✕</button></div>
+    <div class="ntf-card-body">${_esc(bodyText)}</div>
+    <div class="ntf-card-actions"><button class="ntf-card-btn" id="ntf-ok-${id}">확인</button></div>`;
+  document.body.appendChild(el);
+  document.getElementById('ntf-ok-'+id).onclick = ()=>{ ntfDismiss(id); if(onConfirm) onConfirm(); };
+  _ntfCards = _ntfCards.filter(c=>c!==id);
+  _ntfCards.push(id);
+  _ntfRelayout();
+}
+function ntfDismiss(id){
+  const el = document.getElementById('ntf-'+id); if(el) el.remove();
+  _ntfCards = _ntfCards.filter(c=>c!==id);
+  _ntfRelayout();
+}
+function _ntfRelayout(){
+  let bottom = 20;
+  _ntfCards.forEach(id=>{
+    const el = document.getElementById('ntf-'+id); if(!el) return;
+    el.style.bottom = bottom+'px';
+    bottom += el.offsetHeight + 12;
+  });
+}
+
+// ── 미입금 알림 감시 (대상: phoneorder 메뉴 권한 보유자 — 종범/규리/관리자 계정에 권한 부여해서 사용) ──
+//    페이지를 안 열어도 백그라운드에서 동작. 집계/불량률까지 매번 새로고침하지 않도록
+//    데이터 로드(_poFetchRecords)만 하고, 화면이 떠 있을 때만 목록을 다시 그린다.
+let _poVerSeen;   // 마지막으로 확인한 최신 updated_at (버전체크로 불필요한 재조회 방지)
+function poStartWatch(){
+  if(_poWatchStarted) return;
+  const u = window.__CURRENT_USER; if(!u) return;
+  if(u.role!=='master' && _menuPerm('phoneorder')==='none') return;
+  _poWatchStarted = true;
+  poPollTick();
+  if(!_poWatchTimer) _poWatchTimer = setInterval(poPollTick, 5*60*1000);
+}
+async function poPollTick(){
+  if(document.hidden) return;
+  try{
+    const {data,error} = await sb.from('work_calendar').select('updated_at')
+      .eq('person','__app__').like('kind','po\\_%').order('updated_at',{ascending:false}).limit(1);
+    if(error) throw error;
+    const v = (data && data[0]) ? data[0].updated_at : null;
+    if(v !== _poVerSeen || !_poLoaded){
+      _poVerSeen = v;
+      _poRecords = await _poFetchRecords();
+      _poLoaded = true;
+      if(_poOnPage()){ poFillStaffFilter(); poRenderUnpaid(); poRenderSummary(); poRenderList(); }
+    }
+  }catch(e){ console.warn('poPollTick 실패', e); }
+  poCheckUnpaidAlert();
+}
+function poCheckUnpaidAlert(){
+  if(!_poLoaded) return;
+  const unpaid = _poRecords.filter(r=>r.paidStatus==='미입금').map(r=>({...r,_days:_poDays(r.date)}))
+    .filter(r=>r._days!=null && r._days>=14);
+  if(!unpaid.length){ _poSeenUnpaidKey=''; ntfDismiss('po_unpaid'); return; }
+  const today = new Date().toISOString().slice(0,10);
+  const key = today+'|'+unpaid.length;
+  if(key===_poSeenUnpaidKey) return;
+  _poSeenUnpaidKey = key;
+  const over1m = unpaid.filter(r=>r._days>=30).length;
+  ntfShow('po_unpaid', '📞 전화구매건 미입금 알림',
+    `미입금 2주 이상 ${unpaid.length}건${over1m?` (1개월 이상 ${over1m}건 포함)`:''}\n전화구매건 메뉴에서 확인해주세요.`,
+    ()=>goMenu('phoneorder'));
 }
 
 // ══════════════════════════════════════════════
