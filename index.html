@@ -1481,6 +1481,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <button class="btn btn-pr" id="addTopBtn" style="display:none;">+ 추가</button>
     <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
     <span id="viewBadge" style="display:none;font-size:10px;color:#F59E0B;border:1px solid #F59E0B66;border-radius:5px;padding:2px 6px;white-space:nowrap;">열람전용</span>
+    <button class="btn btn-sm" id="taskBellBtn" onclick="taskOpenInbox()" title="받은 요청함 (F9 키: 어디서든 새 요청 보내기)" style="position:relative;">🔔<span id="taskBellBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:#EF4444;color:#fff;font-size:10px;line-height:1;border-radius:8px;padding:2px 5px;min-width:14px;text-align:center;"></span></button>
     <span id="whoami" onclick="openMyPage()" title="마이페이지" style="font-size:11px;color:var(--tx2);padding:3px 8px;white-space:nowrap;cursor:pointer;border-radius:6px;border:1px solid var(--bd);"></span>
     <button class="btn btn-sm" onclick="logout()" title="로그아웃">로그아웃</button>
   </div>
@@ -4791,6 +4792,57 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- ═══ 업무 요청하기 (F9 단축키, 어디서든) ═══ -->
+<div class="modal-overlay" id="taskCreateModal">
+  <div class="modal" style="max-width:400px;">
+    <h3>📨 업무 요청하기</h3>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:6px;">
+      <div>
+        <div class="cl-lbl">받는사람</div>
+        <select id="taskToSel" style="width:100%;height:38px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;background:var(--bg);color:var(--tx);font-family:inherit;"></select>
+      </div>
+      <div>
+        <div class="cl-lbl">요청 내용</div>
+        <textarea id="taskContentInp" placeholder="요청할 내용을 입력하세요" rows="4"
+          style="width:100%;border:1.5px solid var(--bd);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--tx2);">📍 현재 화면: <b id="taskCurMenuLabel"></b> — 받는사람이 "바로가기"를 누르면 이 화면으로 바로 이동합니다.</div>
+    </div>
+    <div class="ma" style="margin-top:16px;">
+      <button class="btn" onclick="closeModal('taskCreateModal')">취소</button>
+      <button class="btn btn-pr" onclick="taskSubmitCreate()">보내기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 업무 요청 도착 팝업 (실시간) ═══ -->
+<div class="modal-overlay" id="taskPopupModal">
+  <div class="modal" style="max-width:380px;">
+    <h3>📨 업무 요청이 도착했습니다</h3>
+    <div style="margin-top:6px;font-size:13px;line-height:1.6;">
+      <div><b id="taskPopFrom"></b>님이 <span id="taskPopMenu" style="color:var(--pr);font-weight:600;"></span> 관련 요청을 보냈습니다.</div>
+      <div style="margin-top:8px;white-space:pre-wrap;background:var(--bg2);border-radius:8px;padding:10px;" id="taskPopContent"></div>
+      <div style="margin-top:6px;font-size:11px;color:var(--tx2);" id="taskPopTime"></div>
+    </div>
+    <div class="ma" style="margin-top:16px;">
+      <button class="btn" onclick="taskPopupClose()">닫기 ✕</button>
+      <button class="btn" onclick="taskPopupAck()">확인</button>
+      <button class="btn btn-pr" onclick="taskPopupGoto()">바로가기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 받은 요청함 ═══ -->
+<div class="modal-overlay" id="taskInboxModal">
+  <div class="modal" style="max-width:520px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">📥 받은 요청함 <span style="font-size:11px;color:var(--tx2);font-weight:400;">(F9: 새 요청 보내기)</span></h3>
+      <button class="btn btn-sm" onclick="closeModal('taskInboxModal')">✕ 닫기</button>
+    </div>
+    <div id="taskInboxList" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
 <!-- GROQ AI CHAT -->
 <button class="chat-fab" id="chatFab" onclick="toggleChat()" title="AI 재고 어시스턴트">💬</button>
 <div class="chat-win" id="chatWin">
@@ -5210,6 +5262,7 @@ function _revealApp(sess){
   applyPermissions();
   logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
   poStartWatch();   // 전화구매건 미입금 알림 감시 (메뉴 진입 안 해도 권한자에게 뜨도록)
+  taskStartWatch();   // 계정 간 업무 요청 실시간 알림 감시 시작
   _startAppData();   // 실제 로그인 성공(또는 저장된 세션 복원) 후에만 데이터 로드 시작 — 로그인 전 방문(봇/크롤러 포함)에는 Supabase egress 발생 안 함
 }
 function _startAppData(){
@@ -6138,6 +6191,199 @@ async function logiStartNoticeWatch(){
       .subscribe();
   }catch(e){ console.warn('logi realtime 구독 실패(폴링으로 대체)', e); }
 }
+
+// ══════════════════════════════════════════════
+// 계정 간 업무 요청 (F9 단축키 → 어디서든 요청 보내기, 실시간 팝업 알림)
+//   저장: work_calendar(person='__app__', kind='task_requests') 재사용
+// ══════════════════════════════════════════════
+let _taskRequests = [];
+let _taskWatchStarted = false;
+let _taskWatchPoll = null;
+let _taskWatchCh = null;
+let _taskVerCache;
+let _taskSeenIds = new Set();     // 감시 시작 시점 기준선 — 이보다 새로운 항목만 팝업 대상
+let _taskPopupQueue = [];
+let _taskPopupShowing = false;
+let _taskPopupCur = null;
+
+function _taskMe(){ return window.__CURRENT_USER; }
+function _taskFmtTime(iso){
+  if(!iso) return '';
+  const d=new Date(iso);
+  const p2=n=>String(n).padStart(2,'0');
+  return `${p2(d.getMonth()+1)}/${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
+async function taskOpenCreateModal(){
+  const me=_taskMe(); if(!me){ toast('로그인 후 이용해주세요.'); return; }
+  try{ await loadAppProfiles(); }catch{}
+  const sel=document.getElementById('taskToSel');
+  const others=(APP_PROFILES||[]).filter(p=>p.username!==me.username);
+  sel.innerHTML = others.length
+    ? others.map(p=>`<option value="${_esc(p.username)}">${_esc(p.name||p.username)}</option>`).join('')
+    : '<option value="">등록된 다른 계정이 없습니다</option>';
+  document.getElementById('taskContentInp').value='';
+  const deptLabel=(DEPTS.find(d=>d.id===_activeDept)||{}).label||'';
+  document.getElementById('taskCurMenuLabel').textContent = _menuLabel(currentPage) + (deptLabel?` (${deptLabel})`:'');
+  openModal('taskCreateModal');
+  setTimeout(()=>document.getElementById('taskContentInp')?.focus(), 50);
+}
+
+async function taskSubmitCreate(){
+  const me=_taskMe(); if(!me) return;
+  const toUsername=document.getElementById('taskToSel').value;
+  if(!toUsername){ toast('받는사람을 선택해주세요.'); return; }
+  const content=document.getElementById('taskContentInp').value.trim();
+  if(!content){ toast('요청 내용을 입력해주세요.'); return; }
+  const toProfile=(APP_PROFILES||[]).find(p=>p.username===toUsername);
+  const rec={
+    id:'t'+Date.now()+Math.random().toString(36).slice(2,8),
+    fromUsername:me.username, fromName:me.name||me.username,
+    toUsername, toName: toProfile ? (toProfile.name||toProfile.username) : toUsername,
+    menu:currentPage, dept:_activeDept, menuLabel:_menuLabel(currentPage),
+    content, createdAt:new Date().toISOString(),
+    read:false, resolvedAt:null
+  };
+  let arr=[];
+  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{}
+  arr.push(rec);
+  await cloudKvSave('task_requests', arr);
+  _taskRequests=arr;
+  _taskSeenIds.add(rec.id);   // 내가 방금 만든 건 나에게 팝업으로 다시 뜨지 않도록
+  _taskBroadcast();
+  closeModal('taskCreateModal');
+  toast('📨 '+rec.toName+'님에게 요청을 보냈습니다.');
+}
+
+function taskUnreadCount(){
+  const me=_taskMe(); if(!me) return 0;
+  return _taskRequests.filter(t=>t.toUsername===me.username && !t.read).length;
+}
+function taskRenderBadge(){
+  const n=taskUnreadCount();
+  const b=document.getElementById('taskBellBadge'); if(!b) return;
+  b.style.display = n>0 ? '' : 'none';
+  b.textContent = n>9 ? '9+' : String(n);
+}
+function taskRenderInbox(){
+  const me=_taskMe(); if(!me) return;
+  const list=document.getElementById('taskInboxList'); if(!list) return;
+  const mine=_taskRequests.filter(t=>t.toUsername===me.username).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  if(!mine.length){ list.innerHTML='<div style="text-align:center;color:var(--tx2);padding:24px 0;font-size:12.5px;">받은 요청이 없습니다.</div>'; return; }
+  list.innerHTML = mine.map(t=>`
+    <div style="border:1px solid var(--bd);border-radius:10px;padding:10px 12px;${t.read?'opacity:.55;':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--tx2);gap:8px;">
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b style="color:var(--tx);">${_esc(t.fromName)}</b> → ${_esc(t.menuLabel||'')}</span>
+        <span style="white-space:nowrap;">${_taskFmtTime(t.createdAt)}</span>
+      </div>
+      <div style="margin-top:6px;font-size:13px;white-space:pre-wrap;">${_esc(t.content||'')}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end;">
+        ${t.read?'':`<button class="btn btn-sm" onclick="taskMarkRead('${t.id}')">확인</button>`}
+        <button class="btn btn-sm btn-pr" onclick="taskGoto('${t.id}')">바로가기</button>
+      </div>
+    </div>`).join('');
+}
+async function taskOpenInbox(){
+  const me=_taskMe(); if(!me){ toast('로그인 후 이용해주세요.'); return; }
+  try{ _taskRequests=(await cloudKvLoad('task_requests'))||[]; }catch{}
+  taskRenderInbox();
+  openModal('taskInboxModal');
+  taskRenderBadge();
+}
+async function _taskUpdateRecord(id, patch){
+  let arr=[];
+  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{ return; }
+  const idx=arr.findIndex(t=>t.id===id); if(idx===-1) return;
+  arr[idx]={ ...arr[idx], ...patch };
+  await cloudKvSave('task_requests', arr);
+  _taskRequests=arr;
+  taskRenderBadge();
+  if(document.getElementById('taskInboxModal')?.classList.contains('open')) taskRenderInbox();
+  _taskBroadcast();
+}
+async function taskMarkRead(id){
+  await _taskUpdateRecord(id, { read:true, resolvedAt:new Date().toISOString() });
+}
+async function taskGoto(id){
+  const t=_taskRequests.find(x=>x.id===id) || (_taskPopupCur && _taskPopupCur.id===id ? _taskPopupCur : null);
+  await taskMarkRead(id);
+  closeModal('taskInboxModal');
+  if(t) goMenu(t.menu);
+}
+
+// ── 실시간 도착 팝업 (확인/바로가기/닫기) ──
+function _taskDrainPopupQueue(){
+  if(_taskPopupShowing || !_taskPopupQueue.length) return;
+  _taskPopupCur=_taskPopupQueue.shift();
+  _taskPopupShowing=true;
+  document.getElementById('taskPopFrom').textContent=_taskPopupCur.fromName||'';
+  document.getElementById('taskPopMenu').textContent='['+(_taskPopupCur.menuLabel||'')+']';
+  document.getElementById('taskPopContent').textContent=_taskPopupCur.content||'';
+  document.getElementById('taskPopTime').textContent=_taskFmtTime(_taskPopupCur.createdAt);
+  openModal('taskPopupModal');
+  try{ logiChime(); }catch{}
+}
+function _taskPopupNext(){
+  _taskPopupShowing=false; _taskPopupCur=null;
+  closeModal('taskPopupModal');
+  setTimeout(_taskDrainPopupQueue, 300);
+}
+function taskPopupClose(){ _taskPopupNext(); }   // 안읽음 상태 유지 — 종 아이콘/받은요청함에서 다시 확인 가능
+async function taskPopupAck(){ const t=_taskPopupCur; _taskPopupNext(); if(t) await taskMarkRead(t.id); }
+async function taskPopupGoto(){ const t=_taskPopupCur; _taskPopupNext(); if(t) await taskGoto(t.id); }
+
+async function _taskCheckNew(){
+  const me=_taskMe(); if(!me) return;
+  let arr;
+  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{ return; }
+  _taskRequests=arr;
+  if(document.getElementById('taskInboxModal')?.classList.contains('open')) taskRenderInbox();
+  taskRenderBadge();
+  const fresh=arr.filter(t=>t.toUsername===me.username && !t.read && !_taskSeenIds.has(t.id));
+  fresh.forEach(t=>{ _taskSeenIds.add(t.id); _taskPopupQueue.push(t); });
+  _taskDrainPopupQueue();
+}
+async function _taskPollTick(){
+  if(document.hidden) return;
+  const v=await cloudKvVersion('task_requests');
+  if(v!==undefined && v!==_taskVerCache){ _taskVerCache=v; await _taskCheckNew(); }
+}
+function _taskBroadcast(){
+  try{ if(_taskWatchCh){ _taskWatchCh.send({type:'broadcast',event:'task_ping',payload:{t:Date.now()}}); return; } }catch{}
+  try{
+    const tx=sb.channel('task-rt');
+    tx.subscribe(st=>{ if(st==='SUBSCRIBED'){ tx.send({type:'broadcast',event:'task_ping',payload:{t:Date.now()}}); setTimeout(()=>{ try{ sb.removeChannel(tx); }catch{} },1500); } });
+  }catch{}
+}
+async function taskStartWatch(){
+  if(_taskWatchStarted) return;
+  const me=_taskMe(); if(!me) return;
+  _taskWatchStarted=true;
+  try{ _logiGetCtx(); }catch{}   // 물류팀 권한 없는 계정은 logiStartNoticeWatch에서 오디오 잠금 해제가 안 되므로 여기서도 시도(로그인 직후 호출돼야 브라우저 자동재생 정책 통과)
+  let arr=[];
+  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{}
+  _taskRequests=arr;
+  _taskSeenIds=new Set(arr.map(t=>t.id));   // 로그인 시점 이전 항목은 팝업 없이 뱃지로만 표시
+  taskRenderBadge();
+  if(!_taskWatchPoll){
+    _taskWatchPoll=setInterval(_taskPollTick, 60000);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _taskPollTick(); });
+  }
+  if(_taskWatchCh) return;
+  try{
+    _taskWatchCh = sb.channel('task-rt')
+      .on('broadcast', { event:'task_ping' }, _taskCheckNew)
+      .on('postgres_changes', { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.task_requests' }, _taskCheckNew)
+      .subscribe();
+  }catch(e){ console.warn('업무요청 realtime 구독 실패(폴링으로 대체)', e); }
+}
+// F9: 어디서든 업무 요청하기 팝업 (입력창 포커스 여부와 무관하게 안전 — 문자 입력이 아닌 함수키)
+document.addEventListener('keydown', function(e){
+  if(e.key!=='F9') return;
+  if(!window.__CURRENT_USER) return;
+  e.preventDefault();
+  taskOpenCreateModal();
+});
 
 // ══════════════════════════════════════════════
 // 물류팀 택배박스 — 박스 마스터 + 날짜별 현재고 + 주문
