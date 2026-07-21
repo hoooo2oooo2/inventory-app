@@ -8168,11 +8168,18 @@ async function rvwLoadManage(){
 }
 function rvwManageDefaults(){ return {status:'진행전', progressNote:'', managerNote:'', productAmount:'', costAmount:'', lossAmount:'', assignee:'', manualName:'', manualPhone:'', manualQty:''}; }
 function rvwGetManage(reviewId){ return _rvwManage[reviewId] ? {...rvwManageDefaults(), ..._rvwManage[reviewId]} : rvwManageDefaults(); }
-function rvwSetManage(reviewId, patch){
+async function rvwSetManage(reviewId, patch){
   const cur = _rvwManage[reviewId] ? {..._rvwManage[reviewId]} : rvwManageDefaults();
   Object.assign(cur, patch, {updatedAt: new Date().toISOString()});
+  _rvwManage[reviewId] = cur;   // 로컬 낙관적 반영(즉시 화면 갱신용)
+
+  // 다른 PC가 그 사이 다른 리뷰 건을 저장했을 수 있으므로, 저장 직전 클라우드 최신본을
+  // 다시 받아와 그 위에 이번 변경만 얹는다 — 안 그러면 통째로 upsert할 때 stale 캐시가
+  // 다른 사람의 수정을 덮어써 사라지는 문제가 있었음.
+  let latest=null; try{ latest = await cloudKvLoad(REVIEW_MANAGE_KEY); }catch{ latest=null; }
+  _rvwManage = latest || {};
   _rvwManage[reviewId] = cur;
-  cloudKvSave(REVIEW_MANAGE_KEY, _rvwManage);
+  await cloudKvSave(REVIEW_MANAGE_KEY, _rvwManage);
 }
 
 // ── 매출관리 통합(_revData)에서 상품주문번호로 이름/전화번호/제품명/수량 매칭 ──
@@ -8380,7 +8387,9 @@ async function rvwOnRatingChange(reviewId, val){
   const er = _rvwRowCache[reviewId]; if(!er) return;
   const m = String(er.reviewDate||'').slice(0,7);
   if(!/^\d{4}-\d{2}$/.test(m)) return;
-  await rvwLoadMonth(m);
+  // 다른 PC가 같은 달 데이터를 그 사이 저장했을 수 있으므로, 저장 직전 최신본을 다시 받아온다.
+  let latest=null; try{ latest = await cloudKvLoad(rvwMKey(m)); }catch{ latest=null; }
+  _rvwMonths[m] = latest || _rvwMonths[m] || {};
   const row = _rvwMonths[m][reviewId]; if(!row) return;
   if(row.rating===n) return;
   row.rating = n;
@@ -8393,7 +8402,9 @@ async function rvwOnDisplayStatusChange(reviewId, val){
   const er = _rvwRowCache[reviewId]; if(!er) return;
   const m = String(er.reviewDate||'').slice(0,7);
   if(!/^\d{4}-\d{2}$/.test(m)) return;
-  await rvwLoadMonth(m);
+  // 다른 PC가 같은 달 데이터를 그 사이 저장했을 수 있으므로, 저장 직전 최신본을 다시 받아온다.
+  let latest=null; try{ latest = await cloudKvLoad(rvwMKey(m)); }catch{ latest=null; }
+  _rvwMonths[m] = latest || _rvwMonths[m] || {};
   const row = _rvwMonths[m][reviewId]; if(!row) return;
   if(row.displayStatus===ds) return;
   row.displayStatus = ds;
@@ -8708,6 +8719,7 @@ async function rvwPickFiles(fileList){
   await rvwLoadIndex();
   let ok=0, totalNew=0, totalDup=0;
   const touched = new Set();
+  const refreshed = new Set();   // 다른 PC 동시저장 대비 — 이번 업로드에서 이미 최신본으로 갱신한 달
   for(const file of files){
     try{
       const buf = await file.arrayBuffer();
@@ -8717,7 +8729,12 @@ async function rvwPickFiles(fileList){
       for(const row of rows){
         const m = row.reviewDate.slice(0,7);
         if(!/^\d{4}-\d{2}$/.test(m)) continue;
-        await rvwLoadMonth(m);
+        if(!refreshed.has(m)){
+          // 다른 PC가 그 사이 저장했을 수 있으므로, 이번 업로드에서 처음 다루는 달은 캐시 대신 최신본을 받아온다.
+          let latest=null; try{ latest = await cloudKvLoad(rvwMKey(m)); }catch{ latest=null; }
+          _rvwMonths[m] = latest || {};
+          refreshed.add(m);
+        }
         if(_rvwMonths[m][row.reviewId]){
           totalDup++;
           continue;   // 기존에 저장된 데이터를 보존 — 새로 업로드된 중복 리뷰는 버림
