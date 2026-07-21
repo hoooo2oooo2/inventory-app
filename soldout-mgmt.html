@@ -66,6 +66,15 @@
   .qf{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;}
   .qf.active{background:var(--blue);color:#fff;border-color:var(--blue);}
   .qf.qf-red.active{background:var(--red);border-color:var(--red);}
+  .qf.qf-orange{color:#9A6210;border-color:#F3D9A8;}
+  .qf.qf-orange.active{background:#E0A82A;border-color:#E0A82A;color:#fff;}
+  .miss-site-box{background:#FFFBEF;border:1px solid #F3D9A8;border-radius:10px;padding:10px 12px;margin-top:10px;}
+  .miss-site-title{font-size:12px;font-weight:800;color:#9A6210;margin-bottom:8px;}
+  .miss-site-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .ms-chip{border:1px solid #F3D9A8;background:#fff;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;color:#9A6210;cursor:pointer;transition:.12s;}
+  .ms-chip:hover{border-color:#E0A82A;background:#FDF3E7;}
+  .ms-chip.active{background:#E0A82A;border-color:#E0A82A;color:#fff;}
+  .ms-chip .ms-n{font-weight:800;margin-left:4px;opacity:.85;}
   .qf.qf-cat.active{background:var(--green);border-color:var(--green);color:#fff;}
 
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
@@ -79,6 +88,26 @@
 
   .pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden;}
   .pcard.soldout-card{border-color:#F6C9CA;}
+  .pcard.disc-card{border-color:#EFC65C;background:#FFFBEF;}
+  .pcard.disc-card .pcard-head:hover{background:#FEF6E0;}
+  .pcard.disc-card .pcard-body{border-top-color:#F2DFA8;}
+  .pcard.disc-card .sitebox{background:#FDF3E7 !important;border-color:#EFC65C !important;opacity:1;}
+  .pcard.disc-card .sitebox .sitebox-name{color:#7A4E08;}
+  .pcard.disc-card .numval{background:rgba(255,255,255,.75);color:#7A4E08;}
+  .pcard.disc-card .numval:hover{border-color:#C98A12;color:#9A6210;}
+  .pcard.disc-card .numlabel{color:#9A6210;}
+  .pcard.disc-card .miss-txt,.pcard.disc-card .x-txt{color:#9A6210;}
+  .pcard.disc-card .so-since{color:#9A6210;}
+  .pcard.disc-card .erp-full span{background:#FBEAC4;color:#7A4E08;}
+  .toggle.t-disc{background:#E0A82A;}
+  .pcard.disc-card .toggle{background:#E0A82A !important;}
+  .pcard.disc-card .toggle:disabled{cursor:default;}
+  .pill.disc{background:#FDF3E7;color:#9A6210;}
+  .btn-yellow{background:#FDF3E7;color:#9A6210;border-color:#F3D9A8;}
+  .btn-yellow:hover{background:#E0A82A;color:#fff;border-color:#E0A82A;}
+  .btn-yellow.on{background:#E0A82A;color:#fff;border-color:#E0A82A;}
+  .btn-edit{background:var(--blue-light);color:var(--blue);border-color:#D7E3FC;}
+  .btn-edit:hover{background:var(--blue);color:#fff;border-color:var(--blue);}
   .pcard-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;cursor:pointer;flex-wrap:wrap;}
   .pcard-head:hover{background:#FAFBFF;}
   .pcard-titlewrap{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
@@ -134,7 +163,6 @@
   .legend span{display:inline-flex;align-items:center;gap:5px;}
   .legend .sq{width:9px;height:9px;border-radius:3px;}
 
-  #viewTable table{border-collapse:collapse;width:100%;table-layout:fixed;}
   thead th{text-align:left;font-size:12px;color:var(--ink-soft);font-weight:700;padding:10px 8px;background:#FAFBFD;
     border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:sticky;top:0;z-index:2;}
   tbody td{padding:8px 6px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top;}
@@ -210,9 +238,18 @@
   .site-block textarea:focus{outline:none;border-color:var(--blue);}
   .site-block.x-active textarea{display:none;}
   .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;position:sticky;bottom:0;background:#fff;padding-top:8px;}
-  .site-manage-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
-  .site-manage-row input{flex:1;}
-  .site-manage-row button{border:none;background:var(--red-light);color:var(--red);width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:14px;flex-shrink:0;}
+  .site-manage-row{display:flex;gap:6px;margin-bottom:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:9px;padding:6px 8px;transition:.12s;}
+  .site-manage-row.dragging{opacity:.45;}
+  .site-manage-row.drag-over{border-color:var(--blue);background:var(--blue-light);}
+  .site-manage-row input{flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:13px;font-family:inherit;}
+  .site-manage-row input:focus{outline:none;border-color:var(--blue);}
+  .site-manage-row .sm-handle{cursor:grab;color:#C7CCD8;font-size:15px;padding:0 2px;user-select:none;flex-shrink:0;}
+  .site-manage-row .sm-handle:active{cursor:grabbing;}
+  .site-manage-row .sm-no{font-size:11px;font-weight:800;color:var(--ink-soft);width:20px;text-align:center;flex-shrink:0;}
+  .site-manage-row .sm-move{border:1px solid var(--line);background:#fff;color:var(--ink-soft);width:26px;height:28px;border-radius:6px;cursor:pointer;font-size:11px;flex-shrink:0;line-height:1;}
+  .site-manage-row .sm-move:hover:not(:disabled){border-color:var(--blue);color:var(--blue);}
+  .site-manage-row .sm-move:disabled{opacity:.3;cursor:default;}
+  .site-manage-row button[data-remove]{border:none;background:var(--red-light);color:var(--red);width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:14px;flex-shrink:0;}
   .add-site-btn{width:100%;border:1px dashed var(--line);background:#fff;border-radius:8px;padding:8px;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;margin-top:4px;}
   .add-site-btn:hover{border-color:var(--blue);color:var(--blue);}
 
@@ -267,18 +304,15 @@
     </div>
     <div class="h-right">
       <button class="btn" id="btnUpload">📂 엑셀 업로드</button>
-      <button class="btn" id="btnDownload">⬇ 엑셀 다운로드</button>
-      <button class="btn btn-red" id="btnDeleteAll">🗑 데이터 전체삭제</button>
+      <button class="btn" id="btnDownload">📥 엑셀 다운로드</button>
       <button class="btn" id="btnSites">⚙ 사이트 설정</button>
       <button class="btn btn-primary" id="btnAdd">＋ 신규 상품 등록</button>
+      <button class="btn btn-red" id="btnDeleteAll">🗑 데이터 전체삭제</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;">
     </div>
   </div>
 
-  <div class="viewtabs">
-    <div class="vtab active" data-view="quick">⚡ 품절 · 해제 처리</div>
-    <div class="vtab" data-view="table">📋 상품번호 관리 <span class="badge" id="missBadge" style="display:none;"></span></div>
-  </div>
+  
 
   <div id="viewQuick">
     <div id="longSoldWarn" style="display:none;"></div>
@@ -296,8 +330,10 @@
       <div class="quick-filters" id="quickFilters">
         <button class="qf active" data-qf="all">전체</button>
         <button class="qf qf-red" data-qf="soldout">품절 있는 상품</button>
+        <button class="qf qf-orange" data-qf="missing">상품번호 미기재 <span id="qfMissCount"></span></button>
       </div>
       <div class="quick-filters" id="catFilters" style="margin-top:8px;"></div>
+      <div id="missSiteFilters" style="display:none;"></div>
     </div>
     <div class="result-count" id="resultCount"></div>
     <div id="quickList"></div>
@@ -305,35 +341,7 @@
     <div id="quickPager" style="display:flex;justify-content:center;gap:8px;align-items:center;margin-top:14px;"></div>
   </div>
 
-  <div id="viewTable" style="display:none;">
-    <div class="alert" id="alertBox"></div>
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title" id="panelTitle">전체 상품</div>
-        <div class="panel-tools">
-          <div class="legend">
-            <span><span class="sq" style="background:var(--green-light);border:1px solid #CDEFE0;"></span>기재완료</span>
-            <span><span class="sq" style="background:var(--red-light);border:1px solid #F6C9CA;"></span>미기재</span>
-            <span><span class="sq" style="background:var(--gray-light);border:1px solid var(--line);"></span>X 미판매</span>
-          </div>
-          <select class="search" id="tableFilter" style="width:150px;">
-            <option value="all">전체 보기</option>
-            <option value="missing">미기재만</option>
-            <option value="new">신규 등록(7일)</option>
-          </select>
-          <input class="search" id="tableSearch" placeholder="상품명 · 별칭 검색">
-        </div>
-      </div>
-      <div style="overflow-x:auto;max-height:70vh;">
-        <table>
-          <thead><tr id="theadRow"></tr></thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
-      <div class="empty" id="tableEmpty" style="display:none;border:none;">표시할 상품이 없습니다.</div>
-      <div id="tablePager" style="display:flex;justify-content:center;gap:8px;align-items:center;padding:14px 0;"></div>
-    </div>
-  </div>
+  
 
 </div>
 
@@ -464,7 +472,7 @@
 
 let state = {
   sites: [], products: [],
-  view: 'quick', quickFilter: 'all', catFilter: 'all', openCards: {},
+  view: 'quick', quickFilter: 'all', missSite: 'all', catFilter: 'all', openCards: {},
   searchQuery: '', searchField: 'erp', searchDone: false,
   deletePw: '0000',
   quickPage: 0, tablePage: 0, missingSiteFilter: null,
@@ -650,16 +658,10 @@ function render(){
     `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} · 사이트 ${state.sites.length}곳 · 상품 ${state.products.length}개`;
 
   const missCount = state.products.filter(isMissing).length;
-  const mb = document.getElementById('missBadge');
-  mb.style.display = missCount>0 ? 'flex':'none';
-  mb.textContent = missCount;
+  const mc = document.getElementById('qfMissCount');
+  if(mc) mc.textContent = missCount>0 ? `(${missCount})` : '';
 
-  document.getElementById('viewQuick').style.display = state.view==='quick' ? '' : 'none';
-  document.getElementById('viewTable').style.display = state.view==='table' ? '' : 'none';
-  document.querySelectorAll('.vtab').forEach(el=> el.classList.toggle('active', el.dataset.view===state.view));
-
-  if(state.view==='quick') renderQuick();
-  else renderTableView();
+  renderQuick();
 }
 
 function quickMatch(p, q, field){
@@ -733,6 +735,43 @@ function productCategories(){
   return [...ordered, ...extras];
 }
 
+function renderMissSiteFilters(){
+  const el = document.getElementById('missSiteFilters');
+  if(!el) return;
+  if(state.quickFilter !== 'missing'){
+    el.style.display = 'none'; el.innerHTML = ''; state.missSite = 'all';
+    return;
+  }
+  const stats = state.sites.map(s=>({
+    site: s,
+    count: state.products.filter(p=> cellIsMissing(getCell(p, s.id))).length
+  })).filter(x=> x.count>0).sort((a,b)=> b.count - a.count);
+
+  if(!stats.length){
+    el.style.display = 'none'; el.innerHTML = ''; return;
+  }
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="miss-site-box">
+      <div class="miss-site-title">⚠ 상품번호가 누락된 사이트 — 클릭하면 해당 사이트가 누락된 상품만 표시됩니다</div>
+      <div class="miss-site-chips">
+        <button class="ms-chip ${state.missSite==='all'?'active':''}" data-mssite="all">전체 사이트</button>
+        ${stats.map(x=>`
+          <button class="ms-chip ${state.missSite===x.site.id?'active':''}" data-mssite="${x.site.id}">
+            ${escapeHtml(x.site.name)}<span class="ms-n">${x.count}</span>
+          </button>`).join('')}
+      </div>
+    </div>`;
+  el.querySelectorAll('[data-mssite]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const v = btn.dataset.mssite;
+      state.missSite = (state.missSite === v && v !== 'all') ? 'all' : v;
+      state.quickPage = 0;
+      renderQuick();
+    });
+  });
+}
+
 function renderCatFilters(){
   const el = document.getElementById('catFilters');
   const cats = productCategories();
@@ -764,8 +803,13 @@ function renderQuick(){
   }
 
   renderCatFilters();
+  renderMissSiteFilters();
   let list = state.products.filter(p=>quickMatch(p, q, field));
   if(state.quickFilter==='soldout') list = list.filter(p=> ['soldout','partial'].includes(productSaleStatus(p)));
+  if(state.quickFilter==='missing'){
+    list = list.filter(isMissing);
+    if(state.missSite !== 'all') list = list.filter(p=> cellIsMissing(getCell(p, state.missSite)));
+  }
   if(state.catFilter!=='all') list = list.filter(p=> (p.category||'모든상품') === state.catFilter);
 
   document.getElementById('resultCount').textContent = q ? `"${q}" 검색 결과 ${list.length}개` : `상품 ${list.length}개`;
@@ -792,20 +836,24 @@ function renderQuick(){
       : `<span class="pill miss">번호 없음</span>`;
     const open = !!state.openCards[p.id] || !!q;
     return `
-    <div class="pcard ${st==='soldout'?'soldout-card':''} ${open?'open':''}">
+    <div class="pcard ${p.discontinued?'disc-card':(st==='soldout'?'soldout-card':'')} ${open?'open':''}">
       <div class="pcard-head" data-toggle="${p.id}">
         <div class="pcard-titlewrap">
           <span class="pcard-title" title="${escapeHtml(p.erpName)}">${escapeHtml(firstLine(p.erpName))}</span>
           ${extraLineCount(p.erpName)>0?`<span class="pcard-alias" style="background:var(--blue-light);color:var(--blue);">외 ${extraLineCount(p.erpName)}종</span>`:''}
           ${p.searchName?`<span class="pcard-alias">${escapeHtml(p.searchName)}</span>`:''}
           ${p.category?`<span class="pcard-alias" style="background:var(--green-light);color:#0F8A56;">${escapeHtml(p.category)}</span>`:''}
+          ${p.discontinued?'<span class="pill disc">⛔ 단종</span>':''}
           ${stPill}
           ${missN>0?`<span class="pill miss">미기재 ${missN}곳</span>`:''}
         </div>
         <div class="pcard-actions">
           <button class="btn btn-sm" data-hist="${p.id}">🕐 이력</button>
-          <button class="btn btn-sm btn-red" data-allsoldout="${p.id}">전체 품절</button>
-          <button class="btn btn-sm btn-green" data-allrestore="${p.id}">전체 해제</button>
+          <button class="btn btn-sm btn-edit" data-edit="${p.id}">✎ 수정</button>
+          <button class="btn btn-sm btn-red" data-allsoldout="${p.id}" ${p.discontinued?'disabled style="opacity:.4;cursor:default;"':''}>전체 품절</button>
+          <button class="btn btn-sm btn-green" data-allrestore="${p.id}" ${p.discontinued?'disabled style="opacity:.4;cursor:default;"':''}>전체 해제</button>
+          <button class="btn btn-sm btn-yellow ${p.discontinued?'on':''}" data-disc="${p.id}">${p.discontinued?'단종 해제':'단종'}</button>
+          <button class="btn btn-sm btn-red" data-del="${p.id}" title="상품 삭제">🗑</button>
         </div>
       </div>
       <div class="pcard-body">
@@ -820,7 +868,7 @@ function renderQuick(){
             return `<div class="sitebox ${cls}">
               <div class="sitebox-head">
                 <span class="sitebox-name">${escapeHtml(s.name)}</span>
-                <button class="toggle ${cell.soldout?'t-off':'t-on'}" data-tg-pid="${p.id}" data-tg-sid="${s.id}">${cell.soldout?'품절':'판매중'}</button>
+                <button class="toggle ${p.discontinued?'t-disc':(cell.soldout?'t-off':'t-on')}" data-tg-pid="${p.id}" data-tg-sid="${s.id}" ${p.discontinued?'disabled title="단종 상품입니다. 단종 해제 후 변경하세요."':''}>${p.discontinued?'단종':(cell.soldout?'품절':'판매중')}</button>
               </div>
               ${(cell.numbers||[]).map(n=>`
                 <div class="numline">
@@ -877,6 +925,33 @@ function renderQuick(){
   });
   container.querySelectorAll('[data-hist]').forEach(btn=>{
     btn.addEventListener('click', ()=> openHistModal(btn.dataset.hist));
+  });
+  container.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openDeleteFlow(btn.dataset.del));
+  });
+  container.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openEditModal(btn.dataset.edit));
+  });
+  container.querySelectorAll('[data-disc]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const p = state.products.find(x=>x.id===btn.dataset.disc);
+      if(!p) return;
+      if(!p.discontinued){
+        if(!confirm(`"${firstLine(p.erpName)}" 상품을 단종 처리할까요?\n등록된 모든 사이트(${activeSites(p).length}곳)가 품절 상태로 함께 변경됩니다.`)) return;
+        p.discontinued = true;
+        activeSites(p).forEach(s=> setSoldout(getCell(p,s.id), true));
+      } else {
+        if(!confirm(`"${firstLine(p.erpName)}" 단종을 해제할까요?\n등록된 모든 사이트가 판매중 상태로 되돌아갑니다.`)) return;
+        p.discontinued = false;
+        activeSites(p).forEach(s=> setSoldout(getCell(p,s.id), false));
+      }
+      await saveState();
+      state.openCards[p.id] = true;
+      render();
+      showToast(p.discontinued
+        ? `"${firstLine(p.erpName)}" 단종 처리 — 전체 ${activeSites(p).length}곳 품절 반영됨`
+        : `"${firstLine(p.erpName)}" 단종 해제 — 전체 판매중으로 복귀`);
+    });
   });
 
 }
@@ -1094,43 +1169,77 @@ async function runImport(){
   showToast(`가져오기 완료 — 신규 ${added}개${updated?`, 덮어씀 ${updated}개`:''}${skipped?`, 건너뜀 ${skipped}개`:''}`);
 }
 
-function exportExcel(){
+/* ---------- 엑셀 다운로드 ---------- */
+function exportToExcel(){
   if(typeof XLSX === 'undefined'){
     showToast('엑셀 처리 모듈을 불러오지 못했습니다. 인터넷 연결 확인 후 새로고침 해주세요.');
     return;
   }
-  if(!state.products.length){
-    showToast('내보낼 상품이 없습니다.');
-    return;
-  }
-  const cellToText = (cell)=>{
-    if(!cell) return '';
-    if(cell.x) return 'X';
-    return (cell.numbers||[]).map(n=> n.value + (n.label? `(${n.label})`:'')).join('\n');
-  };
+  if(!state.products.length){ showToast('내보낼 상품이 없습니다.'); return; }
 
-  const byCat = new Map();
-  state.products.forEach(p=>{
-    const cat = p.category || '모든상품';
-    if(!byCat.has(cat)) byCat.set(cat, []);
-    byCat.get(cat).push(p);
-  });
+  try{
+    const wb = XLSX.utils.book_new();
 
-  const wb = XLSX.utils.book_new();
-  byCat.forEach((prods, cat)=>{
-    const header = ['ERP상품명', '상품명찾기', ...state.sites.map(s=>s.name)];
-    const rows = [header];
-    prods.forEach(p=>{
-      rows.push([p.erpName, p.searchName||'', ...state.sites.map(s=> cellToText(p.siteData[s.id]))]);
+    // 카테고리별로 시트 분리 (업로드 형식과 동일하게)
+    const cats = productCategories();
+    const groups = cats.length ? cats : ['모든상품'];
+
+    groups.forEach(cat=>{
+      const list = state.products.filter(p => (p.category||'모든상품') === cat);
+      if(!list.length) return;
+
+      const header = ['ERP 상품명','상품명 찾기', ...state.sites.map(s=>s.name)];
+      const aoa = [header];
+
+      list.forEach(p=>{
+        const row = [p.erpName || '', p.searchName || ''];
+        state.sites.forEach(s=>{
+          const cell = getCell(p, s.id);
+          if(cell.x) row.push('X');
+          else if(!cell.numbers || !cell.numbers.length) row.push('');
+          else row.push(cell.numbers.map(n=> n.value + (n.label ? `(${n.label})` : '')).join('\n'));
+        });
+        aoa.push(row);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      // 열 너비
+      ws['!cols'] = [{wch:28},{wch:16}, ...state.sites.map(()=>({wch:22}))];
+      // 시트명 31자 제한 및 금지문자 제거
+      let sheetName = String(cat).replace(/[\\\/\?\*\[\]:]/g,'-').slice(0,31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
     });
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const safeName = String(cat).replace(/[\\/*?:[\]]/g,'').slice(0,31) || 'Sheet1';
-    XLSX.utils.book_append_sheet(wb, ws, safeName);
-  });
 
-  const d = new Date();
-  const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  XLSX.writeFile(wb, `상품번호_품절관리_${ymd}.xlsx`);
+    // 품절 이력 시트 (기록이 있는 경우만)
+    const histRows = [['ERP 상품명','사이트','회차','품절 시작','해제일','품절 기간(일)','상태']];
+    state.products.forEach(p=>{
+      state.sites.forEach(s=>{
+        const cell = getCell(p, s.id);
+        (cell.history||[]).forEach((h,idx)=>{
+          const end = h.end ? new Date(h.end) : new Date();
+          const days = Math.max(0, Math.floor((end - new Date(h.start))/86400000));
+          histRows.push([
+            firstLine(p.erpName), s.name, idx+1,
+            fmtDate(h.start), h.end ? fmtDate(h.end) : '',
+            days, h.end ? '해제됨' : '품절 중'
+          ]);
+        });
+      });
+    });
+    if(histRows.length > 1){
+      const wsH = XLSX.utils.aoa_to_sheet(histRows);
+      wsH['!cols'] = [{wch:30},{wch:14},{wch:7},{wch:12},{wch:12},{wch:13},{wch:10}];
+      XLSX.utils.book_append_sheet(wb, wsH, '품절이력');
+    }
+
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    XLSX.writeFile(wb, `상품번호_품절관리_${stamp}.xlsx`);
+    showToast(`엑셀 다운로드 완료 — 상품 ${state.products.length}개`);
+  }catch(err){
+    console.error(err);
+    showToast('엑셀 파일 생성에 실패했습니다.');
+  }
 }
 
 function openUploadModal(){
@@ -1158,164 +1267,6 @@ async function confirmDeleteAllYes(){
 }
 
 /* ---------- 표 뷰 ---------- */
-function renderTableView(){
-  const total = state.products.length;
-  const missing = state.products.filter(isMissing);
-  const newThisWeek = state.products.filter(isNew).length;
-  const box = document.getElementById('alertBox');
-
-  const f = document.getElementById('tableFilter').value;
-
-  if(total===0){
-    box.innerHTML = `등록된 상품이 없습니다. <b>엑셀 업로드</b> 또는 <b>신규 상품 등록</b>으로 상품을 추가해보세요.`;
-  } else if(missing.length===0){
-    box.innerHTML = `전체 <b>${total}개</b> 상품 모두 사이트별 상품번호 기재(또는 X 처리)가 완료되었습니다. 이번 주 신규 등록 <b>${newThisWeek}개</b>.`;
-  } else if(f !== 'missing'){
-    // 요약만 표시, 상세는 리스트 보러가기 클릭 시
-    box.innerHTML = `
-      전체 <b>${total}개</b> 상품 중 <b style="color:var(--red)">${missing.length}개</b>에 상품번호 누락이 있습니다.
-      <button class="btn btn-sm" id="btnGoMissing" style="margin-left:10px;color:var(--red);border-color:#F6C9CA;">미기재 리스트 보러가기 →</button>`;
-    const goBtn = document.getElementById('btnGoMissing');
-    if(goBtn) goBtn.addEventListener('click', ()=>{
-      document.getElementById('tableFilter').value = 'missing';
-      state.tablePage = 0;
-      renderTableView();
-    });
-  } else {
-    const perSite = state.sites.map(s=>({site:s, count: state.products.filter(p=> cellIsMissing(getCell(p,s.id))).length}))
-      .filter(x=>x.count>0).sort((a,b)=>b.count-a.count);
-    box.innerHTML = `
-      미기재 상품 <b style="color:var(--red)">${missing.length}개</b>를 표시 중입니다.
-      <button class="btn btn-sm" id="btnBackAll" style="margin-left:10px;">전체 보기로 돌아가기</button>
-      <div style="margin-top:6px;">${perSite.map(x=>`
-        <span class="chip-mini warn" style="cursor:pointer;${state.missingSiteFilter===x.site.id?'background:var(--red);color:#fff;':''}" data-msite="${x.site.id}">${escapeHtml(x.site.name)} 누락 ${x.count}개</span>`).join('')}
-      <span class="chip-mini">이번 주 신규 등록 ${newThisWeek}개</span></div>`;
-    const backBtn = document.getElementById('btnBackAll');
-    if(backBtn) backBtn.addEventListener('click', ()=>{
-      document.getElementById('tableFilter').value = 'all';
-      state.tablePage = 0;
-      state.missingSiteFilter = null;
-      renderTableView();
-    });
-    box.querySelectorAll('[data-msite]').forEach(chip=>{
-      chip.addEventListener('click', ()=>{
-        const sid = chip.dataset.msite;
-        state.missingSiteFilter = state.missingSiteFilter===sid ? null : sid;
-        state.tablePage = 0;
-        renderTableView();
-      });
-    });
-  }
-
-  document.getElementById('theadRow').innerHTML = `
-    <th class="col-erp">ERP 상품명</th>
-    <th class="col-search">상품명찾기</th>
-    ${state.sites.map(s=>`<th class="site-cell" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</th>`).join('')}
-    <th class="col-del"></th>`;
-
-  let list = state.products.slice();
-  if(f==='missing'){
-    list = list.filter(isMissing);
-    if(state.missingSiteFilter) list = list.filter(p=> cellIsMissing(getCell(p, state.missingSiteFilter)));
-  } else if(state.missingSiteFilter){
-    state.missingSiteFilter = null;   // 미기재 필터를 벗어나면 사이트별 세부 필터도 함께 해제
-  }
-  if(f==='new') list = list.filter(isNew);
-  const q = document.getElementById('tableSearch').value.trim().toLowerCase();
-  if(q) list = list.filter(p=> (p.erpName||'').toLowerCase().includes(q) || (p.searchName||'').toLowerCase().includes(q));
-  list.sort((a,b)=> new Date(b.addedDate)-new Date(a.addedDate));
-
-  document.getElementById('panelTitle').textContent = `상품 목록 (${list.length})`;
-  document.getElementById('tableEmpty').style.display = list.length?'none':'block';
-
-  // 상품 수가 많을 때 전체를 한 번에 그리면 버벅이므로 페이지 단위로 표시
-  const maxTablePage = Math.max(0, Math.ceil(list.length/TABLE_PAGE_SIZE)-1);
-  if(state.tablePage > maxTablePage) state.tablePage = maxTablePage;
-  const tableStart = state.tablePage * TABLE_PAGE_SIZE;
-  const pageList = list.slice(tableStart, tableStart + TABLE_PAGE_SIZE);
-  renderPager('tablePager', list.length, TABLE_PAGE_SIZE, state.tablePage, (p)=>{ state.tablePage = p; renderTableView(); });
-
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = pageList.map(p=>{
-    const missing = isMissing(p);
-    const missCount = productMissingSites(p).length;
-    return `
-    <tr>
-      <td class="col-erp">
-        <textarea class="prod-name-edit" data-pid="${p.id}" rows="${Math.max(1, String(p.erpName||'').split('\n').length)}" placeholder="ERP 상품명">${escapeHtml(p.erpName)}</textarea>${isNew(p)?'<span class="badge-new">NEW</span>':''}
-      </td>
-      <td class="col-search"><input type="text" class="search-name-edit" data-pid="${p.id}" value="${escapeHtml(p.searchName||'')}" placeholder="상품명찾기"></td>
-      ${state.sites.map(s=>{
-        const cell = getCell(p, s.id);
-        const cls = cell.x ? 'xstate' : (cellIsFilled(cell) ? 'filled' : 'missing');
-        const text = (cell.numbers||[]).map(n=> n.value + (n.label? `(${n.label})`:'')).join('\n');
-        return `<td class="site-cell">
-          <div class="cell-box ${cls}">
-            <label class="x-row" title="X (미판매) 체크"><input type="checkbox" class="x-checkbox" data-pid="${p.id}" data-sid="${s.id}" ${cell.x?'checked':''}> X</label>
-            <div class="x-label">X 미판매</div>
-            <textarea class="numbers-area" data-pid="${p.id}" data-sid="${s.id}" rows="${Math.max(1,(cell.numbers||[]).length)}" placeholder="미기재">${escapeHtml(text)}</textarea>
-          </div>
-        </td>`;
-      }).join('')}
-      <td class="col-del"><button class="btn btn-sm btn-red" data-del="${p.id}" style="padding:4px 8px;font-size:11px;">삭제</button></td>
-    </tr>`;
-  }).join('');
-
-  tbody.querySelectorAll('.x-checkbox').forEach(chk=>{
-    chk.addEventListener('change', async (e)=>{
-      const prod = state.products.find(x=>x.id===e.target.dataset.pid);
-      const cell = getCell(prod, e.target.dataset.sid);
-      cell.x = e.target.checked;
-      if(cell.x){ cell.numbers = []; if(cell.soldout) setSoldout(cell,false); }
-      await saveState(); render();
-      showToast(cell.x ? 'X(미판매) 처리되었습니다.' : 'X 해제되었습니다.');
-    });
-  });
-  tbody.querySelectorAll('.numbers-area').forEach(area=>{
-    area.addEventListener('input', ()=>{ area.rows = Math.max(1, area.value.split('\n').length); });
-    area.addEventListener('blur', async (e)=>{
-      const prod = state.products.find(x=>x.id===e.target.dataset.pid);
-      const cell = getCell(prod, e.target.dataset.sid);
-      cell.numbers = parseNumbersText(e.target.value);
-      await saveState(); render();
-    });
-  });
-  tbody.querySelectorAll('[data-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=> openDeleteFlow(btn.dataset.del));
-  });
-  tbody.querySelectorAll('.prod-name-edit').forEach(area=>{
-    area.addEventListener('input', ()=>{ area.rows = Math.max(1, area.value.split('\n').length); });
-    area.addEventListener('blur', async (e)=> updateProdErpName(e.target.dataset.pid, e.target.value));
-  });
-  tbody.querySelectorAll('.search-name-edit').forEach(inp=>{
-    inp.addEventListener('blur', async (e)=> updateProdSearchName(e.target.dataset.pid, e.target.value));
-    inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter') e.target.blur(); });
-  });
-}
-async function updateProdErpName(pid, val){
-  const p = state.products.find(x=>x.id===pid);
-  if(!p) return;
-  const name = String(val||'').split('\n').map(l=>l.trim()).filter(Boolean).join('\n');
-  if(!name){ showToast('ERP 상품명은 비울 수 없습니다.'); render(); return; }
-  if(name === p.erpName) return;
-  if(state.products.some(x=>x.id!==pid && x.erpName===name)){
-    showToast('이미 등록된 상품명입니다.'); render(); return;
-  }
-  p.erpName = name;
-  await saveState();
-  render();
-  showToast('상품명이 수정되었습니다.');
-}
-async function updateProdSearchName(pid, val){
-  const p = state.products.find(x=>x.id===pid);
-  if(!p) return;
-  const name = String(val||'').trim();
-  if(name === (p.searchName||'')) return;
-  p.searchName = name;
-  await saveState();
-  render();
-}
-
 /* ---------- 삭제 플로우 (비밀번호 → 예/아니오) ---------- */
 function openDeleteFlow(pid){
   delTargetPid = pid;
@@ -1445,6 +1396,17 @@ function selectExisting(pid){
   renderAddSiteBlocks(p);
 }
 
+function openEditModal(pid){
+  const p = state.products.find(x=>x.id===pid);
+  if(!p) return;
+  document.getElementById('newProdName').value = '';
+  document.getElementById('newProdSearch').value = '';
+  setAddMode('exist');
+  document.getElementById('existSearch').value = firstLine(p.erpName);
+  selectExisting(pid);
+  document.getElementById('addOverlay').classList.add('show');
+}
+
 function openAddModal(){
   document.getElementById('newProdName').value = '';
   document.getElementById('newProdSearch').value = '';
@@ -1509,12 +1471,18 @@ function openSiteModal(){
 }
 function renderSiteManageList(){
   const el = document.getElementById('siteManageList');
-  el.innerHTML = state.sites.map(s=>`
-    <div class="site-manage-row" data-sid="${s.id}">
+  const last = state.sites.length - 1;
+  el.innerHTML = state.sites.map((s,i)=>`
+    <div class="site-manage-row" data-sid="${s.id}" data-idx="${i}" draggable="true">
+      <span class="sm-handle" title="드래그해서 순서 변경">⠿</span>
+      <span class="sm-no">${i+1}</span>
       <input type="text" value="${escapeHtml(s.name)}" data-name>
+      <button class="sm-move" data-up title="위로" ${i===0?'disabled':''}>▲</button>
+      <button class="sm-move" data-down title="아래로" ${i===last?'disabled':''}>▼</button>
       <button data-remove title="삭제">✕</button>
     </div>
   `).join('');
+
   el.querySelectorAll('input[data-name]').forEach(inp=>{
     inp.addEventListener('change', async (e)=>{
       const site = state.sites.find(s=>s.id===e.target.closest('.site-manage-row').dataset.sid);
@@ -1522,6 +1490,50 @@ function renderSiteManageList(){
       await saveState(); render();
     });
   });
+
+  // 위/아래 버튼으로 순서 변경
+  el.querySelectorAll('[data-up]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const i = Number(btn.closest('.site-manage-row').dataset.idx);
+      moveSite(i, i-1);
+    });
+  });
+  el.querySelectorAll('[data-down]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const i = Number(btn.closest('.site-manage-row').dataset.idx);
+      moveSite(i, i+1);
+    });
+  });
+
+  // 드래그 앤 드롭으로 순서 변경
+  let dragIdx = null;
+  el.querySelectorAll('.site-manage-row').forEach(row=>{
+    row.addEventListener('dragstart', (e)=>{
+      dragIdx = Number(row.dataset.idx);
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try{ e.dataTransfer.setData('text/plain', String(dragIdx)); }catch(_){}
+    });
+    row.addEventListener('dragend', ()=>{
+      row.classList.remove('dragging');
+      el.querySelectorAll('.site-manage-row').forEach(r=>r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', (e)=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if(Number(row.dataset.idx) !== dragIdx) row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', ()=> row.classList.remove('drag-over'));
+    row.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const from = dragIdx !== null ? dragIdx : Number(e.dataTransfer.getData('text/plain'));
+      const to = Number(row.dataset.idx);
+      dragIdx = null;
+      if(!isNaN(from) && !isNaN(to)) moveSite(from, to);
+    });
+  });
+
   el.querySelectorAll('[data-remove]').forEach(btn=>{
     btn.addEventListener('click', async (e)=>{
       const row = e.target.closest('.site-manage-row');
@@ -1535,6 +1547,20 @@ function renderSiteManageList(){
     });
   });
 }
+
+/* 사이트 순서 이동 — 데이터는 사이트 id로 연결되어 있어 순서만 바뀌고 상품번호·품절상태·이력은 그대로 따라감 */
+async function moveSite(from, to){
+  if(from === to) return;
+  if(from < 0 || to < 0 || from >= state.sites.length || to >= state.sites.length) return;
+  const moved = state.sites[from];
+  state.sites.splice(from, 1);
+  state.sites.splice(to, 0, moved);
+  await saveState();
+  renderSiteManageList();
+  render();
+  showToast(`"${moved.name}" 순서 이동 (${to+1}번째) · 등록 데이터 함께 이동됨`);
+}
+
 async function addSiteRow(){
   const newSite = {id:uid('s'), name:`사이트${state.sites.length+1}`};
   state.sites.push(newSite);
@@ -1548,9 +1574,6 @@ async function init(){
   await loadState();
   render();
 
-  document.querySelectorAll('.vtab').forEach(el=>{
-    el.addEventListener('click', ()=>{ state.view = el.dataset.view; render(); });
-  });
   function doQuickSearch(){
     state.searchQuery = document.getElementById('quickSearch').value;
     state.searchField = document.getElementById('searchField').value;
@@ -1563,6 +1586,7 @@ async function init(){
   document.getElementById('quickFilters').addEventListener('click', (e)=>{
     const btn = e.target.closest('.qf'); if(!btn) return;
     state.quickFilter = btn.dataset.qf;
+    if(state.quickFilter !== 'missing') state.missSite = 'all';
     state.searchDone = true;
     state.quickPage = 0;
     document.querySelectorAll('.qf').forEach(b=>b.classList.toggle('active', b===btn));
@@ -1598,7 +1622,7 @@ async function init(){
   document.getElementById('siteOverlay').addEventListener('click', (e)=>{ if(e.target.id==='siteOverlay') document.getElementById('siteOverlay').classList.remove('show'); });
 
   document.getElementById('btnUpload').addEventListener('click', openUploadModal);
-  document.getElementById('btnDownload').addEventListener('click', exportExcel);
+  document.getElementById('btnDownload').addEventListener('click', exportToExcel);
   document.getElementById('uploadZone').addEventListener('click', ()=> document.getElementById('fileInput').click());
   document.getElementById('fileInput').addEventListener('change', (e)=>{
     if(e.target.files && e.target.files[0]) parseWorkbook(e.target.files[0]);
@@ -1615,8 +1639,6 @@ async function init(){
   document.getElementById('closeHist').addEventListener('click', ()=> document.getElementById('histOverlay').classList.remove('show'));
   document.getElementById('histOverlay').addEventListener('click', (e)=>{ if(e.target.id==='histOverlay') document.getElementById('histOverlay').classList.remove('show'); });
 
-  document.getElementById('tableSearch').addEventListener('input', ()=>{ state.tablePage = 0; renderTableView(); });
-  document.getElementById('tableFilter').addEventListener('change', ()=>{ state.tablePage = 0; renderTableView(); });
 
 
   // 삭제 플로우
