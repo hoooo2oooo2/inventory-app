@@ -4325,6 +4325,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-empty" id="revDlyDnutEmpty" style="padding:16px;">데이터 없음</div>
         </div>
       </div>
+
+      <!-- 제품별 판매량 증감 분석 (실시간) -->
+      <div class="rev-tbl-card" style="margin-top:14px;">
+        <div class="rev-tbl-head" style="flex-wrap:wrap;gap:8px;">
+          <span class="rev-tbl-title">📈 제품별 판매량 증감 분석 (실시간)</span>
+          <span style="font-size:11px;color:var(--tx2);" id="trendAsOf"></span>
+        </div>
+        <div class="rev-filter" style="border:none;border-top:0.5px solid var(--bd);border-radius:0;flex-wrap:wrap;">
+          <span class="rev-filter-lbl">비교기준</span>
+          <div class="rev-filter-group" id="trendBasisBtns"></div>
+          <span class="rev-filter-lbl" style="margin-left:6px;">판매처</span>
+          <div class="rev-filter-group" id="trendChBtns"></div>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--tx2);cursor:pointer;margin-left:auto;">
+            <input type="checkbox" id="trendFlagshipOnly" onchange="setTrendFlagshipOnly(this.checked)" style="cursor:pointer;">주력상품만
+          </label>
+        </div>
+        <div class="rev-empty" id="trendEmpty">데이터를 불러오는 중입니다...</div>
+        <div class="tw"><table class="dt" id="trendTbl" style="display:none;">
+          <thead><tr>
+            <th>제품명</th>
+            <th style="text-align:center;">주력</th>
+            <th style="text-align:right;" id="trendTodayHdr">오늘</th>
+            <th style="text-align:right;" id="trendBaseHdr">기준일</th>
+            <th style="text-align:right;">증감수량</th>
+            <th style="text-align:right;">증감률</th>
+          </tr></thead>
+          <tbody id="trendTbody"></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- ── 광고센터 탭 ── -->
@@ -10521,7 +10550,7 @@ function _renderRevCurrentPage(){
   if(_revPage==='upload')   renderRevUpSlots();
   if(_revPage==='adcenter') renderAdCenter();
   if(_revPage==='unified')  renderUnifiedTable();
-  if(_revPage==='daily')    renderDailyReport();
+  if(_revPage==='daily'){   renderDailyReport(); renderProdTrend(); }
   if(_revPage==='region')   renderRegionPage();
   if(_revPage==='ssa')      renderSsaPage();
 }
@@ -13139,6 +13168,172 @@ function setDlyFilter(type, val){
 function setDlyTypeFilter(val){
   _dlyTypeFilter=val||'ALL';
   renderDailyReport();
+}
+
+// ── 일일보고: 제품별 판매량 증감 분석 (실시간, 오늘 기준 여러 시점과 비교) ──
+const TREND_BASIS = [
+  {id:'yesterday',label:'어제'},{id:'week1',label:'1주 전'},{id:'week2',label:'2주 전'},
+  {id:'lastmonth',label:'저번달'},{id:'month6',label:'6개월'},{id:'lastyear',label:'작년'}
+];
+let _trendFilter={basis:'yesterday', ch:'ALL', flagshipOnly:false};
+const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
+
+function _trendPad2(n){ return String(n).padStart(2,'0'); }
+// 월/연 단위로 이동하되 말일 초과 시 클램프 (예: 1/31 - 1개월 → 12/31)
+function _trendAddMonthsClamped(date,n){
+  const y=date.getFullYear(), m=date.getMonth(), day=date.getDate();
+  const first=new Date(y,m+n,1);
+  const lastDay=new Date(first.getFullYear(),first.getMonth()+1,0).getDate();
+  first.setDate(Math.min(day,lastDay));
+  return first;
+}
+function _trendBaseDate(basis){
+  const now=new Date(); now.setHours(0,0,0,0);
+  if(basis==='yesterday'){ const d=new Date(now); d.setDate(d.getDate()-1); return d; }
+  if(basis==='week1'){ const d=new Date(now); d.setDate(d.getDate()-7); return d; }
+  if(basis==='week2'){ const d=new Date(now); d.setDate(d.getDate()-14); return d; }
+  if(basis==='lastmonth') return _trendAddMonthsClamped(now,-1);
+  if(basis==='month6') return _trendAddMonthsClamped(now,-6);
+  if(basis==='lastyear') return _trendAddMonthsClamped(now,-12);
+  return now;
+}
+function _trendYmd(d){ return { year:d.getFullYear(), mmdd:`${_trendPad2(d.getMonth()+1)}-${_trendPad2(d.getDate())}` }; }
+
+// 비교에 필요한 연도(올해·작년) 데이터가 로드돼있는지 보장
+async function ensureTrendYears(){
+  const now=new Date();
+  const y1=now.getFullYear(), y0=y1-1;
+  if(!_revYearsLoaded.has(y1)) await ensureRevYear(y1);
+  if(!_revYearsLoaded.has(y0)) await ensureRevYear(y0);
+}
+
+function _trendDayMap(year, mmdd, ch){
+  const map={};
+  _revData.forEach(r=>{
+    if(r.year!==year||r.date!==mmdd) return;
+    if(ch!=='ALL'&&r.ch!==ch) return;
+    const k=r.modelName||r.itemCode||'미상';
+    map[k]=(map[k]||0)+(r.orderQty||0);
+  });
+  return map;
+}
+
+function _trendWindowKeys(days){
+  const now=new Date(); now.setHours(0,0,0,0);
+  const keys=new Set();
+  for(let i=0;i<days;i++){
+    const d=new Date(now); d.setDate(d.getDate()-i);
+    keys.add(d.getFullYear()+'|'+_trendPad2(d.getMonth()+1)+'-'+_trendPad2(d.getDate()));
+  }
+  return keys;
+}
+
+// 최근 90일 기준: 판매량 상위(베스트) 또는 판매일수 비율이 높은(스테디) 제품 → 주력 태그
+function _trendFlagshipSet(ch){
+  const keys=_trendWindowKeys(TREND_FLAGSHIP_WINDOW_DAYS);
+  const stats={};
+  _revData.forEach(r=>{
+    if(!r.date) return;
+    const k=r.year+'|'+r.date;
+    if(!keys.has(k)) return;
+    if(ch!=='ALL'&&r.ch!==ch) return;
+    const name=r.modelName||r.itemCode||'미상';
+    if(!stats[name]) stats[name]={qty:0,days:new Set()};
+    stats[name].qty+=(r.orderQty||0);
+    if((r.orderQty||0)>0) stats[name].days.add(k);
+  });
+  const entries=Object.entries(stats).filter(([,v])=>v.qty>0);
+  const byQty=[...entries].sort((a,b)=>b[1].qty-a[1].qty);
+  const bestCut=Math.max(3,Math.ceil(byQty.length*0.2));
+  const flagship=new Map();   // name → ['베스트','스테디']
+  byQty.slice(0,bestCut).forEach(([name])=>{
+    if(!flagship.has(name)) flagship.set(name,[]);
+    flagship.get(name).push('베스트');
+  });
+  entries.forEach(([name,v])=>{
+    const ratio=v.days.size/TREND_FLAGSHIP_WINDOW_DAYS;
+    if(ratio>=0.7 && v.qty>=10){
+      if(!flagship.has(name)) flagship.set(name,[]);
+      if(!flagship.get(name).includes('스테디')) flagship.get(name).push('스테디');
+    }
+  });
+  return flagship;
+}
+
+function setTrendBasis(basis){ _trendFilter.basis=basis; renderProdTrend(); }
+function setTrendCh(ch){ _trendFilter.ch=ch; renderProdTrend(); }
+function setTrendFlagshipOnly(v){ _trendFilter.flagshipOnly=!!v; renderProdTrend(); }
+
+function renderProdTrend(){
+  const now=new Date();
+  const y1=now.getFullYear(), y0=y1-1;
+  if(!_revYearsLoaded.has(y1)||!_revYearsLoaded.has(y0)){
+    ensureTrendYears().then(renderProdTrend);
+    return;
+  }
+
+  const basisBtnsEl=document.getElementById('trendBasisBtns');
+  if(basisBtnsEl) basisBtnsEl.innerHTML=TREND_BASIS.map(b=>
+    `<button class="rfbtn${_trendFilter.basis===b.id?' active':''}" onclick="setTrendBasis('${b.id}')">${b.label}</button>`).join('');
+
+  const chs=sortCh([...new Set(_revData.filter(r=>r.year===y1||r.year===y0).map(r=>r.ch).filter(Boolean))]);
+  const chBtnsEl=document.getElementById('trendChBtns');
+  if(chBtnsEl) chBtnsEl.innerHTML=`<button class="rfbtn${_trendFilter.ch==='ALL'?' active':''}" onclick="setTrendCh('ALL')">전체</button>`
+    +chs.map(c=>`<button class="rfbtn${_trendFilter.ch===c?' active':''}" onclick="setTrendCh('${c}')">${c}</button>`).join('');
+
+  const todayYmd=_trendYmd(now);
+  const baseDate=_trendBaseDate(_trendFilter.basis);
+  const baseYmd=_trendYmd(baseDate);
+
+  const todayHdr=document.getElementById('trendTodayHdr');
+  const baseHdr=document.getElementById('trendBaseHdr');
+  if(todayHdr) todayHdr.textContent=`오늘 (${todayYmd.year}-${todayYmd.mmdd})`;
+  if(baseHdr) baseHdr.textContent=`${TREND_BASIS.find(b=>b.id===_trendFilter.basis).label} (${baseYmd.year}-${baseYmd.mmdd})`;
+  const asOf=document.getElementById('trendAsOf');
+  if(asOf) asOf.textContent=`기준: ${now.toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})} 현재`;
+
+  const todayMap=_trendDayMap(todayYmd.year, todayYmd.mmdd, _trendFilter.ch);
+  const baseMap=_trendDayMap(baseYmd.year, baseYmd.mmdd, _trendFilter.ch);
+  const flagship=_trendFlagshipSet(_trendFilter.ch);
+
+  let names=[...new Set([...Object.keys(todayMap),...Object.keys(baseMap)])];
+  if(_trendFilter.flagshipOnly) names=names.filter(n=>flagship.has(n));
+
+  let list=names.map(name=>{
+    const t=todayMap[name]||0, b=baseMap[name]||0;
+    const diff=t-b;
+    const pct = b>0 ? (diff/b*100) : (t>0?100:0);
+    return {name, t, b, diff, pct, tags:flagship.get(name)||[]};
+  }).sort((a,b)=>(b.t+b.b)-(a.t+a.b));
+
+  const empty=document.getElementById('trendEmpty');
+  const tbl=document.getElementById('trendTbl');
+  const tbody=document.getElementById('trendTbody');
+  if(!list.length){
+    if(empty){ empty.style.display='block'; empty.textContent='해당 조건에 판매 데이터가 없습니다.'; }
+    if(tbl) tbl.style.display='none';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  if(tbl) tbl.style.display='';
+
+  const trendBadge=t=>t==='베스트'
+    ?'<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:#FEE2E2;color:#DC2626;font-size:10px;font-weight:700;margin-right:2px;">🔥베스트</span>'
+    :'<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:#DBEAFE;color:#2563EB;font-size:10px;font-weight:700;margin-right:2px;">⭐스테디</span>';
+
+  if(tbody) tbody.innerHTML=list.map(v=>{
+    const up=v.diff>0, down=v.diff<0;
+    const diffColor= up?'#DC2626':down?'#059669':'var(--tx2)';
+    const arrow = up?'▲':down?'▼':'-';
+    return `<tr>
+      <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.name}">${v.name}</td>
+      <td style="text-align:center;white-space:nowrap;">${v.tags.map(trendBadge).join('')}</td>
+      <td style="text-align:right;">${v.t.toLocaleString()}</td>
+      <td style="text-align:right;">${v.b.toLocaleString()}</td>
+      <td style="text-align:right;color:${diffColor};font-weight:600;">${arrow} ${Math.abs(v.diff).toLocaleString()}</td>
+      <td style="text-align:right;color:${diffColor};font-weight:600;">${v.b>0?(Math.abs(v.pct).toFixed(1)+'%'):(v.t>0?'신규':'-')}</td>
+    </tr>`;
+  }).join('');
 }
 
 // 제품별 판매현황 행 더블클릭 → 일별 판매수량 그래프 팝업
