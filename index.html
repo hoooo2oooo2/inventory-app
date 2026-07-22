@@ -13223,8 +13223,9 @@ function _trendAddMonthsClamped(date,n){
   first.setDate(Math.min(day,lastDay));
   return first;
 }
-function _trendBaseDate(basis){
-  const now=new Date(); now.setHours(0,0,0,0);
+// anchor(기준일) 기준으로 비교 시점 계산 — anchor는 "오늘"이 아니라 최근 업로드된 날짜
+function _trendBaseDate(basis, anchor){
+  const now=new Date(anchor); now.setHours(0,0,0,0);
   if(basis==='yesterday'){ const d=new Date(now); d.setDate(d.getDate()-1); return d; }
   if(basis==='week1'){ const d=new Date(now); d.setDate(d.getDate()-7); return d; }
   if(basis==='week2'){ const d=new Date(now); d.setDate(d.getDate()-14); return d; }
@@ -13234,6 +13235,20 @@ function _trendBaseDate(basis){
   return now;
 }
 function _trendYmd(d){ return { year:d.getFullYear(), mmdd:`${_trendPad2(d.getMonth()+1)}-${_trendPad2(d.getDate())}` }; }
+
+// 실제 매출 데이터가 존재하는 가장 최근 날짜(=최근 업로드된 날짜)를 "오늘" 대신 기준일로 사용
+// (당일 데이터가 아직 업로드 안 된 경우 0으로 잘못 비교되는 것을 방지)
+function _trendLatestDate(){
+  let latest=null;
+  _revData.forEach(r=>{
+    if(!r.date||!r.year) return;
+    const full=`${r.year}-${r.date}`;
+    if(!latest||full>latest) latest=full;
+  });
+  if(!latest) return new Date();
+  const [y,mm,dd]=latest.split('-').map(Number);
+  return new Date(y,mm-1,dd);
+}
 
 // 비교에 필요한 연도(올해·작년) 데이터가 로드돼있는지 보장
 async function ensureTrendYears(){
@@ -13254,8 +13269,8 @@ function _trendDayMap(year, mmdd, ch){
   return map;
 }
 
-function _trendWindowKeys(days){
-  const now=new Date(); now.setHours(0,0,0,0);
+function _trendWindowKeys(days, anchor){
+  const now=new Date(anchor); now.setHours(0,0,0,0);
   const keys=new Set();
   for(let i=0;i<days;i++){
     const d=new Date(now); d.setDate(d.getDate()-i);
@@ -13264,9 +13279,9 @@ function _trendWindowKeys(days){
   return keys;
 }
 
-// 최근 90일 기준: 판매량 상위(베스트) 또는 판매일수 비율이 높은(스테디) 제품 → 주력 태그
-function _trendFlagshipSet(ch){
-  const keys=_trendWindowKeys(TREND_FLAGSHIP_WINDOW_DAYS);
+// 최근 90일(기준일 이전) 기준: 판매량 상위(베스트) 또는 판매일수 비율이 높은(스테디) 제품 → 주력 태그
+function _trendFlagshipSet(ch, anchor){
+  const keys=_trendWindowKeys(TREND_FLAGSHIP_WINDOW_DAYS, anchor);
   const stats={};
   _revData.forEach(r=>{
     if(!r.date) return;
@@ -13301,10 +13316,21 @@ function setTrendCh(ch){ _trendFilter.ch=ch; _trendPage=0; renderProdTrend(); }
 function setTrendFlagshipOnly(v){ _trendFilter.flagshipOnly=!!v; _trendPage=0; renderProdTrend(); }
 
 function renderProdTrend(){
-  const now=new Date();
-  const y1=now.getFullYear(), y0=y1-1;
+  const realNow=new Date();
+  const y1=realNow.getFullYear(), y0=y1-1;
   if(!_revYearsLoaded.has(y1)||!_revYearsLoaded.has(y0)){
     ensureTrendYears().then(renderProdTrend);
+    return;
+  }
+
+  // "오늘" 대신 실제 데이터가 있는 가장 최근 날짜를 기준일로 사용
+  const anchor=_trendLatestDate();
+  const baseDate=_trendBaseDate(_trendFilter.basis, anchor);
+  // 기준일·비교일이 아직 안 불러온 연도에 걸치면(예: 연초 최신 데이터 기준 -12개월) 추가 로드
+  const needed=[...new Set([anchor.getFullYear(), anchor.getFullYear()-1, baseDate.getFullYear()])];
+  const missing=needed.filter(y=>!_revYearsLoaded.has(y));
+  if(missing.length){
+    Promise.all(missing.map(y=>ensureRevYear(y))).then(renderProdTrend);
     return;
   }
 
@@ -13312,25 +13338,24 @@ function renderProdTrend(){
   if(basisBtnsEl) basisBtnsEl.innerHTML=TREND_BASIS.map(b=>
     `<button class="rfbtn${_trendFilter.basis===b.id?' active':''}" onclick="setTrendBasis('${b.id}')">${b.label}</button>`).join('');
 
-  const chs=sortCh([...new Set(_revData.filter(r=>r.year===y1||r.year===y0).map(r=>r.ch).filter(Boolean))]);
+  const chs=sortCh([...new Set(_revData.filter(r=>needed.includes(r.year)).map(r=>r.ch).filter(Boolean))]);
   const chBtnsEl=document.getElementById('trendChBtns');
   if(chBtnsEl) chBtnsEl.innerHTML=`<button class="rfbtn${_trendFilter.ch==='ALL'?' active':''}" onclick="setTrendCh('ALL')">전체</button>`
     +chs.map(c=>`<button class="rfbtn${_trendFilter.ch===c?' active':''}" onclick="setTrendCh('${c}')">${c}</button>`).join('');
 
-  const todayYmd=_trendYmd(now);
-  const baseDate=_trendBaseDate(_trendFilter.basis);
+  const todayYmd=_trendYmd(anchor);
   const baseYmd=_trendYmd(baseDate);
 
   const todayHdr=document.getElementById('trendTodayHdr');
   const baseHdr=document.getElementById('trendBaseHdr');
-  if(todayHdr) todayHdr.textContent=`오늘 (${todayYmd.year}-${todayYmd.mmdd})`;
+  if(todayHdr) todayHdr.textContent=`최근 (${todayYmd.year}-${todayYmd.mmdd})`;
   if(baseHdr) baseHdr.textContent=`${TREND_BASIS.find(b=>b.id===_trendFilter.basis).label} (${baseYmd.year}-${baseYmd.mmdd})`;
   const asOf=document.getElementById('trendAsOf');
-  if(asOf) asOf.textContent=`기준: ${now.toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})} 현재`;
+  if(asOf) asOf.textContent=`데이터 기준일: ${todayYmd.year}-${todayYmd.mmdd} (최근 업로드 기준, 오늘 데이터 미업로드 시 자동으로 직전 날짜 사용)`;
 
   const todayMap=_trendDayMap(todayYmd.year, todayYmd.mmdd, _trendFilter.ch);
   const baseMap=_trendDayMap(baseYmd.year, baseYmd.mmdd, _trendFilter.ch);
-  const flagship=_trendFlagshipSet(_trendFilter.ch);
+  const flagship=_trendFlagshipSet(_trendFilter.ch, anchor);
 
   let names=[...new Set([...Object.keys(todayMap),...Object.keys(baseMap)])];
   if(_trendFilter.flagshipOnly) names=names.filter(n=>flagship.has(n));
