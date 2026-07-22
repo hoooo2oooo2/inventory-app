@@ -4315,13 +4315,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <tbody id="revDlyTbody"></tbody>
             <tfoot id="revDlyTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
           </table></div>
+          <div id="revDlyPager" style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:0.5px solid var(--bd);font-size:11px;"></div>
         </div>
         <div class="rev-card">
           <div class="rev-card-title"><span>🍩 제품구분 비중</span></div>
-          <div style="position:relative;height:200px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:relative;height:150px;display:flex;align-items:center;justify-content:center;">
             <canvas id="revDlyDnut"></canvas>
           </div>
-          <div id="revDlyDnutLegend" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;"></div>
+          <div id="revDlyDnutLegend" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;max-height:130px;overflow-y:auto;"></div>
           <div class="rev-empty" id="revDlyDnutEmpty" style="padding:16px;">데이터 없음</div>
         </div>
       </div>
@@ -4342,7 +4343,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </label>
         </div>
         <div class="rev-empty" id="trendEmpty">데이터를 불러오는 중입니다...</div>
-        <div class="tw"><table class="dt" id="trendTbl" style="display:none;">
+        <div class="tw"><table class="dt" id="trendTbl" style="display:none;table-layout:fixed;width:100%;">
+          <colgroup>
+            <col style="width:34%;"><col style="width:15%;"><col style="width:13%;"><col style="width:13%;"><col style="width:13%;"><col style="width:12%;">
+          </colgroup>
           <thead><tr>
             <th>제품명</th>
             <th style="text-align:center;">주력</th>
@@ -4353,6 +4357,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </tr></thead>
           <tbody id="trendTbody"></tbody>
         </table></div>
+        <div id="trendPager" style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:0.5px solid var(--bd);font-size:11px;"></div>
       </div>
     </div>
 
@@ -12962,6 +12967,8 @@ function toggleRevMask(){
 // ── 일일 보고 ──
 let _dlyFilter={year:null,month:null,day:null,ch:'ALL'};
 let _dlyTypeFilter='ALL';   // 제품별 판매현황 '구분' 헤더 필터
+let _dlyProdPage=0;         // 제품별 판매현황 페이지(0-based)
+const DLY_PAGE_SIZE=15;
 let _revDlyDnut=null;
 let _dlyProdListCache=[];   // 제품별 판매현황 현재 렌더 목록(더블클릭 → 그래프 팝업에서 참조)
 let _dlyProdChart=null;
@@ -13088,7 +13095,14 @@ function renderDailyReport(){
   const viewList=_dlyTypeFilter==='ALL'?prodList:prodList.filter(([,v])=>v.type===_dlyTypeFilter);
   _dlyProdListCache=viewList;   // 더블클릭 시 인덱스로 참조(이름에 특수문자 있어도 안전)
 
-  if(tbody) tbody.innerHTML=viewList.map(([name,v],i)=>{
+  // 페이지네이션 (제품 수가 많으면 페이지로 나눠 표시)
+  const dlyMaxPage=Math.max(0,Math.ceil(viewList.length/DLY_PAGE_SIZE)-1);
+  if(_dlyProdPage>dlyMaxPage) _dlyProdPage=dlyMaxPage;
+  const dlyStart=_dlyProdPage*DLY_PAGE_SIZE;
+  const dlyDisplay=viewList.slice(dlyStart, dlyStart+DLY_PAGE_SIZE);
+
+  if(tbody) tbody.innerHTML=dlyDisplay.map(([name,v],idxInPage)=>{
+    const i=dlyStart+idxInPage;
     const rate=v.settle>0?(v.margin/v.settle*100):0;
     const rCls=rate<0?'rev-margin-neg':rate>0?'rev-margin-pos':'';
     return `<tr ondblclick="openDlyProdChart(${i})" title="더블클릭: 일별 판매수량 그래프" style="cursor:pointer;">
@@ -13102,6 +13116,24 @@ function renderDailyReport(){
       <td style="text-align:right;" class="${rCls}">${rate.toFixed(1)}%</td>
     </tr>`;
   }).join('');
+
+  const dlyPagerEl=document.getElementById('revDlyPager');
+  if(dlyPagerEl){
+    if(viewList.length<=DLY_PAGE_SIZE){ dlyPagerEl.innerHTML=''; }
+    else{
+      const dlyMaxP=dlyMaxPage+1;
+      const from=dlyStart+1, to=Math.min(dlyStart+DLY_PAGE_SIZE,viewList.length);
+      dlyPagerEl.innerHTML=`
+        <span style="color:var(--tx2);">${from.toLocaleString()}–${to.toLocaleString()} / 전체 ${viewList.length.toLocaleString()}개</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="btn btn-sm" onclick="_dlyProdPage=0;renderDailyReport()" ${_dlyProdPage===0?'disabled':''}>처음</button>
+          <button class="btn btn-sm" onclick="_dlyProdPage--;renderDailyReport()" ${_dlyProdPage===0?'disabled':''}>◀</button>
+          <span style="padding:0 6px;">${_dlyProdPage+1} / ${dlyMaxP}</span>
+          <button class="btn btn-sm" onclick="_dlyProdPage++;renderDailyReport()" ${_dlyProdPage>=dlyMaxP-1?'disabled':''}>▶</button>
+          <button class="btn btn-sm" onclick="_dlyProdPage=${dlyMaxP-1};renderDailyReport()" ${_dlyProdPage>=dlyMaxP-1?'disabled':''}>끝</button>
+        </div>`;
+    }
+  }
 
   // 합계 행 (필터 적용된 목록 기준)
   const totSettle=viewList.reduce((s,[,v])=>s+v.settle,0);
@@ -13162,11 +13194,13 @@ function setDlyFilter(type, val){
   else if(type==='day') _dlyFilter.day=(val===null||val==='null')?null:Number(val);
   else _dlyFilter.ch=val;
   _dlyTypeFilter='ALL';   // 기간·판매처 변경 시 구분 필터 초기화
+  _dlyProdPage=0;
   renderDailyReport();
 }
 
 function setDlyTypeFilter(val){
   _dlyTypeFilter=val||'ALL';
+  _dlyProdPage=0;
   renderDailyReport();
 }
 
@@ -13176,6 +13210,8 @@ const TREND_BASIS = [
   {id:'lastmonth',label:'저번달'},{id:'month6',label:'6개월'},{id:'lastyear',label:'작년'}
 ];
 let _trendFilter={basis:'yesterday', ch:'ALL', flagshipOnly:false};
+let _trendPage=0;           // 증감 분석 표 페이지(0-based)
+const TREND_PAGE_SIZE=15;
 const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
 
 function _trendPad2(n){ return String(n).padStart(2,'0'); }
@@ -13260,9 +13296,9 @@ function _trendFlagshipSet(ch){
   return flagship;
 }
 
-function setTrendBasis(basis){ _trendFilter.basis=basis; renderProdTrend(); }
-function setTrendCh(ch){ _trendFilter.ch=ch; renderProdTrend(); }
-function setTrendFlagshipOnly(v){ _trendFilter.flagshipOnly=!!v; renderProdTrend(); }
+function setTrendBasis(basis){ _trendFilter.basis=basis; _trendPage=0; renderProdTrend(); }
+function setTrendCh(ch){ _trendFilter.ch=ch; _trendPage=0; renderProdTrend(); }
+function setTrendFlagshipOnly(v){ _trendFilter.flagshipOnly=!!v; _trendPage=0; renderProdTrend(); }
 
 function renderProdTrend(){
   const now=new Date();
@@ -13309,24 +13345,32 @@ function renderProdTrend(){
   const empty=document.getElementById('trendEmpty');
   const tbl=document.getElementById('trendTbl');
   const tbody=document.getElementById('trendTbody');
+  const trendPagerEl=document.getElementById('trendPager');
   if(!list.length){
     if(empty){ empty.style.display='block'; empty.textContent='해당 조건에 판매 데이터가 없습니다.'; }
     if(tbl) tbl.style.display='none';
+    if(trendPagerEl) trendPagerEl.innerHTML='';
     return;
   }
   if(empty) empty.style.display='none';
   if(tbl) tbl.style.display='';
 
+  // 페이지네이션
+  const trendMaxPage=Math.max(0,Math.ceil(list.length/TREND_PAGE_SIZE)-1);
+  if(_trendPage>trendMaxPage) _trendPage=trendMaxPage;
+  const trendStart=_trendPage*TREND_PAGE_SIZE;
+  const trendDisplay=list.slice(trendStart, trendStart+TREND_PAGE_SIZE);
+
   const trendBadge=t=>t==='베스트'
     ?'<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:#FEE2E2;color:#DC2626;font-size:10px;font-weight:700;margin-right:2px;">🔥베스트</span>'
     :'<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:#DBEAFE;color:#2563EB;font-size:10px;font-weight:700;margin-right:2px;">⭐스테디</span>';
 
-  if(tbody) tbody.innerHTML=list.map(v=>{
+  if(tbody) tbody.innerHTML=trendDisplay.map(v=>{
     const up=v.diff>0, down=v.diff<0;
     const diffColor= up?'#DC2626':down?'#059669':'var(--tx2)';
     const arrow = up?'▲':down?'▼':'-';
     return `<tr>
-      <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.name}">${v.name}</td>
+      <td style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.name}">${v.name}</td>
       <td style="text-align:center;white-space:nowrap;">${v.tags.map(trendBadge).join('')}</td>
       <td style="text-align:right;">${v.t.toLocaleString()}</td>
       <td style="text-align:right;">${v.b.toLocaleString()}</td>
@@ -13334,6 +13378,23 @@ function renderProdTrend(){
       <td style="text-align:right;color:${diffColor};font-weight:600;">${v.b>0?(Math.abs(v.pct).toFixed(1)+'%'):(v.t>0?'신규':'-')}</td>
     </tr>`;
   }).join('');
+
+  if(trendPagerEl){
+    if(list.length<=TREND_PAGE_SIZE){ trendPagerEl.innerHTML=''; }
+    else{
+      const trendMaxP=trendMaxPage+1;
+      const from=trendStart+1, to=Math.min(trendStart+TREND_PAGE_SIZE,list.length);
+      trendPagerEl.innerHTML=`
+        <span style="color:var(--tx2);">${from.toLocaleString()}–${to.toLocaleString()} / 전체 ${list.length.toLocaleString()}개</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="btn btn-sm" onclick="_trendPage=0;renderProdTrend()" ${_trendPage===0?'disabled':''}>처음</button>
+          <button class="btn btn-sm" onclick="_trendPage--;renderProdTrend()" ${_trendPage===0?'disabled':''}>◀</button>
+          <span style="padding:0 6px;">${_trendPage+1} / ${trendMaxP}</span>
+          <button class="btn btn-sm" onclick="_trendPage++;renderProdTrend()" ${_trendPage>=trendMaxP-1?'disabled':''}>▶</button>
+          <button class="btn btn-sm" onclick="_trendPage=${trendMaxP-1};renderProdTrend()" ${_trendPage>=trendMaxP-1?'disabled':''}>끝</button>
+        </div>`;
+    }
+  }
 }
 
 // 제품별 판매현황 행 더블클릭 → 일별 판매수량 그래프 팝업
