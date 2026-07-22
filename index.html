@@ -4345,10 +4345,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rev-empty" id="trendEmpty">데이터를 불러오는 중입니다...</div>
         <div class="tw"><table class="dt" id="trendTbl" style="display:none;table-layout:fixed;width:100%;">
           <colgroup>
-            <col style="width:34%;"><col style="width:15%;"><col style="width:13%;"><col style="width:13%;"><col style="width:13%;"><col style="width:12%;">
+            <col style="width:26%;"><col style="width:14%;"><col style="width:14%;"><col style="width:12%;"><col style="width:12%;"><col style="width:12%;"><col style="width:10%;">
           </colgroup>
           <thead><tr>
             <th>제품명</th>
+            <th style="white-space:nowrap;">구분 <select id="trendTypeFilter" onchange="setTrendTypeFilter(this.value)" style="font-size:10px;padding:1px 4px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);cursor:pointer;max-width:80px;"><option value="ALL">전체</option></select></th>
             <th style="text-align:center;">주력</th>
             <th style="text-align:right;" id="trendTodayHdr">오늘</th>
             <th style="text-align:right;" id="trendBaseHdr">기준일</th>
@@ -13210,6 +13211,7 @@ const TREND_BASIS = [
   {id:'lastmonth',label:'저번달'},{id:'month6',label:'6개월'},{id:'lastyear',label:'작년'}
 ];
 let _trendFilter={basis:'yesterday', ch:'ALL', flagshipOnly:false};
+let _trendTypeFilter='ALL';   // 증감 분석 표 '구분' 헤더 필터
 let _trendPage=0;           // 증감 분석 표 페이지(0-based)
 const TREND_PAGE_SIZE=15;
 const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
@@ -13269,6 +13271,19 @@ function _trendDayMap(year, mmdd, ch){
   return map;
 }
 
+// 제품명 → 구분(itemType) — 표에 '구분' 필터를 걸기 위한 참조용
+function _trendTypeMap(years, ch){
+  const map={};
+  _revData.forEach(r=>{
+    if(!years.includes(r.year)) return;
+    if(ch!=='ALL'&&r.ch!==ch) return;
+    if(!r.itemType) return;
+    const k=r.modelName||r.itemCode||'미상';
+    map[k]=r.itemType;
+  });
+  return map;
+}
+
 function _trendWindowKeys(days, anchor){
   const now=new Date(anchor); now.setHours(0,0,0,0);
   const keys=new Set();
@@ -13311,9 +13326,10 @@ function _trendFlagshipSet(ch, anchor){
   return flagship;
 }
 
-function setTrendBasis(basis){ _trendFilter.basis=basis; _trendPage=0; renderProdTrend(); }
-function setTrendCh(ch){ _trendFilter.ch=ch; _trendPage=0; renderProdTrend(); }
-function setTrendFlagshipOnly(v){ _trendFilter.flagshipOnly=!!v; _trendPage=0; renderProdTrend(); }
+function setTrendBasis(basis){ _trendFilter.basis=basis; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
+function setTrendCh(ch){ _trendFilter.ch=ch; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
+function setTrendFlagshipOnly(v){ _trendFilter.flagshipOnly=!!v; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
+function setTrendTypeFilter(val){ _trendTypeFilter=val||'ALL'; _trendPage=0; renderProdTrend(); }
 
 function renderProdTrend(){
   const realNow=new Date();
@@ -13355,17 +13371,28 @@ function renderProdTrend(){
 
   const todayMap=_trendDayMap(todayYmd.year, todayYmd.mmdd, _trendFilter.ch);
   const baseMap=_trendDayMap(baseYmd.year, baseYmd.mmdd, _trendFilter.ch);
+  const typeMap=_trendTypeMap(needed, _trendFilter.ch);
   const flagship=_trendFlagshipSet(_trendFilter.ch, anchor);
 
   let names=[...new Set([...Object.keys(todayMap),...Object.keys(baseMap)])];
   if(_trendFilter.flagshipOnly) names=names.filter(n=>flagship.has(n));
 
-  let list=names.map(name=>{
+  const fullList=names.map(name=>{
     const t=todayMap[name]||0, b=baseMap[name]||0;
     const diff=t-b;
     const pct = b>0 ? (diff/b*100) : (t>0?100:0);
-    return {name, t, b, diff, pct, tags:flagship.get(name)||[]};
+    return {name, type:typeMap[name]||'', t, b, diff, pct, tags:flagship.get(name)||[]};
   }).sort((a,b)=>(b.t+b.b)-(a.t+a.b));
+
+  // '구분' 헤더 필터 옵션 채우기 (선택값 유지, 없으면 전체로)
+  const typeSel=document.getElementById('trendTypeFilter');
+  if(typeSel){
+    const types=[...new Set(fullList.map(v=>v.type).filter(Boolean))].sort();
+    if(_trendTypeFilter!=='ALL'&&!types.includes(_trendTypeFilter)) _trendTypeFilter='ALL';
+    typeSel.innerHTML='<option value="ALL">전체</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');
+    typeSel.value=_trendTypeFilter;
+  }
+  const list=_trendTypeFilter==='ALL'?fullList:fullList.filter(v=>v.type===_trendTypeFilter);
 
   const empty=document.getElementById('trendEmpty');
   const tbl=document.getElementById('trendTbl');
@@ -13396,6 +13423,7 @@ function renderProdTrend(){
     const arrow = up?'▲':down?'▼':'-';
     return `<tr>
       <td style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.name}">${v.name}</td>
+      <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${v.type}</td>
       <td style="text-align:center;white-space:nowrap;">${v.tags.map(trendBadge).join('')}</td>
       <td style="text-align:right;">${v.t.toLocaleString()}</td>
       <td style="text-align:right;">${v.b.toLocaleString()}</td>
