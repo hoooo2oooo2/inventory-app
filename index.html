@@ -13216,6 +13216,7 @@ let _trendTypeFilter='ALL';   // 증감 분석 표 '구분' 헤더 필터
 let _trendPage=0;           // 증감 분석 표 페이지(0-based)
 const TREND_PAGE_SIZE=15;
 const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
+const TREND_FLAGSHIP_MIN_SALE_DAYS=14; // '베스트' 판정 최소 판매일수 (반짝 신규 판매 제외, 최소 2주는 팔려야 인정)
 
 function _trendPad2(n){ return String(n).padStart(2,'0'); }
 // 월/연 단위로 이동하되 말일 초과 시 클램프 (예: 1/31 - 1개월 → 12/31)
@@ -13310,8 +13311,10 @@ function _trendFlagshipSet(ch, anchor){
     if((r.orderQty||0)>0) stats[name].days.add(k);
   });
   const entries=Object.entries(stats).filter(([,v])=>v.qty>0);
-  const byQty=[...entries].sort((a,b)=>b[1].qty-a[1].qty);
-  const bestCut=Math.max(3,Math.ceil(byQty.length*0.2));
+  // 반짝 판매(출시 초반 며칠 대량 판매) 신제품이 '베스트'로 오판정되지 않도록 최소 판매일수 확보된 것만 후보로
+  const bestCandidates=entries.filter(([,v])=>v.days.size>=TREND_FLAGSHIP_MIN_SALE_DAYS);
+  const byQty=[...bestCandidates].sort((a,b)=>b[1].qty-a[1].qty);
+  const bestCut=Math.max(3,Math.ceil(entries.length*0.2));
   const flagship=new Map();   // name → ['베스트','스테디']
   byQty.slice(0,bestCut).forEach(([name])=>{
     if(!flagship.has(name)) flagship.set(name,[]);
