@@ -13535,18 +13535,28 @@ function openTrendBulkDetail(i){
   }
   rows.sort((a,b)=> (b.year+b.date).localeCompare(a.year+a.date) || (a.ch||'').localeCompare(b.ch||''));
 
-  // 날짜·판매처별 수량 집계
-  const byDayCh=new Map();
+  // 날짜별로 묶고, 그 안에서 판매처별 수량 + 날짜 합계 표시
+  const byDate=new Map();
   rows.forEach(r=>{
-    const k=`${r.year}-${r.date}|${r.ch||''}`;
-    if(!byDayCh.has(k)) byDayCh.set(k,{year:r.year,date:r.date,ch:r.ch,qty:0});
-    byDayCh.get(k).qty+=(r.orderQty||0);
+    const dk=`${r.year}-${r.date}`;
+    if(!byDate.has(dk)) byDate.set(dk,{year:r.year,date:r.date,chMap:new Map(),total:0});
+    const g=byDate.get(dk);
+    const ch=r.ch||'';
+    g.chMap.set(ch,(g.chMap.get(ch)||0)+(r.orderQty||0));
+    g.total+=(r.orderQty||0);
   });
-  const summaryHtml=[...byDayCh.values()].map(s=>`<tr>
-      <td>${s.year}-${s.date}</td>
-      <td>${escAttr(s.ch||'')}</td>
-      <td style="text-align:right;font-weight:600;">${f(s.qty)}개</td>
-    </tr>`).join('');
+  const summaryHtml=[...byDate.values()].map(g=>{
+    const chRows=[...g.chMap.entries()].map(([ch,qty])=>`<tr>
+        <td>${g.year}-${g.date}</td>
+        <td>${escAttr(ch)}</td>
+        <td style="text-align:right;font-weight:600;">${f(qty)}개</td>
+      </tr>`).join('');
+    const totalRow=`<tr style="font-weight:700;background:var(--bg2);">
+        <td colspan="2" style="text-align:right;">${g.year}-${g.date} 합계</td>
+        <td style="text-align:right;">${f(g.total)}개</td>
+      </tr>`;
+    return chRows+totalRow;
+  }).join('');
 
   let gQty=0, gSale=0, gSettle=0, gMargin=0;
   const orderHtml=rows.map(r=>{
