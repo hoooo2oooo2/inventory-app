@@ -5075,6 +5075,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 스마트스토어 주간 리포트 MODAL (매주 화요일 관리자에게 자동 표시) -->
+<div class="modal-overlay" id="weeklySSReportModal">
+  <div class="modal" style="max-width:640px;max-height:80vh;overflow-y:auto;">
+    <h3>📊 스마트스토어 주간 리포트</h3>
+    <div id="weeklySSReportBody"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('weeklySSReportModal')">닫기</button></div>
+  </div>
+</div>
+
 <!-- TELEGRAM MODAL -->
 <div class="modal-overlay" id="telegramModal">
   <div class="modal">
@@ -5317,6 +5326,7 @@ function _startAppData(){
   _appDataStarted = true;
   loadAll().then(async ()=>{
     checkTelegramAlert();
+    checkWeeklySmartstoreReport();
     startTgPolling();
     // 페이지 로드 시 월별집계 오류 자동 감지 & 수정
     const issues=_detectMonthlyBatch();
@@ -13380,6 +13390,134 @@ function _trendBulkMap(ch, anchor){
     if(isOutlier) bulk.add(name);
   });
   return bulk;
+}
+
+// ══════════════ 스마트스토어 주간 리포트 (매주 화요일, 관리자에게만) ══════════════
+// 최근 7일 vs 그 직전 30일을 비교해 ①자주 들어오는 제품(스테디) ②갑자기 들어온 제품 ③급락한 제품을 뽑는다.
+const WEEKLY_SS_WINDOW_DAYS=7;
+const WEEKLY_SS_BASE_DAYS=30;
+const WEEKLY_SS_SUDDEN_MAX_BASE_DAYS=2;  // '갑자기 들어온' 평소 등장일수 상한(절대값 — 주말·휴일 유무와 무관)
+const WEEKLY_SS_SUDDEN_MIN_TOTAL=10;     // '갑자기 들어온' 최소 이번주 총수량(잡음 제외)
+const WEEKLY_SS_FREQ_WEEK_RATIO=0.6;     // '자주 들어오는' 최소 이번주 등장 비율(실제 업로드된 날 기준)
+const WEEKLY_SS_FREQ_BASE_RATIO=0.5;     // '자주 들어오는' 최소 평소(30일) 등장 비율
+const WEEKLY_SS_DROP_BASE_RATIO=0.5;     // '급락' 후보로 볼 최소 평소 등장 비율
+const WEEKLY_SS_DROP_MIN_BASE_AVG=2;     // '급락' 최소 평소 일평균 수량
+const WEEKLY_SS_DROP_RATIO=0.4;          // '급락' 판정: 이번주 일평균이 평소 일평균의 이 비율 이하
+
+function computeWeeklySSReport(){
+  const ch='스마트스토어';
+  const anchor=_trendLatestDate();
+  const weekKeys=_trendWindowKeys(WEEKLY_SS_WINDOW_DAYS, anchor);
+  const fullKeys=_trendWindowKeys(WEEKLY_SS_WINDOW_DAYS+WEEKLY_SS_BASE_DAYS, anchor);
+  const baseKeys=new Set([...fullKeys].filter(k=>!weekKeys.has(k)));
+
+  const weekByName={}, baseByName={}, typeOf={};
+  const activeWeekDates=new Set(), activeBaseDates=new Set();
+  _revData.forEach(r=>{
+    if(r.ch!==ch || !r.date) return;
+    const k=r.year+'|'+r.date;
+    const inWeek=weekKeys.has(k), inBase=baseKeys.has(k);
+    if(!inWeek && !inBase) return;
+    if(inWeek) activeWeekDates.add(k); else activeBaseDates.add(k);
+    const name=r.modelName||r.itemCode||'미상';
+    if(r.itemType) typeOf[name]=r.itemType;
+    const q=r.orderQty||0;
+    if(inWeek){ (weekByName[name]=weekByName[name]||{})[k]=(weekByName[name][k]||0)+q; }
+    else{ (baseByName[name]=baseByName[name]||{})[k]=(baseByName[name][k]||0)+q; }
+  });
+  // 실제 업로드가 있었던 날만 세어 기준을 잡는다(주말·휴일에 업로드가 없는 채널 특성 반영)
+  const activeWeekDays=Math.max(1, activeWeekDates.size);
+  const activeBaseDays=Math.max(1, activeBaseDates.size);
+  const freqWeekMin=Math.ceil(activeWeekDays*WEEKLY_SS_FREQ_WEEK_RATIO);
+  const freqBaseMin=Math.ceil(activeBaseDays*WEEKLY_SS_FREQ_BASE_RATIO);
+  const dropBaseMin=Math.ceil(activeBaseDays*WEEKLY_SS_DROP_BASE_RATIO);
+
+  const names=new Set([...Object.keys(weekByName), ...Object.keys(baseByName)]);
+  const list=[...names].map(name=>{
+    const wd=weekByName[name]||{}, bd=baseByName[name]||{};
+    const weekTotal=Object.values(wd).reduce((a,b)=>a+b,0);
+    const weekDaysPresent=Object.values(wd).filter(v=>v>0).length;
+    const baseTotal=Object.values(bd).reduce((a,b)=>a+b,0);
+    const baseDaysPresent=Object.values(bd).filter(v=>v>0).length;
+    return { name, type:typeOf[name]||'', weekTotal, weekDaysPresent, baseTotal, baseDaysPresent,
+      baseAvgPerDay:baseTotal/WEEKLY_SS_BASE_DAYS, weekAvgPerDay:weekTotal/activeWeekDays };
+  });
+
+  const frequent=list.filter(v=>v.weekDaysPresent>=freqWeekMin && v.baseDaysPresent>=freqBaseMin)
+    .sort((a,b)=>b.weekTotal-a.weekTotal).slice(0,10);
+  const sudden=list.filter(v=>v.baseDaysPresent<=WEEKLY_SS_SUDDEN_MAX_BASE_DAYS && v.weekTotal>=WEEKLY_SS_SUDDEN_MIN_TOTAL)
+    .sort((a,b)=>b.weekTotal-a.weekTotal).slice(0,10);
+  const dropped=list.filter(v=>v.baseDaysPresent>=dropBaseMin && v.baseAvgPerDay>=WEEKLY_SS_DROP_MIN_BASE_AVG && v.weekAvgPerDay<=v.baseAvgPerDay*WEEKLY_SS_DROP_RATIO)
+    .sort((a,b)=>(b.baseAvgPerDay-b.weekAvgPerDay)-(a.baseAvgPerDay-a.weekAvgPerDay)).slice(0,10);
+
+  const ymd=_trendYmd(anchor);
+  return { anchorLabel:`${ymd.year}-${ymd.mmdd}`, activeWeekDays, activeBaseDays, frequent, sudden, dropped };
+}
+
+function _weeklySSRow(v, activeWeekDays){
+  return `<tr><td style="padding:4px 8px;">${v.name}</td><td style="padding:4px 8px;color:var(--tx2);">${v.type}</td>`
+    +`<td style="padding:4px 8px;text-align:right;">${Math.round(v.weekTotal).toLocaleString()}</td>`
+    +`<td style="padding:4px 8px;text-align:right;">${v.weekDaysPresent}/${activeWeekDays}</td>`
+    +`<td style="padding:4px 8px;text-align:right;color:var(--tx2);">${v.baseAvgPerDay.toFixed(1)}/일</td></tr>`;
+}
+function _weeklySSSection(title, desc, arr, activeWeekDays){
+  return `<h4 style="margin:14px 0 4px;">${title}</h4>`
+    +`<div style="font-size:11px;color:var(--tx2);margin-bottom:6px;">${desc}</div>`
+    +(arr.length
+      ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="border-bottom:1px solid var(--bd);">
+            <th style="text-align:left;padding:4px 8px;">제품명</th><th style="text-align:left;padding:4px 8px;">구분</th>
+            <th style="text-align:right;padding:4px 8px;">이번주</th><th style="text-align:right;padding:4px 8px;">등장일</th>
+            <th style="text-align:right;padding:4px 8px;">평소 일평균</th></tr></thead>
+          <tbody>${arr.map(v=>_weeklySSRow(v,activeWeekDays)).join('')}</tbody></table>`
+      : `<div style="font-size:12px;color:var(--tx2);">해당 없음</div>`);
+}
+function renderWeeklySSReportHTML(data){
+  return `<div style="font-size:12px;color:var(--tx2);margin-bottom:8px;">데이터 기준일: ${data.anchorLabel} (스마트스토어, 최근 ${WEEKLY_SS_WINDOW_DAYS}일 중 실제 업로드 ${data.activeWeekDays}일 vs 직전 ${WEEKLY_SS_BASE_DAYS}일 중 ${data.activeBaseDays}일 비교)</div>`
+    +_weeklySSSection('🔥 자주 들어오는 제품(스테디)', '평소에도 자주 팔리고 이번주에도 꾸준히 들어온 제품', data.frequent, data.activeWeekDays)
+    +_weeklySSSection('🆕 갑자기 들어온 제품', '평소엔 거의 없었는데 이번주 새로 주문이 발생한 제품 (단발성 대량구매일 수 있음)', data.sudden, data.activeWeekDays)
+    +_weeklySSSection('📉 급락한 제품', '평소 잘 팔리다가 이번주 물량이 크게 줄어든 제품', data.dropped, data.activeWeekDays);
+}
+function buildWeeklySSReportTelegramText(data){
+  const line=v=>`• ${v.name} (${v.type}) 이번주 ${Math.round(v.weekTotal).toLocaleString()}개 / ${v.weekDaysPresent}일 등장 (평소 일평균 ${v.baseAvgPerDay.toFixed(1)}개)`;
+  const sec=(title,arr)=>`<b>${title}</b>\n`+(arr.length? arr.slice(0,7).map(line).join('\n') : '해당 없음');
+  return `📊 <b>스마트스토어 주간 리포트 (${data.anchorLabel} 기준)</b>\n\n`
+    +sec('🔥 자주 들어오는 제품', data.frequent)+'\n\n'
+    +sec('🆕 갑자기 들어온 제품', data.sudden)+'\n\n'
+    +sec('📉 급락한 제품', data.dropped)
+    +`\n\n📱 앱에서 자세히: https://hoooo2oooo2.github.io/inventory-app/`;
+}
+function showWeeklySSReportModal(data){
+  const body=document.getElementById('weeklySSReportBody');
+  if(body) body.innerHTML=renderWeeklySSReportHTML(data);
+  openModal('weeklySSReportModal');
+}
+// 매주 화요일 기준이지만, 화요일에 아무도 접속하지 않았으면 그다음 접속 때(요일 무관) 그 날 기준으로 대신 발송.
+// "마지막 발송일로부터 7일 이상 지났을 때" 관리자(master)가 접속하면 실행 — 정상적으로는 화요일마다 걸리고,
+// 화요일에 접속이 없었던 주는 그다음 최초 접속일에 캐치업으로 걸린다.
+async function checkWeeklySmartstoreReport(){
+  try{
+    const sess=window.__CURRENT_USER;
+    if(!sess || sess.role!=='master') return;
+    const today=new Date(); today.setHours(0,0,0,0);
+    const todayStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const lastSent=await cloudKvLoad('weekly_ss_report_lastsent');
+    if(lastSent){
+      const [ly,lm,ld]=lastSent.split('-').map(Number);
+      const lastDate=new Date(ly,lm-1,ld);
+      const daysSince=Math.round((today-lastDate)/86400000);
+      if(daysSince<7) return;   // 아직 일주일 안 지남
+    }
+    await ensureTrendYears();
+    const data=computeWeeklySSReport();
+    showWeeklySSReportModal(data);
+    const tok=localStorage.getItem('tg_token'), chat=localStorage.getItem('tg_chat');
+    if(tok && chat){
+      try{ await _tgPost(tok, chat, buildWeeklySSReportTelegramText(data)); }
+      catch(e){ console.warn('주간 스마트스토어 리포트 텔레그램 전송 실패', e); }
+    }
+    await cloudKvSave('weekly_ss_report_lastsent', todayStr);
+  }catch(e){ console.warn('checkWeeklySmartstoreReport 실패', e); }
 }
 
 function setTrendBasis(basis){ _trendFilter.basis=basis; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
