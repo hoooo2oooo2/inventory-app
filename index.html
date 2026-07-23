@@ -5195,6 +5195,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 제품별 판매량 증감 분석 — 행 클릭 시 최근 N일 판매 상세(날짜·판매처별 수량 + 주문건) 팝업 -->
+<div class="modal-overlay" id="trendBulkDetailModal">
+  <div class="modal" style="max-width:680px;max-height:82vh;overflow-y:auto;">
+    <h3 id="trendBulkTitle">📦 판매 상세</h3>
+    <div id="trendBulkBody"></div>
+    <div class="ma" style="margin-top:12px;">
+      <button class="btn" onclick="closeModal('trendBulkDetailModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 판매분석/로켓그로스 날짜별 삭제·되돌리기 팝업 -->
 <div class="modal-overlay" id="dsManageModal">
   <div class="modal" style="max-width:520px;max-height:84vh;overflow-y:auto;">
@@ -13217,6 +13228,10 @@ let _trendPage=0;           // 증감 분석 표 페이지(0-based)
 const TREND_PAGE_SIZE=15;
 const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
 const TREND_FLAGSHIP_MIN_SALE_DAYS=14; // '베스트' 판정 최소 판매일수 (반짝 신규 판매 제외, 최소 2주는 팔려야 인정)
+const TREND_BULK_WINDOW_DAYS=3;        // '대량' 판정 기준 최근 N일
+const TREND_BULK_MIN_QTY=10;           // '대량' 판정 최소 수량(최근 N일 합계)
+let _trendListCache=[];   // 증감 분석 표 현재 페이지 렌더 목록(행 클릭 → 상세 팝업에서 참조)
+let _trendAnchor=new Date();   // 증감 분석 표 최근 렌더에 사용된 기준일(상세 팝업에서 재사용)
 
 function _trendPad2(n){ return String(n).padStart(2,'0'); }
 // 월/연 단위로 이동하되 말일 초과 시 클램프 (예: 1/31 - 1개월 → 12/31)
@@ -13330,6 +13345,26 @@ function _trendFlagshipSet(ch, anchor){
   return flagship;
 }
 
+// 최근 3일(기준일 포함) 합계 판매량 상위(+최소 수량 충족) 제품 → '대량' 태그
+// (반짝 대량판매 자체를 알리는 목적이라 '베스트' 최소 판매일수 조건과 무관하게 별도 판정)
+function _trendBulkMap(ch, anchor){
+  const keys=_trendWindowKeys(TREND_BULK_WINDOW_DAYS, anchor);
+  const stats={};
+  _revData.forEach(r=>{
+    if(!r.date) return;
+    const k=r.year+'|'+r.date;
+    if(!keys.has(k)) return;
+    if(ch!=='ALL'&&r.ch!==ch) return;
+    const name=r.modelName||r.itemCode||'미상';
+    stats[name]=(stats[name]||0)+(r.orderQty||0);
+  });
+  const entries=Object.entries(stats).filter(([,qty])=>qty>0);
+  const candidates=entries.filter(([,qty])=>qty>=TREND_BULK_MIN_QTY);
+  const byQty=[...candidates].sort((a,b)=>b[1]-a[1]);
+  const cut=Math.max(3,Math.ceil(entries.length*0.2));
+  return new Set(byQty.slice(0,cut).map(([name])=>name));
+}
+
 function setTrendBasis(basis){ _trendFilter.basis=basis; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
 function setTrendCh(ch){ _trendFilter.ch=ch; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
 function setTrendFlagshipOnly(v){ _trendFilter.flagshipOnly=!!v; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
@@ -13363,6 +13398,7 @@ function renderProdTrend(){
   if(chBtnsEl) chBtnsEl.innerHTML=`<button class="rfbtn${_trendFilter.ch==='ALL'?' active':''}" onclick="setTrendCh('ALL')">전체</button>`
     +chs.map(c=>`<button class="rfbtn${_trendFilter.ch===c?' active':''}" onclick="setTrendCh('${c}')">${c}</button>`).join('');
 
+  _trendAnchor=anchor;
   const todayYmd=_trendYmd(anchor);
   const baseYmd=_trendYmd(baseDate);
 
@@ -13377,6 +13413,7 @@ function renderProdTrend(){
   const baseMap=_trendDayMap(baseYmd.year, baseYmd.mmdd, _trendFilter.ch);
   const typeMap=_trendTypeMap(needed, _trendFilter.ch);
   const flagship=_trendFlagshipSet(_trendFilter.ch, anchor);
+  const bulkSet=_trendBulkMap(_trendFilter.ch, anchor);
 
   let names=[...new Set([...Object.keys(todayMap),...Object.keys(baseMap)])];
   if(_trendFilter.flagshipOnly) names=names.filter(n=>flagship.has(n));
@@ -13385,7 +13422,9 @@ function renderProdTrend(){
     const t=todayMap[name]||0, b=baseMap[name]||0;
     const diff=t-b;
     const pct = b>0 ? (diff/b*100) : (t>0?100:0);
-    return {name, type:typeMap[name]||'', t, b, diff, pct, tags:flagship.get(name)||[]};
+    const tags=[...(flagship.get(name)||[])];
+    if(bulkSet.has(name)) tags.push('대량');
+    return {name, type:typeMap[name]||'', t, b, diff, pct, tags};
   }).sort((a,b)=>(b.t+b.b)-(a.t+a.b));
 
   // '구분' 헤더 필터 옵션 채우기 (선택값 유지, 없으면 전체로)
@@ -13419,13 +13458,16 @@ function renderProdTrend(){
 
   const trendBadge=t=>t==='베스트'
     ?'<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:#FEE2E2;color:#DC2626;font-size:10px;font-weight:700;margin-right:2px;">🔥베스트</span>'
+    :t==='대량'
+    ?'<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:#FFEDD5;color:#C2410C;font-size:10px;font-weight:700;margin-right:2px;">📦대량</span>'
     :'<span style="display:inline-block;padding:1px 6px;border-radius:8px;background:#DBEAFE;color:#2563EB;font-size:10px;font-weight:700;margin-right:2px;">⭐스테디</span>';
 
-  if(tbody) tbody.innerHTML=trendDisplay.map(v=>{
+  _trendListCache=trendDisplay;
+  if(tbody) tbody.innerHTML=trendDisplay.map((v,i)=>{
     const up=v.diff>0, down=v.diff<0;
     const diffColor= up?'#DC2626':down?'#059669':'var(--tx2)';
     const arrow = up?'▲':down?'▼':'-';
-    return `<tr>
+    return `<tr onclick="openTrendBulkDetail(${i})" style="cursor:pointer;" title="클릭 시 최근 ${TREND_BULK_WINDOW_DAYS}일 판매 상세 보기">
       <td style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.name}">${v.name}</td>
       <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${v.type}</td>
       <td style="text-align:center;white-space:nowrap;">${v.tags.map(trendBadge).join('')}</td>
@@ -13452,6 +13494,82 @@ function renderProdTrend(){
         </div>`;
     }
   }
+}
+
+// 증감 분석 표 행 클릭 → 최근 N일(TREND_BULK_WINDOW_DAYS) 판매 상세(날짜·판매처별 수량 + 주문건 목록) 팝업
+function openTrendBulkDetail(i){
+  const entry=_trendListCache[i]; if(!entry) return;
+  const name=entry.name;
+  const keys=_trendWindowKeys(TREND_BULK_WINDOW_DAYS, _trendAnchor);
+  const ch=_trendFilter.ch;
+  const rows=_revData.filter(r=>{
+    if((r.modelName||r.itemCode||'미상')!==name) return false;
+    if(ch!=='ALL'&&r.ch!==ch) return false;
+    if(!r.date) return false;
+    if(!keys.has(r.year+'|'+r.date)) return false;
+    return (r.orderQty||0)>0;
+  });
+
+  const f=n=>(n||0).toLocaleString('ko-KR');
+  const mColor=n=>n>0?'color:#059669;font-weight:600;':n<0?'color:#DC2626;font-weight:600;':'';
+
+  document.getElementById('trendBulkTitle').innerHTML=`📦 ${escAttr(name)} — 최근 ${TREND_BULK_WINDOW_DAYS}일 판매 상세`;
+
+  if(!rows.length){
+    document.getElementById('trendBulkBody').innerHTML=`<div class="rev-empty" style="padding:24px 0;">최근 ${TREND_BULK_WINDOW_DAYS}일간 판매 데이터가 없습니다.</div>`;
+    openModal('trendBulkDetailModal');
+    return;
+  }
+  rows.sort((a,b)=> (b.year+b.date).localeCompare(a.year+a.date) || (a.ch||'').localeCompare(b.ch||''));
+
+  // 날짜·판매처별 수량 집계
+  const byDayCh=new Map();
+  rows.forEach(r=>{
+    const k=`${r.year}-${r.date}|${r.ch||''}`;
+    if(!byDayCh.has(k)) byDayCh.set(k,{year:r.year,date:r.date,ch:r.ch,qty:0});
+    byDayCh.get(k).qty+=(r.orderQty||0);
+  });
+  const summaryHtml=[...byDayCh.values()].map(s=>`<tr>
+      <td>${s.year}-${s.date}</td>
+      <td>${escAttr(s.ch||'')}</td>
+      <td style="text-align:right;font-weight:600;">${f(s.qty)}개</td>
+    </tr>`).join('');
+
+  let gQty=0, gSale=0, gSettle=0, gMargin=0;
+  const orderHtml=rows.map(r=>{
+    const mg=r.margin||0, mr=r.marginRate!=null?(r.marginRate*100).toFixed(1)+'%':'—';
+    gQty+=(r.orderQty||0); gSale+=(r.salePrice||0); gSettle+=(r.settlement||0); gMargin+=mg;
+    return `<tr>
+      <td style="text-align:left;">${maskName(r.buyer||r.receiver||'')}</td>
+      <td style="text-align:right;">${r.orderQty!=null?r.orderQty:''}</td>
+      <td style="text-align:right;">${f(r.salePrice)}</td>
+      <td style="text-align:right;${mColor(mg)}">${f(mg)}</td>
+      <td style="text-align:right;">${mr}</td>
+    </tr>`;
+  }).join('');
+  const gRate=gSettle>0?(gMargin/gSettle*100):0;
+
+  document.getElementById('trendBulkBody').innerHTML=`
+    <table class="dt" style="width:100%;margin-bottom:16px;">
+      <thead><tr><th>날짜</th><th>판매처</th><th style="text-align:right;">판매수량</th></tr></thead>
+      <tbody>${summaryHtml}</tbody>
+    </table>
+    <div style="font-size:12px;font-weight:600;color:var(--tx2);margin:0 0 6px;">주문건 목록 (총 ${rows.length.toLocaleString()}건)</div>
+    <table class="dt" style="width:100%;">
+      <thead><tr>
+        <th style="text-align:left;">이름</th><th style="text-align:right;">구매수량</th>
+        <th style="text-align:right;">판매가</th><th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
+      </tr></thead>
+      <tbody>${orderHtml}</tbody>
+      <tfoot><tr style="font-weight:700;background:var(--bg2);">
+        <td style="text-align:right;">합계</td>
+        <td style="text-align:right;">${f(gQty)}</td>
+        <td style="text-align:right;">${f(gSale)}</td>
+        <td style="text-align:right;${mColor(gMargin)}">${f(gMargin)}</td>
+        <td style="text-align:right;">${gRate.toFixed(1)}%</td>
+      </tr></tfoot>
+    </table>`;
+  openModal('trendBulkDetailModal');
 }
 
 // 제품별 판매현황 행 더블클릭 → 일별 판매수량 그래프 팝업
