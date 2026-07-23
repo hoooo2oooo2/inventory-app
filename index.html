@@ -13230,8 +13230,9 @@ const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
 const TREND_FLAGSHIP_MIN_SALE_DAYS=14; // '베스트' 판정 최소 판매일수 (반짝 신규 판매 제외, 최소 2주는 팔려야 인정)
 const TREND_FLAGSHIP_MIN_TOTAL_QTY=50; // '베스트' 판정 최소 누적 판매량(90일) — 카탈로그 전체가 저조해도 흔들리지 않는 절대 기준
 const TREND_BULK_WINDOW_DAYS=2;        // '대량' 판정 시 살펴볼 최근 N일(오늘=최근 업로드일 + 어제, 이 기간 내 주문건을 검사)
-const TREND_BULK_AVG_WINDOW_DAYS=30;   // '대량' 판정용 평균 주문수량 계산 기준 최근 N일
-const TREND_BULK_MULTIPLIER=3;         // 평균 주문수량 대비 이 배수 이상인 단일 주문건이 있으면 '대량'
+const TREND_BULK_AVG_WINDOW_DAYS=30;   // '대량' 판정용 평소 주문수량 분포(평균·표준편차) 계산 기준 최근 N일
+const TREND_BULK_MIN_SAMPLE=5;         // 이 표본 수(최근 30일 주문건수) 미만이면 통계가 불안정해 판정 보류
+const TREND_BULK_ZSCORE=2.5;           // 평소 분포에서 표준편차 몇 배 벗어나야 '대량'으로 볼지(고정 배수 대신 제품별 편차 자체를 반영)
 let _trendListCache=[];   // 증감 분석 표 현재 페이지 렌더 목록(행 클릭 → 상세 팝업에서 참조)
 let _trendAnchor=new Date();   // 증감 분석 표 최근 렌더에 사용된 기준일(상세 팝업에서 재사용)
 
@@ -13347,22 +13348,21 @@ function _trendFlagshipSet(ch, anchor){
   return flagship;
 }
 
-// '대량' 판정: 제품별 합계량이 아니라 "개별 주문건 1건"의 수량이 그 제품의 평소 평균 주문수량(최근
-// TREND_BULK_AVG_WINDOW_DAYS일) 대비 TREND_BULK_MULTIPLIER배 이상인 경우 → 최근 TREND_BULK_WINDOW_DAYS일 내
-// 그런 주문건이 하나라도 있으면 태그
+// '대량' 판정: 고정 배수가 아니라 그 제품 자체의 최근 30일 주문수량 분포(평균·표준편차)를 구해서,
+// 최근 TREND_BULK_WINDOW_DAYS일 내 주문건 중 그 분포에서 TREND_BULK_ZSCORE 표준편차 이상 벗어난 게
+// 있으면 '대량'으로 판정 — 제품마다 "원래 주문량이 들쭉날쭉한지"를 자동으로 반영해 문턱값이 스스로 조정된다.
+// 표본(주문건수)이 TREND_BULK_MIN_SAMPLE 미만이면 통계가 불안정하므로 판정을 보류(태그 없음)한다.
 function _trendBulkMap(ch, anchor){
   const avgKeys=_trendWindowKeys(TREND_BULK_AVG_WINDOW_DAYS, anchor);
   const recentKeys=_trendWindowKeys(TREND_BULK_WINDOW_DAYS, anchor);
-  const avgStats={};   // name → {qtySum, count} (평균 주문수량 계산용)
+  const qtyByName={};   // name → 최근 30일 주문수량 배열(그 제품의 '평소 분포' 표본)
   _revData.forEach(r=>{
     if(!r.date||!(r.orderQty>0)) return;
     const k=r.year+'|'+r.date;
     if(!avgKeys.has(k)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
     const name=r.modelName||r.itemCode||'미상';
-    if(!avgStats[name]) avgStats[name]={qtySum:0,count:0};
-    avgStats[name].qtySum+=r.orderQty;
-    avgStats[name].count+=1;
+    (qtyByName[name]=qtyByName[name]||[]).push(r.orderQty);
   });
   const bulk=new Set();
   _revData.forEach(r=>{
@@ -13371,9 +13371,13 @@ function _trendBulkMap(ch, anchor){
     if(!recentKeys.has(k)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
     const name=r.modelName||r.itemCode||'미상';
-    const st=avgStats[name]; if(!st||st.count===0) return;
-    const avg=st.qtySum/st.count;
-    if(avg>0 && r.orderQty>=avg*TREND_BULK_MULTIPLIER) bulk.add(name);
+    const arr=qtyByName[name]; if(!arr||arr.length<TREND_BULK_MIN_SAMPLE) return;
+    const mean=arr.reduce((s,v)=>s+v,0)/arr.length;
+    const variance=arr.reduce((s,v)=>s+(v-mean)**2,0)/(arr.length-1);
+    const sd=Math.sqrt(variance);
+    // 표준편차가 0(항상 똑같은 수량만 팔림)이면 평균보다 조금이라도 크면 그 자체로 이례적인 것으로 취급
+    const isOutlier = sd>0 ? (r.orderQty-mean)/sd>=TREND_BULK_ZSCORE : r.orderQty>mean;
+    if(isOutlier) bulk.add(name);
   });
   return bulk;
 }
