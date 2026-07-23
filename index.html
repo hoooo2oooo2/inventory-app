@@ -13228,8 +13228,9 @@ let _trendPage=0;           // 증감 분석 표 페이지(0-based)
 const TREND_PAGE_SIZE=15;
 const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
 const TREND_FLAGSHIP_MIN_SALE_DAYS=14; // '베스트' 판정 최소 판매일수 (반짝 신규 판매 제외, 최소 2주는 팔려야 인정)
-const TREND_BULK_WINDOW_DAYS=3;        // '대량' 판정 기준 최근 N일
-const TREND_BULK_MIN_QTY=10;           // '대량' 판정 최소 수량(최근 N일 합계)
+const TREND_BULK_WINDOW_DAYS=3;        // '대량' 판정 시 살펴볼 최근 N일(이 기간 내 주문건을 검사)
+const TREND_BULK_AVG_WINDOW_DAYS=30;   // '대량' 판정용 평균 주문수량 계산 기준 최근 N일
+const TREND_BULK_MULTIPLIER=2;         // 평균 주문수량 대비 이 배수 이상인 단일 주문건이 있으면 '대량'
 let _trendListCache=[];   // 증감 분석 표 현재 페이지 렌더 목록(행 클릭 → 상세 팝업에서 참조)
 let _trendAnchor=new Date();   // 증감 분석 표 최근 렌더에 사용된 기준일(상세 팝업에서 재사용)
 
@@ -13345,24 +13346,35 @@ function _trendFlagshipSet(ch, anchor){
   return flagship;
 }
 
-// 최근 3일(기준일 포함) 합계 판매량 상위(+최소 수량 충족) 제품 → '대량' 태그
-// (반짝 대량판매 자체를 알리는 목적이라 '베스트' 최소 판매일수 조건과 무관하게 별도 판정)
+// '대량' 판정: 제품별 합계량이 아니라 "개별 주문건 1건"의 수량이 그 제품의 평소 평균 주문수량(최근
+// TREND_BULK_AVG_WINDOW_DAYS일) 대비 TREND_BULK_MULTIPLIER배 이상인 경우 → 최근 TREND_BULK_WINDOW_DAYS일 내
+// 그런 주문건이 하나라도 있으면 태그
 function _trendBulkMap(ch, anchor){
-  const keys=_trendWindowKeys(TREND_BULK_WINDOW_DAYS, anchor);
-  const stats={};
+  const avgKeys=_trendWindowKeys(TREND_BULK_AVG_WINDOW_DAYS, anchor);
+  const recentKeys=_trendWindowKeys(TREND_BULK_WINDOW_DAYS, anchor);
+  const avgStats={};   // name → {qtySum, count} (평균 주문수량 계산용)
   _revData.forEach(r=>{
-    if(!r.date) return;
+    if(!r.date||!(r.orderQty>0)) return;
     const k=r.year+'|'+r.date;
-    if(!keys.has(k)) return;
+    if(!avgKeys.has(k)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
     const name=r.modelName||r.itemCode||'미상';
-    stats[name]=(stats[name]||0)+(r.orderQty||0);
+    if(!avgStats[name]) avgStats[name]={qtySum:0,count:0};
+    avgStats[name].qtySum+=r.orderQty;
+    avgStats[name].count+=1;
   });
-  const entries=Object.entries(stats).filter(([,qty])=>qty>0);
-  const candidates=entries.filter(([,qty])=>qty>=TREND_BULK_MIN_QTY);
-  const byQty=[...candidates].sort((a,b)=>b[1]-a[1]);
-  const cut=Math.max(3,Math.ceil(entries.length*0.2));
-  return new Set(byQty.slice(0,cut).map(([name])=>name));
+  const bulk=new Set();
+  _revData.forEach(r=>{
+    if(!r.date||!(r.orderQty>0)) return;
+    const k=r.year+'|'+r.date;
+    if(!recentKeys.has(k)) return;
+    if(ch!=='ALL'&&r.ch!==ch) return;
+    const name=r.modelName||r.itemCode||'미상';
+    const st=avgStats[name]; if(!st||st.count===0) return;
+    const avg=st.qtySum/st.count;
+    if(avg>0 && r.orderQty>=avg*TREND_BULK_MULTIPLIER) bulk.add(name);
+  });
+  return bulk;
 }
 
 function setTrendBasis(basis){ _trendFilter.basis=basis; _trendTypeFilter='ALL'; _trendPage=0; renderProdTrend(); }
