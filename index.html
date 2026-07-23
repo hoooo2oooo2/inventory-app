@@ -13228,9 +13228,10 @@ let _trendPage=0;           // 증감 분석 표 페이지(0-based)
 const TREND_PAGE_SIZE=15;
 const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
 const TREND_FLAGSHIP_MIN_SALE_DAYS=14; // '베스트' 판정 최소 판매일수 (반짝 신규 판매 제외, 최소 2주는 팔려야 인정)
+const TREND_FLAGSHIP_MIN_TOTAL_QTY=50; // '베스트' 판정 최소 누적 판매량(90일) — 카탈로그 전체가 저조해도 흔들리지 않는 절대 기준
 const TREND_BULK_WINDOW_DAYS=3;        // '대량' 판정 시 살펴볼 최근 N일(이 기간 내 주문건을 검사)
 const TREND_BULK_AVG_WINDOW_DAYS=30;   // '대량' 판정용 평균 주문수량 계산 기준 최근 N일
-const TREND_BULK_MULTIPLIER=2;         // 평균 주문수량 대비 이 배수 이상인 단일 주문건이 있으면 '대량'
+const TREND_BULK_MULTIPLIER=3;         // 평균 주문수량 대비 이 배수 이상인 단일 주문건이 있으면 '대량'
 let _trendListCache=[];   // 증감 분석 표 현재 페이지 렌더 목록(행 클릭 → 상세 팝업에서 참조)
 let _trendAnchor=new Date();   // 증감 분석 표 최근 렌더에 사용된 기준일(상세 팝업에서 재사용)
 
@@ -13312,7 +13313,9 @@ function _trendWindowKeys(days, anchor){
   return keys;
 }
 
-// 최근 90일(기준일 이전) 기준: 판매량 상위(베스트) 또는 판매일수 비율이 높은(스테디) 제품 → 주력 태그
+// 최근 90일(기준일 이전) 기준: 꾸준히 팔리며 절대 판매량도 일정 수준 이상인(베스트) 또는 판매일수 비율이
+// 높은(스테디) 제품 → 주력 태그. 카탈로그 대부분이 판매가 저조해도(전체 상위 20% 식) 흔들리지 않도록
+// 상대 순위가 아닌 절대 기준(판매일수·누적수량)으로 판정한다.
 function _trendFlagshipSet(ch, anchor){
   const keys=_trendWindowKeys(TREND_FLAGSHIP_WINDOW_DAYS, anchor);
   const stats={};
@@ -13326,17 +13329,15 @@ function _trendFlagshipSet(ch, anchor){
     stats[name].qty+=(r.orderQty||0);
     if((r.orderQty||0)>0) stats[name].days.add(k);
   });
-  const entries=Object.entries(stats).filter(([,v])=>v.qty>0);
-  // 반짝 판매(출시 초반 며칠 대량 판매) 신제품이 '베스트'로 오판정되지 않도록 최소 판매일수 확보된 것만 후보로
-  const bestCandidates=entries.filter(([,v])=>v.days.size>=TREND_FLAGSHIP_MIN_SALE_DAYS);
-  const byQty=[...bestCandidates].sort((a,b)=>b[1].qty-a[1].qty);
-  const bestCut=Math.max(3,Math.ceil(entries.length*0.2));
   const flagship=new Map();   // name → ['베스트','스테디']
-  byQty.slice(0,bestCut).forEach(([name])=>{
-    if(!flagship.has(name)) flagship.set(name,[]);
-    flagship.get(name).push('베스트');
-  });
-  entries.forEach(([name,v])=>{
+  Object.entries(stats).forEach(([name,v])=>{
+    if(v.qty<=0) return;
+    // '베스트': 최소 판매일수(반짝 신규 판매 제외) + 절대 누적 판매량 기준 모두 충족해야 인정
+    if(v.days.size>=TREND_FLAGSHIP_MIN_SALE_DAYS && v.qty>=TREND_FLAGSHIP_MIN_TOTAL_QTY){
+      if(!flagship.has(name)) flagship.set(name,[]);
+      flagship.get(name).push('베스트');
+    }
+    // '스테디': 거의 매일(판매일수 비율 70%+) 꾸준히 팔리는 제품
     const ratio=v.days.size/TREND_FLAGSHIP_WINDOW_DAYS;
     if(ratio>=0.7 && v.qty>=10){
       if(!flagship.has(name)) flagship.set(name,[]);
