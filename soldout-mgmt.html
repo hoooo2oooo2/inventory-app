@@ -674,6 +674,7 @@ function quickMatch(p, q, field){
       const cell = getCell(p, s.id);
       for(const n of (cell.numbers||[])){
         if(n.value.toLowerCase().includes(ql)) return true;
+        if((n.label||'').toLowerCase().includes(ql)) return true;
       }
     }
     return false;
@@ -1577,6 +1578,7 @@ async function init(){
   function doQuickSearch(){
     state.searchQuery = document.getElementById('quickSearch').value;
     state.searchField = document.getElementById('searchField').value;
+    state.catFilter = 'all';
     state.searchDone = true;
     state.quickPage = 0;
     renderQuick();
