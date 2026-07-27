@@ -15302,41 +15302,35 @@ function calcShippingFee(channel, itemType, salePrice){
 
 // 합배송 그룹(날짜+판매처+수취인+연락처1+주소) 단위로 배송비를 1건만 부과하도록 rows를 제자리에서 보정한다.
 //  기준: 년도+판매일+판매처+수취인+연락처1+주소 가 모두 같으면 한 배송(합배송)으로 간주.
-//  한 그룹 안에서는 배송비를 무조건 딱 1건만 부과한다:
-//   - 그룹의 첫 행이 대표로 ship_qty=1·배송비를 부과받고, 나머지는 ship_qty=0·배송비 0.
-//   - 단, 택배비 설정에서 "수량비례(perUnit)"인 상품이 그룹에 섞여 있으면 그 실비 상품의
-//     배송비가 대표 배송비가 된다(무료/정액 상품 뒤에 묶여 실비가 그냥 0으로 사라지는 것을 방지).
-//     대표가 이미 perUnit 상품이면 이후 다른 perUnit 상품이 더 있어도 배송비를 중복 부과하지 않는다.
+//  한 그룹 안에서는 배송비를 무조건 딱 1건만 부과한다. 대표 선정 우선순위:
+//   ① 택배비 설정에서 "수량비례(perUnit)"인 실비 상품이 있으면 그 상품(첫번째)
+//   ② 없으면 배송비(shipping_fee)>0으로 계산된 상품 중 첫번째
+//      — 그룹의 물리적 첫 행이 마침 무료/0원 상품이라서 뒤에 있는 유상 배송비 상품이
+//        통째로 0원 처리되어 배송비가 사라지는 것을 방지한다.
+//   ③ 그룹 전체가 0원이면 그냥 첫번째 행
 //  rows의 각 원소는 { year, sale_date, channel, receiver, phone1, address, item_no,
 //                     shipping_fee, ship_qty, settlement, cost_price, margin, margin_rate } 형태여야 한다.
 //  업로드 파싱(parseChannelFile)과 택배비 재적용(recalcShippingForKey) 양쪽에서 공유해서 쓴다 —
 //  한쪽에만 적용하면 재적용 시 합배송 그룹이 깨져 배송비가 건별로 중복 부과되는 문제가 있었음.
 function applyShipGroupDedup(rows){
-  const shipGroups = new Map();   // key → { holder: row, holderIsPerUnit: bool }
+  const groups = new Map();   // key → rows[]
   for(const row of rows){
     const key = `${row.year}|${row.sale_date}|${row.channel}|${row.receiver}|${row.phone1}|${row.address}`;
-    const isPerUnitFee = !!(_shipMap[`${row.channel}|${row.item_no}`]||{}).perUnit;
-    const g = shipGroups.get(key);
-    if(!g){
-      row.ship_qty = 1;
-      shipGroups.set(key, { holder: row, holderIsPerUnit: isPerUnitFee });
-      continue;
-    }
-    row.ship_qty = 0;
-    if(isPerUnitFee && !g.holderIsPerUnit){
-      // 지금까지의 대표 배송비는 실비가 아닌데 이 상품은 실비 → 대표를 이 상품으로 교체
-      if(g.holder.shipping_fee>0){
-        g.holder.shipping_fee = 0;
-        g.holder.margin = Math.round(g.holder.settlement - g.holder.cost_price);
-        g.holder.margin_rate = g.holder.settlement>0 ? Math.round(g.holder.margin/g.holder.settlement*10000)/10000 : 0;
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  const isPerUnitFee = row => !!(_shipMap[`${row.channel}|${row.item_no}`]||{}).perUnit;
+  for(const list of groups.values()){
+    const holder = list.find(isPerUnitFee) || list.find(r=>r.shipping_fee>0) || list[0];
+    list.forEach(row=>{
+      if(row===holder){ row.ship_qty = 1; return; }
+      row.ship_qty = 0;
+      if(row.shipping_fee>0){
+        row.shipping_fee = 0;
+        row.margin = Math.round(row.settlement - row.cost_price);
+        row.margin_rate = row.settlement>0 ? Math.round(row.margin/row.settlement*10000)/10000 : 0;
       }
-      g.holder = row;
-      g.holderIsPerUnit = true;
-    } else if(row.shipping_fee>0){
-      row.shipping_fee = 0;
-      row.margin = Math.round(row.settlement - row.cost_price);
-      row.margin_rate = row.settlement>0 ? Math.round(row.margin/row.settlement*10000)/10000 : 0;
-    }
+    });
   }
 }
 
