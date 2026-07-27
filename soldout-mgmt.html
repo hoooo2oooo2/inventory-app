@@ -319,6 +319,7 @@
     <div class="bigsearch-box">
       <div class="bigsearch">
         <select id="searchField">
+          <option value="all">전체</option>
           <option value="erp">ERP상품명</option>
           <option value="alias">상품명</option>
           <option value="number">상품번호</option>
@@ -473,7 +474,7 @@
 let state = {
   sites: [], products: [],
   view: 'quick', quickFilter: 'all', missSite: 'all', catFilter: 'all', openCards: {},
-  searchQuery: '', searchField: 'erp', searchDone: false,
+  searchQuery: '', searchField: 'all', searchDone: false,
   deletePw: '0000',
   quickPage: 0, tablePage: 0, missingSiteFilter: null,
 };
@@ -664,20 +665,26 @@ function render(){
   renderQuick();
 }
 
+function quickMatchNumber(p, ql){
+  for(const s of state.sites){
+    const cell = getCell(p, s.id);
+    for(const n of (cell.numbers||[])){
+      if(n.value.toLowerCase().includes(ql)) return true;
+      if((n.label||'').toLowerCase().includes(ql)) return true;
+    }
+  }
+  return false;
+}
 function quickMatch(p, q, field){
   if(!q) return true;
   const ql = q.toLowerCase();
   if(field === 'erp') return (p.erpName||'').toLowerCase().includes(ql);
   if(field === 'alias') return (p.searchName||'').toLowerCase().includes(ql);
-  if(field === 'number'){
-    for(const s of state.sites){
-      const cell = getCell(p, s.id);
-      for(const n of (cell.numbers||[])){
-        if(n.value.toLowerCase().includes(ql)) return true;
-        if((n.label||'').toLowerCase().includes(ql)) return true;
-      }
-    }
-    return false;
+  if(field === 'number') return quickMatchNumber(p, ql);
+  if(field === 'all'){
+    if((p.erpName||'').toLowerCase().includes(ql)) return true;
+    if((p.searchName||'').toLowerCase().includes(ql)) return true;
+    return quickMatchNumber(p, ql);
   }
   return false;
 }
