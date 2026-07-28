@@ -13293,7 +13293,13 @@ function _trendAddMonthsClamped(date,n){
 // anchor(기준일) 기준으로 비교 시점 계산 — anchor는 "오늘"이 아니라 최근 업로드된 날짜
 function _trendBaseDate(basis, anchor){
   const now=new Date(anchor); now.setHours(0,0,0,0);
-  if(basis==='yesterday'){ const d=new Date(now); d.setDate(d.getDate()-1); return d; }
+  if(basis==='yesterday'){
+    // 달력상 하루 전이 아니라, 실제 데이터가 있는 직전 날짜로 비교
+    // (월요일 업로드분과 비교 시 '어제'가 주말이라 업로드가 없으면 전부 0으로 비교돼 '신규'로 잘못 뜨는 문제 방지)
+    const prev=_trendPrevDataDate(now);
+    if(prev) return prev;
+    const d=new Date(now); d.setDate(d.getDate()-1); return d;
+  }
   if(basis==='week1'){ const d=new Date(now); d.setDate(d.getDate()-7); return d; }
   if(basis==='week2'){ const d=new Date(now); d.setDate(d.getDate()-14); return d; }
   if(basis==='lastmonth') return _trendAddMonthsClamped(now,-1);
@@ -13302,6 +13308,21 @@ function _trendBaseDate(basis, anchor){
   return now;
 }
 function _trendYmd(d){ return { year:d.getFullYear(), mmdd:`${_trendPad2(d.getMonth()+1)}-${_trendPad2(d.getDate())}` }; }
+
+// 기준일(before) 이전에 실제 매출 데이터가 존재하는 가장 최근 날짜(주말·휴일 등 미업로드일 스킵)
+function _trendPrevDataDate(before){
+  const beforeKey=`${before.getFullYear()}-${_trendPad2(before.getMonth()+1)}-${_trendPad2(before.getDate())}`;
+  let best=null;
+  _revData.forEach(r=>{
+    if(!r.date||!r.year) return;
+    const full=`${r.year}-${r.date}`;
+    if(full>=beforeKey) return;
+    if(!best||full>best) best=full;
+  });
+  if(!best) return null;
+  const [y,mm,dd]=best.split('-').map(Number);
+  return new Date(y,mm-1,dd);
+}
 
 // 실제 매출 데이터가 존재하는 가장 최근 날짜(=최근 업로드된 날짜)를 "오늘" 대신 기준일로 사용
 // (당일 데이터가 아직 업로드 안 된 경우 0으로 잘못 비교되는 것을 방지)
