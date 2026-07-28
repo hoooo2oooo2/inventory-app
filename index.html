@@ -4311,7 +4311,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <th style="text-align:right;">판매가 합</th>
               <th style="text-align:right;">정산금액</th>
               <th style="text-align:right;">마진</th>
-              <th style="text-align:right;">마진율</th>
+              <th style="text-align:right;cursor:pointer;" onclick="setDlySort('rate')" title="클릭하여 정렬">마진율<span class="uni-sort-ar" data-dly-k="rate"></span></th>
             </tr></thead>
             <tbody id="revDlyTbody"></tbody>
             <tfoot id="revDlyTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
@@ -13004,6 +13004,19 @@ function toggleRevMask(){
 let _dlyFilter={year:null,month:null,day:null,ch:'ALL'};
 let _dlyTypeFilter='ALL';   // 제품별 판매현황 '구분' 헤더 필터
 let _dlyProdPage=0;         // 제품별 판매현황 페이지(0-based)
+let _dlySort={key:null,dir:-1};   // 제품별 판매현황 헤더 정렬: dir -1=내림차순, 1=오름차순
+
+// 제품별 판매현황 헤더 클릭 정렬 (내림차순 → 오름차순 → 해제 토글)
+function setDlySort(key){
+  if(_dlySort.key===key){
+    if(_dlySort.dir===-1) _dlySort.dir=1;
+    else { _dlySort.key=null; _dlySort.dir=-1; }
+  } else {
+    _dlySort.key=key; _dlySort.dir=-1; // 첫 클릭은 큰 값부터
+  }
+  _dlyProdPage=0;
+  renderDailyReport();
+}
 const DLY_PAGE_SIZE=15;
 let _revDlyDnut=null;
 let _dlyProdListCache=[];   // 제품별 판매현황 현재 렌더 목록(더블클릭 → 그래프 팝업에서 참조)
@@ -13128,7 +13141,11 @@ function renderDailyReport(){
     typeSel.innerHTML='<option value="ALL">전체</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');
     typeSel.value=_dlyTypeFilter;
   }
-  const viewList=_dlyTypeFilter==='ALL'?prodList:prodList.filter(([,v])=>v.type===_dlyTypeFilter);
+  let viewList=_dlyTypeFilter==='ALL'?prodList:prodList.filter(([,v])=>v.type===_dlyTypeFilter);
+  if(_dlySort.key==='rate'){
+    const rateOf=v=>v.settle>0?(v.margin/v.settle):-Infinity;
+    viewList=[...viewList].sort((a,b)=>(rateOf(a[1])-rateOf(b[1]))*_dlySort.dir);
+  }
   _dlyProdListCache=viewList;   // 더블클릭 시 인덱스로 참조(이름에 특수문자 있어도 안전)
 
   // 페이지네이션 (제품 수가 많으면 페이지로 나눠 표시)
@@ -13187,6 +13204,11 @@ function renderDailyReport(){
     <td style="text-align:right;">${fmt(totMargin)}</td>
     <td style="text-align:right;">${totRate.toFixed(1)}%</td>
   </tr>`;
+
+  // 정렬 화살표 표시 갱신
+  document.querySelectorAll('[data-dly-k]').forEach(el=>{
+    el.textContent = _dlySort.key===el.dataset.dlyK ? (_dlySort.dir===-1?' ▼':' ▲') : '';
+  });
 
   // 제품구분 도넛
   const byType={};
