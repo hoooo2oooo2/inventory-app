@@ -560,6 +560,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;align-items:center;justify-content:center;padding:16px;}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--bg);border-radius:14px;width:100%;max-width:420px;padding:18px;max-height:90vh;overflow-y:auto;}
+/* 시스템 자동알림(발주우선순위·마진율급락) 리포트 카드 — 토스 스타일 */
+.sys-report-summary{font-size:12.5px;color:var(--tx2);margin-bottom:10px;padding:9px 12px;background:var(--bg2);border-radius:10px;line-height:1.5;}
+.sys-report-summary b{color:var(--tx);}
+.sys-report-item{border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:8px;background:var(--bg);}
+.sys-report-item:last-child{margin-bottom:0;}
+.sys-report-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.sys-report-name{font-size:13.5px;font-weight:700;color:var(--tx);}
+.sys-report-code{font-size:10.5px;color:var(--tx2);font-family:ui-monospace,monospace;margin-left:5px;}
+.sys-report-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:10px;white-space:nowrap;flex-shrink:0;}
+.sys-report-badge.st-부족{background:#FEE2E2;color:#DC2626;}
+.sys-report-badge.st-긴급{background:#FFEDD5;color:#C2410C;}
+.sys-report-meta{display:flex;gap:12px;margin-top:8px;font-size:11.5px;color:var(--tx2);flex-wrap:wrap;line-height:1.5;}
+.sys-report-meta b{color:var(--tx);font-weight:700;}
+.sys-report-chart-wrap{margin-top:9px;height:52px;}
 .modal h3{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--tx);}
 .field{margin-bottom:10px;}
 .field label{display:block;font-size:11px;color:var(--tx2);margin-bottom:3px;}
@@ -4877,13 +4891,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- ═══ 업무 요청 도착 팝업 (실시간) ═══ -->
+<!-- ═══ 업무 요청 도착 팝업 (실시간) — 시스템 자동알림(발주우선순위·마진율급락)일 땐 리포트 카드로 확장 ═══ -->
 <div class="modal-overlay" id="taskPopupModal">
-  <div class="modal" style="max-width:380px;">
-    <h3>📨 업무 요청이 도착했습니다</h3>
+  <div class="modal" id="taskPopupModalInner" style="max-width:380px;">
+    <h3 id="taskPopTitle">📨 업무 요청이 도착했습니다</h3>
     <div style="margin-top:6px;font-size:13px;line-height:1.6;">
-      <div><b id="taskPopFrom"></b>님이 <span id="taskPopMenu" style="color:var(--pr);font-weight:600;"></span> 관련 요청을 보냈습니다.</div>
+      <div id="taskPopSubtitle"><b id="taskPopFrom"></b>님이 <span id="taskPopMenu" style="color:var(--pr);font-weight:600;"></span> 관련 요청을 보냈습니다.</div>
       <div style="margin-top:8px;white-space:pre-wrap;background:var(--bg2);border-radius:8px;padding:10px;" id="taskPopContent"></div>
+      <div id="taskPopRich" style="display:none;margin-top:8px;max-height:56vh;overflow-y:auto;"></div>
       <div style="margin-top:6px;font-size:11px;color:var(--tx2);" id="taskPopTime"></div>
     </div>
     <div class="ma" style="margin-top:16px;">
@@ -6361,6 +6376,7 @@ function taskRenderInbox(){
       </div>
       <div style="margin-top:6px;font-size:13px;white-space:pre-wrap;">${_esc(t.content||'')}</div>
       <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end;">
+        ${t.sysAlertData?`<button class="btn btn-sm" onclick="taskViewSysAlert('${t.id}')">📊 리포트 보기</button>`:''}
         ${t.read?'':`<button class="btn btn-sm" onclick="taskMarkRead('${t.id}')">확인</button>`}
         <button class="btn btn-sm btn-pr" onclick="taskGoto('${t.id}')">바로가기</button>
       </div>
@@ -6395,25 +6411,117 @@ async function taskGoto(id){
 }
 
 // ── 실시간 도착 팝업 (확인/바로가기/닫기) ──
+// 시스템 자동알림(sysAlertData 있는 레코드)일 땐 일반 텍스트 대신 리포트 카드(제품/채널별 스파크라인 포함)로 렌더링한다.
+let _taskPopupCharts=[];
+function _taskDestroyPopupCharts(){
+  _taskPopupCharts.forEach(c=>{ try{ c.destroy(); }catch{} });
+  _taskPopupCharts=[];
+}
+function _taskRenderPopupBody(rec){
+  const rich=rec.sysAlertData;
+  const inner=document.getElementById('taskPopupModalInner');
+  const richEl=document.getElementById('taskPopRich');
+  const plainEl=document.getElementById('taskPopContent');
+  const subEl=document.getElementById('taskPopSubtitle');
+  _taskDestroyPopupCharts();
+  if(!rich){
+    inner.style.maxWidth='380px';
+    document.getElementById('taskPopTitle').textContent='📨 업무 요청이 도착했습니다';
+    subEl.style.display='';
+    document.getElementById('taskPopFrom').textContent=rec.fromName||'';
+    document.getElementById('taskPopMenu').textContent='['+(rec.menuLabel||'')+']';
+    plainEl.style.display='';
+    plainEl.textContent=rec.content||'';
+    richEl.style.display='none';
+    richEl.innerHTML='';
+    return;
+  }
+  inner.style.maxWidth='560px';
+  subEl.style.display='none';
+  plainEl.style.display='none';
+  const isRestock=rich.kind==='restock';
+  document.getElementById('taskPopTitle').textContent=isRestock?'📦 발주 우선순위 리포트':'📉 채널 마진율 급락 리포트';
+  const summary=isRestock
+    ? `A등급 주력상품 <b>${rich.items.length}건</b>이 재고 부족/긴급 상태입니다.`
+    : `<b>${rich.items.length}개 채널</b>에서 전주 대비 마진율이 5%p 이상 떨어졌습니다.`;
+  const cvIds=rich.items.map((_,i)=>`sysChart_${i}_${Math.random().toString(36).slice(2,8)}`);
+  let html=`<div class="sys-report-summary">${summary}</div>`;
+  rich.items.forEach((it,i)=>{
+    if(isRestock){
+      const stColor=it.status==='부족'?'st-부족':'st-긴급';
+      const orderLine = it.pending>0
+        ? `진행중 <b>${it.pending.toLocaleString()}개</b> 포함해도 <b>${it.addNeeded.toLocaleString()}개</b> 추가 필요(${it.boxes}박스)`
+        : `<b>${it.addNeeded.toLocaleString()}개</b> 발주 필요(${it.boxes}박스)`;
+      html+=`<div class="sys-report-item">
+        <div class="sys-report-top">
+          <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span class="sys-report-name">${_esc(it.name)}</span><span class="sys-report-code">${_esc(it.code)}</span></div>
+          <span class="sys-report-badge ${stColor}">${it.status}</span>
+        </div>
+        <div class="sys-report-meta">
+          <span>현재고 <b>${it.stock.toLocaleString()}개</b></span>
+          <span>일평균 <b>${it.avgDay}개</b></span>
+          <span>${orderLine}</span>
+        </div>
+        <div class="sys-report-chart-wrap"><canvas id="${cvIds[i]}"></canvas></div>
+      </div>`;
+    } else {
+      html+=`<div class="sys-report-item">
+        <div class="sys-report-top">
+          <span class="sys-report-name">${_esc(it.ch)}</span>
+          <span class="sys-report-badge st-부족">${(it.dropPp*100).toFixed(1)}%p ↓</span>
+        </div>
+        <div class="sys-report-meta">
+          <span>전주 <b>${(it.prevRate*100).toFixed(1)}%</b></span>
+          <span>→ 이번주 <b>${(it.curRate*100).toFixed(1)}%</b></span>
+        </div>
+        <div class="sys-report-chart-wrap"><canvas id="${cvIds[i]}"></canvas></div>
+      </div>`;
+    }
+  });
+  richEl.innerHTML=html;
+  richEl.style.display='';
+  rich.items.forEach((it,i)=>{
+    const ctx=document.getElementById(cvIds[i]); if(!ctx) return;
+    const labels=it.series.map(s=>s.label);
+    const values=isRestock ? it.series.map(s=>s.qty) : it.series.map(s=>s.rate!=null?Math.round(s.rate*1000)/10:null);
+    const lineColor=isRestock?'#3182F6':'#DC2626';
+    const chart=new Chart(ctx,{
+      type:'line',
+      data:{labels, datasets:[{data:values, borderColor:lineColor, backgroundColor:lineColor+'22', fill:true, tension:.35, pointRadius:0, borderWidth:2, spanGaps:true}]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{enabled:true}, datalabels:{display:false}},
+        scales:{ x:{display:false}, y:{display:false, beginAtZero:isRestock} } }
+    });
+    _taskPopupCharts.push(chart);
+  });
+}
 function _taskDrainPopupQueue(){
   if(_taskPopupShowing || !_taskPopupQueue.length) return;
   _taskPopupCur=_taskPopupQueue.shift();
   _taskPopupShowing=true;
-  document.getElementById('taskPopFrom').textContent=_taskPopupCur.fromName||'';
-  document.getElementById('taskPopMenu').textContent='['+(_taskPopupCur.menuLabel||'')+']';
-  document.getElementById('taskPopContent').textContent=_taskPopupCur.content||'';
+  _taskRenderPopupBody(_taskPopupCur);
   document.getElementById('taskPopTime').textContent=_taskFmtTime(_taskPopupCur.createdAt);
   openModal('taskPopupModal');
   try{ logiChime(); }catch{}
 }
 function _taskPopupNext(){
   _taskPopupShowing=false; _taskPopupCur=null;
+  _taskDestroyPopupCharts();
   closeModal('taskPopupModal');
   setTimeout(_taskDrainPopupQueue, 300);
 }
 function taskPopupClose(){ _taskPopupNext(); }   // 안읽음 상태 유지 — 종 아이콘/받은요청함에서 다시 확인 가능
 async function taskPopupAck(){ const t=_taskPopupCur; _taskPopupNext(); if(t) await taskMarkRead(t.id); }
 async function taskPopupGoto(){ const t=_taskPopupCur; _taskPopupNext(); if(t) await taskGoto(t.id); }
+// 받은요청함에서 시스템 리포트를 다시 볼 때(큐/팝업쇼잉 상태를 건드리지 않고 단독 조회)
+function taskViewSysAlert(id){
+  const t=_taskRequests.find(x=>x.id===id); if(!t) return;
+  _taskPopupCur=t; _taskPopupShowing=true;
+  _taskRenderPopupBody(t);
+  document.getElementById('taskPopTime').textContent=_taskFmtTime(t.createdAt);
+  closeModal('taskInboxModal');
+  openModal('taskPopupModal');
+}
 
 async function _taskCheckNew(){
   const me=_taskMe(); if(!me) return;
@@ -6481,13 +6589,35 @@ async function _sysAlertMasters(){
   return (APP_PROFILES||[]).filter(u=>SYS_ALERT_RECIPIENTS.includes(u.username));
 }
 
+// 최근 N일 일별 판매수량 시리즈(스파크라인용) — 데이터 없는 날은 0
+function _dailySeries(code, days){
+  const cache=_dCache[code]||{};
+  const out=[];
+  const today=new Date(); today.setHours(0,0,0,0);
+  for(let i=days-1;i>=0;i--){
+    const d=new Date(today); d.setDate(d.getDate()-i);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    out.push({label:`${d.getMonth()+1}/${d.getDate()}`, qty:cache[key]||0});
+  }
+  return out;
+}
+
 const RESTOCK_ALERT_MIN_INTERVAL_DAYS=7;   // 같은 제품 재알림 최소 간격(이미 확인한 문제로 매번 또 알리지 않도록)
+const RESTOCK_ALERT_SERIES_DAYS=21;        // 팝업에 같이 보여줄 최근 판매량 추이 일수
 // 발주 우선순위 알림: ABC A등급(누적판매 상위 80%) 주력상품인데 재고 상태가 '긴급'/'부족'이면 알림.
 // A등급 자체가 이미 daily_sales(판매분석, 전 채널 포함) 기준 판매량으로 매겨져 있어 별도 '베스트'
 // 판정을 새로 만들지 않고 재사용한다 — 안전재고 개월수 산정에도 쓰이는 동일 기준.
+// 이미 발주(입고예정)가 걸려있는 제품은 그 진행중 수량만큼 감안해서 남은 부족분만 알리고,
+// 충분히 걸려있으면 알림 대상에서 제외한다 — 재고관리 화면의 '✓주문진행중' 판정과 동일 기준.
+// 제품이 여러 건이어도 팝업 하나로 묶어서 보여준다(개별 알림 난립 방지).
 async function checkRestockPriorityAlerts(){
   if(!products || !products.length) return;
   ensureAbcGrades();
+  const pendingByCode={};
+  (receiveList||[]).forEach(r=>{
+    const miss=Math.max(0,r.orderQty-(r.in1+r.in2));
+    if(miss>0) pendingByCode[r.code]=(pendingByCode[r.code]||0)+miss;
+  });
   const candidates=[];
   products.forEach(p=>{
     if(p.hidden||p.disc) return;
@@ -6497,7 +6627,11 @@ async function checkRestockPriorityAlerts(){
     if(er<=0) return;
     const r=p.stock/er;
     const st=r<=0.3?'부족':r<=0.6?'긴급':null;
-    if(st) candidates.push({p,st,ord});
+    if(!st) return;
+    const pending=pendingByCode[p.code]||0;
+    if(pending>0 && pending>=ord.needed) return;   // 이미 필요량만큼 발주 진행중 → 알림 제외
+    const addNeeded = pending>0 ? ord.needed-pending : ord.needed;
+    candidates.push({p,st,ord,pending,addNeeded});
   });
   if(!candidates.length) return;
 
@@ -6513,26 +6647,34 @@ async function checkRestockPriorityAlerts(){
   const masters=await _sysAlertMasters();
   if(!masters.length) return;
 
-  const records=[];
-  toAlert.forEach(({p,st,ord})=>{
-    const content=`⚠️ A등급 주력상품 "${p.name}"(${p.code}) 재고 ${st} — 현재고 ${p.stock.toLocaleString()}개, 일평균 ${ord.avgDay}개 판매 중. 발주 검토가 필요합니다.`;
-    masters.forEach(m=>records.push({
-      id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
-      fromUsername:'__system__', fromName:'🤖 자동알림·발주우선순위',
-      toUsername:m.username, toName:m.name||m.username,
-      menu:'order', dept:'cx', menuLabel:'발주관리',
-      content, createdAt:new Date().toISOString(),
-      read:false, resolvedAt:null
-    }));
-    log[p.code]=new Date().toISOString();
-  });
+  toAlert.sort((a,b)=>{ const rank=s=>s==='부족'?0:1; return rank(a.st)-rank(b.st) || b.ord.avgDay-a.ord.avgDay; });
+  const items=toAlert.map(({p,st,ord,pending,addNeeded})=>({
+    code:p.code, name:p.name, status:st, stock:p.stock, avgDay:ord.avgDay,
+    pending, addNeeded, boxes:Math.ceil(addNeeded/(p.boxQty||1)),
+    series:_dailySeries(p.code, RESTOCK_ALERT_SERIES_DAYS)
+  }));
+  const shortList=items.slice(0,3).map(x=>x.name).join(', ')+(items.length>3?` 외 ${items.length-3}건`:'');
+  const content=`⚠️ A등급 주력상품 ${items.length}건 재고 부족/긴급 — ${shortList}. 발주 검토가 필요합니다.`;
+
+  const records=masters.map(m=>({
+    id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
+    fromUsername:'__system__', fromName:'🤖 발주 우선순위 리포트',
+    toUsername:m.username, toName:m.name||m.username,
+    menu:'order', dept:'cx', menuLabel:'발주관리',
+    content, createdAt:new Date().toISOString(),
+    read:false, resolvedAt:null,
+    sysAlertData:{kind:'restock', items}
+  }));
+  toAlert.forEach(({p})=>{ log[p.code]=new Date().toISOString(); });
   await _sysAlertSend(records);
   await cloudKvSave('sys_alert_log_restock', log);
 }
 
 const MARGIN_ALERT_MIN_SETTLE=100000;    // 전주·이번주 정산금액이 이 미만인 채널은 표본이 작아 %가 왜곡되므로 판정 보류
 const MARGIN_ALERT_DROP_PP=0.05;         // 전주 대비 마진율 하락폭(%p) 이 기준 이상이면 알림
+const MARGIN_ALERT_TREND_WEEKS=6;        // 팝업에 같이 보여줄 최근 마진율 추이 주수
 // 채널별 마진율 급락 알림: 매출관리(revenue) 데이터로 채널별 이번주/전주 마진율을 비교한다.
+// 여러 채널이 동시에 걸려도 팝업 하나로 묶어서 보여준다.
 async function checkMarginDropAlerts(){
   if(!_revData || !_revData.length) return;
   await ensureTrendYears();
@@ -6573,19 +6715,38 @@ async function checkMarginDropAlerts(){
   const masters=await _sysAlertMasters();
   if(!masters.length) return;
 
-  const records=[];
-  toAlert.forEach(({ch,prevRate,curRate,dropPp})=>{
-    const content=`📉 [${ch}] 채널 마진율 급락 — 전주 ${(prevRate*100).toFixed(1)}% → 이번주 ${(curRate*100).toFixed(1)}% (${(dropPp*100).toFixed(1)}%p 하락). 확인이 필요합니다.`;
-    masters.forEach(m=>records.push({
-      id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
-      fromUsername:'__system__', fromName:'🤖 자동알림·마진율급락',
-      toUsername:m.username, toName:m.name||m.username,
-      menu:'revenue', dept:'ops', menuLabel:'매출관리',
-      content, createdAt:new Date().toISOString(),
-      read:false, resolvedAt:null
-    }));
-    log[ch]=weekId;
-  });
+  // 채널별 최근 N주 마진율 추이(꺾은선용) — 판정에 쓴 weekKeys 헬퍼를 그대로 재사용
+  const trendSeries=ch=>{
+    const weeks=[];
+    for(let w=MARGIN_ALERT_TREND_WEEKS-1; w>=0; w--){
+      const keys=weekKeys(w*7, w*7+6);
+      let settle=0, margin=0;
+      _revData.forEach(r=>{
+        if(!r.date||!r.year||(r.ch||'기타')!==ch) return;
+        if(!keys.has(r.year+'|'+r.date)) return;
+        settle+=r.settlement||0; margin+=r.margin||0;
+      });
+      const d=new Date(anchor); d.setDate(d.getDate()-w*7);
+      weeks.push({label:`${d.getMonth()+1}/${d.getDate()}`, rate: settle>0?margin/settle:null});
+    }
+    return weeks;
+  };
+
+  toAlert.sort((a,b)=>b.dropPp-a.dropPp);
+  const items=toAlert.map(({ch,prevRate,curRate,dropPp})=>({ ch, prevRate, curRate, dropPp, series:trendSeries(ch) }));
+  const shortList=items.map(x=>x.ch).join(', ');
+  const content=`📉 채널 마진율 급락 ${items.length}건 — ${shortList}. 확인이 필요합니다.`;
+
+  const records=masters.map(m=>({
+    id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
+    fromUsername:'__system__', fromName:'🤖 마진율 급락 리포트',
+    toUsername:m.username, toName:m.name||m.username,
+    menu:'revenue', dept:'ops', menuLabel:'매출관리',
+    content, createdAt:new Date().toISOString(),
+    read:false, resolvedAt:null,
+    sysAlertData:{kind:'margin', items}
+  }));
+  toAlert.forEach(({ch})=>{ log[ch]=weekId; });
   await _sysAlertSend(records);
   await cloudKvSave('sys_alert_log_margin', log);
 }
