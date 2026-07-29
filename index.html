@@ -14227,11 +14227,20 @@ async function downloadDailyExcel(){
     if(thisWeekKeys.has(k)) (weekQty[name]=weekQty[name]||{cur:0,prev:0}).cur+=(r.orderQty||0);
     else if(lastWeekKeys.has(k)) (weekQty[name]=weekQty[name]||{cur:0,prev:0}).prev+=(r.orderQty||0);
   });
+  // 전주 수량이 너무 적으면(예: 1개→52개=+5200%) %가 왜곡돼 일일보고에서 오히려 혼란만 주므로,
+  // 전주 수량이 TREND_WEEK_MIN_BASE 미만일 땐 %가 아니라 실제 증감 개수로 표기한다.
+  const TREND_WEEK_MIN_BASE=10;
   const weekTrend=name=>{
     const w=weekQty[name];
     if(!w||(w.cur===0&&w.prev===0)) return {text:'', dir:0};
     if(w.prev===0) return {text:'🆕신규', dir:1};
     if(w.cur===0) return {text:'▼판매중단', dir:-1};
+    if(w.prev<TREND_WEEK_MIN_BASE){
+      const diff=w.cur-w.prev;
+      const dir=diff>0?1:diff<0?-1:0;
+      if(dir===0) return {text:'-', dir:0};
+      return {text:`${dir>0?'▲+':'▼'}${diff}개`, dir};
+    }
     const pct=(w.cur-w.prev)/w.prev;
     const dir=pct>0.02?1:pct<-0.02?-1:0;
     const arrow=dir>0?'▲':dir<0?'▼':'-';
