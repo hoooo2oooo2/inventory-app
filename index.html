@@ -6460,6 +6460,132 @@ async function taskStartWatch(){
       .subscribe();
   }catch(e){ console.warn('업무요청 realtime 구독 실패(폴링으로 대체)', e); }
 }
+// ── 시스템 자동 알림(발주 우선순위 · 채널별 마진율 급락) — 기존 업무요청(F9/받은요청함) 체계에 통합 ──
+//   실사용자 요청과 같은 task_requests 레코드 포맷을 쓰되 fromUsername:'__system__' 으로 구분한다.
+//   중복 알림 방지용 로그는 별도 cloudKv 키(sys_alert_log_*)에 "마지막으로 알린 시점"만 저장.
+//   마스터 계정 전원에게 보낸다(현재는 대개 1명) — 여러 사람이 동시에 페이지를 열어도 중복 발송
+//   가능성이 있으나(공유배열 동시저장 레이스), 심각한 데이터 손상은 아니라 기존 관례를 따른다.
+async function _sysAlertSend(records){
+  if(!records.length) return;
+  let arr=[];
+  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{}
+  await cloudKvSave('task_requests', arr.concat(records));
+  _taskBroadcast();
+}
+async function _sysAlertMasters(){
+  try{ await loadAppProfiles(); }catch{}
+  return (APP_PROFILES||[]).filter(u=>u.is_master);
+}
+
+const RESTOCK_ALERT_MIN_INTERVAL_DAYS=7;   // 같은 제품 재알림 최소 간격(이미 확인한 문제로 매번 또 알리지 않도록)
+// 발주 우선순위 알림: ABC A등급(누적판매 상위 80%) 주력상품인데 재고 상태가 '긴급'/'부족'이면 알림.
+// A등급 자체가 이미 daily_sales(판매분석, 전 채널 포함) 기준 판매량으로 매겨져 있어 별도 '베스트'
+// 판정을 새로 만들지 않고 재사용한다 — 안전재고 개월수 산정에도 쓰이는 동일 기준.
+async function checkRestockPriorityAlerts(){
+  if(!products || !products.length) return;
+  ensureAbcGrades();
+  const candidates=[];
+  products.forEach(p=>{
+    if(p.hidden||p.disc) return;
+    if(getAbcGrade(p)!=='A') return;
+    const ord=calcNeeded(p);
+    const er=p.reorderPoint>0?p.reorderPoint:(ord.noData?0:Math.round(ord.expM*p.leadTime));
+    if(er<=0) return;
+    const r=p.stock/er;
+    const st=r<=0.3?'부족':r<=0.6?'긴급':null;
+    if(st) candidates.push({p,st,ord});
+  });
+  if(!candidates.length) return;
+
+  let log={};
+  try{ log=(await cloudKvLoad('sys_alert_log_restock'))||{}; }catch{}
+  const now=Date.now();
+  const toAlert=candidates.filter(({p})=>{
+    const last=log[p.code];
+    return !last || (now-new Date(last).getTime())>=RESTOCK_ALERT_MIN_INTERVAL_DAYS*86400000;
+  });
+  if(!toAlert.length) return;
+
+  const masters=await _sysAlertMasters();
+  if(!masters.length) return;
+
+  const records=[];
+  toAlert.forEach(({p,st,ord})=>{
+    const content=`⚠️ A등급 주력상품 "${p.name}"(${p.code}) 재고 ${st} — 현재고 ${p.stock.toLocaleString()}개, 일평균 ${ord.avgDay}개 판매 중. 발주 검토가 필요합니다.`;
+    masters.forEach(m=>records.push({
+      id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
+      fromUsername:'__system__', fromName:'🤖 자동알림·발주우선순위',
+      toUsername:m.username, toName:m.name||m.username,
+      menu:'order', dept:'cx', menuLabel:'발주관리',
+      content, createdAt:new Date().toISOString(),
+      read:false, resolvedAt:null
+    }));
+    log[p.code]=new Date().toISOString();
+  });
+  await _sysAlertSend(records);
+  await cloudKvSave('sys_alert_log_restock', log);
+}
+
+const MARGIN_ALERT_MIN_SETTLE=100000;    // 전주·이번주 정산금액이 이 미만인 채널은 표본이 작아 %가 왜곡되므로 판정 보류
+const MARGIN_ALERT_DROP_PP=0.05;         // 전주 대비 마진율 하락폭(%p) 이 기준 이상이면 알림
+// 채널별 마진율 급락 알림: 매출관리(revenue) 데이터로 채널별 이번주/전주 마진율을 비교한다.
+async function checkMarginDropAlerts(){
+  if(!_revData || !_revData.length) return;
+  await ensureTrendYears();
+  const anchor=_trendLatestDate();
+  const pad2=n=>String(n).padStart(2,'0');
+  const weekKeys=(startOffset,endOffset)=>{
+    const s=new Set();
+    for(let i=startOffset;i<=endOffset;i++){ const d=new Date(anchor); d.setDate(d.getDate()-i); s.add(d.getFullYear()+'|'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())); }
+    return s;
+  };
+  const thisWk=weekKeys(0,6), lastWk=weekKeys(7,13);
+  const byCh={};
+  _revData.forEach(r=>{
+    if(!r.date||!r.year) return;
+    const k=r.year+'|'+r.date;
+    const slotKey = thisWk.has(k) ? 'cur' : lastWk.has(k) ? 'prev' : null;
+    if(!slotKey) return;
+    const ch=r.ch||'기타';
+    if(!byCh[ch]) byCh[ch]={cur:{settle:0,margin:0},prev:{settle:0,margin:0}};
+    byCh[ch][slotKey].settle+=r.settlement||0;
+    byCh[ch][slotKey].margin+=r.margin||0;
+  });
+  const weekId=`${anchor.getFullYear()}-${pad2(anchor.getMonth()+1)}-${pad2(anchor.getDate())}`;
+  const candidates=[];
+  Object.entries(byCh).forEach(([ch,v])=>{
+    if(v.prev.settle<MARGIN_ALERT_MIN_SETTLE||v.cur.settle<MARGIN_ALERT_MIN_SETTLE) return;
+    const prevRate=v.prev.margin/v.prev.settle, curRate=v.cur.margin/v.cur.settle;
+    const dropPp=prevRate-curRate;
+    if(dropPp>=MARGIN_ALERT_DROP_PP) candidates.push({ch,prevRate,curRate,dropPp});
+  });
+  if(!candidates.length) return;
+
+  let log={};
+  try{ log=(await cloudKvLoad('sys_alert_log_margin'))||{}; }catch{}
+  const toAlert=candidates.filter(c=>log[c.ch]!==weekId);
+  if(!toAlert.length) return;
+
+  const masters=await _sysAlertMasters();
+  if(!masters.length) return;
+
+  const records=[];
+  toAlert.forEach(({ch,prevRate,curRate,dropPp})=>{
+    const content=`📉 [${ch}] 채널 마진율 급락 — 전주 ${(prevRate*100).toFixed(1)}% → 이번주 ${(curRate*100).toFixed(1)}% (${(dropPp*100).toFixed(1)}%p 하락). 확인이 필요합니다.`;
+    masters.forEach(m=>records.push({
+      id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
+      fromUsername:'__system__', fromName:'🤖 자동알림·마진율급락',
+      toUsername:m.username, toName:m.name||m.username,
+      menu:'revenue', dept:'ops', menuLabel:'매출관리',
+      content, createdAt:new Date().toISOString(),
+      read:false, resolvedAt:null
+    }));
+    log[ch]=weekId;
+  });
+  await _sysAlertSend(records);
+  await cloudKvSave('sys_alert_log_margin', log);
+}
+
 // F9: 어디서든 업무 요청하기 팝업 (입력창 포커스 여부와 무관하게 안전 — 문자 입력이 아닌 함수키)
 function _taskF9Handler(e){
   if(e.key!=='F9') return;
@@ -8143,7 +8269,7 @@ function goPage(p){
   document.getElementById('addTopBtn').style.display=p==='inv'?'':'none';
   document.getElementById('addTopBtn').onclick=()=>openAddProd();
   document.getElementById('uploadTopBtn').onclick=()=>openUpload(p);
-  if(p==='order') loadDailyCache().then(()=>recalcOrders());
+  if(p==='order') loadDailyCache().then(()=>{ recalcOrders(); checkRestockPriorityAlerts(); });
   if(p==='sales'){
     buildYearSelects();
     const ys=document.getElementById('salesYrSel');
@@ -8155,7 +8281,7 @@ function goPage(p){
   if(p==='rg'){ loadRgDailyCache().then(()=>{ renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
   if(p==='hist'){ renderHist(); loadDsBackups().then(renderDsBackups); }
   if(p==='report') loadDailyCache().then(()=>renderReport());
-  if(p==='revenue') loadRevenuePage().then(()=>goRevPage(_revPage));
+  if(p==='revenue') loadRevenuePage().then(()=>{ goRevPage(_revPage); checkMarginDropAlerts(); });
   if(p==='price'){ pcEnsureBackdata(); pcRenderEstimates(); pcLoadEstimatesCloud(); cmbInit(); }
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
