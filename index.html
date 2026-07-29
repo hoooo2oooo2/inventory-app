@@ -786,6 +786,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-table tbody tr.cmb-on{background:#EEF4FF;}
 .cmb-qty-inp{width:46px;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
 .cmb-qty-inp:focus{border-color:#3182F6;background:var(--bg);}
+.cmb-price-inp{width:56px;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
+.cmb-price-inp:focus{border-color:#3182F6;background:var(--bg);}
 .cmb-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;}
 .cmb-sel,.cmb-saved{flex:1 1 0;min-width:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--bd);border-radius:12px;}
 .cmb-card-head{padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--tx);flex-shrink:0;}
@@ -2396,7 +2398,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <button class="cmb-cbtn cmb-cbtn-arr" onclick="cmbAddChecked('arrival')">한국단가로 계산 <span>×1.1</span></button>
           <button class="cmb-cbtn cmb-cbtn-sup" onclick="cmbAddChecked('supply')">공급가로 계산</button>
         </div>
-        <div class="cmb-left-meta">총 <span id="cmbCount">0</span>개 · 체크 <b id="cmbCheckedN">0</b>개</div>
+        <div class="cmb-left-meta" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>총 <span id="cmbCount">0</span>개 · 체크 <b id="cmbCheckedN">0</b>개</span>
+          <button class="cmb-cat-add" onclick="cmbAddProdOpen()" title="새 제품을 목록에 추가">＋ 제품 추가</button>
+        </div>
       </div>
       <div class="cmb-table-wrap">
         <table class="cmb-table">
@@ -2409,6 +2414,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <th style="width:62px;">한국단가</th>
               <th style="width:62px;">공급가</th>
               <th style="width:50px;">수량</th>
+              <th style="width:26px;"></th>
             </tr>
           </thead>
           <tbody id="cmbTbody"></tbody>
@@ -2477,6 +2483,26 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;gap:8px;">
       <button onclick="document.getElementById('cmbSaveModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
       <button onclick="cmbConfirmSave()" style="flex:2;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 조합계산기 제품 추가 모달 -->
+<div id="cmbAddProdModal" class="pc-modal-bg">
+  <div style="background:var(--bg);border-radius:14px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:16px;">➕ 제품 추가</div>
+    <div class="pc-lbl" style="margin-bottom:6px;">상품코드</div>
+    <input type="text" id="cmbAddCode" placeholder="예: NMSCG015FA" class="pc-inp" style="margin-bottom:12px;" autocomplete="off"/>
+    <div class="pc-lbl" style="margin-bottom:6px;">상품명</div>
+    <input type="text" id="cmbAddName" placeholder="상품명" class="pc-inp" style="margin-bottom:12px;" autocomplete="off" onkeydown="if(event.key==='Enter')cmbAddProdConfirm()"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+      <div><div class="pc-lbl" style="margin-bottom:6px;">박스수량</div><input type="number" id="cmbAddBox" min="0" placeholder="0" class="pc-inp"/></div>
+      <div><div class="pc-lbl" style="margin-bottom:6px;">한국단가</div><input type="number" id="cmbAddArrival" min="0" placeholder="0" class="pc-inp"/></div>
+      <div><div class="pc-lbl" style="margin-bottom:6px;">공급가</div><input type="number" id="cmbAddSupply" min="0" placeholder="0" class="pc-inp"/></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="document.getElementById('cmbAddProdModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
+      <button onclick="cmbAddProdConfirm()" style="flex:2;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">추가</button>
     </div>
   </div>
 </div>
@@ -20230,7 +20256,7 @@ const COMBO_RAW=[["NMSCG015FA","(검정) 엔틱등(대) 문주등 부속",100,24
 // 🧩 제품 조합 계산기 (단가계산기 하위탭)
 //   COMBO_RAW: [code, name, boxQty, arrival(한국단가), supply(공급가)]
 // ══════════════════════════════════════════════
-const COMBO_PRODUCTS = COMBO_RAW.map(r=>({ code:r[0], name:r[1], box:r[2], arrival:r[3], supply:r[4] }));
+let COMBO_PRODUCTS = COMBO_RAW.map(r=>({ code:r[0], name:r[1], box:r[2], arrival:r[3], supply:r[4] }));
 let _cmbState = {};      // code -> {checked:bool, qty:string}
 let _cmbSel = [];        // 선택 제품 리스트 [{code,name,basis,unit,qty,amount}]
 let _cmbSets = [];       // 저장된 세트 [{id,name,items,total,date,author,cat}]
@@ -20260,6 +20286,7 @@ function pcSwitchSub(sub){
 
 // 진입 초기화
 function cmbInit(){
+  if(!_cmbEditsLoaded){ cmbLoadProductEdits().then(()=>cmbRenderList()); }
   cmbRenderList();
   cmbRenderSel();
   if(!_cmbCatsLoaded){ cmbLoadCats(); } else { cmbRenderCatBar(); }
@@ -20279,20 +20306,19 @@ function cmbRenderList(){
   const shown = list.slice(0, MAX);
   tb.innerHTML = shown.map(p=>{
     const st = _cmbState[p.code] || {};
-    const arr = p.arrival!=null ? p.arrival.toLocaleString('ko-KR') : '—';
-    const sup = p.supply!=null ? p.supply.toLocaleString('ko-KR') : '—';
     return `<tr class="${st.checked?'cmb-on':''}" data-code="${_cmbEsc(p.code)}">
       <td style="text-align:center;"><input type="checkbox" ${st.checked?'checked':''} onchange="cmbCheck('${_cmbEsc(p.code)}',this.checked)"></td>
       <td class="cmb-cd">${_cmbEsc(p.code)}</td>
       <td class="cmb-nm">${_cmbEsc(p.name)}</td>
       <td>${p.box!=null?p.box:'—'}</td>
-      <td>${arr}</td>
-      <td>${sup}</td>
+      <td><input type="number" min="0" class="cmb-price-inp" value="${p.arrival!=null?p.arrival:''}" placeholder="—" onchange="cmbEditPrice('${_cmbEsc(p.code)}','arrival',this.value)"></td>
+      <td><input type="number" min="0" class="cmb-price-inp" value="${p.supply!=null?p.supply:''}" placeholder="—" onchange="cmbEditPrice('${_cmbEsc(p.code)}','supply',this.value)"></td>
       <td><input type="number" min="0" class="cmb-qty-inp" value="${st.qty!=null?_cmbEsc(st.qty):''}" placeholder="0" oninput="cmbQty('${_cmbEsc(p.code)}',this.value)"></td>
+      <td style="text-align:center;"><button class="cmb-del-x" title="제품 삭제" onclick="cmbDeleteProduct('${_cmbEsc(p.code)}')">✕</button></td>
     </tr>`;
   }).join('');
-  if(!shown.length) tb.innerHTML = `<tr><td colspan="7" class="cmb-empty">검색 결과가 없습니다.</td></tr>`;
-  else if(list.length>MAX) tb.innerHTML += `<tr><td colspan="7" style="padding:8px;text-align:center;color:var(--tx2);font-size:11px;">상위 ${MAX}개만 표시 — 검색으로 좁혀주세요 (전체 ${list.length.toLocaleString()}개)</td></tr>`;
+  if(!shown.length) tb.innerHTML = `<tr><td colspan="8" class="cmb-empty">검색 결과가 없습니다.</td></tr>`;
+  else if(list.length>MAX) tb.innerHTML += `<tr><td colspan="8" style="padding:8px;text-align:center;color:var(--tx2);font-size:11px;">상위 ${MAX}개만 표시 — 검색으로 좁혀주세요 (전체 ${list.length.toLocaleString()}개)</td></tr>`;
   document.getElementById('cmbCount').textContent = COMBO_PRODUCTS.length.toLocaleString();
   cmbUpdateCheckedCount();
 }
@@ -20317,6 +20343,89 @@ function cmbToggleAll(on){
 function cmbUpdateCheckedCount(){
   const n = Object.values(_cmbState).filter(s=>s.checked).length;
   document.getElementById('cmbCheckedN').textContent = n;
+}
+
+// ── 제품 목록 편집(단가 수정 / 추가 / 삭제) — 정적 COMBO_RAW는 그대로 두고, 그 위에
+//    cloudKv로 저장되는 diff(override/추가/삭제)를 얹어 팀 전체에 동일하게 반영한다 ──
+let _cmbOverrides = {};   // code -> {arrival?, supply?} (수정된 값만)
+let _cmbExtra = [];       // 사용자가 추가한 제품 [{code,name,box,arrival,supply}]
+let _cmbDeleted = [];     // 삭제(숨김) 처리된 기본 제품 코드 목록
+let _cmbEditsLoaded = false;
+
+function cmbRebuildProducts(){
+  const delSet = new Set(_cmbDeleted);
+  const base = COMBO_RAW.filter(r=>!delSet.has(r[0])).map(r=>({ code:r[0], name:r[1], box:r[2], arrival:r[3], supply:r[4] }));
+  const extra = _cmbExtra.map(r=>({ code:r.code, name:r.name, box:r.box, arrival:r.arrival, supply:r.supply }));
+  COMBO_PRODUCTS = base.concat(extra);
+  COMBO_PRODUCTS.forEach(p=>{
+    const ov = _cmbOverrides[p.code];
+    if(ov){ if(ov.arrival!=null) p.arrival=ov.arrival; if(ov.supply!=null) p.supply=ov.supply; }
+  });
+}
+
+async function cmbLoadProductEdits(){
+  const [ov, extra, del] = await Promise.all([
+    cloudKvLoad('combo_price_overrides'),
+    cloudKvLoad('combo_extra_products'),
+    cloudKvLoad('combo_deleted_codes')
+  ]);
+  _cmbOverrides = (ov && typeof ov==='object' && !Array.isArray(ov)) ? ov : {};
+  _cmbExtra = Array.isArray(extra) ? extra : [];
+  _cmbDeleted = Array.isArray(del) ? del : [];
+  _cmbEditsLoaded = true;
+  cmbRebuildProducts();
+}
+
+// 표에서 한국단가/공급가 셀 직접 수정 → override로 저장(다른 PC에도 즉시 공유)
+async function cmbEditPrice(code, field, val){
+  const n = val==='' ? null : Math.round(Number(val));
+  if(val!=='' && (isNaN(n) || n<0)){ toast('올바른 숫자를 입력하세요.'); cmbRenderList(); return; }
+  const p = COMBO_PRODUCTS.find(x=>x.code===code); if(!p) return;
+  p[field] = n;
+  _cmbOverrides[code] = { ..._cmbOverrides[code], [field]: n };
+  await cloudKvSave('combo_price_overrides', _cmbOverrides);
+}
+
+function cmbAddProdOpen(){
+  ['cmbAddCode','cmbAddName','cmbAddBox','cmbAddArrival','cmbAddSupply'].forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('cmbAddProdModal').style.display='flex';
+  document.getElementById('cmbAddCode').focus();
+}
+async function cmbAddProdConfirm(){
+  const code = document.getElementById('cmbAddCode').value.trim();
+  const name = document.getElementById('cmbAddName').value.trim();
+  const boxV = document.getElementById('cmbAddBox').value;
+  const arrV = document.getElementById('cmbAddArrival').value;
+  const supV = document.getElementById('cmbAddSupply').value;
+  if(!code || !name){ toast('상품코드와 상품명은 필수입니다.'); return; }
+  if(COMBO_PRODUCTS.some(p=>p.code===code)){ toast('이미 존재하는 상품코드입니다.'); return; }
+  const box = boxV===''?null:Math.round(Number(boxV));
+  const arrival = arrV===''?null:Math.round(Number(arrV));
+  const supply = supV===''?null:Math.round(Number(supV));
+  _cmbExtra.push({ code, name, box, arrival, supply });
+  await cloudKvSave('combo_extra_products', _cmbExtra);
+  cmbRebuildProducts();
+  document.getElementById('cmbAddProdModal').style.display='none';
+  document.getElementById('cmbSearch').value = code;
+  cmbRenderList();
+  toast('제품이 추가되었습니다.');
+}
+
+async function cmbDeleteProduct(code){
+  const p = COMBO_PRODUCTS.find(x=>x.code===code); if(!p) return;
+  if(!confirm(`[${p.code}] ${p.name} 제품을 목록에서 삭제할까요?\n(이미 저장된 세트·리스트에는 영향 없음)`)) return;
+  const isExtra = _cmbExtra.some(x=>x.code===code);
+  if(isExtra){
+    _cmbExtra = _cmbExtra.filter(x=>x.code!==code);
+    await cloudKvSave('combo_extra_products', _cmbExtra);
+  } else {
+    if(!_cmbDeleted.includes(code)) _cmbDeleted.push(code);
+    await cloudKvSave('combo_deleted_codes', _cmbDeleted);
+  }
+  delete _cmbState[code];
+  cmbRebuildProducts();
+  cmbRenderList();
+  toast('삭제되었습니다.');
 }
 
 // ── 체크 제품 → 선택 리스트에 추가 ──
