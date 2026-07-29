@@ -6471,6 +6471,9 @@ async function _sysAlertSend(records){
   try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{}
   await cloudKvSave('task_requests', arr.concat(records));
   _taskBroadcast();
+  // 방송(realtime broadcast)은 페이지 막 로드된 시점엔 구독 채널이 아직 안 붙어있어 놓칠 수 있으므로,
+  // 알림을 만든 이 세션 자신은 방송 왕복을 기다리지 않고 즉시 확인해서 팝업 큐에 바로 반영한다.
+  try{ await _taskCheckNew(); }catch{}
 }
 const SYS_ALERT_RECIPIENTS=['admin'];   // 시스템 자동알림(발주 우선순위·마진율 급락) 수신 계정 — admin 전용
 async function _sysAlertMasters(){
