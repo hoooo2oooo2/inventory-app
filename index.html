@@ -13308,7 +13308,13 @@ let _trendPage=0;           // 증감 분석 표 페이지(0-based)
 const TREND_PAGE_SIZE=15;
 const TREND_FLAGSHIP_WINDOW_DAYS=90;   // 주력상품 판정 기준 최근 N일
 const TREND_FLAGSHIP_MIN_SALE_DAYS=14; // '베스트' 판정 최소 판매일수 (반짝 신규 판매 제외, 최소 2주는 팔려야 인정)
-const TREND_FLAGSHIP_MIN_TOTAL_QTY=50; // '베스트' 판정 최소 누적 판매량(90일) — 카탈로그 전체가 저조해도 흔들리지 않는 절대 기준
+const TREND_FLAGSHIP_MIN_TOTAL_QTY=30; // '베스트' 판정 최소 누적 판매량(90일) — 카탈로그 규모와 무관하게 걸리는 절대 하한선(주 기준은 아래 상위 비율)
+const TREND_FLAGSHIP_TOP_PCT=0.20;     // '베스트' 판정 주 기준 — 판매일수 조건을 채운 제품들 중 90일 누적판매량 상위 20%
+                                        // (고정 개수 기준은 카탈로그 규모가 커지면 대부분이 '베스트'가 돼버려 상대 기준으로 전환)
+const TREND_FLAGSHIP_SEGMENTS=3;            // 90일을 30일씩 3구간으로 나눠 시기별 판매 분포를 본다
+const TREND_FLAGSHIP_SEG_MIN_DAYS=3;        // 한 구간이 '그 시기에도 팔렸다'로 인정되는 최소 판매일수
+const TREND_FLAGSHIP_MIN_ACTIVE_SEGMENTS=2; // 3구간 중 최소 이만큼에서 활동이 있어야 인정 — 특정 시기 반짝 대량주문만으로
+                                             // 상위 20%에 든 제품을 '계절 상관없이 꾸준히 팔리는' 베스트로 오판하지 않도록
 const TREND_BULK_WINDOW_DAYS=2;        // '대량' 판정 시 살펴볼 최근 N일(오늘=최근 업로드일 + 어제, 이 기간 내 주문건을 검사)
 const TREND_BULK_AVG_WINDOW_DAYS=30;   // '대량' 판정용 평소 주문수량 분포(평균·표준편차) 계산 기준 최근 N일
 const TREND_BULK_MIN_SAMPLE=5;         // 이 표본 수(최근 30일 주문건수) 미만이면 통계가 불안정해 판정 보류
@@ -13415,27 +13421,49 @@ function _trendWindowKeys(days, anchor){
   return keys;
 }
 
-// 최근 90일(기준일 이전) 기준: 꾸준히 팔리며 절대 판매량도 일정 수준 이상인(베스트) 또는 판매일수 비율이
-// 높은(스테디) 제품 → 주력 태그. 카탈로그 대부분이 판매가 저조해도(전체 상위 20% 식) 흔들리지 않도록
-// 상대 순위가 아닌 절대 기준(판매일수·누적수량)으로 판정한다.
+// 최근 90일(기준일 이전) 기준: 꾸준히 팔리며 누적 판매량도 카탈로그 내 상위권인(베스트) 또는 판매일수
+// 비율이 높은(스테디) 제품 → 주력 태그.
+// '베스트'는 고정 개수(예: 90일 50개 이상)가 아니라 판매일수 조건을 채운 제품들 중 누적판매량 상위
+// TREND_FLAGSHIP_TOP_PCT(%) 로 판정한다 — 고정 개수 기준은 카탈로그 규모가 커지면(주력상품 매출이
+// 커지는 만큼) 대부분의 제품이 그 기준을 넘어버려 '베스트'가 사실상 전체 목록이 되는 문제가 있었음.
+// 다만 90일을 30일씩 3구간으로 나눠 최소 TREND_FLAGSHIP_MIN_ACTIVE_SEGMENTS 구간 이상에서 실제
+// 판매가 있어야만 인정 — 특정 시기에 몰린 반짝 대량주문 하나로 누적량만 채운 제품이 '계절 상관없이
+// 꾸준히 팔리는' 베스트로 잘못 뽑히는 것을 막는다.
 function _trendFlagshipSet(ch, anchor){
   const keys=_trendWindowKeys(TREND_FLAGSHIP_WINDOW_DAYS, anchor);
+  const now=new Date(anchor); now.setHours(0,0,0,0);
+  const segLen=TREND_FLAGSHIP_WINDOW_DAYS/TREND_FLAGSHIP_SEGMENTS;
   const stats={};
   _revData.forEach(r=>{
     if(!r.date) return;
     const k=r.year+'|'+r.date;
     if(!keys.has(k)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
+    const qty=r.orderQty||0;
     const name=r.modelName||r.itemCode||'미상';
-    if(!stats[name]) stats[name]={qty:0,days:new Set()};
-    stats[name].qty+=(r.orderQty||0);
-    if((r.orderQty||0)>0) stats[name].days.add(k);
+    if(!stats[name]) stats[name]={qty:0, days:new Set(), segDays:Array.from({length:TREND_FLAGSHIP_SEGMENTS},()=>new Set())};
+    stats[name].qty+=qty;
+    if(qty>0){
+      stats[name].days.add(k);
+      const [mm,dd]=r.date.split('-').map(Number);
+      const diffDays=Math.floor((now-new Date(r.year,mm-1,dd))/86400000);
+      const segIdx=Math.min(TREND_FLAGSHIP_SEGMENTS-1, Math.max(0,Math.floor(diffDays/segLen)));
+      stats[name].segDays[segIdx].add(k);
+    }
   });
+  // 판매일수 조건을 채운 제품들의 누적판매량을 정렬해 상위 TREND_FLAGSHIP_TOP_PCT 컷오프를 구한다
+  // (카탈로그·시기마다 실제 분포에 맞춰 자동으로 조정되는 상대 기준)
+  const dayQualified = Object.values(stats).filter(v=>v.days.size>=TREND_FLAGSHIP_MIN_SALE_DAYS).map(v=>v.qty).sort((a,b)=>b-a);
+  const cutoffIdx = Math.max(0, Math.floor(dayQualified.length*TREND_FLAGSHIP_TOP_PCT)-1);
+  const topPctCutoff = dayQualified.length ? dayQualified[cutoffIdx] : Infinity;
+
   const flagship=new Map();   // name → ['베스트','스테디']
   Object.entries(stats).forEach(([name,v])=>{
     if(v.qty<=0) return;
-    // '베스트': 최소 판매일수(반짝 신규 판매 제외) + 절대 누적 판매량 기준 모두 충족해야 인정
-    if(v.days.size>=TREND_FLAGSHIP_MIN_SALE_DAYS && v.qty>=TREND_FLAGSHIP_MIN_TOTAL_QTY){
+    const activeSegments=v.segDays.filter(s=>s.size>=TREND_FLAGSHIP_SEG_MIN_DAYS).length;
+    // '베스트': 최소 판매일수 + 누적판매량 상위 비율 + 여러 시기에 걸친 실제 판매(반짝 대량주문 배제)
+    if(v.days.size>=TREND_FLAGSHIP_MIN_SALE_DAYS && v.qty>=TREND_FLAGSHIP_MIN_TOTAL_QTY
+       && v.qty>=topPctCutoff && activeSegments>=TREND_FLAGSHIP_MIN_ACTIVE_SEGMENTS){
       if(!flagship.has(name)) flagship.set(name,[]);
       flagship.get(name).push('베스트');
     }
