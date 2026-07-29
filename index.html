@@ -6472,9 +6472,10 @@ async function _sysAlertSend(records){
   await cloudKvSave('task_requests', arr.concat(records));
   _taskBroadcast();
 }
+const SYS_ALERT_RECIPIENTS=['admin'];   // 시스템 자동알림(발주 우선순위·마진율 급락) 수신 계정 — admin 전용
 async function _sysAlertMasters(){
   try{ await loadAppProfiles(); }catch{}
-  return (APP_PROFILES||[]).filter(u=>u.is_master);
+  return (APP_PROFILES||[]).filter(u=>SYS_ALERT_RECIPIENTS.includes(u.username));
 }
 
 const RESTOCK_ALERT_MIN_INTERVAL_DAYS=7;   // 같은 제품 재알림 최소 간격(이미 확인한 문제로 매번 또 알리지 않도록)
