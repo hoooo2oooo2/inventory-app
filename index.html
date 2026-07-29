@@ -10801,10 +10801,19 @@ async function recalcShippingForKey(channel,item_no,feeObj){
   let totalChanged=0;
   for(const [year, dateSet] of byYear){
     const dates=[...dateSet];
-    const {data:rows}=await sb.from('revenue')
-      .select('id,item_no,sale_date,receiver,phone1,address,settlement,cost_price,item_type,sale_price,shipping_fee,margin,margin_rate,order_qty,ship_qty')
-      .eq('channel',channel).eq('year',year).in('sale_date',dates);
-    if(!rows||!rows.length) continue;
+    // ★ Supabase 기본 1000행 제한 — 페이지네이션 없이 조회하면 대상 날짜의 행이
+    //   1000건을 넘는 채널(스마트스토어 등)에서 뒤쪽 행이 잘려 재계산이 누락된다.
+    let rows=[], rFrom=0;
+    while(true){
+      const {data:chunk}=await sb.from('revenue')
+        .select('id,item_no,sale_date,receiver,phone1,address,settlement,cost_price,item_type,sale_price,shipping_fee,margin,margin_rate,order_qty,ship_qty')
+        .eq('channel',channel).eq('year',year).in('sale_date',dates).range(rFrom,rFrom+999);
+      if(!chunk||!chunk.length) break;
+      rows=rows.concat(chunk);
+      if(chunk.length<1000) break;
+      rFrom+=1000;
+    }
+    if(!rows.length) continue;
     rows.forEach(r=>{ r.year=year; r.channel=channel; });
 
     const before = new Map(rows.map(r=>[r.id, {shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}]));
