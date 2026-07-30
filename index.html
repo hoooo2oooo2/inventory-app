@@ -965,6 +965,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .arq-prod-opt:hover{background:#EEF4FF;color:#3182F6;}
 .arq-prod-opt-name{overflow:hidden;text-overflow:ellipsis;}
 .arq-prod-opt-code{font-size:10.5px;color:var(--tx2);font-family:ui-monospace,monospace;flex-shrink:0;}
+/* 택배사 보상목록 */
+.tcb-wrap{max-width:1420px;margin:0 auto;padding:16px 18px;height:calc(100vh - 140px);display:flex;flex-direction:column;box-sizing:border-box;}
+.tcb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
+.tcb-table-scroll{flex:1;overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
+.tcb-table{width:100%;border-collapse:collapse;font-size:12px;}
+.tcb-table thead th{position:sticky;top:0;z-index:2;background:var(--bg2);padding:8px 10px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11px;white-space:nowrap;}
+.tcb-table tbody td{padding:7px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);white-space:nowrap;text-align:center;}
+.tcb-table tbody tr:hover{background:var(--bg2);}
+.tcb-table tbody tr:last-child td{border-bottom:none;}
+.tcb-table td.tcb-l{text-align:left;}
+.tcb-table td.tcb-r{text-align:right;font-family:ui-monospace,monospace;}
+.tcb-acc-분실{background:#FEF2F2;color:#DC2626;}
+.tcb-acc-파손{background:#FFF7ED;color:#EA580C;}
+.tcb-acc-지연{background:#EFF6FF;color:#2563EB;}
+.tcb-acc-오손{background:#FAF5FF;color:#9333EA;}
+.tcb-acc-기타{background:var(--bg2);color:var(--tx2);}
+.tcb-del-btn{border:none;background:none;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1;color:var(--tx2);}
+.tcb-del-btn:hover{color:#DC2626;}
 /* 전화구매건 */
 .po-cat-tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}
 .po-cat-구매{background:#F0FDF4;color:#059669;}
@@ -1722,6 +1740,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-consign" onclick="goMenu('consign')">🚚 위탁 배송건</div>
   <div class="ni" id="nav-accreq" onclick="goMenu('accreq')">🧩 부속요청 게시판</div>
+  <div class="ni" id="nav-tcb" onclick="goMenu('tcb')">💸 택배사 보상목록</div>
   <div class="ni" id="nav-phoneorder" onclick="goMenu('phoneorder')">📞 전화구매건</div>
   <div class="ni" id="nav-rgmgmt" onclick="goMenu('rgmgmt')">🚀 로켓그로스 관리</div>
   <div class="ni" id="nav-cost3day" onclick="goMenu('cost3day')">📦 3일 비용계산</div>
@@ -2812,6 +2831,38 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
  </div>
 </div>
 <div class="arq-prod-drop" id="arqProdDrop"></div>
+
+<!-- ═══ 택배사 보상목록 (CX팀) ═══ -->
+<div class="page" id="page-tcb">
+ <div class="tcb-wrap">
+  <div class="tcb-toolbar">
+    <div class="cs-title">💸 택배사 보상목록 <span class="cs-count" id="tcbCount">0</span></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input class="cs-search" id="tcbSearch" placeholder="송하인·수하인·운송장번호 검색" autocomplete="off" oninput="tcbRender()"/>
+      <input type="file" id="tcbFileInput" accept=".xlsx,.xls" style="display:none;" onchange="tcbPickFile(event)">
+      <button class="cs-add-btn" onclick="document.getElementById('tcbFileInput').click()">📤 엑셀 업로드</button>
+    </div>
+  </div>
+  <div class="tcb-table-scroll">
+    <table class="tcb-table">
+      <thead><tr>
+        <th style="width:100px;">집하일자</th>
+        <th style="width:130px;">송하인명</th>
+        <th style="width:160px;">수하인명</th>
+        <th style="width:140px;">운송장번호</th>
+        <th style="width:70px;">사고유형</th>
+        <th style="width:100px;">상품금액</th>
+        <th style="width:100px;">합의금액</th>
+        <th style="width:100px;">합의일자</th>
+        <th style="width:110px;">계약승인일자</th>
+        <th style="width:100px;">송금일</th>
+        <th style="width:34px;"></th>
+      </tr></thead>
+      <tbody id="tcbTbody"></tbody>
+    </table>
+  </div>
+ </div>
+</div>
 
 <!-- ═══ 전화구매건 (CX팀) ═══ -->
 <div class="page" id="page-phoneorder">
@@ -5376,7 +5427,7 @@ let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인
 //   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
-  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', accreq:'edit', review:'edit', rgmgmt:'edit' } },
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', accreq:'edit', tcb:'edit', review:'edit', rgmgmt:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit', moeum:'edit', soldout:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit', logistatus:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit', coupangad:'edit' } },
@@ -5483,7 +5534,7 @@ async function logout(){
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'phoneorder',label:'📞 전화구매건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'tcb',label:'💸 택배사 보상목록'}, {id:'phoneorder',label:'📞 전화구매건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'moeum',label:'🧮 모음전 계산기'},
@@ -5502,7 +5553,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','accreq','phoneorder','cost3day','review','rgmgmt'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','accreq','tcb','phoneorder','cost3day','review','rgmgmt'] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
@@ -8467,7 +8518,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','accreq','phoneorder','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -8505,6 +8556,7 @@ function goPage(p){
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
   if(p==='accreq') arqInit();
+  if(p==='tcb') tcbInit();
   if(p==='phoneorder') poInit();
   if(p==='rgmgmt') rgmInit();
   if(p==='cost3day') c3Init();
@@ -21882,6 +21934,194 @@ function arqProdBlur(rowId, inputEl){
       arqUpdateField(rowId, { productId:null, productCode:'', productName:val });
     }
   }, 150);
+}
+
+// ══════════════════════════════════════════════
+// 💸 택배사 보상목록 (CX팀) — 화물사고진행현황 엑셀 업로드, 송하인명에 '신성나라:T' 포함된 건만 등록
+//   레코드: {id,pickupDate,senderName,receiverName,trackingNo,accidentType,productAmount,agreeAmount,agreeDate,contractApproveDate,remitDate}
+//   운송장번호를 키로 중복 업로드 자동 차단. cloudKv 'courier_comp_list' 공유배열.
+//   업로드 파일이 SheetJS가 못 읽는 손상된 <si> 태그(택배사 자체 생성 엑셀)를 쓰는 경우가 있어
+//   JSZip으로 직접 xl/sharedStrings.xml·워크시트 XML을 읽는 전용 파서를 사용한다.
+// ══════════════════════════════════════════════
+const TCB_SENDER_FILTER = '신성나라:T';
+let _tcbRows = [];
+let _tcbLoaded = false;
+
+function _tcbEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function _tcbId(){ return 'tcb_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _tcbWon(n){ return n ? (Math.round(Number(n)||0)).toLocaleString('ko-KR') : '—'; }
+function _tcbXmlUnesc(s){ return String(s??'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&'); }
+function _tcbColIdx(letters){ let n=0; for(let i=0;i<letters.length;i++) n = n*26 + (letters.charCodeAt(i)-64); return n-1; }
+
+function tcbInit(){
+  if(!_tcbLoaded){ tcbLoadAll(); }
+  else { tcbRender(); }
+}
+async function tcbLoadAll(){
+  const d = await cloudKvLoad('courier_comp_list');
+  _tcbRows = Array.isArray(d) ? d : [];
+  _tcbLoaded = true;
+  tcbRender();
+}
+function tcbRender(){
+  const tb = document.getElementById('tcbTbody'); if(!tb) return;
+  const q = (document.getElementById('tcbSearch')?.value||'').trim().toLowerCase();
+  let list = _tcbRows;
+  if(q) list = list.filter(r => [r.senderName,r.receiverName,r.trackingNo,r.accidentType].some(v=>(v||'').toLowerCase().includes(q)));
+  list = list.slice().sort((a,b)=>(b.pickupDate||'').localeCompare(a.pickupDate||''));
+  const cnt = document.getElementById('tcbCount'); if(cnt) cnt.textContent = list.length;
+  tb.innerHTML = list.length
+    ? list.map(tcbRowHtml).join('')
+    : `<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--tx2);">등록된 보상 건이 없습니다. <b>[📤 엑셀 업로드]</b>로 등록하세요.</td></tr>`;
+}
+function _tcbAccCls(t){ return ({분실:'tcb-acc-분실',파손:'tcb-acc-파손',지연:'tcb-acc-지연',오손:'tcb-acc-오손'})[t] || 'tcb-acc-기타'; }
+function tcbRowHtml(r){
+  return `<tr data-row="${r.id}">
+    <td>${_tcbEsc(r.pickupDate)}</td>
+    <td class="tcb-l">${_tcbEsc(r.senderName)}</td>
+    <td class="tcb-l">${_tcbEsc(r.receiverName)}</td>
+    <td class="tcb-r">${_tcbEsc(r.trackingNo)}</td>
+    <td>${r.accidentType?`<span class="po-cat-tag ${_tcbAccCls(r.accidentType)}">${_tcbEsc(r.accidentType)}</span>`:'—'}</td>
+    <td class="tcb-r">${_tcbWon(r.productAmount)}</td>
+    <td class="tcb-r">${_tcbWon(r.agreeAmount)}</td>
+    <td>${_tcbEsc(r.agreeDate)||'—'}</td>
+    <td>${_tcbEsc(r.contractApproveDate)||'—'}</td>
+    <td>${_tcbEsc(r.remitDate)||'—'}</td>
+    <td style="text-align:center;"><button class="tcb-del-btn" title="삭제" onclick="tcbDeleteRow('${r.id}')">🗑</button></td>
+  </tr>`;
+}
+
+// ── 엑셀 업로드 → 파싱 → 필터 → 중복차단 → 저장 ──
+function tcbPickFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!file) return;
+  tcbHandleFile(file);
+}
+async function tcbHandleFile(file){
+  try{
+    const buf = await file.arrayBuffer();
+    const aoa = await _tcbParseXlsxAoa(buf);
+    await tcbImport(aoa, file.name);
+  }catch(err){ toast('파일 읽기 오류: '+err.message); console.warn(err); }
+}
+// JSZip으로 워크북을 직접 읽어 [[header...],[row1...],...] 형태(AOA)로 변환
+async function _tcbParseXlsxAoa(arrayBuffer){
+  const zip = await JSZip.loadAsync(arrayBuffer);
+  let strings = [];
+  const ssFile = zip.file('xl/sharedStrings.xml');
+  if(ssFile){
+    const ssXml = await ssFile.async('string');
+    const siBlocks = [...ssXml.matchAll(/<si[^>]*>([\s\S]*?)<\/si>/g)].map(m=>m[1]);
+    strings = siBlocks.map(b => _tcbXmlUnesc([...b.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(m=>m[1]).join('')));
+  }
+  let sheetFile = zip.file('xl/worksheets/sheet1.xml');
+  if(!sheetFile){
+    const names = Object.keys(zip.files).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort();
+    if(names.length) sheetFile = zip.file(names[0]);
+  }
+  if(!sheetFile) throw new Error('워크시트를 찾을 수 없습니다.');
+  const shXml = await sheetFile.async('string');
+  const rowBlocks = [...shXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].map(m=>m[1]);
+  return rowBlocks.map(rowXml=>{
+    const out = [];
+    const cellRe = /<c\s+([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+    let m;
+    while((m = cellRe.exec(rowXml))){
+      const attrs = m[1], inner = m[2];
+      const rMatch = attrs.match(/r="([A-Z]+)\d+"/);
+      if(!rMatch) continue;
+      const idx = _tcbColIdx(rMatch[1]);
+      const tMatch = attrs.match(/t="([a-zA-Z]+)"/);
+      const type = tMatch ? tMatch[1] : 'n';
+      let val = '';
+      if(inner){
+        if(type==='s'){
+          const vMatch = inner.match(/<v>([\s\S]*?)<\/v>/);
+          val = vMatch ? (strings[parseInt(vMatch[1],10)] ?? '') : '';
+        } else if(type==='inlineStr'){
+          const tm = inner.match(/<t[^>]*>([\s\S]*?)<\/t>/);
+          val = tm ? _tcbXmlUnesc(tm[1]) : '';
+        } else {
+          const vMatch = inner.match(/<v>([\s\S]*?)<\/v>/);
+          val = vMatch ? vMatch[1] : '';
+          if(type==='n' && val!=='') val = Number(val);
+          else if(type!=='n') val = _tcbXmlUnesc(val);
+        }
+      }
+      out[idx] = val;
+    }
+    for(let i=0;i<out.length;i++) if(out[i]===undefined) out[i]='';
+    return out;
+  });
+}
+async function tcbImport(json, fileName){
+  if(!json.length){ toast('데이터가 없습니다.'); return; }
+  const head = json[0].map(h=>String(h??'').trim());
+  const ix = n => ssaIx(head, n);
+  const cols = {
+    pickupDate: ix('집하일자'), senderName: ix('송하인명'), receiverName: ix('수하인명'),
+    trackingNo: ix('운송장번호'), accidentType: ix('사고유형'),
+    productAmount: ix('상품금액'), agreeAmount: ix('합의금액'), agreeDate: ix('합의일자'),
+    contractApproveDate: ix('계약승인일자'), remitDate: ix('송금일')
+  };
+  const requiredMissing = ['pickupDate','senderName','receiverName','trackingNo'].filter(k=>cols[k]<0);
+  if(requiredMissing.length){ toast('엑셀에서 필수 헤더를 찾을 수 없습니다: '+requiredMissing.join(', ')); return; }
+
+  const dstr = v => { if(v==null||v==='') return ''; const d=_parseDate(v); return d ? d.str : String(v).trim(); };
+  let parsedTotal=0, filteredOut=0, noTracking=0;
+  const parsed = [];
+  json.slice(1).forEach(r=>{
+    if(!r || !r.some(c=>String(c??'').trim()!=='')) return;
+    parsedTotal++;
+    const senderName = String(r[cols.senderName]??'').trim();
+    if(!senderName.includes(TCB_SENDER_FILTER)){ filteredOut++; return; }
+    const trackingNo = String(r[cols.trackingNo]??'').trim();
+    if(!trackingNo){ noTracking++; return; }
+    parsed.push({
+      id:_tcbId(),
+      pickupDate: cols.pickupDate>=0 ? dstr(r[cols.pickupDate]) : '',
+      senderName, receiverName: cols.receiverName>=0 ? String(r[cols.receiverName]??'').trim() : '',
+      trackingNo, accidentType: cols.accidentType>=0 ? String(r[cols.accidentType]??'').trim() : '',
+      productAmount: cols.productAmount>=0 ? (Number(r[cols.productAmount])||0) : 0,
+      agreeAmount: cols.agreeAmount>=0 ? (Number(r[cols.agreeAmount])||0) : 0,
+      agreeDate: cols.agreeDate>=0 ? dstr(r[cols.agreeDate]) : '',
+      contractApproveDate: cols.contractApproveDate>=0 ? dstr(r[cols.contractApproveDate]) : '',
+      remitDate: cols.remitDate>=0 ? dstr(r[cols.remitDate]) : '',
+    });
+  });
+  if(!parsed.length){ toast(`가져올 데이터가 없습니다. (전체 ${parsedTotal}행 중 '${TCB_SENDER_FILTER}' 포함 건 없음)`); return; }
+
+  let latest = await cloudKvLoad('courier_comp_list');
+  latest = Array.isArray(latest) ? latest : [];
+  const existingNos = new Set(latest.map(r=>r.trackingNo));
+  let added=0, dup=0;
+  parsed.forEach(row=>{
+    if(existingNos.has(row.trackingNo)){ dup++; return; }
+    existingNos.add(row.trackingNo);
+    latest.push(row);
+    added++;
+  });
+  await cloudKvSave('courier_comp_list', latest);
+  _tcbRows = latest;
+  tcbRender();
+  toast(`✅ ${fileName}: 신규 ${added}건 등록`
+    + (dup?` · 중복 ${dup}건 제외`:'')
+    + (filteredOut?` · '${TCB_SENDER_FILTER}' 미포함 ${filteredOut}건 제외`:'')
+    + (noTracking?` · 운송장번호 없음 ${noTracking}건 제외`:''));
+}
+
+function tcbDeleteRow(id){
+  if(!confirm('이 보상 건을 삭제할까요?')) return;
+  _tcbRows = _tcbRows.filter(r=>r.id!==id);
+  tcbRender();
+  tcbSaveDelete(id);
+}
+async function tcbSaveDelete(id){
+  let latest = await cloudKvLoad('courier_comp_list');
+  latest = Array.isArray(latest) ? latest : [];
+  latest = latest.filter(r=>r.id!==id);
+  await cloudKvSave('courier_comp_list', latest);
 }
 
 // ══════════════════════════════════════════════
