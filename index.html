@@ -943,6 +943,28 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cs-pickrow-qty{width:62px;border:1px solid var(--bd);border-radius:7px;padding:6px 8px;font-size:13px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;flex-shrink:0;}
 .cs-pickrow-qty:focus{border-color:#3182F6;background:var(--bg);}
 .cs-pickrow-qty.cs-has{border-color:#3182F6;background:#EEF4FF;font-weight:700;}
+/* 부속요청 게시판 */
+.arq-wrap{max-width:1320px;margin:0 auto;padding:16px 18px;height:calc(100vh - 140px);display:flex;flex-direction:column;box-sizing:border-box;}
+.arq-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
+.arq-table-scroll{flex:1;overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
+.arq-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
+.arq-table thead th{position:sticky;top:0;z-index:2;background:var(--bg2);padding:8px 9px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11px;white-space:nowrap;}
+.arq-table tbody td{padding:4px 6px;border-bottom:0.5px solid var(--bd);color:var(--tx);vertical-align:middle;overflow:hidden;}
+.arq-table tbody tr:hover{background:var(--bg2);}
+.arq-table tbody tr:last-child td{border-bottom:none;}
+.arq-inp{width:100%;border:1px solid transparent;border-radius:6px;padding:5px 7px;font-size:12px;color:var(--tx);background:transparent;outline:none;font-family:inherit;box-sizing:border-box;}
+.arq-inp:hover{background:var(--bg2);}
+.arq-inp:focus{border-color:#3182F6;background:var(--bg);}
+.arq-qty-inp{text-align:center;}
+.arq-status-sel{width:100%;border:none;border-radius:99px;padding:4px 6px;font-size:11px;font-weight:700;text-align:center;text-align-last:center;cursor:pointer;outline:none;font-family:inherit;}
+.arq-prod-code-tag{font-size:9.5px;color:var(--tx2);padding:0 7px;font-family:ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.arq-del-btn{border:none;background:none;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1;color:var(--tx2);}
+.arq-del-btn:hover{color:#DC2626;}
+.arq-prod-drop{position:fixed;z-index:100060;background:var(--bg);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);max-height:260px;overflow-y:auto;display:none;}
+.arq-prod-opt{padding:7px 11px;font-size:12px;color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;white-space:nowrap;}
+.arq-prod-opt:hover{background:#EEF4FF;color:#3182F6;}
+.arq-prod-opt-name{overflow:hidden;text-overflow:ellipsis;}
+.arq-prod-opt-code{font-size:10.5px;color:var(--tx2);font-family:ui-monospace,monospace;flex-shrink:0;}
 /* 전화구매건 */
 .po-cat-tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}
 .po-cat-구매{background:#F0FDF4;color:#059669;}
@@ -1699,6 +1721,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서</div>
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-consign" onclick="goMenu('consign')">🚚 위탁 배송건</div>
+  <div class="ni" id="nav-accreq" onclick="goMenu('accreq')">🧩 부속요청 게시판</div>
   <div class="ni" id="nav-phoneorder" onclick="goMenu('phoneorder')">📞 전화구매건</div>
   <div class="ni" id="nav-rgmgmt" onclick="goMenu('rgmgmt')">🚀 로켓그로스 관리</div>
   <div class="ni" id="nav-cost3day" onclick="goMenu('cost3day')">📦 3일 비용계산</div>
@@ -2760,6 +2783,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
  </div>
 </div>
+
+<!-- ═══ 부속요청 게시판 (CX팀) ═══ -->
+<div class="page" id="page-accreq">
+ <div class="arq-wrap">
+  <div class="arq-toolbar">
+    <div class="cs-title">🧩 부속요청 게시판 <span class="cs-count" id="arqCount">0</span></div>
+    <div style="display:flex;gap:8px;">
+      <input class="cs-search" id="arqSearch" placeholder="제품명·부속명·사유 검색" autocomplete="off" oninput="arqRender()"/>
+      <button class="cs-add-btn" onclick="arqAddRow()">＋ 행 추가</button>
+    </div>
+  </div>
+  <div class="arq-table-scroll" onscroll="arqHideProdDrop()">
+    <table class="arq-table">
+      <thead><tr>
+        <th style="width:118px;">요청날짜</th>
+        <th style="width:200px;">제품명</th>
+        <th style="width:150px;">요청부속</th>
+        <th style="width:64px;">수량</th>
+        <th>요청사유</th>
+        <th style="width:118px;">입고날짜</th>
+        <th style="width:96px;">완료여부</th>
+        <th style="width:34px;"></th>
+      </tr></thead>
+      <tbody id="arqTbody"></tbody>
+    </table>
+  </div>
+ </div>
+</div>
+<div class="arq-prod-drop" id="arqProdDrop"></div>
 
 <!-- ═══ 전화구매건 (CX팀) ═══ -->
 <div class="page" id="page-phoneorder">
@@ -5324,7 +5376,7 @@ let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인
 //   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
-  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', review:'edit', rgmgmt:'edit' } },
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', accreq:'edit', review:'edit', rgmgmt:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit', moeum:'edit', soldout:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit', logistatus:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', sales:'edit', coupangad:'edit' } },
@@ -5431,7 +5483,7 @@ async function logout(){
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
   {id:'rg',label:'로켓그로스'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'phoneorder',label:'📞 전화구매건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'phoneorder',label:'📞 전화구매건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'moeum',label:'🧮 모음전 계산기'},
@@ -5450,7 +5502,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','phoneorder','cost3day','review','rgmgmt'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','rg','price','quote','family','consign','accreq','phoneorder','cost3day','review','rgmgmt'] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logistatus'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','sales','coupangad'] },
@@ -8415,7 +8467,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','phoneorder','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
+  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','accreq','phoneorder','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logistatus','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -8452,6 +8504,7 @@ function goPage(p){
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
+  if(p==='accreq') arqInit();
   if(p==='phoneorder') poInit();
   if(p==='rgmgmt') rgmInit();
   if(p==='cost3day') c3Init();
@@ -21692,6 +21745,143 @@ function csRenderSummary(list){
   document.getElementById('csSumSettle').textContent = _csWon(setSum);
   const mEl=document.getElementById('csSumMargin'); mEl.textContent=_csWon(marginSum); mEl.className='cs-sum-val '+(marginSum>=0?'cs-pos':'cs-neg');
   const rEl=document.getElementById('csSumRate'); rEl.textContent = rate==null?'—':rate.toFixed(1)+'%'; rEl.className='cs-sum-val '+(rate==null?'':(rate>=0?'cs-pos':'cs-neg'));
+}
+
+// ══════════════════════════════════════════════
+// 🧩 부속요청 게시판 (CX팀) — 운영관리 백데이터(products) 검색해 제품 지정, 부속 요청 관리
+//   레코드: {id,reqDate,productId,productCode,productName,part,qty,reason,arriveDate,status}
+//   status: ''(선택 전) | '입고완료' | '보류' | '불가'
+//   cloudKv 'accessory_requests' 공유배열 — 여러 PC 동시 사용 대비, 매 저장 전 최신본을 다시 받아 병합
+// ══════════════════════════════════════════════
+let _arqRows = [];
+let _arqLoaded = false;
+let _arqPickingRow = null;
+
+function _arqEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function _arqId(){ return 'arq_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _arqToday(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+function arqInit(){
+  if(!_arqLoaded){ arqLoadAll(); }
+  else { arqRender(); }
+}
+async function arqLoadAll(){
+  const d = await cloudKvLoad('accessory_requests');
+  _arqRows = Array.isArray(d) ? d : [];
+  _arqLoaded = true;
+  arqRender();
+}
+function arqRender(){
+  const tb = document.getElementById('arqTbody'); if(!tb) return;
+  const q = (document.getElementById('arqSearch')?.value||'').trim().toLowerCase();
+  let list = _arqRows;
+  if(q) list = list.filter(r => [r.productName,r.productCode,r.part,r.reason].some(v=>(v||'').toLowerCase().includes(q)));
+  const cnt = document.getElementById('arqCount'); if(cnt) cnt.textContent = list.length;
+  tb.innerHTML = list.length
+    ? list.map(arqRowHtml).join('')
+    : `<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--tx2);">등록된 요청이 없습니다. <b>[＋ 행 추가]</b>로 등록하세요.</td></tr>`;
+}
+function arqRowHtml(r){
+  const statusCls = r.status==='입고완료' ? 'b-su' : r.status==='보류' ? 'b-wa' : r.status==='불가' ? 'b-da' : 'b-gy';
+  return `<tr data-row="${r.id}">
+    <td><input type="date" class="arq-inp" value="${r.reqDate||''}" onchange="arqUpdateField('${r.id}',{reqDate:this.value})"></td>
+    <td style="position:relative;">
+      <input type="text" class="arq-inp arq-prod-inp" value="${_arqEsc(r.productName||'')}" placeholder="제품명 검색" autocomplete="off"
+        oninput="arqProdInput('${r.id}',this)" onfocus="arqProdInput('${r.id}',this)" onblur="arqProdBlur('${r.id}',this)">
+      ${r.productCode ? `<div class="arq-prod-code-tag">${_arqEsc(r.productCode)}</div>` : ''}
+    </td>
+    <td><input type="text" class="arq-inp" value="${_arqEsc(r.part||'')}" placeholder="부속명 입력" onchange="arqUpdateField('${r.id}',{part:this.value})"></td>
+    <td><input type="number" min="0" class="arq-inp arq-qty-inp" value="${r.qty!=null?r.qty:''}" placeholder="0" onchange="arqUpdateField('${r.id}',{qty:Math.max(0,Math.round(Number(this.value)||0))})"></td>
+    <td><input type="text" class="arq-inp" value="${_arqEsc(r.reason||'')}" placeholder="요청사유 입력" onchange="arqUpdateField('${r.id}',{reason:this.value})"></td>
+    <td><input type="date" class="arq-inp" value="${r.arriveDate||''}" onchange="arqUpdateField('${r.id}',{arriveDate:this.value})"></td>
+    <td>
+      <select class="arq-status-sel badge ${statusCls}" onchange="arqUpdateField('${r.id}',{status:this.value})">
+        <option value="" ${!r.status?'selected':''} disabled hidden>선택</option>
+        <option value="입고완료" ${r.status==='입고완료'?'selected':''}>입고완료</option>
+        <option value="보류" ${r.status==='보류'?'selected':''}>보류</option>
+        <option value="불가" ${r.status==='불가'?'selected':''}>불가</option>
+      </select>
+    </td>
+    <td style="text-align:center;"><button class="arq-del-btn" title="삭제" onclick="arqDeleteRow('${r.id}')">🗑</button></td>
+  </tr>`;
+}
+
+function arqAddRow(){
+  const row = { id:_arqId(), reqDate:_arqToday(), productId:null, productCode:'', productName:'', part:'', qty:'', reason:'', arriveDate:'', status:'' };
+  _arqRows.unshift(row);
+  arqRender();
+  arqSaveAdd(row);
+}
+async function arqSaveAdd(row){
+  let latest = await cloudKvLoad('accessory_requests');
+  latest = Array.isArray(latest) ? latest : [];
+  latest.unshift(row);
+  await cloudKvSave('accessory_requests', latest);
+}
+function arqDeleteRow(id){
+  if(!confirm('이 요청을 삭제할까요?')) return;
+  _arqRows = _arqRows.filter(r=>r.id!==id);
+  arqRender();
+  arqSaveDelete(id);
+}
+async function arqSaveDelete(id){
+  let latest = await cloudKvLoad('accessory_requests');
+  latest = Array.isArray(latest) ? latest : [];
+  latest = latest.filter(r=>r.id!==id);
+  await cloudKvSave('accessory_requests', latest);
+}
+function arqUpdateField(id, patch){
+  let row = _arqRows.find(r=>r.id===id);
+  if(row) Object.assign(row, patch); else { row = { id, ...patch }; _arqRows.push(row); }
+  arqRender();
+  arqSaveField(id, patch, row);
+}
+async function arqSaveField(id, patch, localRow){
+  let latest = await cloudKvLoad('accessory_requests');
+  latest = Array.isArray(latest) ? latest : [];
+  const lrow = latest.find(r=>r.id===id);
+  if(lrow) Object.assign(lrow, patch);
+  else latest.push(localRow ? {...localRow} : { id, ...patch });
+  await cloudKvSave('accessory_requests', latest);
+}
+
+// ── 제품명: 운영관리 백데이터(products) 검색 드롭다운 ──
+function arqProdInput(rowId, inputEl){
+  const q = (inputEl.value||'').trim().toLowerCase();
+  if(!q){ arqHideProdDrop(); return; }
+  const list = (typeof products!=='undefined' ? products : []).filter(p=>!p.hidden &&
+    (p.name.toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q))).slice(0,30);
+  arqShowProdDrop(rowId, inputEl, list);
+}
+function arqShowProdDrop(rowId, inputEl, list){
+  const drop = document.getElementById('arqProdDrop'); if(!drop) return;
+  if(!list.length){ drop.style.display='none'; return; }
+  const r = inputEl.getBoundingClientRect();
+  drop.style.left = r.left+'px';
+  drop.style.top = (r.bottom+2)+'px';
+  drop.style.width = Math.max(r.width,240)+'px';
+  drop.innerHTML = list.map(p=>`<div class="arq-prod-opt" onmousedown="arqPickProd('${rowId}','${p.id}')">
+      <span class="arq-prod-opt-name">${_arqEsc(p.name)}</span><span class="arq-prod-opt-code">${_arqEsc(p.code||'')}</span>
+    </div>`).join('');
+  drop.style.display = 'block';
+}
+function arqHideProdDrop(){ const d=document.getElementById('arqProdDrop'); if(d) d.style.display='none'; }
+function arqPickProd(rowId, prodId){
+  const p = (typeof products!=='undefined' ? products : []).find(x=>String(x.id)===String(prodId)); if(!p) return;
+  _arqPickingRow = rowId;
+  arqUpdateField(rowId, { productId:p.id, productCode:p.code||'', productName:p.name });
+  arqHideProdDrop();
+}
+function arqProdBlur(rowId, inputEl){
+  setTimeout(()=>{
+    arqHideProdDrop();
+    if(_arqPickingRow===rowId){ _arqPickingRow=null; return; }
+    const row = _arqRows.find(r=>r.id===rowId);
+    const val = (inputEl.value||'').trim();
+    if(row && val !== (row.productName||'')){
+      arqUpdateField(rowId, { productId:null, productCode:'', productName:val });
+    }
+  }, 150);
 }
 
 // ══════════════════════════════════════════════
