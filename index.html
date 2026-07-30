@@ -14043,7 +14043,7 @@ function renderProdTrend(){
     const up=v.diff>0, down=v.diff<0;
     const diffColor= up?'#DC2626':down?'#059669':'var(--tx2)';
     const arrow = up?'▲':down?'▼':'-';
-    return `<tr onclick="openTrendBulkDetail(${i})" style="cursor:pointer;" title="클릭 시 최근 ${TREND_BULK_WINDOW_DAYS}일 판매 상세 보기">
+    return `<tr onclick="openTrendBulkDetail(${i})" style="cursor:pointer;" title="클릭 시 비교 기준(${(TREND_BASIS.find(b=>b.id===_trendFilter.basis)||{}).label||''}) 날짜의 판매 상세 보기">
       <td style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.name}">${v.name}</td>
       <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${v.type}</td>
       <td style="text-align:center;white-space:nowrap;">${v.tags.map(trendBadge).join('')}</td>
@@ -14072,11 +14072,19 @@ function renderProdTrend(){
   }
 }
 
-// 증감 분석 표 행 클릭 → 최근 N일(TREND_BULK_WINDOW_DAYS) 판매 상세(날짜·판매처별 수량 + 주문건 목록) 팝업
+// 증감 분석 표 행 클릭 → 그 행이 실제로 비교한 두 날짜(오늘 기준일 · 선택한 비교기준 날짜)의 판매 상세
+// (날짜·판매처별 수량 + 주문건 목록) 팝업.
+// ★ 예전엔 항상 TREND_BULK_WINDOW_DAYS(=2, '대량' 판정용 상수를 재사용)로 최근 2일만 보여줘서,
+//   '저번달'·'작년' 등 다른 비교기준을 선택해도 표에 보이는 두 수치(오늘/비교기준) 중 비교기준
+//   쪽 날짜의 실제 판매내역은 확인할 수 없는 문제가 있었음 — 표의 비교기준과 무관하게 항상 같은
+//   2일만 보여줬기 때문. 이제 표가 실제로 비교한 두 날짜를 그대로 써서 상세를 보여준다.
 function openTrendBulkDetail(i){
   const entry=_trendListCache[i]; if(!entry) return;
   const name=entry.name;
-  const keys=_trendWindowKeys(TREND_BULK_WINDOW_DAYS, _trendAnchor);
+  const basisLabel=(TREND_BASIS.find(b=>b.id===_trendFilter.basis)||{}).label||'비교기준';
+  const baseDate=_trendBaseDate(_trendFilter.basis, _trendAnchor);
+  const todayYmd=_trendYmd(_trendAnchor), baseYmd=_trendYmd(baseDate);
+  const keys=new Set([`${todayYmd.year}|${todayYmd.mmdd}`, `${baseYmd.year}|${baseYmd.mmdd}`]);
   const ch=_trendFilter.ch;
   const rows=_revData.filter(r=>{
     if((r.modelName||r.itemCode||'미상')!==name) return false;
@@ -14089,10 +14097,11 @@ function openTrendBulkDetail(i){
   const f=n=>(n||0).toLocaleString('ko-KR');
   const mColor=n=>n>0?'color:#059669;font-weight:600;':n<0?'color:#DC2626;font-weight:600;':'';
 
-  document.getElementById('trendBulkTitle').innerHTML=`📦 ${escAttr(name)} — 최근 ${TREND_BULK_WINDOW_DAYS}일 판매 상세`;
+  const dateLabel=`${todayYmd.year}-${todayYmd.mmdd} · ${basisLabel}(${baseYmd.year}-${baseYmd.mmdd})`;
+  document.getElementById('trendBulkTitle').innerHTML=`📦 ${escAttr(name)} — ${dateLabel} 판매 상세`;
 
   if(!rows.length){
-    document.getElementById('trendBulkBody').innerHTML=`<div class="rev-empty" style="padding:24px 0;">최근 ${TREND_BULK_WINDOW_DAYS}일간 판매 데이터가 없습니다.</div>`;
+    document.getElementById('trendBulkBody').innerHTML=`<div class="rev-empty" style="padding:24px 0;">${dateLabel} 판매 데이터가 없습니다.</div>`;
     openModal('trendBulkDetailModal');
     return;
   }
