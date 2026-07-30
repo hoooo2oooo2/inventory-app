@@ -763,6 +763,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-mask, #revCustPopupModal .rev-mask{display:inline-block;background:#F1F5F9;color:#94A3B8;border-radius:4px;padding:0 5px;font-size:10px;letter-spacing:1px;}
 #page-revenue .rev-margin-pos{color:#059669;font-weight:600;}
 #page-revenue .rev-margin-neg{color:#DC2626;font-weight:600;}
+#page-revenue .uni-row-flash{background:#FEF3C7 !important;transition:background 2s ease-out;}
 @media(max-width:900px){#page-revenue .rev-kpi{grid-template-columns:repeat(2,1fr);}#page-revenue .rev-chart-grid{grid-template-columns:1fr;}#page-revenue .rev-up-grid{grid-template-columns:repeat(2,1fr);}}
 /* 단가계산기 */
 .pc-lbl{font-size:11px;color:var(--tx2);font-weight:500;margin-bottom:5px;}
@@ -14134,7 +14135,7 @@ function openTrendBulkDetail(i){
   const orderHtml=rows.map(r=>{
     const mg=r.margin||0, mr=r.marginRate!=null?(r.marginRate*100).toFixed(1)+'%':'—';
     gQty+=(r.orderQty||0); gSale+=(r.salePrice||0); gSettle+=(r.settlement||0); gMargin+=mg;
-    return `<tr>
+    return `<tr onclick="goToRevenueRow(${r.id})" style="cursor:pointer;" title="클릭 시 매출관리 통합 메뉴에서 이 주문건으로 이동">
       <td style="text-align:left;">${maskName(r.buyer||r.receiver||'')}</td>
       <td style="text-align:right;">${r.orderQty!=null?r.orderQty:''}</td>
       <td style="text-align:right;">${f(r.salePrice)}</td>
@@ -14165,6 +14166,36 @@ function openTrendBulkDetail(i){
       </tr></tfoot>
     </table>`;
   openModal('trendBulkDetailModal');
+}
+
+// 증감분석 상세팝업의 주문건 클릭 → 매출관리 '통합' 메뉴에서 그 주문 행으로 바로 이동(스크롤+하이라이트).
+// 증감분석 표 자체가 매출관리 페이지 안에 있어 데이터(_revData)는 이미 로드돼있다는 전제 —
+// 필터를 그 행의 연도만 남기고 초기화한 뒤, 통합 탭이 실제로 쓰는 필터·정렬 로직을 그대로
+// 태운 결과(_uniRowsCache)에서 위치를 찾아 해당 페이지로 이동한다.
+function goToRevenueRow(id){
+  const row=_revData.find(r=>r.id===id);
+  if(!row){ toast('해당 주문 데이터를 찾을 수 없습니다.'); return; }
+  closeModal('trendBulkDetailModal');
+  goRevPage('unified');
+  _uniFilter.year=row.year;
+  _uniFilter.months.clear();
+  _uniFilter.chs.clear();
+  _uniSort.key=null;
+  const srchEl=document.getElementById('revUniSrch');
+  if(srchEl) srchEl.value='';
+  renderUnifiedTable();
+  const idx=_uniRowsCache.findIndex(r=>r.id===id);
+  if(idx<0){ toast('필터를 초기화했지만 해당 주문을 찾지 못했습니다.'); return; }
+  _uniPage=Math.floor(idx/UNI_PAGE_SIZE);
+  renderUnifiedTable();
+  setTimeout(()=>{
+    const cb=document.querySelector(`[data-uid="${id}"]`);
+    const tr=cb ? cb.closest('tr') : null;
+    if(!tr) return;
+    tr.scrollIntoView({block:'center', behavior:'smooth'});
+    tr.classList.add('uni-row-flash');
+    setTimeout(()=>tr.classList.remove('uni-row-flash'), 2200);
+  }, 80);
 }
 
 // 제품별 판매현황 행 더블클릭 → 일별 판매수량 그래프 팝업
@@ -14696,6 +14727,7 @@ function buildUniFilterBtns(){
 
 const UNI_PAGE_SIZE = 300;
 let _uniPage = 0; // 현재 페이지 (0-based)
+let _uniRowsCache = []; // renderUnifiedTable()이 마지막으로 필터·정렬한 전체 목록(페이지네이션 전) — 특정 행으로 바로가기 시 재사용
 let _uniSel = new Set(); // 통합 탭 선택된 행 id
 let _uniBatchDelIds = null; // 업로드분 삭제(판매처·날짜 선택) 대기 중인 id 목록(비번 확인 모달 공용)
 
@@ -14896,6 +14928,7 @@ function renderUnifiedTable(){
     el.textContent = _uniSort.key===el.dataset.k ? (_uniSort.dir===-1?' ▼':' ▲') : '';
   });
 
+  _uniRowsCache=rows;   // 페이지네이션 전 전체 목록 — goToRevenueRow()에서 특정 행의 페이지를 찾을 때 재사용
   const total=rows.length;
   document.getElementById('revUniCount').textContent=`${total.toLocaleString()}건`;
 
