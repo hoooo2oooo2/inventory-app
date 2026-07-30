@@ -14440,6 +14440,22 @@ function _buildDailyChartXml(sheetName, serials, saleVals, adVals, firstR, lastR
 const _DAILY_DRAWING_XML=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>209550</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>157162</xdr:rowOff></xdr:from><xdr:to><xdr:col>6</xdr:col><xdr:colOff>1000125</xdr:colOff><xdr:row>14</xdr:row><xdr:rowOff>52387</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="4" name="차트 3"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 
+// 구분(카테고리) 문자열 → 고정 파스텔 배경색. 실사용 중인 11개 구분은 서로 겹치지 않도록 색을
+// 직접 지정해 고정하고, 목록에 없는(향후 새로 생기는) 구분은 문자열 해시로 팔레트에서 골라
+// 쓴다 — 두 경우 모두 같은 이름은 항상 같은 색이 나온다("앞으로 다운받을 땐 그 색상으로 고정").
+const CAT_ROW_FIXED={
+  '가로등':'FFF3E0', '경광등,퇴치기':'FCE4EC', '꽃등':'F3E5F5', '매립등':'E0F7FA',
+  '미니등':'FFF9C4', '벽등,센서등':'E1F5FE', '잡화':'F1F8E9', '전구':'FFE0B2',
+  '정원등':'E8F5E9', '줄조명':'EDE7F6', '투광등':'FFEBEE'
+};
+const CAT_ROW_PALETTE=['FFF3E0','FCE4EC','F3E5F5','E0F7FA','FFF9C4','E1F5FE','F1F8E9','FFECB3','E8F5E9','EDE7F6','FBE9E7','E3F2FD','FFEBEE','F9FBE7','ECEFF1','FFF8E1','E8EAF6','F1F0FA','E0F2F1','FFE4EC'];
+function _catRowColor(cat){
+  const s=String(cat||'미분류');
+  if(CAT_ROW_FIXED[s]) return CAT_ROW_FIXED[s];
+  let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return CAT_ROW_PALETTE[h%CAT_ROW_PALETTE.length];
+}
+
 async function downloadDailyExcel(){
   if(!_dlyFilter.year||!_dlyFilter.month){ alert('년도와 월을 선택하세요.'); return; }
   if(!window.XLSXStyle||!window.JSZip){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
@@ -14526,7 +14542,7 @@ async function downloadDailyExcel(){
   for(let i=0;i<typeList.length;i++){ fmt(wsT,2+i,1,WON); fmt(wsT,2+i,2,PCT); }
   U.book_append_sheet(wb,wsT,'제품구분비중');
 
-  // ── 제품별_판매현황 시트 (마진율 5%미만 빨강 강조) ──
+  // ── 제품별_판매현황 시트 (구분별 배경색 + 마진율 5%미만 빨강 강조 + 최근 31일 일별 판매수량 + 신규 하이라이트) ──
   const byProd={};
   dayRowsForBreakdown.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
@@ -14537,63 +14553,111 @@ async function downloadDailyExcel(){
   Object.values(byProd).forEach(v=>{v.cnt=v.pkgs.size;});
   const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
 
-  // ── 제품별 전주 대비 증감(%) — 다운로드 기준일 포함 최근 7일 vs 그 직전 7일 주문수량 비교 ──
-  //    선택 월만 로드돼 있을 수 있으므로 기준일 전후 14일이 걸치는 연도를 미리 보장한다
+  // ── 일별 판매수량(다운로드 기준일 포함 최근 31일) + '신규' 판정용 데이터 ──
+  //    '신규' = 어떤 날 주문이 있었는데 그 직전 NEW_SILENCE_DAYS(30)일간 완전 무주문이었던 경우
+  //    (그 날 = 신규 트리거일). 트리거일로부터 NEW_HILITE_DAYS(7)일간(그날 포함), 실제 주문이
+  //    있는 날짜의 리포트에 한해 모델명 셀에 연한 초록 배경을 표시한다(주문 없는 날엔 표시 안 함).
+  //    다운로드 기준일(선택월/일)에 따라 매번 최근 31일 구간 자체가 달라진다(요청사항).
+  const DAILY_COLS_DAYS=31, NEW_SILENCE_DAYS=30, NEW_HILITE_DAYS=7;
+  const DAILY_HIST_DAYS=DAILY_COLS_DAYS+NEW_SILENCE_DAYS;   // 신규 판정에 필요한 과거 범위까지 포함
   const refDate=new Date(selY,selMon-1,endDay);
+  // 선택 월만 로드돼 있을 수 있으므로 기준일 이전 61일가 걸치는 연도를 미리 보장한다
   if(!_revYearsLoaded.has(selY)) await ensureRevYear(selY);
   if(!_revYearsLoaded.has(selY-1)) await ensureRevYear(selY-1);
-  const _wkKey=d=>`${d.getFullYear()}|${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const _wkKeySet=(startOffset,endOffset)=>{
-    const s=new Set();
-    for(let i=startOffset;i<=endOffset;i++){ const d=new Date(refDate); d.setDate(d.getDate()-i); s.add(_wkKey(d)); }
-    return s;
-  };
-  const thisWeekKeys=_wkKeySet(0,6), lastWeekKeys=_wkKeySet(7,13);
-  const weekQty={};   // 모델명 → {cur,prev} 주문수량
+  const dkey=d=>`${d.getFullYear()}|${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const histFrom=new Date(refDate); histFrom.setDate(histFrom.getDate()-(DAILY_HIST_DAYS-1));
+  const dailyQty={};   // 모델명 → { 'YYYY|MM-DD': 주문수량 }
   _revData.forEach(r=>{
     if(chFilter!=='ALL'&&r.ch!==chFilter) return;
     if(!r.date||!r.year) return;
-    const k=r.year+'|'+r.date;
+    const [mm,dd]=r.date.split('-').map(Number);
+    const d=new Date(r.year,mm-1,dd);
+    if(d<histFrom||d>refDate) return;
     const name=r.modelName||r.itemCode||'미상';
-    if(thisWeekKeys.has(k)) (weekQty[name]=weekQty[name]||{cur:0,prev:0}).cur+=(r.orderQty||0);
-    else if(lastWeekKeys.has(k)) (weekQty[name]=weekQty[name]||{cur:0,prev:0}).prev+=(r.orderQty||0);
+    const k=r.year+'|'+r.date;
+    (dailyQty[name]=dailyQty[name]||{})[k]=(dailyQty[name][k]||0)+(r.orderQty||0);
   });
+  const qtyOn=(name,d)=>(dailyQty[name]||{})[dkey(d)]||0;
+  const silentBefore=(name,d)=>{
+    for(let i=1;i<=NEW_SILENCE_DAYS;i++){
+      const dd=new Date(d); dd.setDate(dd.getDate()-i);
+      if(qtyOn(name,dd)>0) return false;
+    }
+    return true;
+  };
+  const isTriggerDay=(name,d)=>qtyOn(name,d)>0 && silentBefore(name,d);
+  const isNewHighlightToday=name=>{
+    if(qtyOn(name,refDate)<=0) return false;   // 오늘 주문 없으면 표시 안 함
+    for(let back=0; back<NEW_HILITE_DAYS; back++){
+      const d=new Date(refDate); d.setDate(d.getDate()-back);
+      if(qtyOn(name,d)>0 && isTriggerDay(name,d)) return true;
+    }
+    return false;
+  };
+  // 날짜 컬럼(오래된 날짜 → 최신순, 오늘 포함 31일)
+  const WD=['일','월','화','수','목','금','토'];
+  const dateCols=[];
+  for(let i=DAILY_COLS_DAYS-1;i>=0;i--){ const d=new Date(refDate); d.setDate(d.getDate()-i); dateCols.push(d); }
+  const dateHeaders=dateCols.map(d=>`${pad(d.getMonth()+1)}/${pad(d.getDate())}(${WD[d.getDay()]})`);
+
+  // ── 제품별 전주 대비 증감 — 다운로드 기준일 포함 최근 7일 vs 그 직전 7일 주문수량 비교(dailyQty에서 파생) ──
+  const weekSum=(name,startOffset,endOffset)=>{
+    let s=0;
+    for(let i=startOffset;i<=endOffset;i++){ const d=new Date(refDate); d.setDate(d.getDate()-i); s+=qtyOn(name,d); }
+    return s;
+  };
   // %는 전주 수량이 적을 때(예: 1개→52개=+5200%) 왜곡되기 쉬워 혼란을 주므로, 항상 %가 아닌
-  // 실제 증감 개수로 표기한다.
+  // 실제 증감 개수로 표기한다. '신규'는 주별 비교가 아니라 위 신규 트리거일 판정을 그대로 쓴다.
   const weekTrend=name=>{
-    const w=weekQty[name];
-    if(!w||(w.cur===0&&w.prev===0)) return {text:'', dir:0};
-    if(w.prev===0) return {text:'🆕신규', dir:1};
-    if(w.cur===0) return {text:'▼판매중단', dir:-1};
-    const diff=w.cur-w.prev;
+    const cur=weekSum(name,0,6), prev=weekSum(name,7,13);
+    if(cur===0&&prev===0) return {text:'', dir:0};
+    if(isTriggerDay(name,refDate)) return {text:'🆕신규', dir:1};
+    if(cur===0) return {text:'▼판매중단', dir:-1};
+    const diff=cur-prev;
     const dir=diff>0?1:diff<0?-1:0;
     if(dir===0) return {text:'-', dir:0};
     return {text:`${dir>0?'▲+':'▼'}${diff}개`, dir};
   };
 
+  const FIXED_COLS=9;                       // A~I(전주대비까지) — 틀고정 대상
+  const totalCols=FIXED_COLS+DAILY_COLS_DAYS;
   const s2=[];
   s2.push(['■ 제품별 판매 현황']);
-  s2.push(['모델명','구분','주문수량','택배건수','판매가합','마진','마진율','비고','전주대비']);
-  prodList.forEach(([name,v])=>s2.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.margin,v.settle>0?v.margin/v.settle:0,'',weekTrend(name).text]));
+  s2.push(['모델명','구분','주문수량','택배건수','판매가합','마진','마진율','비고','전주대비','일별 판매수량(최근 31일)', ...Array(DAILY_COLS_DAYS-1).fill('')]);
+  s2.push([...Array(FIXED_COLS).fill(''), ...dateHeaders]);
+  prodList.forEach(([name,v])=>{
+    const daily=dateCols.map(d=>qtyOn(name,d));
+    s2.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.margin,v.settle>0?v.margin/v.settle:0,'',weekTrend(name).text, ...daily]);
+  });
   const tQ=prodList.reduce((s,[,v])=>s+v.qty,0), tC=prodList.reduce((s,[,v])=>s+v.cnt,0),
         tS=prodList.reduce((s,[,v])=>s+v.saleTotal,0), tSt=prodList.reduce((s,[,v])=>s+v.settle,0),
         tM=prodList.reduce((s,[,v])=>s+v.margin,0);
-  s2.push(['합계','',tQ,tC,tS,tM,tSt>0?tM/tSt:0,'','']);
+  const totalDaily=dateCols.map(d=>prodList.reduce((s,[name])=>s+qtyOn(name,d),0));
+  s2.push(['합계','',tQ,tC,tS,tM,tSt>0?tM/tSt:0,'','', ...totalDaily]);
   const ws2=U.aoa_to_sheet(s2);
-  ws2['!cols']=[{wch:40},{wch:11},{wch:9},{wch:9},{wch:13},{wch:12},{wch:9},{wch:14},{wch:11}];
-  sc(ws2,0,0,SECT); for(let c=0;c<9;c++) sc(ws2,1,c,HEAD);
+  ws2['!cols']=[{wch:40},{wch:11},{wch:9},{wch:9},{wch:13},{wch:12},{wch:9},{wch:14},{wch:11}, ...Array(DAILY_COLS_DAYS).fill({wch:9})];
+  sc(ws2,0,0,SECT);
+  for(let c=0;c<totalCols;c++) sc(ws2,1,c,HEAD);
+  for(let c=0;c<totalCols;c++) sc(ws2,2,c,HEAD);
   const UP={font:{bold:true,color:{rgb:'059669'}}}, DOWN={font:{bold:true,color:{rgb:'DC2626'}}};
+  const NEWBG={fill:{patternType:'solid',fgColor:{rgb:'DCFCE7'}}};
   prodList.forEach(([name,v],i)=>{
-    const r=2+i;
+    const r=3+i;
+    const catBg={fill:{patternType:'solid',fgColor:{rgb:_catRowColor(v.type)}}};
+    for(let c=0;c<totalCols;c++) sc(ws2,r,c,catBg);
     fmt(ws2,r,4,WON); fmt(ws2,r,5,MARGIN_FMT); fmt(ws2,r,6,PCT);
     const rate=v.settle>0?v.margin/v.settle:0;
     if(rate<0.05){ sc(ws2,r,5,RED5); sc(ws2,r,6,RED5); fmt(ws2,r,5,WON); fmt(ws2,r,6,PCT); }
     const dir=weekTrend(name).dir;
     if(dir>0) sc(ws2,r,8,UP); else if(dir<0) sc(ws2,r,8,DOWN);
+    if(isNewHighlightToday(name)) sc(ws2,r,0,NEWBG);
   });
-  const totR=2+prodList.length;
-  for(let c=0;c<9;c++) sc(ws2,totR,c,HEAD);
+  const totR=3+prodList.length;
+  for(let c=0;c<totalCols;c++) sc(ws2,totR,c,HEAD);
   fmt(ws2,totR,4,WON); fmt(ws2,totR,5,MARGIN_FMT); fmt(ws2,totR,6,PCT);
+  // 시트 추가 순서상 이 시트의 sheetN.xml 번호(1-based) — 아래 틀고정 XML 패치에서 사용.
+  // 이 시점까지 append된 시트 = 월별 시트(monthCharts.length개) + 제품구분비중(1개) + 이 시트 자신.
+  const uniProdSheetIdx=monthCharts.length+2;
   U.book_append_sheet(wb,ws2,'제품별_판매현황');
 
   // ── 상세데이터 시트 (다운로드 기준일 기준: 특정 일자 선택 시 해당 일자만, 미선택 시 1일~기준일 누적) ──
@@ -14637,31 +14701,43 @@ async function downloadDailyExcel(){
 
   const wbout=XS.write(wb,{bookType:'xlsx',type:'array'});
 
-  // ── 각 월 시트에 차트 주입 ──
+  // ── 각 월 시트에 차트 주입 + 제품별_판매현황 시트 틀고정(freeze panes) ──
+  // xlsx-js-style(SheetJS 커뮤니티 빌드)이 틀고정을 네이티브로 못 써서(Pro 전용 기능) sheetN.xml에
+  // <pane> 엘리먼트를 직접 patch한다 — 차트 주입과 동일한 방식(생성된 zip을 열어 XML 수정 후 재압축).
   try{
-    if(monthCharts.length){
-      const zip=await JSZip.loadAsync(wbout);
-      let ctAdd='';
-      for(const mc of monthCharts){
-        const k=mc.sheetIdx;
-        zip.file(`xl/charts/chart${k}.xml`,_buildDailyChartXml(mc.name,mc.serials,mc.sales,mc.ads,mc.firstR,mc.lastR));
-        zip.file(`xl/drawings/drawing${k}.xml`,_DAILY_DRAWING_XML);
-        zip.file(`xl/drawings/_rels/drawing${k}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${k}.xml"/></Relationships>`);
-        zip.file(`xl/worksheets/_rels/sheet${k}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${k}.xml"/></Relationships>`);
-        let sx=await zip.file(`xl/worksheets/sheet${k}.xml`).async('string');
-        if(!/xmlns:r=/.test(sx)) sx=sx.replace('<worksheet ','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
-        if(!/<drawing /.test(sx)) sx=sx.replace('</worksheet>','<drawing r:id="rId1"/></worksheet>');
-        zip.file(`xl/worksheets/sheet${k}.xml`,sx);
-        ctAdd+=`<Override PartName="/xl/drawings/drawing${k}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/><Override PartName="/xl/charts/chart${k}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`;
-      }
+    const zip=await JSZip.loadAsync(wbout);
+    let ctAdd='';
+    for(const mc of monthCharts){
+      const k=mc.sheetIdx;
+      zip.file(`xl/charts/chart${k}.xml`,_buildDailyChartXml(mc.name,mc.serials,mc.sales,mc.ads,mc.firstR,mc.lastR));
+      zip.file(`xl/drawings/drawing${k}.xml`,_DAILY_DRAWING_XML);
+      zip.file(`xl/drawings/_rels/drawing${k}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${k}.xml"/></Relationships>`);
+      zip.file(`xl/worksheets/_rels/sheet${k}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${k}.xml"/></Relationships>`);
+      let sx=await zip.file(`xl/worksheets/sheet${k}.xml`).async('string');
+      if(!/xmlns:r=/.test(sx)) sx=sx.replace('<worksheet ','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+      if(!/<drawing /.test(sx)) sx=sx.replace('</worksheet>','<drawing r:id="rId1"/></worksheet>');
+      zip.file(`xl/worksheets/sheet${k}.xml`,sx);
+      ctAdd+=`<Override PartName="/xl/drawings/drawing${k}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/><Override PartName="/xl/charts/chart${k}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`;
+    }
+    if(ctAdd){
       let ct=await zip.file('[Content_Types].xml').async('string');
       ct=ct.replace('</Types>',ctAdd+'</Types>');
       zip.file('[Content_Types].xml',ct);
-      const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      _saveBlob(blob,fileName);
-      return;
     }
-  }catch(e){ console.warn('차트 주입 실패, 차트 없이 저장', e); }
+    // 제품별_판매현황: A~I(9열)·1~3행 틀고정 → J4가 스크롤 시작점
+    {
+      const k=uniProdSheetIdx;
+      const paneXml='<pane xSplit="9" ySplit="3" topLeftCell="J4" activePane="bottomRight" state="frozen"/><selection pane="bottomRight" activeCell="J4" sqref="J4"/>';
+      let sx=await zip.file(`xl/worksheets/sheet${k}.xml`).async('string');
+      if(/<pane /.test(sx)){ /* 이미 있으면 손대지 않음 */ }
+      else if(/<sheetView([^>]*)\/>/.test(sx)) sx=sx.replace(/<sheetView([^>]*)\/>/, `<sheetView$1>${paneXml}</sheetView>`);
+      else if(/<sheetView[^>]*>/.test(sx)) sx=sx.replace(/(<sheetView[^>]*>)/, `$1${paneXml}`);
+      zip.file(`xl/worksheets/sheet${k}.xml`,sx);
+    }
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    _saveBlob(blob,fileName);
+    return;
+  }catch(e){ console.warn('엑셀 후처리(차트/틀고정) 실패, 기본 저장으로 대체', e); }
   _saveBlob(new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),fileName);
 }
 
