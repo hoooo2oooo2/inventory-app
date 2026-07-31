@@ -1452,6 +1452,57 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-rcv-ok{color:#15803D;font-weight:800;font-size:13px;}
 .lbx-rcv-empty{text-align:center;color:var(--tx2);padding:48px 0;font-size:13px;}
 /* (박스 현황 표 스타일은 .lst2-* 로 이전됨) */
+/* ═══ 택배박스 — 통합 레이아웃(목록+캘린더) ═══ */
+.lbx-table-scroll-top{max-height:40vh;flex:0 0 auto;margin-bottom:14px;}
+.lbx-price-link{cursor:pointer;border-bottom:1px dashed var(--tx2);}
+.lbx-price-link:hover{color:var(--pr);border-color:var(--pr);}
+.lbx-stock-savedcell{cursor:pointer;}
+.lbx-stock-savedcell:hover .lbx-saved-val{color:var(--pr);text-decoration:underline;}
+.lbx-hist-btn{border:none;background:none;cursor:pointer;font-size:12px;color:var(--tx2);margin-left:3px;}
+.lbx-hist-btn:hover{color:var(--pr);}
+.lbx-row.hidden-row{opacity:.45;}
+.lbx-hidebadge{display:inline-block;margin-left:5px;font-size:10px;font-weight:700;color:#fff;background:#9CA3AF;padding:1px 6px;border-radius:5px;vertical-align:middle;}
+.lbx-namecell .lbx-strong{cursor:pointer;}
+.lbx-namecell .lbx-strong:hover,.lbx-boxno:hover{color:var(--pr);}
+/* 주문 섹션: 캘린더 + 선택일 상세 */
+.lbx-order-section{flex:1;min-height:0;display:grid;grid-template-columns:320px 1fr;gap:14px;}
+.lbx-cal-card{border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:12px;display:flex;flex-direction:column;min-height:0;}
+.lbx-cal-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.lbx-cal-title{font-size:14px;font-weight:800;color:var(--tx);}
+.lbx-cal-nav{border:1px solid var(--bd);background:var(--bg2);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:14px;color:var(--tx);}
+.lbx-cal-nav:hover{background:var(--prl);color:var(--pr);}
+.lbx-cal-dow{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;color:var(--tx2);font-weight:700;margin-bottom:4px;}
+.lbx-cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.lbx-cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;font-size:12px;color:var(--tx);position:relative;gap:2px;}
+.lbx-cal-cell.empty{cursor:default;}
+.lbx-cal-cell:not(.empty):hover{background:var(--bg2);}
+.lbx-cal-cell.today .lbx-cal-daynum{color:var(--pr);font-weight:800;}
+.lbx-cal-cell.sel{background:var(--prl);outline:1.5px solid var(--pr);}
+.lbx-cal-dot{width:6px;height:6px;border-radius:50%;}
+.lbx-cal-dot.wait{background:#F59E0B;}
+.lbx-cal-dot.partial{background:#3B82F6;}
+.lbx-cal-dot.done{background:#22C55E;}
+.lbx-cal-legend{display:flex;gap:12px;justify-content:center;margin-top:10px;font-size:11px;color:var(--tx2);}
+.lbx-cal-legend .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;}
+.lbx-cal-legend .dot.wait{background:#F59E0B;}
+.lbx-cal-legend .dot.partial{background:#3B82F6;}
+.lbx-cal-legend .dot.done{background:#22C55E;}
+.lbx-day-card{border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:12px 14px;display:flex;flex-direction:column;min-height:0;overflow:auto;}
+.lbx-day-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14px;font-weight:800;color:var(--tx);margin-bottom:8px;}
+.lbx-day-pending{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.lbx-pending-chip{font-size:11px;font-weight:700;color:#B45309;background:#FEF3C7;border-radius:20px;padding:4px 11px;cursor:pointer;}
+.lbx-pending-chip:hover{background:#FDE68A;}
+/* 박스 상세 모달 */
+.lbx-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px;margin-top:8px;font-size:13px;}
+.lbx-detail-grid .k{color:var(--tx2);font-size:11px;font-weight:600;margin-bottom:2px;}
+.lbx-detail-grid .v{color:var(--tx);font-weight:700;}
+.lbx-detail-chart-lbl{font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:6px;}
+/* 이력 모달 리스트 */
+.lbx-hist-row{display:flex;align-items:center;justify-content:space-between;padding:9px 4px;border-bottom:1px solid var(--bd);font-size:13px;}
+.lbx-hist-row:last-child{border-bottom:none;}
+.lbx-hist-date{color:var(--tx2);font-size:12px;}
+.lbx-hist-val{font-weight:800;color:var(--tx);}
+.lbx-hist-prev{font-size:11px;color:var(--tx2);margin-left:6px;}
 </style>
 </head>
 <body>
@@ -2065,29 +2116,25 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- ═══ 물류팀 택배박스 ═══ -->
+<!-- ═══ 물류팀 택배박스 (통합 화면: 목록 + 캘린더 주문/입고) ═══ -->
 <div class="page" id="page-logibox">
   <div class="lbx-wrap">
     <div class="lbx-head">
-      <div class="lbx-subnav" id="lbxSubnav">
-        <div class="lbx-sni active" id="lbxsni-list" onclick="goLogiBoxTab('list')">📦 박스 목록</div>
-        <div class="lbx-sni" id="lbxsni-rcv" onclick="goLogiBoxTab('rcv')">🚚 주문·입고확인</div>
-      </div>
+      <div class="lbx-title">📮 택배박스 관리</div>
       <div class="lbx-tools" id="lbxListTools">
+        <button class="btn btn-sm" id="lbxHiddenBtn" onclick="lbxToggleShowHidden()">🙈 숨긴 박스 보기</button>
         <button class="btn btn-pr btn-sm" onclick="logiBoxOpenEdit(null)">＋ 박스 추가</button>
         <button class="btn btn-sm" style="background:#05C072;color:#fff;border-color:#05C072;" onclick="logiBoxOpenOrder()">🛒 주문하기</button>
       </div>
     </div>
-    <!-- 박스 목록 탭 -->
-    <div class="lbx-sub active" id="lbxsub-list">
-    <div class="lbx-table-scroll">
+    <div class="lbx-table-scroll lbx-table-scroll-top">
       <table class="lbx-table">
         <thead>
           <tr>
-            <th>명칭 / 업체</th><th>박스번호</th>
+            <th>명칭 / 업체<br><span class="lbx-unit">더블클릭 시 상세</span></th><th>박스번호</th>
             <th class="lbx-size-th">박스 사이즈<br><span class="lbx-unit">가로 × 세로 × 높이 mm</span></th>
-            <th>박스당<br>수량</th><th>박스당<br>금액</th><th>낱개<br>금액</th>
-            <th>저장된 현재고<br><span class="lbx-unit">(저장일)</span></th>
+            <th>박스당<br>수량</th><th>박스당<br>금액<br><span class="lbx-unit">클릭 시 변동이력</span></th><th>낱개<br>금액</th>
+            <th>저장된 현재고<br><span class="lbx-unit">클릭 시 기록이력</span></th>
             <th class="lbx-stock-th">현재고 입력<br><span class="lbx-stock-date" id="lbxStockDateLbl">—</span></th>
             <th>관리</th>
           </tr>
@@ -2095,18 +2142,27 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <tbody id="lbxTbody"></tbody>
       </table>
     </div>
-    </div>
-    <!-- 주문·입고확인 탭 -->
-    <div class="lbx-sub" id="lbxsub-rcv">
-      <div class="lbx-rcv-toolbar">
-        <div class="lbx-rcv-filter">
-          <button class="lbx-rcvf active" id="lbxrcvf-all" onclick="logiRcvSetFilter('all')">전체</button>
-          <button class="lbx-rcvf" id="lbxrcvf-wait" onclick="logiRcvSetFilter('wait')">⏳ 입고 대기</button>
-          <button class="lbx-rcvf" id="lbxrcvf-done" onclick="logiRcvSetFilter('done')">✅ 입고 완료</button>
+    <div class="lbx-order-section">
+      <div class="lbx-cal-card">
+        <div class="lbx-cal-head">
+          <button class="lbx-cal-nav" onclick="lbxCalMove(-1)">‹</button>
+          <span class="lbx-cal-title" id="lbxCalTitle">-</span>
+          <button class="lbx-cal-nav" onclick="lbxCalMove(1)">›</button>
+          <button class="btn btn-sm" style="margin-left:auto;" onclick="lbxCalGoToday()">오늘</button>
         </div>
-        <span class="lbx-rcv-hint">주문한 박스 수량을 확인하고 입고를 체크하세요 (수량 확인용)</span>
+        <div class="lbx-cal-dow"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+        <div class="lbx-cal-days" id="lbxCalGrid"></div>
+        <div class="lbx-cal-legend">
+          <span><i class="dot wait"></i>입고 대기</span>
+          <span><i class="dot partial"></i>일부 입고</span>
+          <span><i class="dot done"></i>입고 완료</span>
+        </div>
       </div>
-      <div class="lbx-rcv-list" id="lbxRcvList"></div>
+      <div class="lbx-day-card">
+        <div class="lbx-day-head" id="lbxDaySelTitle"></div>
+        <div class="lbx-day-pending" id="lbxPendingQuick"></div>
+        <div class="lbx-rcv-list" id="lbxDayOrders"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -2130,6 +2186,37 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <button class="btn" onclick="closeModal('lbxEditModal')">취소</button>
       <button class="btn btn-pr" onclick="logiBoxSave()">저장</button>
     </div>
+  </div>
+</div>
+
+<!-- 박스 상세 모달 (명칭/박스번호 더블클릭) -->
+<div class="modal-overlay" id="lbxDetailModal">
+  <div class="modal" style="max-width:560px;">
+    <h3 id="lbxDetailTitle">박스 상세</h3>
+    <div class="lbx-detail-grid" id="lbxDetailGrid"></div>
+    <div style="margin-top:16px;">
+      <div class="lbx-detail-chart-lbl">📊 월별 주문 수량 <span style="font-weight:500;">(많이 쓰이는 박스인지 확인)</span></div>
+      <div style="height:180px;position:relative;"><canvas id="lbxDetailChart"></canvas></div>
+    </div>
+    <div class="ma"><button class="btn" onclick="closeModal('lbxDetailModal')">닫기</button></div>
+  </div>
+</div>
+
+<!-- 박스당 금액 변동 이력 모달 -->
+<div class="modal-overlay" id="lbxPriceHistModal">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="lbxPriceHistTitle">박스당 금액 변동 이력</h3>
+    <div id="lbxPriceHistBody" style="margin-top:6px;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('lbxPriceHistModal')">닫기</button></div>
+  </div>
+</div>
+
+<!-- 현재고 기록 이력 모달 -->
+<div class="modal-overlay" id="lbxStockHistModal">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="lbxStockHistTitle">현재고 기록 이력</h3>
+    <div id="lbxStockHistBody" style="margin-top:6px;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('lbxStockHistModal')">닫기</button></div>
   </div>
 </div>
 
@@ -6954,9 +7041,9 @@ const LBX_SEED = [
 ];
 function _lbxSeedBoxes(){ return LBX_SEED.map((r,i)=>({ id:i+1, company:r[0], name:r[1], boxNo:r[2], w:r[3], d:r[4], h:r[5], qtyPerBox:r[6], pricePerBox:r[7], stock:{}, safetyStock:0, priceUpdatedAt:null })); }
 
+let _lbxShowHidden=false, _lbxJumpToDate=null;
 async function loadLogiBox(){
   if(!_logiBoxDate) _logiBoxDate = _lbxToday();
-  const dateEl=document.getElementById('lbxDate'); if(dateEl && !dateEl.value) dateEl.value=_logiBoxDate;
   if(_logiBoxes===null){
     _logiBoxes = (await cloudKvLoad('logi_boxes')) || [];
     // 비어있고 아직 시드한 적 없으면 엑셀 박스 목록으로 초기 기입(1회)
@@ -6970,14 +7057,31 @@ async function loadLogiBox(){
     }
     _logiBoxNextId = _logiBoxes.length ? Math.max(..._logiBoxes.map(b=>b.id||0))+1 : 1;
   }
-  goLogiBoxTab(_logiBoxTab||'list');
+  _logiOrders = (await cloudKvLoad('logi_box_orders')) || [];
+  if(_lbxJumpToDate){
+    const [y,m]=_lbxJumpToDate.split('-').map(Number);
+    _lbxCalYear=y; _lbxCalMonth=m-1; _lbxCalSelDate=_lbxJumpToDate;
+    _lbxJumpToDate=null;
+  }
+  logiBoxRender();
+  lbxCalRender();
 }
-function logiBoxDateChange(v){ _logiBoxDate = v || _lbxToday(); logiBoxRender(); }
+function lbxToggleShowHidden(){ _lbxShowHidden=!_lbxShowHidden; logiBoxRender(); }
+async function logiBoxToggleHidden(id){
+  const b=(_logiBoxes||[]).find(x=>x.id===id); if(!b) return;
+  b.hidden=!b.hidden;
+  await cloudKvSave('logi_boxes', _logiBoxes);
+  logiBoxRender();
+}
 function logiBoxRender(){
   const lbl=document.getElementById('lbxStockDateLbl'); if(lbl) lbl.textContent=_lbxToday();
   const tb=document.getElementById('lbxTbody'); if(!tb) return;
-  const list=_logiBoxes||[];
-  if(!list.length){ tb.innerHTML=`<tr><td colspan="9" class="lbx-empty">등록된 택배박스가 없습니다. ‘＋ 박스 추가’로 등록하세요.</td></tr>`; return; }
+  const all=_logiBoxes||[];
+  const list = _lbxShowHidden ? all : all.filter(b=>!b.hidden);
+  const hiddenCount = all.filter(b=>b.hidden).length;
+  const hbtn=document.getElementById('lbxHiddenBtn');
+  if(hbtn) hbtn.textContent = _lbxShowHidden ? `👁️ 숨긴 박스 숨기기 (${hiddenCount})` : `🙈 숨긴 박스 보기${hiddenCount?` (${hiddenCount})`:''}`;
+  if(!list.length){ tb.innerHTML=`<tr><td colspan="9" class="lbx-empty">${_lbxShowHidden?'숨긴 박스가 없습니다.':'등록된 택배박스가 없습니다. ‘＋ 박스 추가’로 등록하세요.'}</td></tr>`; return; }
   const cheap=_lbxCheapestMap();
   const curMonth=_lbxMonth();
   tb.innerHTML=list.map(b=>{
@@ -6991,17 +7095,18 @@ function logiBoxRender(){
     // 저장된(최근) 현재고
     const ls=_lbxLatestStock(b);
     const savedCell = ls ? `<span class="lbx-saved-val">${_lbxComma(ls.qty)}</span><div class="lbx-saved-date">${ls.date.slice(5)}</div>` : '<span class="lbx-saved-date">-</span>';
-    return `<tr>
-      <td class="lbx-namecell"><span class="lbx-strong">${_logiEsc(b.name)}</span><div class="lbx-sub">${_logiEsc(b.company||'-')}</div></td>
-      <td><span class="lbx-boxno">${_logiEsc(b.boxNo)}</span></td>
+    return `<tr class="lbx-row${b.hidden?' hidden-row':''}">
+      <td class="lbx-namecell"><span class="lbx-strong" ondblclick="lbxBoxDetail(${b.id})" title="더블클릭: 상세보기">${_logiEsc(b.name)}</span>${b.hidden?'<span class="lbx-hidebadge">숨김</span>':''}<div class="lbx-sub">${_logiEsc(b.company||'-')}</div></td>
+      <td><span class="lbx-boxno" ondblclick="lbxBoxDetail(${b.id})" title="더블클릭: 상세보기">${_logiEsc(b.boxNo)}</span></td>
       <td class="lbx-size-cell"><span class="lbx-size">${_lbxComma(b.w)} × ${_lbxComma(b.d)} × ${_lbxComma(b.h)}</span></td>
       <td class="lbx-num">${_lbxComma(b.qtyPerBox)}</td>
-      <td class="lbx-num">${_lbxComma(b.pricePerBox)}${priceWarn}</td>
+      <td class="lbx-num"><span class="lbx-price-link" onclick="lbxPriceHistory(${b.id})" title="클릭: 변동이력 보기">${_lbxComma(b.pricePerBox)}</span>${priceWarn}</td>
       <td class="lbx-num">${_lbxComma(Math.round(unit))}${cheapTag}</td>
-      <td>${savedCell}</td>
+      <td class="lbx-stock-savedcell" onclick="lbxStockHistory(${b.id})" title="클릭: 기록 이력 보기">${savedCell}</td>
       <td class="lbx-stock-cell"><input class="lbx-stock-inp" type="number" value="${stock}" placeholder="-" onchange="logiBoxSetStock(${b.id}, this.value)"></td>
       <td>
         <button class="lbx-row-btn edit" title="수정" onclick="logiBoxOpenEdit(${b.id})">✏️</button>
+        <button class="lbx-row-btn" title="${b.hidden?'목록에 표시':'목록에서 숨김'}" onclick="logiBoxToggleHidden(${b.id})">${b.hidden?'👁️':'🙈'}</button>
         <button class="lbx-row-btn del" title="삭제" onclick="logiBoxDelete(${b.id})">🗑️</button>
       </td>
     </tr>`;
@@ -7072,8 +7177,19 @@ async function logiBoxSave(){
   };  // 낱개금액은 박스당금액÷수량으로 자동계산(저장 안 함)
   data.priceUpdatedAt=_lbxMonth();   // 수정 버튼 저장 시 이번 달 단가 확인 완료로 기록
   _logiBoxes=_logiBoxes||[];
-  if(editId){ const b=_logiBoxes.find(x=>x.id===Number(editId)); if(b) Object.assign(b,data); }
-  else{ data.id=_logiBoxNextId++; data.stock={}; data.safetyStock=0; _logiBoxes.push(data); }
+  if(editId){
+    const b=_logiBoxes.find(x=>x.id===Number(editId));
+    if(b){
+      const oldPrice=_lbxNum(b.pricePerBox);
+      Object.assign(b,data);
+      if(_lbxNum(data.pricePerBox)!==oldPrice){
+        b.priceLog=Array.isArray(b.priceLog)?b.priceLog:[];
+        b.priceLog.push({ date:_lbxToday(), price:_lbxNum(data.pricePerBox), prevPrice:oldPrice });
+        if(b.priceLog.length>50) b.priceLog=b.priceLog.slice(-50);
+      }
+    }
+  }
+  else{ data.id=_logiBoxNextId++; data.stock={}; data.safetyStock=0; data.priceLog=[{ date:_lbxToday(), price:_lbxNum(data.pricePerBox), prevPrice:null }]; _logiBoxes.push(data); }
   await cloudKvSave('logi_boxes', _logiBoxes);
   closeModal('lbxEditModal');
   logiBoxRender();
@@ -7087,10 +7203,10 @@ async function logiBoxDelete(id){
   logiBoxRender();
 }
 // ── 주문 (박스 선택 + 박스 수량, 최대 5박스) ──
-function logiBoxOpenOrder(){
-  const list=_logiBoxes||[];
-  if(!list.length){ toast('먼저 택배박스를 등록하세요.'); return; }
-  const dateEl=document.getElementById('lbxOrderDate'); if(dateEl) dateEl.value=_logiBoxDate||_lbxToday();
+function logiBoxOpenOrder(presetDate){
+  const list=(_logiBoxes||[]).filter(b=>!b.hidden);
+  if(!list.length){ toast('먼저 택배박스를 등록하세요. (숨긴 박스는 주문 목록에서 제외됩니다)'); return; }
+  const dateEl=document.getElementById('lbxOrderDate'); if(dateEl) dateEl.value=presetDate||_lbxCalSelDate||_logiBoxDate||_lbxToday();
   document.getElementById('lbxOrderList').innerHTML=list.map(b=>{
     const ls=_lbxLatestStock(b);
     const st=_lbxStockStatus(b);
@@ -7138,97 +7254,262 @@ async function logiBoxConfirmOrder(){
   if(!rows.length){ toast('주문할 박스와 박스 수량을 입력하세요.'); return; }
   const total=rows.reduce((s,r)=>s+r.amount,0);
   const u=window.__CURRENT_USER;
-  const orderDate=(document.getElementById('lbxOrderDate')||{}).value || _logiBoxDate || _lbxToday();
+  const orderDate=(document.getElementById('lbxOrderDate')||{}).value || _lbxCalSelDate || _logiBoxDate || _lbxToday();
   const order={ id:Date.now(), date:orderDate, by:u?(u.name||u.username):'', items:rows, total, ts:Date.now() };
-  try{ const prev=(await cloudKvLoad('logi_box_orders'))||[]; prev.unshift(order); await cloudKvSave('logi_box_orders', prev); }
+  try{
+    await _lbxReloadOrders();
+    _logiOrders.unshift(order);
+    await cloudKvSave('logi_box_orders', _logiOrders);
+  }
   catch(e){ console.warn('주문 저장 실패', e); }
   closeModal('lbxOrderModal');
-  const lines=rows.map(r=>`· ${r.name||r.company} ${r.boxCount}박스 (${_lbxComma(r.amount)}원)`).join('\n');
   toast(`주문이 등록되었습니다. 합계 ${_lbxComma(total)}원`);
-  alert(`🛒 주문 내역\n\n${lines}\n\n합계: ${_lbxComma(total)}원`);
+  lbxCalGoTo(orderDate);
 }
 
-// ── 소분류 탭 (박스 목록 / 주문·입고확인) ──
-let _logiBoxTab='list';
-function goLogiBoxTab(t){
-  _logiBoxTab=t;
-  ['list','rcv'].forEach(x=>{
-    document.getElementById('lbxsni-'+x)?.classList.toggle('active',x===t);
-    document.getElementById('lbxsub-'+x)?.classList.toggle('active',x===t);
-  });
-  const tools=document.getElementById('lbxListTools'); if(tools) tools.style.visibility = t==='list'?'visible':'hidden';
-  if(t==='rcv') loadLogiRcv(); else logiBoxRender();
-}
-// ── 주문·입고확인: 주문한 박스 수량 리스트 + 입고 체크(수량 확인용) ──
-let _logiRcvFilter='all';
-async function loadLogiRcv(){
-  _logiOrders = (await cloudKvLoad('logi_box_orders')) || [];
-  logiRcvRender();
-}
-function logiRcvSetFilter(f){
-  _logiRcvFilter=f;
-  ['all','wait','done'].forEach(x=>document.getElementById('lbxrcvf-'+x)?.classList.toggle('active',x===f));
-  logiRcvRender();
-}
+// ── 캘린더: 주문일자 표시 + 선택일 상세(입고체크·수정·삭제) ──
+let _lbxCalYear=null, _lbxCalMonth=null, _lbxCalSelDate=null;
 function _rcvDone(it){ return it && it.received===true; }
-function logiRcvRender(){
-  const wrap=document.getElementById('lbxRcvList'); if(!wrap) return;
-  const orders=_logiOrders||[];
-  if(!orders.length){ wrap.innerHTML=`<div class="lbx-rcv-empty">주문 내역이 없습니다. (택배박스 → 🛒 주문하기에서 주문하면 여기에 표시됩니다)</div>`; return; }
+async function _lbxReloadOrders(){ _logiOrders=(await cloudKvLoad('logi_box_orders'))||[]; return _logiOrders; }
+function _lbxFindOrderItem(orderId, boxId){
+  const o=(_logiOrders||[]).find(x=>x.id===orderId); if(!o) return null;
+  const it=(o.items||[]).find(x=>x.id===boxId); if(!it) return null;
+  return { o, it };
+}
+function _lbxOrdersByDate(){
+  const map={};
+  (_logiOrders||[]).forEach(o=>{ (map[o.date]=map[o.date]||[]).push(o); });
+  return map;
+}
+function _lbxPendingList(){
+  return [...new Set((_logiOrders||[]).filter(o=>(o.items||[]).some(it=>it.received!==true)).map(o=>o.date))].filter(Boolean).sort();
+}
+function lbxCalInit(){
+  const now=new Date();
+  if(_lbxCalYear==null){ _lbxCalYear=now.getFullYear(); _lbxCalMonth=now.getMonth(); }
+  if(_lbxCalSelDate==null) _lbxCalSelDate=_lbxToday();
+}
+function lbxCalMove(delta){
+  lbxCalInit();
+  _lbxCalMonth+=delta;
+  if(_lbxCalMonth<0){ _lbxCalMonth=11; _lbxCalYear--; }
+  if(_lbxCalMonth>11){ _lbxCalMonth=0; _lbxCalYear++; }
+  lbxCalRender();
+}
+function lbxCalGoToday(){
+  const now=new Date();
+  _lbxCalYear=now.getFullYear(); _lbxCalMonth=now.getMonth(); _lbxCalSelDate=_lbxToday();
+  lbxCalRender();
+}
+function lbxCalGoTo(dateStr){
+  if(!dateStr) return;
+  const [y,m]=dateStr.split('-').map(Number);
+  _lbxCalYear=y; _lbxCalMonth=m-1; _lbxCalSelDate=dateStr;
+  lbxCalRender();
+}
+function lbxCalSelectDate(dateStr){ _lbxCalSelDate=dateStr; lbxCalRender(); }
+function lbxCalRender(){
+  lbxCalInit();
+  const grid=document.getElementById('lbxCalGrid'); if(!grid) return;
+  const y=_lbxCalYear, m=_lbxCalMonth;
+  const titleEl=document.getElementById('lbxCalTitle'); if(titleEl) titleEl.textContent=`${y}년 ${m+1}월`;
+  const startWd=new Date(y,m,1).getDay();
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const ordMap=_lbxOrdersByDate();
+  const todayStr=_lbxToday();
   let html='';
-  orders.forEach((o,oi)=>{
+  for(let i=0;i<startWd;i++) html+='<div class="lbx-cal-cell empty"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr=`${y}-${pad(m+1)}-${pad(d)}`;
+    const orders=ordMap[dateStr]||[];
+    let statusCls='';
+    if(orders.length){
+      const allDone=orders.every(o=>(o.items||[]).every(_rcvDone));
+      const anyDone=orders.some(o=>(o.items||[]).some(_rcvDone));
+      statusCls = allDone?'done':(anyDone?'partial':'wait');
+    }
+    const cls=['lbx-cal-cell'];
+    if(dateStr===_lbxCalSelDate) cls.push('sel');
+    if(dateStr===todayStr) cls.push('today');
+    html+=`<div class="${cls.join(' ')}" onclick="lbxCalSelectDate('${dateStr}')">
+      <span class="lbx-cal-daynum">${d}</span>
+      ${orders.length?`<span class="lbx-cal-dot ${statusCls}"></span>`:''}
+    </div>`;
+  }
+  grid.innerHTML=html;
+  lbxCalRenderDay();
+}
+function lbxCalRenderDay(){
+  const titleEl=document.getElementById('lbxDaySelTitle');
+  const wrap=document.getElementById('lbxDayOrders');
+  const pendWrap=document.getElementById('lbxPendingQuick');
+  if(!wrap||!titleEl) return;
+  const dateStr=_lbxCalSelDate||_lbxToday();
+  titleEl.innerHTML=`📅 <b>${dateStr}</b> 주문 내역 <button class="btn btn-pr btn-sm" onclick="logiBoxOpenOrder('${dateStr}')">＋ 이 날짜 주문 추가</button>`;
+  if(pendWrap){
+    const pend=_lbxPendingList();
+    pendWrap.innerHTML = pend.length
+      ? `<span style="font-size:11px;color:var(--tx2);margin-right:2px;align-self:center;">⏳ 입고 대기 주문일:</span>`+pend.map(d=>`<span class="lbx-pending-chip" onclick="lbxCalGoTo('${d}')">${d}${d===dateStr?' ✓':''}</span>`).join('')
+      : '';
+  }
+  const orders=(_logiOrders||[]).filter(o=>o.date===dateStr);
+  if(!orders.length){ wrap.innerHTML=`<div class="lbx-rcv-empty">이 날짜의 주문이 없습니다.</div>`; return; }
+  wrap.innerHTML = orders.map(o=>{
     const items=o.items||[];
     const done=items.length>0 && items.every(_rcvDone);
     const any=items.some(_rcvDone);
-    if(_logiRcvFilter==='wait' && done) return;
-    if(_logiRcvFilter==='done' && !done) return;
     const badge = done ? '<span class="lbx-rcv-badge done">✅ 입고 완료</span>'
                 : any  ? '<span class="lbx-rcv-badge partial">🔵 일부 입고</span>'
                 :        '<span class="lbx-rcv-badge wait">⏳ 입고 대기</span>';
-    const rows=items.map((it,ii)=>{
+    const rows=items.map(it=>{
       const rcv=_rcvDone(it);
       const rq = it.receivedQty!=null?it.receivedQty:it.boxCount;
       const units = it.totalUnits!=null?it.totalUnits:'';
       const action = rcv
         ? `<span class="lbx-rcv-ok">✓ ${_lbxComma(rq)} 박스${it.receivedAt?`<br><small>${it.receivedAt} 입고</small>`:''}</span>`
-        : `<input class="lbx-rcv-qty" id="rcvq-${oi}-${ii}" type="number" min="0" value="${_lbxNum(it.boxCount)}">`;
+        : `<input class="lbx-rcv-qty" id="rcvq-${o.id}-${it.id}" type="number" min="0" value="${_lbxNum(it.boxCount)}">`;
       const btn = rcv
-        ? `<button class="btn btn-sm" onclick="logiRcvUndo(${oi},${ii})">입고취소</button>`
-        : `<button class="btn btn-pr btn-sm" onclick="logiRcvConfirm(${oi},${ii})">입고확인</button>`;
+        ? `<button class="btn btn-sm" onclick="logiRcvUndo(${o.id},${it.id})">입고취소</button>`
+        : `<button class="btn btn-pr btn-sm" onclick="logiRcvConfirm(${o.id},${it.id})">입고확인</button>`;
+      const editBtn = rcv ? '' : `<button class="lbx-row-btn edit" title="수량 수정" onclick="logiOrderEditItemQty(${o.id},${it.id})">✏️</button>`;
       return `<tr class="${rcv?'rcv-done':''}">
         <td class="l">${_logiEsc(it.name||it.company||'-')}${_lbxItemTag(it)}${(it.company&&it.name)?`<br><small>${_logiEsc(it.company)}</small>`:''}</td>
         <td>${_lbxComma(it.boxCount)} 박스${units!==''?`<br><small>${_lbxComma(units)}개</small>`:''}</td>
+        <td>${_lbxComma(it.amount)}원</td>
         <td>${action}</td>
         <td>${btn}</td>
+        <td>${editBtn}<button class="lbx-row-btn del" title="삭제" onclick="logiOrderDeleteItem(${o.id},${it.id})">🗑️</button></td>
       </tr>`;
     }).join('');
-    html+=`<div class="lbx-rcv-card">
+    return `<div class="lbx-rcv-card">
       <div class="lbx-rcv-chead">
-        <span class="lbx-rcv-date">📅 ${o.date||'-'}</span>
         ${o.by?`<span class="lbx-rcv-by">담당: ${_logiEsc(o.by)}</span>`:''}
         ${badge}
+        <button class="btn btn-sm" style="margin-left:auto;" onclick="logiOrderDeleteOrder(${o.id})">주문 전체 삭제</button>
       </div>
       <table class="lbx-rcv-tbl">
-        <thead><tr><th style="text-align:left;">명칭</th><th>주문 수량</th><th>입고 수량</th><th>확인</th></tr></thead>
+        <thead><tr><th style="text-align:left;">명칭</th><th>수량</th><th>금액</th><th>입고</th><th>확인</th><th>관리</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
-  });
-  wrap.innerHTML = html || `<div class="lbx-rcv-empty">해당 상태의 주문이 없습니다.</div>`;
+  }).join('');
 }
-async function logiRcvConfirm(oi,ii){
-  const o=(_logiOrders||[])[oi]; if(!o) return; const it=(o.items||[])[ii]; if(!it) return;
-  const el=document.getElementById(`rcvq-${oi}-${ii}`);
+async function logiOrderEditItemQty(orderId, boxId){
+  await _lbxReloadOrders();
+  const found=_lbxFindOrderItem(orderId, boxId); if(!found) return;
+  const { o, it } = found;
+  if(_rcvDone(it)){ toast('입고 완료된 항목은 먼저 입고취소 후 수정하세요.'); return; }
+  const v=prompt(`박스 수량 수정 (현재 ${it.boxCount}박스)`, it.boxCount);
+  if(v==null) return;
+  const q=_lbxNum(v);
+  if(q<=0){ toast('1 이상의 수량을 입력하세요.'); return; }
+  const b=(_logiBoxes||[]).find(x=>x.id===boxId);
+  const qtyPerBox = b ? _lbxNum(b.qtyPerBox) : (it.boxCount>0 ? _lbxNum(it.totalUnits)/it.boxCount : 0);
+  it.boxCount=q; it.amount=q*_lbxNum(it.pricePerBox); it.totalUnits=q*qtyPerBox;
+  o.total=(o.items||[]).reduce((s,x)=>s+_lbxNum(x.amount),0);
+  await cloudKvSave('logi_box_orders', _logiOrders);
+  toast('수정되었습니다.');
+  lbxCalRender();
+}
+async function logiOrderDeleteItem(orderId, boxId){
+  if(!confirm('이 항목을 삭제할까요?')) return;
+  await _lbxReloadOrders();
+  const o=(_logiOrders||[]).find(x=>x.id===orderId); if(!o) return;
+  o.items=(o.items||[]).filter(x=>x.id!==boxId);
+  if(!o.items.length) _logiOrders=_logiOrders.filter(x=>x.id!==orderId);
+  else o.total=o.items.reduce((s,x)=>s+_lbxNum(x.amount),0);
+  await cloudKvSave('logi_box_orders', _logiOrders);
+  toast('삭제되었습니다.');
+  lbxCalRender();
+}
+async function logiOrderDeleteOrder(orderId){
+  if(!confirm('이 주문 전체를 삭제할까요?')) return;
+  await _lbxReloadOrders();
+  _logiOrders=_logiOrders.filter(x=>x.id!==orderId);
+  await cloudKvSave('logi_box_orders', _logiOrders);
+  toast('삭제되었습니다.');
+  lbxCalRender();
+}
+async function logiRcvConfirm(orderId, boxId){
+  await _lbxReloadOrders();
+  const found=_lbxFindOrderItem(orderId, boxId); if(!found) return;
+  const { it } = found;
+  const el=document.getElementById(`rcvq-${orderId}-${boxId}`);
   it.received=true; it.receivedQty=el?_lbxNum(el.value):_lbxNum(it.boxCount); it.receivedAt=_lbxToday();
   await cloudKvSave('logi_box_orders', _logiOrders);
   toast('입고 확인되었습니다.');
-  logiRcvRender();
+  lbxCalRender();
 }
-async function logiRcvUndo(oi,ii){
-  const o=(_logiOrders||[])[oi]; const it=o&&(o.items||[])[ii]; if(!it) return;
+async function logiRcvUndo(orderId, boxId){
+  await _lbxReloadOrders();
+  const found=_lbxFindOrderItem(orderId, boxId); if(!found) return;
+  const { it } = found;
   it.received=false; delete it.receivedQty; delete it.receivedAt;
   await cloudKvSave('logi_box_orders', _logiOrders);
-  logiRcvRender();
+  lbxCalRender();
+}
+
+// ── 박스 상세 팝업(명칭·박스번호 더블클릭) ──
+let _lbxDetailChartInst=null;
+function lbxBoxDetail(id){
+  const b=(_logiBoxes||[]).find(x=>x.id===id); if(!b) return;
+  document.getElementById('lbxDetailTitle').textContent = `📦 ${b.name||b.company||'박스 상세'}`;
+  let recent=null;
+  (_logiOrders||[]).forEach(o=>{ (o.items||[]).forEach(it=>{ if(it.id===id && (!recent||o.date>recent.date)) recent={date:o.date, boxCount:it.boxCount}; }); });
+  const ls=_lbxLatestStock(b);
+  const grid=document.getElementById('lbxDetailGrid');
+  const row=(k,v)=>`<div><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  grid.innerHTML =
+    row('박스번호', _logiEsc(b.boxNo)||'-') +
+    row('업체명', _logiEsc(b.company)||'-') +
+    row('사이즈', _lbxSizeStr(b)||'-') +
+    row('박스당 수량', `${_lbxComma(b.qtyPerBox)}개`) +
+    row('박스당 금액', `${_lbxComma(b.pricePerBox)}원`) +
+    row('낱개 금액', `${_lbxComma(Math.round(_lbxUnit(b)))}원`) +
+    row('최근 주문일 / 수량', recent ? `${recent.date} · ${_lbxComma(recent.boxCount)}박스` : '주문 이력 없음') +
+    row('현재고', ls ? `${_lbxComma(ls.qty)}박스 (${ls.date})` : '기록 없음') +
+    (b.hidden?row('상태','<span style="color:#9CA3AF;">🙈 숨김 처리됨</span>'):'');
+  openModal('lbxDetailModal');
+  setTimeout(()=>_lbxRenderDetailChart(b), 30);
+}
+function _lbxRenderDetailChart(b){
+  const c=document.getElementById('lbxDetailChart'); if(!c) return;
+  if(_lbxDetailChartInst){ _lbxDetailChartInst.destroy(); _lbxDetailChartInst=null; }
+  const byMonth={};
+  (_logiOrders||[]).forEach(o=>{ const m=(o.date||'').slice(0,7); if(!m) return; (o.items||[]).forEach(it=>{ if(it.id===b.id) byMonth[m]=(byMonth[m]||0)+_lbxNum(it.boxCount); }); });
+  const months=Object.keys(byMonth).sort();
+  const ctx=c.getContext('2d');
+  if(!months.length){
+    ctx.clearRect(0,0,c.width,c.height);
+    ctx.save(); ctx.fillStyle='#999'; ctx.font='13px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('주문 이력이 없어 그래프를 표시할 수 없습니다.', (c.width||300)/2, (c.height||180)/2); ctx.restore();
+    return;
+  }
+  const dark=matchMedia('(prefers-color-scheme:dark)').matches;
+  const gc=dark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)', tc=dark?'#888':'#aaa';
+  _lbxDetailChartInst=new Chart(c,{type:'bar',data:{labels:months,datasets:[{label:'주문 박스 수',data:months.map(m=>byMonth[m]),backgroundColor:'#3B82F6',borderRadius:5,maxBarThickness:34}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx2=>`  ${ctx2.parsed.y.toLocaleString()}박스`}}},scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},precision:0},beginAtZero:true}}}});
+}
+// ── 박스당 금액 변동 이력 팝업 ──
+function lbxPriceHistory(id){
+  const b=(_logiBoxes||[]).find(x=>x.id===id); if(!b) return;
+  document.getElementById('lbxPriceHistTitle').textContent = `💰 ${b.name||b.company||'박스'} — 박스당 금액 변동 이력`;
+  const body=document.getElementById('lbxPriceHistBody');
+  const log=Array.isArray(b.priceLog)?[...b.priceLog].reverse():[];
+  const rows=log.map(e=>`<div class="lbx-hist-row"><span class="lbx-hist-date">${e.date}</span><span><span class="lbx-hist-val">${_lbxComma(e.price)}원</span>${e.prevPrice!=null?`<span class="lbx-hist-prev">(이전 ${_lbxComma(e.prevPrice)}원)</span>`:''}</span></div>`).join('');
+  body.innerHTML = `<div class="lbx-hist-row"><span class="lbx-hist-date">현재</span><span class="lbx-hist-val" style="color:var(--pr);">${_lbxComma(b.pricePerBox)}원</span></div>` +
+    (rows || `<div class="lbx-rcv-empty" style="padding:20px 0;">변경 이력이 없습니다.<br><span style="font-size:11px;">앞으로 단가를 수정하면 여기에 자동으로 기록됩니다.</span></div>`);
+  openModal('lbxPriceHistModal');
+}
+// ── 현재고 기록 이력 팝업 ──
+function lbxStockHistory(id){
+  const b=(_logiBoxes||[]).find(x=>x.id===id); if(!b) return;
+  document.getElementById('lbxStockHistTitle').textContent = `📦 ${b.name||b.company||'박스'} — 현재고 기록 이력`;
+  const body=document.getElementById('lbxStockHistBody');
+  const log=_lbxLog(b).slice().sort((a,c)=>c.date.localeCompare(a.date));
+  body.innerHTML = log.length
+    ? log.map(e=>`<div class="lbx-hist-row"><span class="lbx-hist-date">${e.date}</span><span class="lbx-hist-val">${_lbxComma(e.qty)}박스</span></div>`).join('')
+    : `<div class="lbx-rcv-empty" style="padding:20px 0;">기록된 현재고가 없습니다.</div>`;
+  openModal('lbxStockHistModal');
 }
 
 // ══════════════════════════════════════════════
@@ -7288,7 +7569,12 @@ function openProgressOrders(){
   }
   openModal('lstProgressModal');
 }
-function gotoReceiving(){ closeModal('lstProgressModal'); goMenu('logibox'); goLogiBoxTab('rcv'); }
+function gotoReceiving(){
+  closeModal('lstProgressModal');
+  const pend=_lbxPendingList();
+  _lbxJumpToDate = pend.length ? pend[0] : _lbxToday();
+  goMenu('logibox');
+}
 function logiStatusRender(){
   const table=document.getElementById('lstTable'); if(!table) return;
   const orders=_logiOrders||[];
