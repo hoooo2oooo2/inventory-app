@@ -15135,15 +15135,16 @@ async function downloadDailyExcel(){
   };
   // %는 전주 수량이 적을 때(예: 1개→52개=+5200%) 왜곡되기 쉬워 혼란을 주므로, 항상 %가 아닌
   // 실제 증감 개수로 표기한다. '신규'는 주별 비교가 아니라 위 신규 트리거일 판정을 그대로 쓴다.
+  // kind: 'new'(신규-기존 색상 유지) / 'up'(증가-빨강) / 'down'(감소·판매중단-파랑) / 'flat' / 'none'
   const weekTrend=name=>{
     const cur=weekSum(name,0,6), prev=weekSum(name,7,13);
-    if(cur===0&&prev===0) return {text:'', dir:0};
-    if(isTriggerDay(name,refDate)) return {text:'🆕신규', dir:1};
-    if(cur===0) return {text:'▼판매중단', dir:-1};
+    if(cur===0&&prev===0) return {text:'', dir:0, kind:'none'};
+    if(isTriggerDay(name,refDate)) return {text:'🆕신규', dir:1, kind:'new'};
+    if(cur===0) return {text:'▼판매중단', dir:-1, kind:'down'};
     const diff=cur-prev;
     const dir=diff>0?1:diff<0?-1:0;
-    if(dir===0) return {text:'-', dir:0};
-    return {text:`${dir>0?'▲+':'▼'}${diff}개`, dir};
+    if(dir===0) return {text:'-', dir:0, kind:'flat'};
+    return {text:`${dir>0?'▲+':'▼'}${diff}개`, dir, kind:dir>0?'up':'down'};
   };
 
   const FIXED_COLS=9;                       // A~I(전주대비까지) — 틀고정 대상
@@ -15169,7 +15170,9 @@ async function downloadDailyExcel(){
   // 헤더 행(2행, 0-based index 1)에 필터 드롭다운 적용 — 합계 행은 필터 대상에서 제외
   const totR=2+prodList.length;
   ws2['!autofilter']={ref:U.encode_range({s:{r:1,c:0},e:{r:totR-1,c:totalCols-1}})};
-  const UP={font:{bold:true,color:{rgb:'059669'}}}, DOWN={font:{bold:true,color:{rgb:'DC2626'}}};
+  const NEWSTYLE={font:{bold:true,color:{rgb:'059669'}}};   // 🆕신규 — 기존 색상 그대로 유지
+  const UP={font:{bold:true,color:{rgb:'DC2626'}}};          // 증가(▲+N개) — 빨강
+  const DOWN={font:{bold:true,color:{rgb:'2563EB'}}};        // 감소·판매중단(▼) — 파랑
   const NEWBG={fill:{patternType:'solid',fgColor:{rgb:'DCFCE7'}}};
   // 일별 출고수량 셀 배경색(0개=색없음, 1~20=연초록(피톤치드 톤, 채도 낮춤), 21~40=연주황, 41~60=연파랑, 61+=연보라) + 0개 초과는 굵게
   const qtyCellStyle=q=>{
@@ -15183,8 +15186,10 @@ async function downloadDailyExcel(){
     fmt(ws2,r,4,WON); fmt(ws2,r,5,MARGIN_FMT); fmt(ws2,r,6,PCT);
     const rate=v.settle>0?v.margin/v.settle:0;
     if(rate<0.05){ sc(ws2,r,5,RED5); sc(ws2,r,6,RED5); fmt(ws2,r,5,WON); fmt(ws2,r,6,PCT); }
-    const dir=weekTrend(name).dir;
-    if(dir>0) sc(ws2,r,8,UP); else if(dir<0) sc(ws2,r,8,DOWN);
+    const kind=weekTrend(name).kind;
+    if(kind==='new') sc(ws2,r,8,NEWSTYLE);
+    else if(kind==='up') sc(ws2,r,8,UP);
+    else if(kind==='down') sc(ws2,r,8,DOWN);
     if(isNewHighlightToday(name)) sc(ws2,r,0,NEWBG);
     dateCols.forEach((d,di)=>{
       const st=qtyCellStyle(qtyOn(name,d));
