@@ -15171,6 +15171,12 @@ async function downloadDailyExcel(){
   ws2['!autofilter']={ref:U.encode_range({s:{r:1,c:0},e:{r:totR-1,c:totalCols-1}})};
   const UP={font:{bold:true,color:{rgb:'059669'}}}, DOWN={font:{bold:true,color:{rgb:'DC2626'}}};
   const NEWBG={fill:{patternType:'solid',fgColor:{rgb:'DCFCE7'}}};
+  // 일별 출고수량 셀 배경색(0개=색없음, 1~20=연초록, 21~40=연주황, 41~60=연파랑, 61+=연보라) + 0개 초과는 굵게
+  const qtyCellStyle=q=>{
+    if(q<=0) return null;
+    const rgb=q<=20?'DCFCE7':q<=40?'FFEDD5':q<=60?'DBEAFE':'F3E8FF';
+    return {fill:{patternType:'solid',fgColor:{rgb}},font:{bold:true}};
+  };
   prodList.forEach(([name,v],i)=>{
     const r=2+i;
     sc(ws2,r,1,{fill:{patternType:'solid',fgColor:{rgb:_catRowColor(v.type)}}});   // 구분(B열) 셀에만 배경색
@@ -15180,6 +15186,10 @@ async function downloadDailyExcel(){
     const dir=weekTrend(name).dir;
     if(dir>0) sc(ws2,r,8,UP); else if(dir<0) sc(ws2,r,8,DOWN);
     if(isNewHighlightToday(name)) sc(ws2,r,0,NEWBG);
+    dateCols.forEach((d,di)=>{
+      const st=qtyCellStyle(qtyOn(name,d));
+      if(st) sc(ws2,r,FIXED_COLS+di,st);
+    });
   });
   for(let c=0;c<totalCols;c++) sc(ws2,totR,c,HEAD);
   fmt(ws2,totR,4,WON); fmt(ws2,totR,5,MARGIN_FMT); fmt(ws2,totR,6,PCT);
