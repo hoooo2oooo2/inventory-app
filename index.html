@@ -917,7 +917,28 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cs-sum-item.cs-sum-hi{background:#FFFBEB;border-color:#F59E0B66;}
 .cs-sum-item.cs-sum-hi .cs-sum-val{color:#D97706;}
 /* 위탁: 폭 고정 래퍼(표가 화면 전체로 늘어나 휑해지는 문제 방지) */
-.cs-wrap{max-width:1100px;}
+.cs-wrap{max-width:1360px;}
+/* 위탁: 주문·거래 리스트 옆 미니 달력(정산금액 합계) */
+.cs-order-layout{display:flex;gap:16px;align-items:flex-start;}
+.cs-order-layout .cs-card{flex:1;min-width:0;}
+.cs-order-cal{width:250px;flex-shrink:0;border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:14px;}
+.cs-order-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cs-order-cal-title{font-size:12.5px;font-weight:700;color:var(--tx);}
+.cs-order-cal-nav{display:flex;gap:4px;}
+.cs-order-cal-nav button{border:none;background:var(--bg2);color:var(--tx2);width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1;font-family:inherit;}
+.cs-order-cal-nav button:hover{background:#EEF4FF;color:#3182F6;}
+.cs-order-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cs-order-cal-wd{font-size:10px;color:var(--tx2);text-align:center;padding-bottom:4px;}
+.cs-order-cal-cell{min-height:38px;border-radius:7px;padding:3px 1px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:var(--bg2);}
+.cs-order-cal-cell.empty{background:transparent;}
+.cs-order-cal-cell .d{font-size:10.5px;font-weight:600;color:var(--tx2);}
+.cs-order-cal-cell.has{background:#EEF4FF;}
+.cs-order-cal-cell.has .d{color:#3182F6;}
+.cs-order-cal-cell.cs-order-cal-today{outline:1.5px solid #F59E0B;outline-offset:-1.5px;}
+.cs-order-cal-amt{font-size:9px;font-weight:700;color:#1B64DA;margin-top:1px;line-height:1.15;text-align:center;word-break:keep-all;}
+.cs-order-cal-total{margin-top:10px;padding-top:10px;border-top:1px solid var(--bd);font-size:11px;color:var(--tx2);display:flex;justify-content:space-between;align-items:center;}
+.cs-order-cal-total b{color:var(--tx);font-size:13px;}
+.cs-order-cal-empty{font-size:11.5px;color:var(--tx2);text-align:center;padding:16px 4px;line-height:1.6;}
 /* 위탁: 제품 카드 그리드 */
 .cs-pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px;}
 .cs-pcard{position:relative;border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:14px 15px;transition:.12s;}
@@ -2947,7 +2968,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="cs-sum-item"><span class="cs-sum-lbl">마진 합계</span><span class="cs-sum-val" id="csSumMargin">0원</span></div>
       <div class="cs-sum-item"><span class="cs-sum-lbl">평균 마진율</span><span class="cs-sum-val" id="csSumRate">—</span></div>
     </div>
-    <div class="cs-card" id="csOrderCard"></div>
+    <div class="cs-order-layout">
+      <div class="cs-card" id="csOrderCard"></div>
+      <div class="cs-order-cal" id="csOrderCal"></div>
+    </div>
   </div>
  </div>
 </div>
@@ -21791,6 +21815,7 @@ let _csTab = 'products';
 let _csSelVendor = 'ALL';     // 선택된 배송처 id 또는 'ALL'
 let _csProdCatFilter = '';    // 제품 목록 카테고리 필터('' = 전체)
 let _csEditVendorId = null, _csEditProdId = null, _csEditOrderId = null;
+let _csCalYM = null;   // 주문·거래 리스트 우측 미니 달력의 표시 월 {y,m} (배송처 변경 시 초기화)
 
 function _csEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function _csWon(n){ return (Math.round(Number(n)||0)).toLocaleString('ko-KR')+'원'; }
@@ -21878,6 +21903,7 @@ function csRenderVendorChips(){
 }
 function csSelectVendor(id){
   _csSelVendor = id;
+  _csCalYM = null;   // 배송처가 바뀌면 미니 달력도 그 배송처의 최근 주문월로 다시 잡는다
   csRenderVendorChips(); csRenderVHead(); csRenderProducts(); csRenderOrders();
 }
 function csRenderVHead(){
@@ -22165,6 +22191,7 @@ function csRenderOrders(){
   const card = document.getElementById('csOrderCard');
   card.style.overflowX='auto';   // 좁은 화면에서 잘리지 않고 가로 스크롤
   csRenderSummary(list);
+  csRenderOrderCal();
   if(!_csVendors.length){ card.innerHTML = `<div class="cs-empty">먼저 위쪽 <b>[＋ 배송처]</b>로 위탁 배송처를 추가하세요.</div>`; return; }
   if(!list.length){ card.innerHTML = `<div class="cs-empty">${_csOrders.length?'조건에 맞는 주문이 없습니다.':'저장된 주문이 없습니다. <b>[＋ 주문 추가]</b>로 등록하세요.'}</div>`; return; }
   card.innerHTML = `<table class="cs-table" style="min-width:980px;"><thead><tr>
@@ -22207,7 +22234,7 @@ function csOnShip(id, val){
 function csOnSettle(id, val){
   const o = _csOrders.find(x=>x.id===id); if(!o) return;
   o.settlement = Math.max(0, Math.round(Number(val)||0));
-  csRecomputeRow(o); csRenderSummary(); csRenderVHead();
+  csRecomputeRow(o); csRenderSummary(); csRenderVHead(); csRenderOrderCal();
 }
 function csRecomputeRow(o){
   const m = _csOrderMargin(o);
@@ -22230,6 +22257,82 @@ function csRenderSummary(list){
   document.getElementById('csSumSettle').textContent = _csWon(setSum);
   const mEl=document.getElementById('csSumMargin'); mEl.textContent=_csWon(marginSum); mEl.className='cs-sum-val '+(marginSum>=0?'cs-pos':'cs-neg');
   const rEl=document.getElementById('csSumRate'); rEl.textContent = rate==null?'—':rate.toFixed(1)+'%'; rEl.className='cs-sum-val '+(rate==null?'':(rate>=0?'cs-pos':'cs-neg'));
+}
+
+// ── 주문·거래 리스트 우측 미니 달력: 주문건 있는 날짜에 정산금액 합계 표시 ──
+// 배송처(전체 포함)·검색어 필터는 표와 동일하게 반영하되, 날짜는 표의 '월별 보기'와 무관하게
+// 달력 자체 네비게이션(◂ ▸)으로 독립적으로 넘겨본다.
+function _csCalDefaultYM(){
+  const list = _csSelVendor==='ALL' ? _csOrders : _csOrders.filter(o=>o.vendorId===_csSelVendor);
+  if(list.length){
+    const latest = list.reduce((a,b)=> (b.date||'') > (a.date||'') ? b : a);
+    const [y,m] = (latest.date||'').split('-').map(Number);
+    if(y&&m) return {y,m};
+  }
+  const now = new Date();
+  return {y:now.getFullYear(), m:now.getMonth()+1};
+}
+function csCalNav(delta){
+  if(!_csCalYM) _csCalYM = _csCalDefaultYM();
+  let {y,m} = _csCalYM;
+  m += delta;
+  if(m<1){ m=12; y--; } else if(m>12){ m=1; y++; }
+  _csCalYM = {y,m};
+  csRenderOrderCal();
+}
+function _csCalAmt(n){
+  if(n>=10000) return (n/10000).toFixed(n%10000?1:0).replace(/\.0$/,'')+'만';
+  return n.toLocaleString('ko-KR');
+}
+function csRenderOrderCal(){
+  const box = document.getElementById('csOrderCal');
+  if(!box) return;
+  if(!_csVendors.length){ box.innerHTML=''; return; }
+  if(!_csCalYM) _csCalYM = _csCalDefaultYM();
+  const {y,m} = _csCalYM;
+  const q = (document.getElementById('csOrderSearch')?.value||'').trim().toLowerCase();
+  let list = _csSelVendor==='ALL' ? _csOrders.slice() : _csOrders.filter(o=>o.vendorId===_csSelVendor);
+  if(q) list = list.filter(o=>{
+    const hay = [o.customer, _csVendorName(o.vendorId)].concat((o.items||[]).flatMap(it=>[it.productName,it.productCode]));
+    return hay.some(v=>(v||'').toLowerCase().includes(q));
+  });
+  const ym = `${y}-${pad(m)}`;
+  const byDate = {};
+  list.forEach(o=>{
+    if((o.date||'').slice(0,7)!==ym) return;
+    byDate[o.date] = (byDate[o.date]||0) + (o.settlement||0);
+  });
+  const first = new Date(y, m-1, 1);
+  const startWd = first.getDay();
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const todayStr = _csToday();
+  const WD = ['일','월','화','수','목','금','토'];
+  let cells = '';
+  for(let i=0;i<startWd;i++) cells += `<div class="cs-order-cal-cell empty"></div>`;
+  let monthTotal = 0, orderDays = 0;
+  for(let d=1; d<=daysInMonth; d++){
+    const ds = `${y}-${pad(m)}-${pad(d)}`;
+    const has = Object.prototype.hasOwnProperty.call(byDate, ds);
+    const amt = byDate[ds]||0;
+    if(has){ monthTotal += amt; orderDays++; }
+    const isToday = ds===todayStr;
+    cells += `<div class="cs-order-cal-cell${has?' has':''}${isToday?' cs-order-cal-today':''}" title="${has?_csEsc(ds)+' 정산 '+_csWon(amt):_csEsc(ds)}">
+      <span class="d">${d}</span>${has?`<span class="cs-order-cal-amt">${_csCalAmt(amt)}</span>`:''}
+    </div>`;
+  }
+  box.innerHTML = `
+    <div class="cs-order-cal-head">
+      <div class="cs-order-cal-title">🗓 ${y}년 ${m}월</div>
+      <div class="cs-order-cal-nav">
+        <button onclick="csCalNav(-1)" title="이전 달">‹</button>
+        <button onclick="csCalNav(1)" title="다음 달">›</button>
+      </div>
+    </div>
+    <div class="cs-order-cal-grid">
+      ${WD.map(w=>`<div class="cs-order-cal-wd">${w}</div>`).join('')}
+      ${cells}
+    </div>
+    <div class="cs-order-cal-total"><span>주문일 ${orderDays}일 합계</span><b>${_csWon(monthTotal)}</b></div>`;
 }
 
 // ══════════════════════════════════════════════
