@@ -4362,7 +4362,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revMonKpi2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi2Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">🛒 주문건수</div><div class="rev-kpi-val" id="revMonKpi3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi3Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revMonKpi5">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi5Sub">판매처 선택 반영</div></div>
-        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📉 손실금액</div><div class="rev-kpi-val" id="revMonKpi4" style="color:#DC2626;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi4Sub">마진 마이너스 합계</div></div>
+        <div class="rev-kpi-card" style="cursor:pointer;" onclick="openRevLossDetail()" title="클릭 시 손실 주문 상세 보기"><div class="rev-kpi-lbl">📉 손실금액</div><div class="rev-kpi-val" id="revMonKpi4" style="color:#DC2626;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi4Sub">마진 마이너스 합계</div></div>
       </div>
       <div class="rev-chart-grid">
         <div class="rev-card">
@@ -5529,6 +5529,25 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="trendBulkBody"></div>
     <div class="ma" style="margin-top:12px;">
       <button class="btn" onclick="closeModal('trendBulkDetailModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 매출관리 월별 탭 — 손실금액 KPI 클릭 시 손실 주문 상세 팝업 -->
+<div class="modal-overlay" id="revLossDetailModal">
+  <div class="modal" style="max-width:900px;max-height:82vh;overflow-y:auto;">
+    <h3 id="revLossDetailTitle">📉 손실 주문 상세</h3>
+    <div style="font-size:11px;color:var(--tx2);margin-bottom:8px;">고객이름 더블클릭 시 통합 메뉴에서 해당 주문건으로 이동합니다.</div>
+    <div class="tw"><table class="dt" style="width:100%;">
+      <thead><tr>
+        <th>날짜</th><th>판매처</th><th>고객이름</th><th>제품명</th>
+        <th style="text-align:right;">판매가</th><th style="text-align:right;">정산금액</th>
+        <th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
+      </tr></thead>
+      <tbody id="revLossDetailTbody"></tbody>
+    </table></div>
+    <div class="ma" style="margin-top:12px;">
+      <button class="btn" onclick="closeModal('revLossDetailModal')">닫기</button>
     </div>
   </div>
 </div>
@@ -13678,6 +13697,8 @@ function renderRevSummary(){
 
 // ── 월별 탭 렌더링 ──
 let _revSelYear = null; // 선택된 년도
+let _revLossRows = []; // 월별 탭 손실금액 KPI 상세 대상 행
+let _revLossMonth = '';
 
 function renderRevMonthly(){
   // 년도 목록(전체 범위) — 선택 연도가 미적재면 그 연도만 로드 후 재렌더
@@ -13723,6 +13744,7 @@ function renderRevMonthly(){
   // 손실금액 = 마진이 마이너스인 건들의 손실 합계(절댓값)
   const lossRows=rows.filter(r=>(r.margin||0)<0);
   const loss=lossRows.reduce((s,r)=>s+(r.margin||0),0); // 음수
+  _revLossRows=lossRows; _revLossMonth=_revSelMonth;
   const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
 
   const setKpi=(id,val,sub)=>{
@@ -14723,6 +14745,7 @@ function goToRevenueRow(id){
   const row=_revData.find(r=>r.id===id);
   if(!row){ toast('해당 주문 데이터를 찾을 수 없습니다.'); return; }
   closeModal('trendBulkDetailModal');
+  closeModal('revLossDetailModal');
   goRevPage('unified');
   _uniFilter.year=row.year;
   _uniFilter.months.clear();
@@ -14743,6 +14766,29 @@ function goToRevenueRow(id){
     tr.classList.add('uni-row-flash');
     setTimeout(()=>tr.classList.remove('uni-row-flash'), 2200);
   }, 80);
+}
+
+// 매출관리 월별 탭 — 손실금액 KPI 클릭 시 손실 주문 상세 팝업
+function openRevLossDetail(){
+  const rows=_revLossRows||[];
+  document.getElementById('revLossDetailTitle').textContent=`📉 손실 주문 상세 — ${_revLossMonth} (${rows.length.toLocaleString()}건)`;
+  const f=n=>(n||0).toLocaleString('ko-KR');
+  document.getElementById('revLossDetailTbody').innerHTML = rows.length
+    ? rows.slice().sort((a,b)=>(a.margin||0)-(b.margin||0)).map(r=>{
+        const mr=r.marginRate!=null?(r.marginRate*100).toFixed(1)+'%':'—';
+        return `<tr>
+          <td>${r.date||''}</td>
+          <td>${r.ch||''}</td>
+          <td style="cursor:pointer;text-decoration:underline dotted;" ondblclick="goToRevenueRow(${r.id})" title="더블클릭 시 통합 메뉴에서 이 주문건으로 이동">${maskName(r.buyer||r.receiver||'')}</td>
+          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.modelName||r.itemCode||''}</td>
+          <td style="text-align:right;">${f(r.salePrice)}</td>
+          <td style="text-align:right;">${f(r.settlement)}</td>
+          <td style="text-align:right;color:#DC2626;">${f(r.margin)}</td>
+          <td style="text-align:right;">${mr}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="8" style="text-align:center;color:var(--tx2);padding:20px;">손실 주문이 없습니다</td></tr>`;
+  openModal('revLossDetailModal');
 }
 
 // 제품별 판매현황 행 더블클릭 → 일별 판매수량 그래프 팝업
