@@ -4773,9 +4773,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
         <div class="rev-chart-grid" style="margin-top:14px;">
           <div class="rev-card">
-            <div class="rev-card-title"><span>🚫 일별 취소율 추이</span></div>
-            <div class="rev-chart-wrap"><canvas id="rgCancelChart"></canvas></div>
-            <div class="rev-empty" id="rgCancelChartEmpty" style="padding:20px;display:none;">데이터가 없습니다</div>
+            <div class="rev-card-title"><span>📈 일별 구매전환율 추이</span></div>
+            <div class="rev-chart-wrap"><canvas id="rgConvChart"></canvas></div>
+            <div class="rev-empty" id="rgConvChartEmpty" style="padding:20px;display:none;">데이터가 없습니다</div>
           </div>
           <div class="rev-card">
             <div class="rev-card-title"><span>⚡ 취소 유형 비교</span></div>
@@ -14425,6 +14425,7 @@ async function renderDlyRgCard(periodLabel){
   optList.forEach(o=>{
     o.mappedName=rgResolveName(o.optionId);
     o.displayName=o.mappedName||o.productName;
+    o.qty = o.qty * rgQtyMultiplier(o.optionId);   // 세트상품 개입수 반영(낱개 수량으로 보정)
     o.convRate=o.visitors>0?(o.orders/o.visitors*100):0;
     o.cancelRateRow=o.grossQty>0?(o.cancelQty/o.grossQty*100):0;
   });
@@ -14497,14 +14498,17 @@ let _rgSelMonth = null;
 let _rgProdCache = {};      // ym('YYYY-MM') → 해당 월 상품별 원본 행 배열
 let _rgUpFiles = {};        // {vendor:File, daily:File}
 let _rgSort = {key:'revenue', dir:-1};
-let _rgRevChart=null, _rgCancelChart=null, _rgProdDnut=null;
+let _rgRevChart=null, _rgConvChart=null, _rgProdDnut=null;
 const RG_CH_COLORS=['#F97316','#3182F6','#059669','#8B5CF6','#DC2626','#EC4899','#0EA5E9','#14B8A6','#F59E0B','#64748B'];
-// 옵션ID ↔ 백데이터 상품 수동 매칭 (cloudKv 'rg_option_map' = { optionId: backdata code })
+// 옵션ID ↔ 백데이터 상품 수동 매칭 (cloudKv 'rg_option_map' = { optionId: backdata id })
 let _rgOptionMap = {};
 let _rgOptionMapLoaded = false;
 let _rgMatchTargetId = null;
 // 제품별 매출 순위 표의 조회 기간 (월 선택과 별도로 지정 가능, 기본값은 선택된 월 전체)
 let _rgProdRange = {from:null, to:null};
+// 세트상품 개입수 (cloudKv 'rg_pack_multiplier' = { optionId: 개입수 }) — 판매량 표시에 곱해서 실제 낱개 수량으로 보정
+let _rgPackMultiplier = {};
+let _rgPackMultiplierLoaded = false;
 async function loadRgOptionMap(){
   try{
     const d=await cloudKvLoad('rg_option_map');
@@ -14512,10 +14516,40 @@ async function loadRgOptionMap(){
   }catch(e){ _rgOptionMap={}; }
   _rgOptionMapLoaded=true;
 }
+async function loadRgPackMultiplier(){
+  try{
+    const d=await cloudKvLoad('rg_pack_multiplier');
+    _rgPackMultiplier=(d && typeof d==='object' && !Array.isArray(d)) ? d : {};
+  }catch(e){ _rgPackMultiplier={}; }
+  _rgPackMultiplierLoaded=true;
+}
+function rgQtyMultiplier(optionId){
+  const n=Number(_rgPackMultiplier[optionId]);
+  return (n && n>1) ? n : 1;
+}
+async function rgTogglePackSet(checkbox, optionId){
+  if(checkbox.checked){
+    const inp=document.getElementById('rgPackInp-'+optionId);
+    if(inp){ inp.style.display='inline-block'; inp.focus(); }
+  } else {
+    const inp=document.getElementById('rgPackInp-'+optionId);
+    if(inp){ inp.style.display='none'; inp.value=''; }
+    await rgSetPackMultiplier(optionId, 1);
+  }
+}
+async function rgSetPackMultiplier(optionId, val){
+  const n=Math.max(1, parseInt(val)||1);
+  _rgPackMultiplier = {..._rgPackMultiplier, [optionId]: n};
+  await cloudKvSave('rg_pack_multiplier', _rgPackMultiplier, {force:true});
+  renderRgProdSection();
+}
+// 매칭은 백데이터의 code가 아니라 고유 id로 저장한다.
+// (백데이터에서 "ss소장 직접소싱" 등 여러 상품이 code를 공유하는 경우가 있어, code로 저장하면
+//  전혀 다른 상품이 같이 "선택됨"으로 잡히는 문제가 있었음 — id는 항상 유일하므로 이 문제가 없다)
 function rgResolveName(optionId){
-  const code=_rgOptionMap[optionId];
-  if(!code) return null;
-  const bd=_bdData.find(r=>String(r.code)===String(code));
+  const id=_rgOptionMap[optionId];
+  if(id==null) return null;
+  const bd=_bdData.find(r=>String(r.id)===String(id));
   return bd?bd.name:null;
 }
 function _rgDefaultRangeForMonth(ym){
@@ -14698,6 +14732,7 @@ async function submitRgUpload(){
 async function renderRgPage(){
   if(!_rgTotalsLoaded) await loadRgDailyTotals();
   if(!_rgOptionMapLoaded) await loadRgOptionMap();
+  if(!_rgPackMultiplierLoaded) await loadRgPackMultiplier();
   renderRgUpload();
   const months=_rgMonthsAvailable();
   const emptyEl=document.getElementById('rgEmptyMsg'), contentEl=document.getElementById('rgContent');
@@ -14814,32 +14849,25 @@ function renderRgContent(){
     } else { if(revEmpty) revEmpty.style.display='block'; revCtx.style.display='none'; }
   }
 
-  // 일별 취소율 추이 (VENDOR_ITEM_METRICS 기반 — 일별 파일엔 취소 컬럼 없음)
-  const byDate={};
-  prodRows.forEach(r=>{
-    if(!byDate[r.date]) byDate[r.date]={grossQty:0,cancelQty:0};
-    byDate[r.date].grossQty+=r.grossQty||0;
-    byDate[r.date].cancelQty+=Math.abs(r.cancelQty||0);
-  });
-  const cancelDateKeys=Object.keys(byDate).sort();
-  const cancelCtx=document.getElementById('rgCancelChart'), cancelEmpty=document.getElementById('rgCancelChartEmpty');
-  if(cancelCtx){
-    if(_rgCancelChart){_rgCancelChart.destroy();_rgCancelChart=null;}
-    if(cancelDateKeys.length){
-      if(cancelEmpty) cancelEmpty.style.display='none'; cancelCtx.style.display='';
-      _rgCancelChart=new Chart(cancelCtx.getContext('2d'),{
+  // 일별 구매전환율 추이 (DAILY_SUMMARY_METRICS의 구매전환율 컬럼 기준, 계정 전체)
+  const convCtx=document.getElementById('rgConvChart'), convEmpty=document.getElementById('rgConvChartEmpty');
+  if(convCtx){
+    if(_rgConvChart){_rgConvChart.destroy();_rgConvChart=null;}
+    if(dateKeys.length){
+      if(convEmpty) convEmpty.style.display='none'; convCtx.style.display='';
+      _rgConvChart=new Chart(convCtx.getContext('2d'),{
         type:'line',
-        data:{labels:cancelDateKeys.map(k=>`${parseInt(k.split('-')[2])}일`),
-          datasets:[{label:'취소율',
-            data:cancelDateKeys.map(k=>{const v=byDate[k]; return v.grossQty>0?+(v.cancelQty/v.grossQty*100).toFixed(1):0;}),
-            borderColor:'#DC2626',backgroundColor:'rgba(220,38,38,0.08)',tension:0.3,pointRadius:3,pointBackgroundColor:'#DC2626',fill:true}]},
+        data:{labels:dateKeys.map(k=>`${parseInt(k.split('-')[2])}일`),
+          datasets:[{label:'구매전환율',
+            data:dateKeys.map(k=>+(_rgDailyTotals[k].conversionRate||0).toFixed(1)),
+            borderColor:'#3182F6',backgroundColor:'rgba(49,130,246,0.08)',tension:0.3,pointRadius:3,pointBackgroundColor:'#3182F6',fill:true}]},
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`취소율: ${(+c.parsed.y).toFixed(1)}%`}}},
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`구매전환율: ${(+c.parsed.y).toFixed(1)}%`}}},
           scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'var(--tx2)'}},
             y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{font:{size:10},color:'var(--tx2)',callback:v=>(+v).toFixed(1)+'%'}}}
         }
       });
-    } else { if(cancelEmpty) cancelEmpty.style.display='block'; cancelCtx.style.display='none'; }
+    } else { if(convEmpty) convEmpty.style.display='block'; convCtx.style.display='none'; }
   }
 
   // 취소 유형 비교 (즉시취소 vs 일반취소)
@@ -14892,6 +14920,8 @@ async function renderRgProdSection(){
     o.itemWinnerAvg=o.itemWinnerN>0?(o.itemWinnerSum/o.itemWinnerN):0;
     o.mappedName=rgResolveName(o.optionId);
     o.displayName=o.mappedName||o.productName;
+    o.packMult=rgQtyMultiplier(o.optionId);
+    o.qty = o.qty * o.packMult;   // 세트상품 개입수 반영(낱개 수량으로 보정) — 매출/취소율 등은 패키지 단위 그대로 둠
   });
   const grossQtyTotal=optList.reduce((s,o)=>s+o.grossQty,0);
   const cancelQtyTotal=optList.reduce((s,o)=>s+o.cancelQty,0);
@@ -14920,6 +14950,14 @@ async function renderRgProdSection(){
             <span style="cursor:pointer;font-size:12px;flex-shrink:0;" title="${o.mappedName?'매칭 변경':'백데이터 상품과 매칭'}" onclick="event.stopPropagation();openRgMatchModal('${o.optionId}')">${o.mappedName?'✎':'🔗'}</span>
           </div>
           <div style="font-size:10px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.mappedName?'쿠팡: '+o.productName:(o.optionName&&o.optionName!==o.productName?o.optionName:'')}</div>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:3px;" onclick="event.stopPropagation();">
+            <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:var(--tx2);cursor:pointer;white-space:nowrap;">
+              <input type="checkbox" ${o.packMult>1?'checked':''} onchange="rgTogglePackSet(this,'${o.optionId}')" style="cursor:pointer;">세트
+            </label>
+            <input type="number" min="1" step="1" value="${o.packMult>1?o.packMult:''}" placeholder="개입수"
+              id="rgPackInp-${o.optionId}" onchange="rgSetPackMultiplier('${o.optionId}', this.value)"
+              style="width:48px;font-size:10px;padding:1px 4px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);color:var(--tx);display:${o.packMult>1?'inline-block':'none'};">
+          </div>
         </td>
         <td style="text-align:right;font-weight:600;">${fmt(o.revenue)}</td>
         <td style="text-align:right;">${o.qty.toLocaleString()}</td>
@@ -15017,10 +15055,10 @@ let _rgProdChartMode='daily';   // 'daily' | 'monthly'
 let _rgProdChartOptionIds=[];
 let _rgProdChartCv=null;
 async function openRgProdChart(optionId, displayName){
-  const mappedCode=_rgOptionMap[optionId];
+  const mappedId=_rgOptionMap[optionId];
   let ids=[optionId];
-  if(mappedCode){
-    ids=Object.keys(_rgOptionMap).filter(oid=>_rgOptionMap[oid]===mappedCode);
+  if(mappedId!=null){
+    ids=Object.keys(_rgOptionMap).filter(oid=>_rgOptionMap[oid]===mappedId);
   }
   _rgProdChartOptionIds=ids;
   const titleEl=document.getElementById('rgProdChartTitle');
@@ -15050,13 +15088,13 @@ function renderRgProdChart(){
   let labels=[], qtyData=[];
   if(_rgProdChartMode==='daily'){
     const byDate={};
-    rows.forEach(r=>{ byDate[r.date]=(byDate[r.date]||0)+(r.qty||0); });
+    rows.forEach(r=>{ byDate[r.date]=(byDate[r.date]||0)+(r.qty||0)*rgQtyMultiplier(r.optionId); });
     const keys=Object.keys(byDate).sort();
     labels=keys.map(k=>k.slice(5).replace('-','/'));
     qtyData=keys.map(k=>byDate[k]);
   } else {
     const byMonth={};
-    rows.forEach(r=>{ const m=r.date.slice(0,7); byMonth[m]=(byMonth[m]||0)+(r.qty||0); });
+    rows.forEach(r=>{ const m=r.date.slice(0,7); byMonth[m]=(byMonth[m]||0)+(r.qty||0)*rgQtyMultiplier(r.optionId); });
     const keys=Object.keys(byMonth).sort();
     labels=keys;
     qtyData=keys.map(k=>byMonth[k]);
@@ -15097,7 +15135,7 @@ async function openRgMatchModal(optionId){
     ? `옵션ID <b>${optionId}</b><br>쿠팡 상품명: ${target.productName}${target.optionName&&target.optionName!==target.productName?' / '+target.optionName:''}`
     : `옵션ID <b>${optionId}</b>`;
   const unmatchBtn=document.getElementById('rgUnmatchBtn');
-  if(unmatchBtn) unmatchBtn.style.display = _rgOptionMap[optionId] ? '' : 'none';
+  if(unmatchBtn) unmatchBtn.style.display = (_rgOptionMap[optionId]!=null) ? '' : 'none';
   const searchEl=document.getElementById('rgMatchSearch');
   if(searchEl) searchEl.value='';
   openModal('rgMatchModal');
@@ -15116,24 +15154,32 @@ function renderRgMatchList(){
     listEl.innerHTML='<div class="rev-empty" style="padding:16px;">백데이터가 비어있습니다 — 매출관리 &gt; 백데이터 탭에서 먼저 등록하세요</div>';
     return;
   }
-  let list=_bdData;
-  if(q) list=list.filter(r=>String(r.code||'').toLowerCase().includes(q)||String(r.name||'').toLowerCase().includes(q));
+  const curId=_rgOptionMap[_rgMatchTargetId];
+  let list;
+  if(q){
+    list=_bdData.filter(r=>String(r.code||'').toLowerCase().includes(q)||String(r.name||'').toLowerCase().includes(q));
+  } else {
+    // 검색어 없이 열었을 때는 현재 매칭된 항목을 맨 위에 고정해서 바로 보이게 한다
+    const matched = curId!=null ? _bdData.find(r=>String(r.id)===String(curId)) : null;
+    list = matched ? [matched, ...(_bdData.filter(r=>r!==matched))] : _bdData;
+  }
   list=list.slice(0,80);
-  const curCode=_rgOptionMap[_rgMatchTargetId];
-  listEl.innerHTML = list.length ? list.map(r=>`
-    <div onclick="rgSelectMatch('${String(r.code).replace(/'/g,"\\'")}')" style="padding:8px 10px;border:1px solid ${String(r.code)===String(curCode)?'var(--pr)':'var(--bd)'};background:${String(r.code)===String(curCode)?'var(--prl)':'var(--bg)'};border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;">
+  listEl.innerHTML = list.length ? list.map(r=>{
+    const isSel = curId!=null && String(r.id)===String(curId);
+    return `<div onclick="rgSelectMatch('${String(r.id)}')" style="padding:8px 10px;border:1px solid ${isSel?'var(--pr)':'var(--bd)'};background:${isSel?'var(--prl)':'var(--bg)'};border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;">
       <div style="overflow:hidden;">
         <div style="font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</div>
         <div style="font-size:10.5px;color:var(--tx2);">${r.code}</div>
       </div>
-      ${String(r.code)===String(curCode)?'<span style="color:var(--pr);font-size:12px;flex-shrink:0;">✓ 선택됨</span>':''}
-    </div>`).join('') : '<div class="rev-empty" style="padding:16px;">검색 결과가 없습니다</div>';
+      ${isSel?'<span style="color:var(--pr);font-size:12px;flex-shrink:0;font-weight:700;">✓ 선택됨</span>':''}
+    </div>`;
+  }).join('') : '<div class="rev-empty" style="padding:16px;">검색 결과가 없습니다</div>';
 }
 // 저장 직전에 다시 불러와서 병합하지 않고, 이미 로드돼있는 인메모리 맵 위에 바로 얹어서 저장한다.
 // (재조회가 실패/지연되면 빈 객체로 덮어써 cloudKvSave의 "급격한 축소" 안전장치에 걸려 저장이 조용히 스킵되는 문제가 있었음 — force로 우회)
-async function rgSelectMatch(code){
+async function rgSelectMatch(bdId){
   if(!_rgMatchTargetId) return;
-  _rgOptionMap = {..._rgOptionMap, [_rgMatchTargetId]: code};
+  _rgOptionMap = {..._rgOptionMap, [_rgMatchTargetId]: bdId};
   await cloudKvSave('rg_option_map', _rgOptionMap, {force:true});
   closeModal('rgMatchModal');
   renderRgProdSection();
