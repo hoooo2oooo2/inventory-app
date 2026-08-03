@@ -5690,8 +5690,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <select class="sel" id="dlyProdYearSel" onchange="renderDlyProdChart()"></select>
       <span class="rev-filter-lbl" style="margin-left:8px;">월</span>
       <select class="sel" id="dlyProdMonthSel" onchange="renderDlyProdChart()"></select>
-      <span class="rev-filter-lbl" style="margin-left:8px;">판매처</span>
+      <span class="rev-filter-lbl" id="dlyProdChLbl" style="margin-left:8px;">판매처</span>
       <select class="sel" id="dlyProdChSel" onchange="renderDlyProdChart()"></select>
+      <span id="dlyProdChMultiNote" style="display:none;font-size:11px;color:var(--tx2);margin-left:8px;"></span>
     </div>
     <div class="rev-kpi" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px;">
       <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 선택월 판매수량 합계</div><div class="rev-kpi-val" id="dlyProdKpiMonth" style="color:#3182F6;">—</div></div>
@@ -12225,13 +12226,14 @@ function parseAdKey(k){ const i=k.indexOf('|'); return { ch:k.slice(0,i), date:k
 // 기간/채널 조건에 맞는 광고비 합계
 function sumAdSpend({year=null, month=null, day=null, ch='ALL'}={}){
   let t=0;
+  const chArr = Array.isArray(ch) ? ch : (ch==='ALL' ? null : [ch]);
   for(const k in _adSpend){
     const {ch:c, date:d}=parseAdKey(k);
     const parts=d.split('-'); // YYYY-MM-DD
     if(year!=null && Number(parts[0])!==Number(year)) continue;
     if(month!=null && Number(parts[1])!==Number(month)) continue;
     if(day!=null && Number(parts[2])!==Number(day)) continue;
-    if(ch!=='ALL' && c!==ch) continue;
+    if(chArr && !chArr.includes(c)) continue;
     t += Number(_adSpend[k])||0;
   }
   return t;
@@ -14195,18 +14197,31 @@ let _dlyProdChartKey=null;
 const CH_COLORS_DLY=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
 
 function renderDailyReport(){
-  const years=_revYears();
+  // 년/월/일 후보는 _revData(일반 채널) + _rgDailyTotals(로켓그로스) 날짜를 합쳐서 계산한다.
+  // (로켓그로스만 업로드된 기간은 _revData에 없어서, 이걸 안 하면 그 날짜로 이동할 방법이 없었음)
+  const rgYmdKeys=Object.keys(_rgDailyTotals);
+  const revYears=_revYears();
+  const rgYears=[...new Set(rgYmdKeys.map(k=>Number(k.slice(0,4))))];
+  const years=[...new Set([...revYears, ...rgYears])].sort((a,b)=>b-a);
   if(!years.length) return;
   if(!_dlyFilter.year||!years.includes(_dlyFilter.year)) _dlyFilter.year=years[0];
-  if(!_revYearsLoaded.has(_dlyFilter.year)){ ensureRevYear(_dlyFilter.year).then(renderDailyReport); return; }
-  const monthsInYear=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date).map(r=>parseInt(r.date.substring(0,2))))].sort((a,b)=>b-a);
+  if(revYears.includes(_dlyFilter.year) && !_revYearsLoaded.has(_dlyFilter.year)){ ensureRevYear(_dlyFilter.year).then(renderDailyReport); return; }
+  const monthsInYear=[...new Set([
+    ..._revData.filter(r=>r.year===_dlyFilter.year&&r.date).map(r=>parseInt(r.date.substring(0,2))),
+    ...rgYmdKeys.filter(k=>k.startsWith(String(_dlyFilter.year))).map(k=>parseInt(k.slice(5,7)))
+  ])].sort((a,b)=>b-a);
   if(!_dlyFilter.month||!monthsInYear.includes(_dlyFilter.month)) _dlyFilter.month=monthsInYear[0];
-  const daysInMonth=[...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(String(_dlyFilter.month).padStart(2,'0'))).map(r=>parseInt(r.date.split('-')[1]))).values()].sort((a,b)=>b-a);
+  const daysInMonth=[...new Set([
+    ..._revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(String(_dlyFilter.month).padStart(2,'0'))).map(r=>parseInt(r.date.split('-')[1])),
+    ...rgYmdKeys.filter(k=>k.startsWith(`${_dlyFilter.year}-${String(_dlyFilter.month).padStart(2,'0')}`)).map(k=>parseInt(k.slice(8,10)))
+  ])].sort((a,b)=>b-a);
   // day는 null 허용 (해제 시 월 전체)
   if(_dlyFilter.day!==null&&(!_dlyFilter.day||!daysInMonth.includes(_dlyFilter.day))) _dlyFilter.day=daysInMonth[0];
 
   const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
   const pad=v=>String(v).padStart(2,'0');
+  // 판매처 다중선택 매칭(로켓그로스는 별도 전용뷰라 배열에 안 들어감 — 문자열 그대로 유지)
+  const chMatchDly = c => _dlyFilter.ch==='ALL' ? true : (Array.isArray(_dlyFilter.ch) ? _dlyFilter.ch.includes(c) : c===_dlyFilter.ch);
 
   // 버튼 렌더
   const yEl=document.getElementById('revDlyYearBtns');
@@ -14217,14 +14232,14 @@ function renderDailyReport(){
   // 일 버튼: 토글 가능 (재클릭 시 해제 → 월 전체)
   if(dEl) dEl.innerHTML=`<button class="rfbtn${_dlyFilter.day===null?' active':''}" onclick="setDlyFilter('day',null)" style="font-size:10px;">월전체</button>`
     +daysInMonth.map(d=>`<button class="rfbtn${d===_dlyFilter.day?' active':''}" onclick="setDlyFilter('day',${d===_dlyFilter.day?'null':d})">${d}일</button>`).join('');
-  // 판매처 버튼: 선택된 기간 기준
+  // 판매처 버튼: 선택된 기간 기준, 일반 채널은 중복(다중) 선택 가능 — 여러 개 고르면 합계로 표시
   const monPfx=pad(_dlyFilter.month)+(_dlyFilter.day?('-'+pad(_dlyFilter.day)):'');
   const chs=sortCh([...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(monPfx)).map(r=>r.ch).filter(Boolean))]);
   const cEl=document.getElementById('revDlyChBtns');
   const rgBtnHtml = Object.keys(_rgDailyTotals).length
     ? `<button class="rfbtn${_dlyFilter.ch==='로켓그로스'?' active':''}" onclick="setDlyFilter('ch','로켓그로스')">🚀 로켓그로스</button>` : '';
   if(cEl) cEl.innerHTML=`<button class="rfbtn${_dlyFilter.ch==='ALL'?' active':''}" onclick="setDlyFilter('ch','ALL')">전체</button>`
-    +chs.map(c=>`<button class="rfbtn${_dlyFilter.ch===c?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('')
+    +chs.map(c=>`<button class="rfbtn${chMatchDly(c)&&_dlyFilter.ch!=='ALL'?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('')
     +rgBtnHtml;
 
   // 기간 라벨(로켓그로스 전용 카드에서도 사용)
@@ -14236,7 +14251,7 @@ function renderDailyReport(){
   const monStr=pad(_dlyFilter.month);
   let rows=_revData.filter(r=>r.year===_dlyFilter.year&&r.date?.startsWith(monStr));
   if(_dlyFilter.day!==null) rows=rows.filter(r=>r.date===`${monStr}-${pad(_dlyFilter.day)}`);
-  if(_dlyFilter.ch!=='ALL') rows=rows.filter(r=>r.ch===_dlyFilter.ch);
+  if(_dlyFilter.ch!=='ALL') rows=rows.filter(r=>chMatchDly(r.ch));
 
   // ── 전월 동기간 데이터 (전월 대비) ──
   const prevM=_dlyFilter.month===1?12:_dlyFilter.month-1;
@@ -14244,7 +14259,7 @@ function renderDailyReport(){
   const prevMonStr=pad(prevM);
   let prevRows=_revData.filter(r=>r.year===prevY&&r.date?.startsWith(prevMonStr));
   if(_dlyFilter.day!==null) prevRows=prevRows.filter(r=>r.date===`${prevMonStr}-${pad(_dlyFilter.day)}`);
-  if(_dlyFilter.ch!=='ALL') prevRows=prevRows.filter(r=>r.ch===_dlyFilter.ch);
+  if(_dlyFilter.ch!=='ALL') prevRows=prevRows.filter(r=>chMatchDly(r.ch));
 
   // 택배건수 = 합포장 기준 고유 배송 건수 (날짜+판매처+주문번호+수취인+연락처1+주소)
   const pkgKey=r=>`${r.date}|${r.ch}|${r.orderNo}|${r.receiver}|${r.phone1}|${r.addr}`;
@@ -14320,7 +14335,8 @@ function renderDailyReport(){
   const tbody=document.getElementById('revDlyTbody');
   const tfoot=document.getElementById('revDlyTfoot');
   const sub=document.getElementById('revDlyTblSub');
-  if(sub) sub.textContent=`${periodLabel} ${_dlyFilter.ch==='ALL'?'전체':_dlyFilter.ch}`+(adDly>0?` · 광고비 -${fmt(adDly)} (마진 반영)`:'');
+  const chLabelDly=_dlyFilter.ch==='ALL'?'전체':(Array.isArray(_dlyFilter.ch)?_dlyFilter.ch.join('·'):_dlyFilter.ch);
+  if(sub) sub.textContent=`${periodLabel} ${chLabelDly}`+(adDly>0?` · 광고비 -${fmt(adDly)} (마진 반영)`:'');
 
   if(!rows.length){
     if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return;
@@ -14525,7 +14541,17 @@ function setDlyFilter(type, val){
   if(type==='year'){_dlyFilter.year=val;_dlyFilter.month=null;_dlyFilter.day=null;}
   else if(type==='month'){_dlyFilter.month=val;_dlyFilter.day=null;}
   else if(type==='day') _dlyFilter.day=(val===null||val==='null')?null:Number(val);
-  else _dlyFilter.ch=val;
+  else if(type==='ch'){
+    if(val==='ALL'||val==='로켓그로스'){
+      _dlyFilter.ch=val;
+    } else {
+      // 일반 판매처: 다중 선택 토글 ('전체'·'로켓그로스' 상태에서 클릭하면 새로 시작)
+      let cur=Array.isArray(_dlyFilter.ch)?[..._dlyFilter.ch]:[];
+      if(cur.includes(val)) cur=cur.filter(c=>c!==val);
+      else cur=[...cur, val];
+      _dlyFilter.ch=cur.length?cur:'ALL';
+    }
+  }
   _dlyTypeFilter='ALL';   // 기간·판매처 변경 시 구분 필터 초기화
   _dlyProdPage=0;
   renderDailyReport();
@@ -15110,10 +15136,12 @@ async function renderRgProdSection(){
         type:'doughnut',
         data:{labels:nameEntries.map(([k])=>k),datasets:[{
           data:nameEntries.map(([,v])=>v),
-          backgroundColor:RG_CH_COLORS.slice(0,nameEntries.length),borderWidth:2,borderColor:'#fff'
+          // 색상 10개를 넘어가면 .slice()는 그 이후 항목에 undefined를 넣어 데이터 배열보다 짧아지고,
+          // 그 항목들의 hover/tooltip이 깨지는 문제가 있었음 — 인덱스를 순환시켜 항상 데이터 개수만큼 채운다
+          backgroundColor:nameEntries.map((_,i)=>RG_CH_COLORS[i%RG_CH_COLORS.length]),borderWidth:2,borderColor:'#fff'
         }]},
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}개`}}}}
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${(Number(c.parsed)||0).toLocaleString()}개`}}}}
       });
       _rgDnutFullList=nameEntries;   // 더보기 팝업에서 전체 목록 참조
       const top5=nameEntries.slice(0,5);
@@ -15979,6 +16007,9 @@ async function hideRevLossRow(id, btnEl){
   openRevLossDetail();
 }
 
+const DLY_MULTI_COLORS=['#3182F6','#F97316','#059669','#8B5CF6','#DC2626','#EC4899','#0EA5E9','#14B8A6'];
+let _dlyProdChartChs=null;   // 판매처 다중선택 중일 때 그 채널 배열(고정), 단일/전체일 땐 null
+
 // 제품별 판매현황 행 더블클릭 → 일별 판매수량 그래프 팝업
 async function openDlyProdChart(i){
   const entry=_dlyProdListCache[i]; if(!entry) return;
@@ -15992,9 +16023,21 @@ async function openDlyProdChart(i){
   const mSel=document.getElementById('dlyProdMonthSel');
   mSel.innerHTML=Array.from({length:12},(_,idx)=>idx+1).map(m=>`<option value="${m}">${m}월</option>`).join('');
   mSel.value=_dlyFilter.month;
-  const chSel=document.getElementById('dlyProdChSel');
-  chSel.innerHTML='<option value="ALL">전체</option>'+REV_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
-  chSel.value=_dlyFilter.ch&&REV_CHANNELS.includes(_dlyFilter.ch)?_dlyFilter.ch:'ALL';
+
+  // 메인 필터에서 판매처가 2개 이상 중복 선택돼 있으면, 그 채널들을 각각 별도 그래프(이중/다중 그래프)로 표시
+  const isMulti=Array.isArray(_dlyFilter.ch)&&_dlyFilter.ch.length>1;
+  _dlyProdChartChs=isMulti?[..._dlyFilter.ch]:null;
+  const chSel=document.getElementById('dlyProdChSel'), chLbl=document.getElementById('dlyProdChLbl'), chNote=document.getElementById('dlyProdChMultiNote');
+  chSel.style.display=isMulti?'none':'';
+  if(chLbl) chLbl.style.display=isMulti?'none':'';
+  if(isMulti){
+    if(chNote){ chNote.style.display=''; chNote.textContent=`판매처별 비교: ${_dlyProdChartChs.join(' · ')}`; }
+  } else {
+    if(chNote) chNote.style.display='none';
+    chSel.innerHTML='<option value="ALL">전체</option>'+REV_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
+    const curCh=Array.isArray(_dlyFilter.ch)?_dlyFilter.ch[0]:_dlyFilter.ch;
+    chSel.value=curCh&&REV_CHANNELS.includes(curCh)?curCh:'ALL';
+  }
   openModal('dlyProdChartModal');
   await renderDlyProdChart();
 }
@@ -16003,22 +16046,27 @@ async function renderDlyProdChart(){
   const name=_dlyProdChartKey; if(!name) return;
   const year=Number(document.getElementById('dlyProdYearSel').value);
   const month=Number(document.getElementById('dlyProdMonthSel').value);
-  const ch=document.getElementById('dlyProdChSel').value||'ALL';
   if(!year||!month) return;
   await ensureRevYear(year);
   const monStr=String(month).padStart(2,'0');
   const daysInMonth=new Date(year,month,0).getDate();
   const keyOf=r=>r.modelName||r.itemCode||'미상';
-  const chMatch=r=>ch==='ALL'||r.ch===ch;
 
-  // 선택 연/월/판매처 일별 판매수량
-  const dayQty=Array(daysInMonth).fill(0);
+  const multi=_dlyProdChartChs;   // null이면 단일/전체 모드
+  const ch=multi?null:(document.getElementById('dlyProdChSel').value||'ALL');
+  const chMatch=r=>multi?multi.includes(r.ch):(ch==='ALL'||r.ch===ch);
+
+  // 선택 연/월/판매처(들) 일별 판매수량 — 다중이면 채널별로 분리 집계
+  const seriesData={};
+  (multi||['__ALL__']).forEach(c=>seriesData[c]=Array(daysInMonth).fill(0));
   _revData.forEach(r=>{
     if(r.year!==year||!r.date||!r.date.startsWith(monStr)||keyOf(r)!==name||!chMatch(r)) return;
     const d=parseInt(r.date.split('-')[1]);
-    if(d>=1&&d<=daysInMonth) dayQty[d-1]+=(r.orderQty||0);
+    if(d<1||d>daysInMonth) return;
+    const key=multi?r.ch:'__ALL__';
+    if(seriesData[key]) seriesData[key][d-1]+=(r.orderQty||0);
   });
-  const monthTotal=dayQty.reduce((a,b)=>a+b,0);
+  const monthTotal=Object.values(seriesData).reduce((s,arr)=>s+arr.reduce((a,b)=>a+b,0),0);
   document.getElementById('dlyProdKpiMonth').textContent=monthTotal.toLocaleString()+'개';
 
   // 최근 7일(오늘 기준 달력일) — 연도 경계 걸치면 필요한 연도도 로드
@@ -16034,21 +16082,27 @@ async function renderDlyProdChart(){
   },0);
   document.getElementById('dlyProdKpiWeek').textContent=week7.toLocaleString()+'개';
 
-  // 그래프
+  // 그래프 — 다중 판매처면 채널별 시리즈를 각각의 색으로, 단일이면 기존과 동일한 단색 막대
   const labels=Array.from({length:daysInMonth},(_,idx)=>String(idx+1)+'일');
   if(_dlyProdChart) _dlyProdChart.destroy();
   const ctx=document.getElementById('dlyProdChartCv').getContext('2d');
-  const maxQty=Math.max(...dayQty,0);
+  const allQty=Object.values(seriesData).flat();
+  const maxQty=Math.max(...allQty,0);
+  const datasets = multi
+    ? multi.map((c,i)=>({label:c,data:seriesData[c],
+        backgroundColor:DLY_MULTI_COLORS[i%DLY_MULTI_COLORS.length]+'AA',
+        borderColor:DLY_MULTI_COLORS[i%DLY_MULTI_COLORS.length],borderWidth:1,borderRadius:3,borderSkipped:false}))
+    : [{data:seriesData.__ALL__,backgroundColor:'rgba(49,130,246,.55)',borderRadius:4,borderSkipped:false}];
   _dlyProdChart=new Chart(ctx,{
     type:'bar',
-    data:{labels,datasets:[{data:dayQty,backgroundColor:'rgba(49,130,246,.55)',borderRadius:4,borderSkipped:false}]},
+    data:{labels,datasets},
     options:{
       responsive:true,maintainAspectRatio:false,
       layout:{padding:{top:20}},
-      plugins:{legend:{display:false},
+      plugins:{legend:{display:!!multi,position:'top',labels:{font:{size:11}}},
         tooltip:{backgroundColor:'#F7F8FA',borderColor:'rgba(0,0,0,.08)',borderWidth:1,titleColor:'#191919',bodyColor:'#191919',
-          callbacks:{label:c=>` ${c.parsed.y.toLocaleString()}개`}},
-        datalabels:{display:true,anchor:'end',align:'end',offset:2,color:'#3182F6',font:{size:11,weight:'700'},formatter:v=>v||''}},
+          callbacks:{label:c=>multi?` ${c.dataset.label}: ${c.parsed.y.toLocaleString()}개`:` ${c.parsed.y.toLocaleString()}개`}},
+        datalabels:{display:!multi,anchor:'end',align:'end',offset:2,color:'#3182F6',font:{size:11,weight:'700'},formatter:v=>v||''}},
       scales:{
         x:{grid:{display:false},ticks:{color:'#888',font:{size:10}}},
         y:{beginAtZero:true,suggestedMax:maxQty*1.15,grid:{color:'rgba(100,100,120,.15)'},ticks:{color:'#888',font:{size:11},callback:v=>v+'개'}},
@@ -16243,8 +16297,11 @@ async function downloadDailyExcel(){
   const XS=window.XLSXStyle, U=XS.utils;
   const pad=v=>String(v).padStart(2,'0');
   const selY=_dlyFilter.year, selMon=_dlyFilter.month, selMonStr=pad(selMon);
-  const chFilter=_dlyFilter.ch, chLabel=chFilter==='ALL'?'전체':chFilter;
-  const selMonRows=_revData.filter(r=>r.year===selY&&r.date?.startsWith(selMonStr)&&(chFilter==='ALL'||r.ch===chFilter));
+  const chFilter=_dlyFilter.ch;
+  const chArr = chFilter==='ALL' ? null : (Array.isArray(chFilter)?chFilter:[chFilter]);
+  const chMatch = c => !chArr || chArr.includes(c);
+  const chLabel = chFilter==='ALL' ? '전체' : (Array.isArray(chFilter)?chFilter.join('·'):chFilter);
+  const selMonRows=_revData.filter(r=>r.year===selY&&r.date?.startsWith(selMonStr)&&chMatch(r.ch));
   const selDays=[...new Set(selMonRows.map(r=>parseInt(r.date.split('-')[1])))].sort((a,b)=>a-b);
   const endDay=_dlyFilter.day!==null?_dlyFilter.day:(selDays.length?selDays[selDays.length-1]:1);
   const fileName=`일일보고_${selY}-${selMonStr}-${pad(endDay)}_${chLabel}.xlsx`;
@@ -16266,14 +16323,14 @@ async function downloadDailyExcel(){
   let ymList;
   if(cumChk){
     const ymSet=new Set();
-    _revData.forEach(r=>{ if(chFilter!=='ALL'&&r.ch!==chFilter) return; if(r.year&&r.date) ymSet.add(`${r.year}-${r.date.slice(0,2)}`); });
+    _revData.forEach(r=>{ if(!chMatch(r.ch)) return; if(r.year&&r.date) ymSet.add(`${r.year}-${r.date.slice(0,2)}`); });
     ymList=[...ymSet].sort().reverse();
   } else {
     ymList=[`${selY}-${selMonStr}`];
   }
   ymList.forEach(name=>{
     const [yy,mm]=name.split('-').map(Number);
-    const rows=_revData.filter(r=>r.year===yy&&r.date?.startsWith(pad(mm))&&(chFilter==='ALL'||r.ch===chFilter));
+    const rows=_revData.filter(r=>r.year===yy&&r.date?.startsWith(pad(mm))&&chMatch(r.ch));
     const days=[...new Set(rows.map(r=>r.date))].sort();
     if(!days.length) return;
     const agg=days.map(ds=>{
@@ -16353,7 +16410,7 @@ async function downloadDailyExcel(){
   const histFrom=new Date(refDate); histFrom.setDate(histFrom.getDate()-(DAILY_HIST_DAYS-1));
   const dailyQty={};   // 모델명 → { 'YYYY|MM-DD': 주문수량 }
   _revData.forEach(r=>{
-    if(chFilter!=='ALL'&&r.ch!==chFilter) return;
+    if(!chMatch(r.ch)) return;
     if(!r.date||!r.year) return;
     const [mm,dd]=r.date.split('-').map(Number);
     const d=new Date(r.year,mm-1,dd);
@@ -16489,7 +16546,7 @@ async function downloadDailyExcel(){
     const {ch,date}=parseAdKey(k); const p=date.split('-');
     if(Number(p[0])!==selY||Number(p[1])!==selMon) continue;
     if(Number(p[2])>endDay) continue;
-    if(chFilter!=='ALL'&&ch!==chFilter) continue;
+    if(!chMatch(ch)) continue;
     adRows.push({date,ch,amt:_adSpend[k]});
   }
   adRows.sort((a,b)=>a.date.localeCompare(b.date)||a.ch.localeCompare(b.ch));
