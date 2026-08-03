@@ -4769,22 +4769,6 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <div class="rev-empty" id="rgConvChartEmpty" style="padding:20px;display:none;">데이터가 없습니다</div>
           </div>
         </div>
-        <!-- 판매량 비중 도넛: 가로형(왼쪽 도넛 · 오른쪽 비중 목록) -->
-        <div class="rev-card" style="margin-top:14px;">
-          <div class="rev-card-title"><span>🍩 제품별 판매량 비중</span><span style="font-size:10.5px;color:var(--tx2);font-weight:400;">상품명 매칭된 항목만</span></div>
-          <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
-            <div style="position:relative;height:190px;width:190px;flex-shrink:0;">
-              <canvas id="rgProdDnut"></canvas>
-            </div>
-            <div id="rgProdDnutLegend" style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:5px;"></div>
-          </div>
-          <div id="rgProdDnutNote" style="font-size:10.5px;color:var(--tx2);margin-top:8px;"></div>
-          <div class="rev-empty" id="rgProdDnutEmpty" style="padding:16px;display:none;">매칭된 상품이 없습니다 — 아래 표에서 🔗로 상품을 매칭하세요</div>
-        </div>
-        <div class="rev-card" style="margin-top:14px;">
-          <div class="rev-card-title"><span>⚡ 취소 유형 비교</span></div>
-          <div id="rgCancelTypeBox" style="padding:10px 4px;"></div>
-        </div>
         <div class="rev-tbl-card" style="margin-top:14px;">
           <div class="rev-tbl-head" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">
             <span class="rev-tbl-title">🏆 제품별 매출 순위</span>
@@ -4817,6 +4801,21 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </table></div>
           <div id="rgProdPager" style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:0.5px solid var(--bd);font-size:11px;"></div>
         </div>
+        <!-- 판매량 비중 도넛: 가로형(왼쪽 도넛 · 오른쪽 상위5 목록 + 더보기) -->
+        <div class="rev-card" style="margin-top:14px;">
+          <div class="rev-card-title"><span>🍩 제품별 판매량 비중</span><span style="font-size:10.5px;color:var(--tx2);font-weight:400;">상품명 매칭된 항목만</span></div>
+          <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+            <div style="position:relative;height:260px;width:260px;flex-shrink:0;">
+              <canvas id="rgProdDnut"></canvas>
+            </div>
+            <div style="flex:1;min-width:220px;">
+              <div id="rgProdDnutLegend" style="display:flex;flex-direction:column;gap:5px;"></div>
+              <button class="btn btn-sm" id="rgProdDnutMoreBtn" onclick="openRgDnutFullList()" style="display:none;margin-top:8px;">더보기</button>
+            </div>
+          </div>
+          <div id="rgProdDnutNote" style="font-size:10.5px;color:var(--tx2);margin-top:8px;"></div>
+          <div class="rev-empty" id="rgProdDnutEmpty" style="padding:16px;display:none;">매칭된 상품이 없습니다 — 위 표에서 🔗로 상품을 매칭하세요</div>
+        </div>
       </div>
     </div>
 
@@ -4834,15 +4833,64 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
     </div>
 
-    <!-- 로켓그로스: 제품별 판매량 추이 팝업 -->
+    <!-- 로켓그로스: 판매량 비중 전체 목록(더보기) 팝업 -->
+    <div class="modal-overlay" id="rgDnutFullModal">
+      <div class="modal" style="max-width:480px;">
+        <h3 style="margin:0 0 10px;">🍩 제품별 판매량 비중 (전체)</h3>
+        <div id="rgDnutFullList" style="max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
+        <div class="ma" style="margin-top:12px;">
+          <button class="btn" onclick="closeModal('rgDnutFullModal')">닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 로켓그로스: 제품별 판매량 추이 팝업(보고용 상세) -->
     <div class="modal-overlay" id="rgProdChartModal">
-      <div class="modal" style="max-width:640px;">
+      <div class="modal" style="max-width:960px;">
         <h3 id="rgProdChartTitle">📊 판매량 추이</h3>
-        <div class="rev-filter" style="padding:0 0 10px;flex-wrap:wrap;">
-          <span class="rev-filter-lbl">보기</span>
+        <div class="rev-filter" style="padding:0 0 10px;flex-wrap:wrap;gap:10px;">
+          <span class="rev-filter-lbl">기간</span>
+          <input type="date" id="rgProdChartFrom" onchange="setRgProdChartRange()" style="font-size:11px;padding:3px 6px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);">
+          <span style="color:var(--tx2);">~</span>
+          <input type="date" id="rgProdChartTo" onchange="setRgProdChartRange()" style="font-size:11px;padding:3px 6px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);">
+          <span class="rev-filter-lbl" style="margin-left:8px;">보기</span>
           <div class="rev-filter-group" id="rgProdChartModeBtns"></div>
         </div>
-        <div style="position:relative;height:280px;">
+        <div class="rev-kpi" style="grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">🚀 매출</div>
+            <div class="rev-kpi-val" id="rgPcK0" style="font-size:20px;">—</div>
+          </div>
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">📦 판매량</div>
+            <div class="rev-kpi-val" id="rgPcK1" style="font-size:20px;">—</div>
+          </div>
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">🛒 주문건수</div>
+            <div class="rev-kpi-val" id="rgPcK2" style="font-size:20px;">—</div>
+          </div>
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">🚫 취소율</div>
+            <div class="rev-kpi-val" id="rgPcK3" style="font-size:20px;color:#D97706;">—</div>
+          </div>
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">👀 방문자</div>
+            <div class="rev-kpi-val" id="rgPcK4" style="font-size:20px;">—</div>
+          </div>
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">🔍 조회수</div>
+            <div class="rev-kpi-val" id="rgPcK5" style="font-size:20px;">—</div>
+          </div>
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">🧺 장바구니</div>
+            <div class="rev-kpi-val" id="rgPcK6" style="font-size:20px;">—</div>
+          </div>
+          <div class="rev-kpi-card" style="padding:10px 12px;">
+            <div class="rev-kpi-lbl" style="font-size:10.5px;">💹 구매전환율</div>
+            <div class="rev-kpi-val" id="rgPcK7" style="font-size:20px;">—</div>
+          </div>
+        </div>
+        <div style="position:relative;height:420px;">
           <canvas id="rgProdChartCv"></canvas>
         </div>
         <div class="ma" style="margin-top:12px;">
@@ -14504,6 +14552,20 @@ let _rgUpFiles = {};        // {vendor:File, daily:File}
 let _rgSort = {key:'revenue', dir:-1};
 let _rgRevChart=null, _rgConvChart=null, _rgProdDnut=null;
 const RG_CH_COLORS=['#F97316','#3182F6','#059669','#8B5CF6','#DC2626','#EC4899','#0EA5E9','#14B8A6','#F59E0B','#64748B'];
+let _rgDnutFullList=[];   // 판매량 비중 도넛 전체 목록(더보기 팝업용) — [ [상품명, 판매량], ... ]
+function openRgDnutFullList(){
+  const total=_rgDnutFullList.reduce((s,[,v])=>s+v,0);
+  const listEl=document.getElementById('rgDnutFullList');
+  if(listEl) listEl.innerHTML=_rgDnutFullList.map(([k,v],i)=>`
+    <div class="rev-ch-row">
+      <div class="rev-ch-name" style="display:flex;align-items:center;gap:6px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:${RG_CH_COLORS[i%10]};display:inline-block;flex-shrink:0;"></span>${k}
+      </div>
+      <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${_rgDnutFullList[0][1]>0?Math.round(v/_rgDnutFullList[0][1]*100):0}%;background:${RG_CH_COLORS[i%10]};"></div></div>
+      <div class="rev-ch-val">${v.toLocaleString()}개 <span style="color:var(--tx2);font-weight:500;">(${total>0?(v/total*100).toFixed(1):0}%)</span></div>
+    </div>`).join('');
+  openModal('rgDnutFullModal');
+}
 // 옵션ID ↔ 백데이터 상품 수동 매칭 (cloudKv 'rg_option_map' = { optionId: backdata id })
 let _rgOptionMap = {};
 let _rgOptionMapLoaded = false;
@@ -14887,17 +14949,6 @@ function renderRgContent(){
     } else { if(convEmpty) convEmpty.style.display='block'; convCtx.style.display='none'; }
   }
 
-  // 취소 유형 비교 (즉시취소 vs 일반취소)
-  const cancelBox=document.getElementById('rgCancelTypeBox');
-  if(cancelBox){
-    const totalInstant=optList.reduce((s,o)=>s+o.instantCancelQty,0);
-    const pct=cancelQtyTotal>0?(totalInstant/cancelQtyTotal*100):0;
-    cancelBox.innerHTML=cancelQtyTotal>0?`
-      <div class="rev-ch-row"><div class="rev-ch-name">즉시취소</div><div class="rev-ch-track"><div class="rev-ch-fill" style="width:${pct}%;background:#DC2626;"></div></div><div class="rev-ch-val">${totalInstant.toLocaleString()}건 (${pct.toFixed(1)}%)</div></div>
-      <div class="rev-ch-row"><div class="rev-ch-name">일반취소</div><div class="rev-ch-track"><div class="rev-ch-fill" style="width:${100-pct}%;background:#F59E0B;"></div></div><div class="rev-ch-val">${(cancelQtyTotal-totalInstant).toLocaleString()}건</div></div>
-      <div style="font-size:10.5px;color:var(--tx2);margin-top:8px;">전체 취소 ${cancelQtyTotal.toLocaleString()}건 중 즉시취소(주문 직후 취소) 비중</div>
-    `:'<div class="rev-empty" style="padding:12px;">취소 데이터가 없습니다</div>';
-  }
 
 }
 
@@ -15064,8 +15115,10 @@ async function renderRgProdSection(){
         options:{responsive:true,maintainAspectRatio:false,
           plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}개`}}}}
       });
+      _rgDnutFullList=nameEntries;   // 더보기 팝업에서 전체 목록 참조
+      const top5=nameEntries.slice(0,5);
       const leg=document.getElementById('rgProdDnutLegend');
-      if(leg) leg.innerHTML=nameEntries.map(([k,v],i)=>`
+      if(leg) leg.innerHTML=top5.map(([k,v],i)=>`
         <div class="rev-ch-row">
           <div class="rev-ch-name" style="display:flex;align-items:center;gap:6px;">
             <span style="width:10px;height:10px;border-radius:50%;background:${RG_CH_COLORS[i%10]};display:inline-block;flex-shrink:0;"></span>${k}
@@ -15073,16 +15126,23 @@ async function renderRgProdSection(){
           <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v/nameEntries[0][1]*100)}%;background:${RG_CH_COLORS[i%10]};"></div></div>
           <div class="rev-ch-val">${v.toLocaleString()}개</div>
         </div>`).join('');
+      const moreBtn=document.getElementById('rgProdDnutMoreBtn');
+      if(moreBtn){
+        moreBtn.style.display = nameEntries.length>5 ? '' : 'none';
+        moreBtn.textContent = `더보기 (${(nameEntries.length-5).toLocaleString()}개 더)`;
+      }
     } else {
       if(dnutEmpty) dnutEmpty.style.display='block'; dnutCtx.style.display='none';
+      const moreBtn=document.getElementById('rgProdDnutMoreBtn'); if(moreBtn) moreBtn.style.display='none';
     }
     if(noteEl) noteEl.textContent = unmatchedCount ? `매칭되지 않은 옵션 ${unmatchedCount}개(판매량 ${unmatchedQty.toLocaleString()}개)는 제외됨` : '';
   }
 }
 
-// ── 제품별 판매량 추이 팝업 (일별/월별 토글) — 매칭된 옵션이면 같은 매칭명으로 묶인 전체 옵션을 함께 집계 ──
+// ── 제품별 판매량 추이 팝업 (기간 선택 + KPI 상세 + 일별/월별 토글) — 매칭된 옵션이면 같은 매칭명으로 묶인 전체 옵션을 함께 집계 ──
 let _rgProdChartMode='daily';   // 'daily' | 'monthly'
 let _rgProdChartOptionIds=[];
+let _rgProdChartRange={from:null,to:null};
 let _rgProdChartCv=null;
 async function openRgProdChart(optionId, displayName){
   const mappedId=_rgOptionMap[optionId];
@@ -15095,10 +15155,28 @@ async function openRgProdChart(optionId, displayName){
   if(titleEl) titleEl.textContent='📊 '+(displayName||'판매량 추이');
   const months=_rgMonthsAvailable(); // 최신순 정렬
   if(months.length) await rgEnsureProdMonths(months[months.length-1], months[0]);
+
+  // 이 상품(매칭 그룹)의 데이터가 있는 전체 기간을 기본값으로
+  const idSet=new Set(ids);
+  let allDates=[];
+  Object.values(_rgProdCache).forEach(arr=>{ (arr||[]).forEach(r=>{ if(idSet.has(r.optionId)) allDates.push(r.date); }); });
+  allDates.sort();
+  _rgProdChartRange = allDates.length ? {from:allDates[0], to:allDates[allDates.length-1]} : {from:null,to:null};
+  const fEl=document.getElementById('rgProdChartFrom'), tEl=document.getElementById('rgProdChartTo');
+  if(fEl) fEl.value=_rgProdChartRange.from||'';
+  if(tEl) tEl.value=_rgProdChartRange.to||'';
+
   _rgProdChartMode='daily';
   renderRgProdChartModeBtns();
   renderRgProdChart();
   openModal('rgProdChartModal');
+}
+function setRgProdChartRange(){
+  const f=document.getElementById('rgProdChartFrom').value;
+  const t=document.getElementById('rgProdChartTo').value;
+  if(!f||!t||f>t) return;
+  _rgProdChartRange={from:f,to:t};
+  renderRgProdChart();
 }
 function setRgProdChartMode(mode){
   _rgProdChartMode=mode;
@@ -15112,8 +15190,32 @@ function renderRgProdChartModeBtns(){
 }
 function renderRgProdChart(){
   const ids=new Set(_rgProdChartOptionIds);
+  const {from,to}=_rgProdChartRange;
   let rows=[];
-  Object.values(_rgProdCache).forEach(arr=>{ (arr||[]).forEach(r=>{ if(ids.has(r.optionId)) rows.push(r); }); });
+  Object.values(_rgProdCache).forEach(arr=>{ (arr||[]).forEach(r=>{
+    if(ids.has(r.optionId) && (!from || (r.date>=from && r.date<=to))) rows.push(r);
+  }); });
+
+  // KPI 상세 (선택 기간 합계)
+  const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
+  const agg=rows.reduce((s,r)=>{
+    const mult=rgQtyMultiplier(r.optionId);
+    s.revenue+=r.revenue||0; s.qty+=(r.qty||0)*mult; s.orders+=r.orders||0;
+    s.visitors+=r.visitors||0; s.views+=r.views||0; s.cart+=r.cart||0;
+    s.grossQty+=r.grossQty||0; s.cancelQty+=Math.abs(r.cancelQty||0);
+    return s;
+  },{revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0,grossQty:0,cancelQty:0});
+  const pcConvRate=agg.visitors>0?(agg.orders/agg.visitors*100):0;
+  const pcCancelRate=agg.grossQty>0?(agg.cancelQty/agg.grossQty*100):0;
+  const setTxt=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  setTxt('rgPcK0', fmt(agg.revenue));
+  setTxt('rgPcK1', agg.qty.toLocaleString()+'개');
+  setTxt('rgPcK2', agg.orders.toLocaleString()+'건');
+  setTxt('rgPcK3', pcCancelRate.toFixed(1)+'%');
+  setTxt('rgPcK4', agg.visitors.toLocaleString());
+  setTxt('rgPcK5', agg.views.toLocaleString());
+  setTxt('rgPcK6', agg.cart.toLocaleString());
+  setTxt('rgPcK7', pcConvRate.toFixed(2)+'%');
 
   let labels=[], qtyData=[];
   if(_rgProdChartMode==='daily'){
