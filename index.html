@@ -14328,7 +14328,15 @@ function renderDailyReport(){
     return;
   }
   if(mainGrid) mainGrid.style.display='';
-  if(rgCard) rgCard.style.display='none';
+  // '전체' 선택 중이면 일반 채널 표 아래에 로켓그로스 제품별 현황도 같이 보여준다.
+  // (그동안 '전체'에서는 위 정산금액 KPI에만 로켓그로스 금액이 합산되고 표에는 전혀 안 보여서
+  //  "전체인데 왜 로켓그로스는 안 보이냐"는 혼란이 있었음 — 특정 채널(스마트스토어 등) 단독 선택 시에는 계속 숨김)
+  if(_dlyFilter.ch==='ALL' && Object.keys(_rgDailyTotals).length){
+    if(rgCard) rgCard.style.display='';
+    renderDlyRgCard(periodLabel);
+  } else {
+    if(rgCard) rgCard.style.display='none';
+  }
 
   const empty=document.getElementById('revDlyEmpty');
   const tbl=document.getElementById('revDlyTbl');
