@@ -4737,12 +4737,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <div class="rev-empty" id="rgRevChartEmpty" style="padding:20px;display:none;">데이터가 없습니다</div>
           </div>
           <div class="rev-card">
-            <div class="rev-card-title"><span>🍩 카테고리별 매출 비중</span></div>
+            <div class="rev-card-title"><span>🍩 제품별 판매량 비중</span><span style="font-size:10.5px;color:var(--tx2);font-weight:400;">상품명 매칭된 항목만</span></div>
             <div style="position:relative;height:180px;display:flex;align-items:center;justify-content:center;">
-              <canvas id="rgCatDnut" style="max-height:160px;"></canvas>
+              <canvas id="rgProdDnut" style="max-height:160px;"></canvas>
             </div>
-            <div id="rgCatLegend" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;"></div>
-            <div class="rev-empty" id="rgCatDnutEmpty" style="padding:16px;display:none;">데이터가 없습니다</div>
+            <div id="rgProdDnutLegend" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;"></div>
+            <div id="rgProdDnutNote" style="font-size:10.5px;color:var(--tx2);margin-top:6px;"></div>
+            <div class="rev-empty" id="rgProdDnutEmpty" style="padding:16px;display:none;">매칭된 상품이 없습니다 — 아래 표에서 🔗로 상품을 매칭하세요</div>
           </div>
         </div>
         <div class="rev-chart-grid" style="margin-top:14px;">
@@ -4757,16 +4758,21 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </div>
         </div>
         <div class="rev-tbl-card" style="margin-top:14px;">
-          <div class="rev-tbl-head">
+          <div class="rev-tbl-head" style="flex-wrap:wrap;gap:8px;">
             <span class="rev-tbl-title">🏆 제품별 매출 순위</span>
             <span style="font-size:11px;color:var(--tx2);" id="rgProdSub"></span>
+            <div style="display:flex;align-items:center;gap:6px;margin-left:auto;font-size:11px;color:var(--tx2);">
+              기간
+              <input type="date" id="rgProdFrom" onchange="setRgProdRange()" style="font-size:11px;padding:3px 6px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);">
+              ~
+              <input type="date" id="rgProdTo" onchange="setRgProdRange()" style="font-size:11px;padding:3px 6px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);">
+            </div>
           </div>
           <div class="rev-empty" id="rgProdEmpty">데이터가 없습니다</div>
           <div class="tw"><table class="dt" id="rgProdTbl" style="display:none;">
             <thead><tr>
               <th style="width:32px;">#</th>
               <th>상품명</th>
-              <th>카테고리</th>
               <th style="text-align:right;cursor:pointer;" onclick="setRgSort('revenue')">매출<span class="uni-sort-ar" data-rg-k="revenue" style="color:#2563EB;"></span></th>
               <th style="text-align:right;cursor:pointer;" onclick="setRgSort('qty')">판매량<span class="uni-sort-ar" data-rg-k="qty" style="color:#2563EB;"></span></th>
               <th style="text-align:right;cursor:pointer;" onclick="setRgSort('orders')">주문건수<span class="uni-sort-ar" data-rg-k="orders" style="color:#2563EB;"></span></th>
@@ -4780,6 +4786,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <tbody id="rgProdTbody"></tbody>
             <tfoot id="rgProdTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
           </table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 로켓그로스: 옵션ID ↔ 백데이터 상품 매칭 모달 -->
+    <div class="modal-overlay" id="rgMatchModal">
+      <div class="modal" style="max-width:480px;">
+        <h3 style="margin:0 0 4px;">상품 매칭</h3>
+        <div style="font-size:11.5px;color:var(--tx2);margin-bottom:10px;line-height:1.5;" id="rgMatchTarget"></div>
+        <input type="text" id="rgMatchSearch" placeholder="백데이터 코드 또는 상품명 검색" style="width:100%;box-sizing:border-box;margin-bottom:8px;" oninput="renderRgMatchList()">
+        <div id="rgMatchList" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:14px;">
+          <button class="btn btn-sm" onclick="rgUnmatchOption()" id="rgUnmatchBtn" style="color:#DC2626;">매칭 해제</button>
+          <button class="btn btn-sm" onclick="closeModal('rgMatchModal')">닫기</button>
         </div>
       </div>
     </div>
@@ -14333,8 +14353,49 @@ let _rgSelMonth = null;
 let _rgProdCache = {};      // ym('YYYY-MM') → 해당 월 상품별 원본 행 배열
 let _rgUpFiles = {};        // {vendor:File, daily:File}
 let _rgSort = {key:'revenue', dir:-1};
-let _rgRevChart=null, _rgCancelChart=null, _rgCatDnut=null;
+let _rgRevChart=null, _rgCancelChart=null, _rgProdDnut=null;
 const RG_CH_COLORS=['#F97316','#3182F6','#059669','#8B5CF6','#DC2626','#EC4899','#0EA5E9','#14B8A6','#F59E0B','#64748B'];
+// 옵션ID ↔ 백데이터 상품 수동 매칭 (cloudKv 'rg_option_map' = { optionId: backdata code })
+let _rgOptionMap = {};
+let _rgOptionMapLoaded = false;
+let _rgMatchTargetId = null;
+// 제품별 매출 순위 표의 조회 기간 (월 선택과 별도로 지정 가능, 기본값은 선택된 월 전체)
+let _rgProdRange = {from:null, to:null};
+async function loadRgOptionMap(){
+  try{
+    const d=await cloudKvLoad('rg_option_map');
+    _rgOptionMap=(d && typeof d==='object' && !Array.isArray(d)) ? d : {};
+  }catch(e){ _rgOptionMap={}; }
+  _rgOptionMapLoaded=true;
+}
+function rgResolveName(optionId){
+  const code=_rgOptionMap[optionId];
+  if(!code) return null;
+  const bd=_bdData.find(r=>String(r.code)===String(code));
+  return bd?bd.name:null;
+}
+function _rgDefaultRangeForMonth(ym){
+  const [y,m]=ym.split('-').map(Number);
+  const last=new Date(Date.UTC(y,m,0)).getUTCDate();
+  return {from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}`};
+}
+// 기간(from~to)이 걸쳐있는 모든 월 샤드(rg_products_YYYY-MM)를 캐시에 로드
+async function rgEnsureProdMonths(fromYm, toYm){
+  const months=[];
+  let [y,m]=fromYm.split('-').map(Number);
+  const [ey,em]=toYm.split('-').map(Number);
+  while(y<ey || (y===ey&&m<=em)){
+    months.push(`${y}-${String(m).padStart(2,'0')}`);
+    m++; if(m>12){ m=1; y++; }
+  }
+  for(const ym of months){
+    if(!_rgProdCache[ym]){
+      const d=await cloudKvLoad('rg_products_'+ym);
+      _rgProdCache[ym]=Array.isArray(d)?d:[];
+    }
+  }
+  return months;
+}
 
 function _rgMonthsAvailable(){
   return [...new Set(Object.keys(_rgDailyTotals).map(k=>k.slice(0,7)))].sort().reverse();
@@ -14492,6 +14553,7 @@ async function submitRgUpload(){
 // ── 탭 진입/렌더 ──
 async function renderRgPage(){
   if(!_rgTotalsLoaded) await loadRgDailyTotals();
+  if(!_rgOptionMapLoaded) await loadRgOptionMap();
   renderRgUpload();
   const months=_rgMonthsAvailable();
   const emptyEl=document.getElementById('rgEmptyMsg'), contentEl=document.getElementById('rgContent');
@@ -14503,6 +14565,7 @@ async function renderRgPage(){
   if(emptyEl) emptyEl.style.display='none';
   if(contentEl) contentEl.style.display='';
   if(!_rgSelMonth||!months.includes(_rgSelMonth)) _rgSelMonth=months[0];
+  if(!_rgProdRange.from||!_rgProdRange.to) _rgProdRange=_rgDefaultRangeForMonth(_rgSelMonth);
   const mBtnsEl=document.getElementById('rgMonthBtns');
   if(mBtnsEl) mBtnsEl.innerHTML=months.map(ym=>`<button class="rfbtn${ym===_rgSelMonth?' active':''}" onclick="setRgMonth('${ym}')">${ym}</button>`).join('');
   if(!_rgProdCache[_rgSelMonth]){
@@ -14510,12 +14573,20 @@ async function renderRgPage(){
     _rgProdCache[_rgSelMonth]=Array.isArray(d)?d:[];
   }
   renderRgContent();
+  renderRgProdSection();
 }
-function setRgMonth(ym){ _rgSelMonth=ym; _rgSort={key:'revenue',dir:-1}; renderRgPage(); }
+function setRgMonth(ym){ _rgSelMonth=ym; _rgSort={key:'revenue',dir:-1}; _rgProdRange=_rgDefaultRangeForMonth(ym); renderRgPage(); }
 function setRgSort(key){
   if(_rgSort.key===key){ _rgSort.dir=_rgSort.dir===-1?1:-1; }
   else { _rgSort.key=key; _rgSort.dir=-1; }
-  renderRgContent();
+  renderRgProdSection();
+}
+async function setRgProdRange(){
+  const f=document.getElementById('rgProdFrom').value;
+  const t=document.getElementById('rgProdTo').value;
+  if(!f||!t||f>t) return;
+  _rgProdRange={from:f,to:t};
+  await renderRgProdSection();
 }
 
 function renderRgContent(){
@@ -14542,21 +14613,15 @@ function renderRgContent(){
   const byOpt={};
   prodRows.forEach(r=>{
     const k=r.optionId;
-    if(!byOpt[k]) byOpt[k]={optionName:r.optionName,productName:r.productName,category:r.category||'미분류',
-      revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0,grossRevenue:0,grossQty:0,cancelAmount:0,cancelQty:0,instantCancelQty:0,itemWinnerSum:0,itemWinnerN:0};
+    if(!byOpt[k]) byOpt[k]={
+      revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0,grossRevenue:0,grossQty:0,cancelAmount:0,cancelQty:0,instantCancelQty:0};
     const o=byOpt[k];
     o.revenue+=r.revenue||0; o.qty+=r.qty||0; o.orders+=r.orders||0;
     o.visitors+=r.visitors||0; o.views+=r.views||0; o.cart+=r.cart||0;
     o.grossRevenue+=r.grossRevenue||0; o.grossQty+=r.grossQty||0;
     o.cancelAmount+=r.cancelAmount||0; o.cancelQty+=Math.abs(r.cancelQty||0); o.instantCancelQty+=Math.abs(r.instantCancelQty||0);
-    o.itemWinnerSum+=(r.itemWinnerRate||0); o.itemWinnerN++;
   });
   const optList=Object.values(byOpt);
-  optList.forEach(o=>{
-    o.convRate=o.visitors>0?(o.orders/o.visitors*100):0;
-    o.cancelRateRow=o.grossQty>0?(o.cancelQty/o.grossQty*100):0;
-    o.itemWinnerAvg=o.itemWinnerN>0?(o.itemWinnerSum/o.itemWinnerN):0;
-  });
   const grossQtyTotal=optList.reduce((s,o)=>s+o.grossQty,0);
   const cancelQtyTotal=optList.reduce((s,o)=>s+o.cancelQty,0);
   const cancelRate=grossQtyTotal>0?(cancelQtyTotal/grossQtyTotal*100):0;
@@ -14601,36 +14666,6 @@ function renderRgContent(){
     } else { if(revEmpty) revEmpty.style.display='block'; revCtx.style.display='none'; }
   }
 
-  // 카테고리별 매출 비중
-  const byCat={};
-  optList.forEach(o=>{ byCat[o.category]=(byCat[o.category]||0)+o.revenue; });
-  const catEntries=Object.entries(byCat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const catCtx=document.getElementById('rgCatDnut'), catEmpty=document.getElementById('rgCatDnutEmpty');
-  if(catCtx){
-    if(_rgCatDnut){_rgCatDnut.destroy();_rgCatDnut=null;}
-    if(catEntries.length){
-      if(catEmpty) catEmpty.style.display='none'; catCtx.style.display='';
-      _rgCatDnut=new Chart(catCtx.getContext('2d'),{
-        type:'doughnut',
-        data:{labels:catEntries.map(([k])=>k),datasets:[{
-          data:catEntries.map(([,v])=>Math.round(v/10000)),
-          backgroundColor:RG_CH_COLORS.slice(0,catEntries.length),borderWidth:2,borderColor:'#fff'
-        }]},
-        options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtMan(c.parsed)}원`}}}}
-      });
-      const leg=document.getElementById('rgCatLegend');
-      if(leg) leg.innerHTML=catEntries.map(([k,v],i)=>`
-        <div class="rev-ch-row">
-          <div class="rev-ch-name" style="display:flex;align-items:center;gap:6px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:${RG_CH_COLORS[i%10]};display:inline-block;flex-shrink:0;"></span>${k}
-          </div>
-          <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v/catEntries[0][1]*100)}%;background:${RG_CH_COLORS[i%10]};"></div></div>
-          <div class="rev-ch-val">${fmt(v)}</div>
-        </div>`).join('');
-    } else { if(catEmpty) catEmpty.style.display='block'; catCtx.style.display='none'; }
-  }
-
   // 일별 취소율 추이 (VENDOR_ITEM_METRICS 기반 — 일별 파일엔 취소 컬럼 없음)
   const byDate={};
   prodRows.forEach(r=>{
@@ -14651,9 +14686,9 @@ function renderRgContent(){
             data:cancelDateKeys.map(k=>{const v=byDate[k]; return v.grossQty>0?+(v.cancelQty/v.grossQty*100).toFixed(1):0;}),
             borderColor:'#DC2626',backgroundColor:'rgba(220,38,38,0.08)',tension:0.3,pointRadius:3,pointBackgroundColor:'#DC2626',fill:true}]},
         options:{responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`취소율: ${c.parsed.y}%`}}},
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`취소율: ${(+c.parsed.y).toFixed(1)}%`}}},
           scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'var(--tx2)'}},
-            y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{font:{size:10},color:'var(--tx2)',callback:v=>v+'%'}}}
+            y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{font:{size:10},color:'var(--tx2)',callback:v=>(+v).toFixed(1)+'%'}}}
         }
       });
     } else { if(cancelEmpty) cancelEmpty.style.display='block'; cancelCtx.style.display='none'; }
@@ -14671,22 +14706,67 @@ function renderRgContent(){
     `:'<div class="rev-empty" style="padding:12px;">취소 데이터가 없습니다</div>';
   }
 
-  // 제품별 매출 순위 테이블
+}
+
+// ── 제품별 매출 순위 표 + 판매량 도넛 (기간 지정 가능, 월 경계를 넘으면 필요한 월 샤드를 추가 로드) ──
+async function renderRgProdSection(){
+  const {from,to}=_rgProdRange; if(!from||!to) return;
+  const fEl=document.getElementById('rgProdFrom'), tEl=document.getElementById('rgProdTo');
+  if(fEl) fEl.value=from;
+  if(tEl) tEl.value=to;
+  const fromYm=from.slice(0,7), toYm=to.slice(0,7);
+  await rgEnsureProdMonths(fromYm, toYm);
+
+  const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
+
+  let rangeRows=[];
+  Object.keys(_rgProdCache).forEach(ym=>{
+    if(ym<fromYm||ym>toYm) return;
+    (_rgProdCache[ym]||[]).forEach(r=>{ if(r.date>=from && r.date<=to) rangeRows.push(r); });
+  });
+
+  const byOpt={};
+  rangeRows.forEach(r=>{
+    const k=r.optionId;
+    if(!byOpt[k]) byOpt[k]={optionName:r.optionName,productName:r.productName,
+      revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0,grossRevenue:0,grossQty:0,cancelAmount:0,cancelQty:0,instantCancelQty:0,itemWinnerSum:0,itemWinnerN:0};
+    const o=byOpt[k];
+    o.revenue+=r.revenue||0; o.qty+=r.qty||0; o.orders+=r.orders||0;
+    o.visitors+=r.visitors||0; o.views+=r.views||0; o.cart+=r.cart||0;
+    o.grossRevenue+=r.grossRevenue||0; o.grossQty+=r.grossQty||0;
+    o.cancelAmount+=r.cancelAmount||0; o.cancelQty+=Math.abs(r.cancelQty||0); o.instantCancelQty+=Math.abs(r.instantCancelQty||0);
+    o.itemWinnerSum+=(r.itemWinnerRate||0); o.itemWinnerN++;
+  });
+  const optList=Object.entries(byOpt).map(([optionId,o])=>({optionId, ...o}));
+  optList.forEach(o=>{
+    o.convRate=o.visitors>0?(o.orders/o.visitors*100):0;
+    o.cancelRateRow=o.grossQty>0?(o.cancelQty/o.grossQty*100):0;
+    o.itemWinnerAvg=o.itemWinnerN>0?(o.itemWinnerSum/o.itemWinnerN):0;
+    o.mappedName=rgResolveName(o.optionId);
+    o.displayName=o.mappedName||o.productName;
+  });
+  const grossQtyTotal=optList.reduce((s,o)=>s+o.grossQty,0);
+  const cancelQtyTotal=optList.reduce((s,o)=>s+o.cancelQty,0);
+  const cancelRate=grossQtyTotal>0?(cancelQtyTotal/grossQtyTotal*100):0;
+
+  // 정렬 + 테이블
   const kmap={revenue:'revenue',qty:'qty',orders:'orders',visitors:'visitors',views:'views',cart:'cart',convRate:'convRate',cancelRate:'cancelRateRow'};
   const fld=kmap[_rgSort.key]||'revenue';
   const sorted=[...optList].sort((a,b)=>(a[fld]-b[fld])*_rgSort.dir);
   const tbl=document.getElementById('rgProdTbl'), tEmpty=document.getElementById('rgProdEmpty'), tBody=document.getElementById('rgProdTbody'), tFoot=document.getElementById('rgProdTfoot');
-  const sub=document.getElementById('rgProdSub'); if(sub) sub.textContent=`${ym} · 옵션 ${sorted.length.toLocaleString()}개`;
+  const sub=document.getElementById('rgProdSub'); if(sub) sub.textContent=`${from} ~ ${to} · 옵션 ${sorted.length.toLocaleString()}개`;
   if(tBody){
     if(sorted.length){
       if(tEmpty) tEmpty.style.display='none'; if(tbl) tbl.style.display='';
       tBody.innerHTML=sorted.map((o,i)=>`<tr>
         <td>${i+1}</td>
-        <td style="max-width:240px;">
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;" title="${o.productName}">${o.productName}</div>
-          ${o.optionName&&o.optionName!==o.productName?`<div style="font-size:10px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${o.optionName}">${o.optionName}</div>`:''}
+        <td style="max-width:260px;">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;flex:1;" title="${o.displayName}">${o.displayName}</div>
+            <span style="cursor:pointer;font-size:12px;flex-shrink:0;" title="${o.mappedName?'매칭 변경':'백데이터 상품과 매칭'}" onclick="openRgMatchModal('${o.optionId}')">${o.mappedName?'✎':'🔗'}</span>
+          </div>
+          <div style="font-size:10px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.mappedName?'쿠팡: '+o.productName:(o.optionName&&o.optionName!==o.productName?o.optionName:'')}</div>
         </td>
-        <td style="white-space:nowrap;">${o.category}</td>
         <td style="text-align:right;font-weight:600;">${fmt(o.revenue)}</td>
         <td style="text-align:right;">${o.qty.toLocaleString()}</td>
         <td style="text-align:right;">${o.orders.toLocaleString()}</td>
@@ -14701,7 +14781,7 @@ function renderRgContent(){
         const t=optList.reduce((s,o)=>({revenue:s.revenue+o.revenue,qty:s.qty+o.qty,orders:s.orders+o.orders,visitors:s.visitors+o.visitors,views:s.views+o.views,cart:s.cart+o.cart}),{revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0});
         const convT=t.visitors>0?(t.orders/t.visitors*100):0;
         tFoot.innerHTML=`<tr>
-          <td colspan="3">합계</td>
+          <td colspan="2">합계</td>
           <td style="text-align:right;">${fmt(t.revenue)}</td>
           <td style="text-align:right;">${t.qty.toLocaleString()}</td>
           <td style="text-align:right;">${t.orders.toLocaleString()}</td>
@@ -14718,6 +14798,98 @@ function renderRgContent(){
   document.querySelectorAll('[data-rg-k]').forEach(el=>{
     el.textContent=_rgSort.key===el.dataset.rgK ? (_rgSort.dir===-1?' ▼':' ▲') : '';
   });
+
+  // 판매량 도넛: 상품명 매칭된 옵션만 매칭 이름 기준으로 묶어서 표시
+  const byName={};
+  let unmatchedQty=0, unmatchedCount=0;
+  optList.forEach(o=>{
+    if(o.mappedName) byName[o.mappedName]=(byName[o.mappedName]||0)+o.qty;
+    else { unmatchedQty+=o.qty; unmatchedCount++; }
+  });
+  const nameEntries=Object.entries(byName).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const dnutCtx=document.getElementById('rgProdDnut'), dnutEmpty=document.getElementById('rgProdDnutEmpty'), noteEl=document.getElementById('rgProdDnutNote');
+  if(dnutCtx){
+    if(_rgProdDnut){_rgProdDnut.destroy();_rgProdDnut=null;}
+    if(nameEntries.length){
+      if(dnutEmpty) dnutEmpty.style.display='none'; dnutCtx.style.display='';
+      _rgProdDnut=new Chart(dnutCtx.getContext('2d'),{
+        type:'doughnut',
+        data:{labels:nameEntries.map(([k])=>k),datasets:[{
+          data:nameEntries.map(([,v])=>v),
+          backgroundColor:RG_CH_COLORS.slice(0,nameEntries.length),borderWidth:2,borderColor:'#fff'
+        }]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed.toLocaleString()}개`}}}}
+      });
+      const leg=document.getElementById('rgProdDnutLegend');
+      if(leg) leg.innerHTML=nameEntries.map(([k,v],i)=>`
+        <div class="rev-ch-row">
+          <div class="rev-ch-name" style="display:flex;align-items:center;gap:6px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:${RG_CH_COLORS[i%10]};display:inline-block;flex-shrink:0;"></span>${k}
+          </div>
+          <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v/nameEntries[0][1]*100)}%;background:${RG_CH_COLORS[i%10]};"></div></div>
+          <div class="rev-ch-val">${v.toLocaleString()}개</div>
+        </div>`).join('');
+    } else {
+      if(dnutEmpty) dnutEmpty.style.display='block'; dnutCtx.style.display='none';
+    }
+    if(noteEl) noteEl.textContent = unmatchedCount ? `매칭되지 않은 옵션 ${unmatchedCount}개(판매량 ${unmatchedQty.toLocaleString()}개)는 제외됨` : '';
+  }
+}
+
+// ── 옵션ID ↔ 백데이터 상품 매칭 모달 ──
+function openRgMatchModal(optionId){
+  _rgMatchTargetId=optionId;
+  let target=null;
+  Object.keys(_rgProdCache).some(ym=>{
+    const row=(_rgProdCache[ym]||[]).find(r=>r.optionId===optionId);
+    if(row){ target=row; return true; }
+    return false;
+  });
+  const targetEl=document.getElementById('rgMatchTarget');
+  if(targetEl) targetEl.innerHTML = target
+    ? `옵션ID <b>${optionId}</b><br>쿠팡 상품명: ${target.productName}${target.optionName&&target.optionName!==target.productName?' / '+target.optionName:''}`
+    : `옵션ID <b>${optionId}</b>`;
+  const unmatchBtn=document.getElementById('rgUnmatchBtn');
+  if(unmatchBtn) unmatchBtn.style.display = _rgOptionMap[optionId] ? '' : 'none';
+  const searchEl=document.getElementById('rgMatchSearch');
+  if(searchEl) searchEl.value='';
+  renderRgMatchList();
+  openModal('rgMatchModal');
+}
+function renderRgMatchList(){
+  const q=(document.getElementById('rgMatchSearch')?.value||'').toLowerCase().trim();
+  const listEl=document.getElementById('rgMatchList'); if(!listEl) return;
+  let list=_bdData;
+  if(q) list=list.filter(r=>(r.code||'').toLowerCase().includes(q)||(r.name||'').toLowerCase().includes(q));
+  list=list.slice(0,80);
+  const curCode=_rgOptionMap[_rgMatchTargetId];
+  listEl.innerHTML = list.length ? list.map(r=>`
+    <div onclick="rgSelectMatch('${String(r.code).replace(/'/g,"\\'")}')" style="padding:8px 10px;border:1px solid ${String(r.code)===String(curCode)?'var(--pr)':'var(--bd)'};background:${String(r.code)===String(curCode)?'var(--prl)':'var(--bg)'};border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;">
+      <div style="overflow:hidden;">
+        <div style="font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</div>
+        <div style="font-size:10.5px;color:var(--tx2);">${r.code}</div>
+      </div>
+      ${String(r.code)===String(curCode)?'<span style="color:var(--pr);font-size:12px;flex-shrink:0;">✓ 선택됨</span>':''}
+    </div>`).join('') : '<div class="rev-empty" style="padding:16px;">검색 결과가 없습니다</div>';
+}
+async function rgSelectMatch(code){
+  if(!_rgMatchTargetId) return;
+  const latest=await cloudKvLoad('rg_option_map')||{};
+  latest[_rgMatchTargetId]=code;
+  await cloudKvSave('rg_option_map', latest);
+  _rgOptionMap=latest;
+  closeModal('rgMatchModal');
+  renderRgProdSection();
+}
+async function rgUnmatchOption(){
+  if(!_rgMatchTargetId) return;
+  const latest=await cloudKvLoad('rg_option_map')||{};
+  delete latest[_rgMatchTargetId];
+  await cloudKvSave('rg_option_map', latest);
+  _rgOptionMap=latest;
+  closeModal('rgMatchModal');
+  renderRgProdSection();
 }
 
 // ── 일일보고: 제품별 판매량 증감 분석 (실시간, 오늘 기준 여러 시점과 비교) ──
