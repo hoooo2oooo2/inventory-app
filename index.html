@@ -715,6 +715,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-tbl-head{padding:12px 16px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
 #page-revenue .rev-tbl-title{font-size:13px;font-weight:600;}
 #revDlyTbl thead th{position:sticky;top:0;z-index:2;background:var(--bg2);}
+#rgProdTbl thead th{position:sticky;top:0;z-index:2;background:var(--bg2);}
 #page-revenue .rev-ch-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid var(--bd);}
 #page-revenue .rev-ch-row:last-child{border:none;}
 #page-revenue .rev-ch-name{width:90px;font-size:12px;font-weight:500;flex-shrink:0;}
@@ -4607,11 +4608,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 정산금액</div><div class="rev-kpi-val" id="revDlyK0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK0s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revDlyK1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK1s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revDlyK2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK2s"></div></div>
-        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 택배건수</div><div class="rev-kpi-val" id="revDlyK3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK3s"></div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl" id="revDlyK3Lbl">📦 택배건수</div><div class="rev-kpi-val" id="revDlyK3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK3s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revDlyK4">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK4s">해당 기간·판매처</div></div>
       </div>
       <!-- 상품 테이블 + 도넛 -->
-      <div class="rev-chart-grid" style="align-items:start;">
+      <div class="rev-chart-grid" style="align-items:start;" id="revDlyMainGrid">
         <div class="rev-tbl-card" style="height:480px;display:flex;flex-direction:column;">
           <div class="rev-tbl-head" style="flex-shrink:0;">
             <span class="rev-tbl-title">📦 제품별 판매 현황</span>
@@ -4644,6 +4645,30 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div id="revDlyDnutLegend" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;overflow-y:auto;"></div>
           <div class="rev-empty" id="revDlyDnutEmpty" style="padding:16px;">데이터 없음</div>
         </div>
+      </div>
+
+      <!-- 로켓그로스 채널 전용 제품별 판매 현황 (판매처=로켓그로스 선택 시에만 표시) -->
+      <div class="rev-tbl-card" id="revDlyRgCard" style="display:none;">
+        <div class="rev-tbl-head">
+          <span class="rev-tbl-title">🚀 로켓그로스 제품별 판매 현황</span>
+          <span style="font-size:11px;color:var(--tx2);" id="revDlyRgSub"></span>
+        </div>
+        <div class="rev-empty" id="revDlyRgEmpty">데이터가 없습니다</div>
+        <div class="tw"><table class="dt" id="revDlyRgTbl" style="display:none;">
+          <thead><tr>
+            <th>상품명</th>
+            <th style="text-align:right;">매출</th>
+            <th style="text-align:right;">판매량</th>
+            <th style="text-align:right;">주문건수</th>
+            <th style="text-align:right;">방문자</th>
+            <th style="text-align:right;">조회</th>
+            <th style="text-align:right;">장바구니</th>
+            <th style="text-align:right;">구매전환율</th>
+            <th style="text-align:right;">취소율</th>
+          </tr></thead>
+          <tbody id="revDlyRgTbody"></tbody>
+          <tfoot id="revDlyRgTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
+        </table></div>
       </div>
 
       <!-- 제품별 판매량 증감 분석 (실시간) -->
@@ -4769,7 +4794,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             </div>
           </div>
           <div class="rev-empty" id="rgProdEmpty">데이터가 없습니다</div>
-          <div class="tw"><table class="dt" id="rgProdTbl" style="display:none;">
+          <div class="tw" style="max-height:640px;overflow-y:auto;"><table class="dt" id="rgProdTbl" style="display:none;">
             <thead><tr>
               <th style="width:32px;">#</th>
               <th>상품명</th>
@@ -4786,6 +4811,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <tbody id="rgProdTbody"></tbody>
             <tfoot id="rgProdTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
           </table></div>
+          <div id="rgProdPager" style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:0.5px solid var(--bd);font-size:11px;"></div>
         </div>
       </div>
     </div>
@@ -4800,6 +4826,23 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div style="display:flex;justify-content:space-between;margin-top:14px;">
           <button class="btn btn-sm" onclick="rgUnmatchOption()" id="rgUnmatchBtn" style="color:#DC2626;">매칭 해제</button>
           <button class="btn btn-sm" onclick="closeModal('rgMatchModal')">닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 로켓그로스: 제품별 판매량 추이 팝업 -->
+    <div class="modal-overlay" id="rgProdChartModal">
+      <div class="modal" style="max-width:640px;">
+        <h3 id="rgProdChartTitle">📊 판매량 추이</h3>
+        <div class="rev-filter" style="padding:0 0 10px;flex-wrap:wrap;">
+          <span class="rev-filter-lbl">보기</span>
+          <div class="rev-filter-group" id="rgProdChartModeBtns"></div>
+        </div>
+        <div style="position:relative;height:280px;">
+          <canvas id="rgProdChartCv"></canvas>
+        </div>
+        <div class="ma" style="margin-top:12px;">
+          <button class="btn" onclick="closeModal('rgProdChartModal')">닫기</button>
         </div>
       </div>
     </div>
@@ -13608,17 +13651,18 @@ async function loadRgDailyTotals(){
   }catch(e){ _rgDailyTotals = {}; }
   _rgTotalsLoaded = true;
 }
-function rgSumRevenue(year, month, day){
+function rgSumDailyField(field, year, month, day){
   const mm=String(month).padStart(2,'0'), dd=day?String(day).padStart(2,'0'):null;
   let sum=0;
   Object.keys(_rgDailyTotals).forEach(k=>{
     const [y,m,d]=k.split('-');
     if(Number(y)!==year||m!==mm) return;
     if(dd && d!==dd) return;
-    sum += _rgDailyTotals[k].revenue||0;
+    sum += _rgDailyTotals[k][field]||0;
   });
   return sum;
 }
+function rgSumRevenue(year, month, day){ return rgSumDailyField('revenue', year, month, day); }
 
 // ── 요약 탭 렌더링 ──
 function renderRevSummary(){
@@ -14125,8 +14169,16 @@ function renderDailyReport(){
   const monPfx=pad(_dlyFilter.month)+(_dlyFilter.day?('-'+pad(_dlyFilter.day)):'');
   const chs=sortCh([...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(monPfx)).map(r=>r.ch).filter(Boolean))]);
   const cEl=document.getElementById('revDlyChBtns');
+  const rgBtnHtml = Object.keys(_rgDailyTotals).length
+    ? `<button class="rfbtn${_dlyFilter.ch==='로켓그로스'?' active':''}" onclick="setDlyFilter('ch','로켓그로스')">🚀 로켓그로스</button>` : '';
   if(cEl) cEl.innerHTML=`<button class="rfbtn${_dlyFilter.ch==='ALL'?' active':''}" onclick="setDlyFilter('ch','ALL')">전체</button>`
-    +chs.map(c=>`<button class="rfbtn${_dlyFilter.ch===c?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('');
+    +chs.map(c=>`<button class="rfbtn${_dlyFilter.ch===c?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('')
+    +rgBtnHtml;
+
+  // 기간 라벨(로켓그로스 전용 카드에서도 사용)
+  const periodLabel=_dlyFilter.day!==null
+    ?`${_dlyFilter.year}-${monPfx.slice(0,2)}-${pad(_dlyFilter.day)}`
+    :`${_dlyFilter.year}-${pad(_dlyFilter.month)} 월전체`;
 
   // ── 현재 기간 데이터 ──
   const monStr=pad(_dlyFilter.month);
@@ -14157,9 +14209,10 @@ function renderDailyReport(){
   const prevMargin=prevMarginGross-adPrev;
   const prevRate=prevSettle>0?(prevMargin/prevSettle*100):0;
   const prevOrders=new Set(prevRows.map(pkgKey)).size;
-  // 로켓그로스 매출('전체' 판매처 선택 중일 때만, 선택된 기간 기준 — 마진 데이터 없어 마진율엔 미반영)
-  const rgDly = _dlyFilter.ch==='ALL' ? rgSumRevenue(_dlyFilter.year, _dlyFilter.month, _dlyFilter.day) : 0;
-  const rgPrevDly = _dlyFilter.ch==='ALL' ? rgSumRevenue(prevY, prevM, _dlyFilter.day) : 0;
+  // 로켓그로스 매출('전체' 또는 '로켓그로스' 채널 선택 중일 때, 선택된 기간 기준 — 마진 데이터 없어 마진율엔 미반영)
+  const rgChSelected = _dlyFilter.ch==='로켓그로스';
+  const rgDly = (_dlyFilter.ch==='ALL'||rgChSelected) ? rgSumRevenue(_dlyFilter.year, _dlyFilter.month, _dlyFilter.day) : 0;
+  const rgPrevDly = (_dlyFilter.ch==='ALL'||rgChSelected) ? rgSumRevenue(prevY, prevM, _dlyFilter.day) : 0;
   const totalSettleDisp = totalSettle + rgDly, prevSettleDisp = prevSettle + rgPrevDly;
 
   // 전월 대비 텍스트 생성
@@ -14172,20 +14225,43 @@ function renderDailyReport(){
 
   document.getElementById('revDlyK0').textContent=fmt(totalSettleDisp);
   document.getElementById('revDlyK0s').innerHTML=diffHtml(totalSettleDisp,prevSettleDisp);
-  document.getElementById('revDlyK1').textContent=fmt(totalMargin);
-  document.getElementById('revDlyK1s').innerHTML=diffHtml(totalMargin,prevMargin);
-  document.getElementById('revDlyK2').textContent=totalRate.toFixed(1)+'%';
-  document.getElementById('revDlyK2s').innerHTML=prevSettle?`<span style="color:${totalRate>=prevRate?'#DC2626':'#059669'};font-weight:600;">${totalRate>=prevRate?'▲':'▼'} ${Math.abs(totalRate-prevRate).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">전월 ${prevRate.toFixed(1)}%</span>`:'<span style="color:var(--tx2);">전월 데이터 없음</span>';
-  document.getElementById('revDlyK3').textContent=totalOrders.toLocaleString()+'건';
-  document.getElementById('revDlyK3s').innerHTML=diffHtml(totalOrders,prevOrders,'건');
-  // 광고비: 마이너스 없이 검은 글씨로 금액만 표시
-  document.getElementById('revDlyK4').textContent=fmt(adDly);
-  document.getElementById('revDlyK4s').innerHTML=adPrev?diffHtml(adDly,adPrev):'<span style="color:var(--tx2);">해당 기간·판매처</span>';
+  const k3lbl=document.getElementById('revDlyK3Lbl');
+  if(rgChSelected){
+    if(k3lbl) k3lbl.textContent='📦 주문건수';
+    document.getElementById('revDlyK1').textContent='-';
+    document.getElementById('revDlyK1s').innerHTML='<span style="color:var(--tx2);">마진 데이터 없음</span>';
+    document.getElementById('revDlyK2').textContent='-';
+    document.getElementById('revDlyK2s').innerHTML='<span style="color:var(--tx2);">마진 데이터 없음</span>';
+    const rgOrdersCur=rgSumDailyField('orders', _dlyFilter.year, _dlyFilter.month, _dlyFilter.day);
+    const rgOrdersPrev=rgSumDailyField('orders', prevY, prevM, _dlyFilter.day);
+    document.getElementById('revDlyK3').textContent=rgOrdersCur.toLocaleString()+'건';
+    document.getElementById('revDlyK3s').innerHTML=diffHtml(rgOrdersCur,rgOrdersPrev,'건');
+    document.getElementById('revDlyK4').textContent='-';
+    document.getElementById('revDlyK4s').innerHTML='<span style="color:var(--tx2);">해당 없음</span>';
+  } else {
+    if(k3lbl) k3lbl.textContent='📦 택배건수';
+    document.getElementById('revDlyK1').textContent=fmt(totalMargin);
+    document.getElementById('revDlyK1s').innerHTML=diffHtml(totalMargin,prevMargin);
+    document.getElementById('revDlyK2').textContent=totalRate.toFixed(1)+'%';
+    document.getElementById('revDlyK2s').innerHTML=prevSettle?`<span style="color:${totalRate>=prevRate?'#DC2626':'#059669'};font-weight:600;">${totalRate>=prevRate?'▲':'▼'} ${Math.abs(totalRate-prevRate).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">전월 ${prevRate.toFixed(1)}%</span>`:'<span style="color:var(--tx2);">전월 데이터 없음</span>';
+    document.getElementById('revDlyK3').textContent=totalOrders.toLocaleString()+'건';
+    document.getElementById('revDlyK3s').innerHTML=diffHtml(totalOrders,prevOrders,'건');
+    // 광고비: 마이너스 없이 검은 글씨로 금액만 표시
+    document.getElementById('revDlyK4').textContent=fmt(adDly);
+    document.getElementById('revDlyK4s').innerHTML=adPrev?diffHtml(adDly,adPrev):'<span style="color:var(--tx2);">해당 기간·판매처</span>';
+  }
 
-  // 기간 라벨
-  const periodLabel=_dlyFilter.day!==null
-    ?`${_dlyFilter.year}-${monStr}-${pad(_dlyFilter.day)}`
-    :`${_dlyFilter.year}-${monStr} 월전체`;
+  // 로켓그로스 채널을 직접 선택한 경우 — 일반 채널용 그리드 대신 전용 카드로 전환하고 여기서 렌더 종료
+  const mainGrid=document.getElementById('revDlyMainGrid');
+  const rgCard=document.getElementById('revDlyRgCard');
+  if(rgChSelected){
+    if(mainGrid) mainGrid.style.display='none';
+    if(rgCard) rgCard.style.display='';
+    renderDlyRgCard(periodLabel);
+    return;
+  }
+  if(mainGrid) mainGrid.style.display='';
+  if(rgCard) rgCard.style.display='none';
 
   const empty=document.getElementById('revDlyEmpty');
   const tbl=document.getElementById('revDlyTbl');
@@ -14321,6 +14397,74 @@ function renderDailyReport(){
           <div class="rev-ch-val">${fmt(v)} <span style="color:var(--tx2);font-weight:500;">(${typeTot>0?(v/typeTot*100).toFixed(1):0}%)</span></div>
         </div>`).join('');
     } else { if(dnutEmpty) dnutEmpty.style.display='block'; dnutCtx.style.display='none'; }
+  }
+}
+
+// ── 일일보고: 판매처=로켓그로스 선택 시 전용 제품별 판매 현황 카드 ──
+async function renderDlyRgCard(periodLabel){
+  const y=_dlyFilter.year, m=_dlyFilter.month, d=_dlyFilter.day;
+  const mm=String(m).padStart(2,'0');
+  const ym=`${y}-${mm}`;
+  await rgEnsureProdMonths(ym, ym);
+  const dateFrom = d ? `${ym}-${String(d).padStart(2,'0')}` : `${ym}-01`;
+  const dateTo   = d ? `${ym}-${String(d).padStart(2,'0')}` : `${ym}-31`;
+  const fmt=n=>n>=100000000?`${(n/100000000).toFixed(1)}억`:n>=10000?`${Math.round(n/10000)}만`:`${Math.round(n).toLocaleString()}`;
+
+  const rows=(_rgProdCache[ym]||[]).filter(r=>r.date>=dateFrom && r.date<=dateTo);
+  const byOpt={};
+  rows.forEach(r=>{
+    const k=r.optionId;
+    if(!byOpt[k]) byOpt[k]={optionName:r.optionName,productName:r.productName,
+      revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0,grossQty:0,cancelQty:0};
+    const o=byOpt[k];
+    o.revenue+=r.revenue||0; o.qty+=r.qty||0; o.orders+=r.orders||0;
+    o.visitors+=r.visitors||0; o.views+=r.views||0; o.cart+=r.cart||0;
+    o.grossQty+=r.grossQty||0; o.cancelQty+=Math.abs(r.cancelQty||0);
+  });
+  const optList=Object.entries(byOpt).map(([optionId,o])=>({optionId, ...o}));
+  optList.forEach(o=>{
+    o.mappedName=rgResolveName(o.optionId);
+    o.displayName=o.mappedName||o.productName;
+    o.convRate=o.visitors>0?(o.orders/o.visitors*100):0;
+    o.cancelRateRow=o.grossQty>0?(o.cancelQty/o.grossQty*100):0;
+  });
+  const sorted=[...optList].sort((a,b)=>b.revenue-a.revenue);
+
+  const sub=document.getElementById('revDlyRgSub');
+  if(sub) sub.textContent=periodLabel;
+  const tbl=document.getElementById('revDlyRgTbl'), tEmpty=document.getElementById('revDlyRgEmpty'), tBody=document.getElementById('revDlyRgTbody'), tFoot=document.getElementById('revDlyRgTfoot');
+  if(!tBody) return;
+  if(sorted.length){
+    if(tEmpty) tEmpty.style.display='none'; if(tbl) tbl.style.display='';
+    tBody.innerHTML=sorted.map(o=>`<tr>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;" title="${o.displayName}">${o.displayName}</td>
+      <td style="text-align:right;font-weight:600;">${fmt(o.revenue)}</td>
+      <td style="text-align:right;">${o.qty.toLocaleString()}</td>
+      <td style="text-align:right;">${o.orders.toLocaleString()}</td>
+      <td style="text-align:right;">${o.visitors.toLocaleString()}</td>
+      <td style="text-align:right;">${o.views.toLocaleString()}</td>
+      <td style="text-align:right;">${o.cart.toLocaleString()}</td>
+      <td style="text-align:right;">${o.convRate.toFixed(2)}%</td>
+      <td style="text-align:right;${o.cancelRateRow>=10?'color:#DC2626;font-weight:600;':''}">${o.cancelRateRow.toFixed(1)}%</td>
+    </tr>`).join('');
+    if(tFoot){
+      const t=optList.reduce((s,o)=>({revenue:s.revenue+o.revenue,qty:s.qty+o.qty,orders:s.orders+o.orders,visitors:s.visitors+o.visitors,views:s.views+o.views,cart:s.cart+o.cart,grossQty:s.grossQty+o.grossQty,cancelQty:s.cancelQty+o.cancelQty}),{revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0,grossQty:0,cancelQty:0});
+      const convT=t.visitors>0?(t.orders/t.visitors*100):0;
+      const cancelT=t.grossQty>0?(t.cancelQty/t.grossQty*100):0;
+      tFoot.innerHTML=`<tr>
+        <td>합계</td>
+        <td style="text-align:right;">${fmt(t.revenue)}</td>
+        <td style="text-align:right;">${t.qty.toLocaleString()}</td>
+        <td style="text-align:right;">${t.orders.toLocaleString()}</td>
+        <td style="text-align:right;">${t.visitors.toLocaleString()}</td>
+        <td style="text-align:right;">${t.views.toLocaleString()}</td>
+        <td style="text-align:right;">${t.cart.toLocaleString()}</td>
+        <td style="text-align:right;">${convT.toFixed(2)}%</td>
+        <td style="text-align:right;">${cancelT.toFixed(1)}%</td>
+      </tr>`;
+    }
+  } else {
+    if(tEmpty) tEmpty.style.display='block'; if(tbl) tbl.style.display='none'; if(tFoot) tFoot.innerHTML='';
   }
 }
 
@@ -14575,10 +14719,11 @@ async function renderRgPage(){
   renderRgContent();
   renderRgProdSection();
 }
-function setRgMonth(ym){ _rgSelMonth=ym; _rgSort={key:'revenue',dir:-1}; _rgProdRange=_rgDefaultRangeForMonth(ym); renderRgPage(); }
+function setRgMonth(ym){ _rgSelMonth=ym; _rgSort={key:'revenue',dir:-1}; _rgProdRange=_rgDefaultRangeForMonth(ym); _rgProdPage=0; renderRgPage(); }
 function setRgSort(key){
   if(_rgSort.key===key){ _rgSort.dir=_rgSort.dir===-1?1:-1; }
   else { _rgSort.key=key; _rgSort.dir=-1; }
+  _rgProdPage=0;
   renderRgProdSection();
 }
 async function setRgProdRange(){
@@ -14586,8 +14731,11 @@ async function setRgProdRange(){
   const t=document.getElementById('rgProdTo').value;
   if(!f||!t||f>t) return;
   _rgProdRange={from:f,to:t};
+  _rgProdPage=0;
   await renderRgProdSection();
 }
+const RG_PROD_PAGE_SIZE=20;
+let _rgProdPage=0;
 
 function renderRgContent(){
   const ym=_rgSelMonth; if(!ym) return;
@@ -14755,15 +14903,21 @@ async function renderRgProdSection(){
   const sorted=[...optList].sort((a,b)=>(a[fld]-b[fld])*_rgSort.dir);
   const tbl=document.getElementById('rgProdTbl'), tEmpty=document.getElementById('rgProdEmpty'), tBody=document.getElementById('rgProdTbody'), tFoot=document.getElementById('rgProdTfoot');
   const sub=document.getElementById('rgProdSub'); if(sub) sub.textContent=`${from} ~ ${to} · 옵션 ${sorted.length.toLocaleString()}개`;
+  const rgMaxPage=Math.max(0,Math.ceil(sorted.length/RG_PROD_PAGE_SIZE)-1);
+  if(_rgProdPage>rgMaxPage) _rgProdPage=rgMaxPage;
+  const rgStart=_rgProdPage*RG_PROD_PAGE_SIZE;
+  const pageList=sorted.slice(rgStart, rgStart+RG_PROD_PAGE_SIZE);
   if(tBody){
     if(sorted.length){
       if(tEmpty) tEmpty.style.display='none'; if(tbl) tbl.style.display='';
-      tBody.innerHTML=sorted.map((o,i)=>`<tr>
+      tBody.innerHTML=pageList.map((o,idxInPage)=>{
+        const i=rgStart+idxInPage;
+        return `<tr onclick="openRgProdChart('${o.optionId}','${(o.displayName||'').replace(/'/g,"\\'")}')" style="cursor:pointer;" title="클릭 시 판매량 추이 보기">
         <td>${i+1}</td>
         <td style="max-width:260px;">
           <div style="display:flex;align-items:center;gap:5px;">
             <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;flex:1;" title="${o.displayName}">${o.displayName}</div>
-            <span style="cursor:pointer;font-size:12px;flex-shrink:0;" title="${o.mappedName?'매칭 변경':'백데이터 상품과 매칭'}" onclick="openRgMatchModal('${o.optionId}')">${o.mappedName?'✎':'🔗'}</span>
+            <span style="cursor:pointer;font-size:12px;flex-shrink:0;" title="${o.mappedName?'매칭 변경':'백데이터 상품과 매칭'}" onclick="event.stopPropagation();openRgMatchModal('${o.optionId}')">${o.mappedName?'✎':'🔗'}</span>
           </div>
           <div style="font-size:10px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.mappedName?'쿠팡: '+o.productName:(o.optionName&&o.optionName!==o.productName?o.optionName:'')}</div>
         </td>
@@ -14776,7 +14930,25 @@ async function renderRgProdSection(){
         <td style="text-align:right;">${o.convRate.toFixed(2)}%</td>
         <td style="text-align:right;${o.cancelRateRow>=10?'color:#DC2626;font-weight:600;':''}">${o.cancelRateRow.toFixed(1)}%</td>
         <td style="text-align:right;color:var(--tx2);">${o.itemWinnerAvg.toFixed(0)}%</td>
-      </tr>`).join('');
+      </tr>`;
+      }).join('');
+      const pagerEl=document.getElementById('rgProdPager');
+      if(pagerEl){
+        if(sorted.length<=RG_PROD_PAGE_SIZE){ pagerEl.innerHTML=''; }
+        else{
+          const rgMaxP=rgMaxPage+1;
+          const pFrom=rgStart+1, pTo=Math.min(rgStart+RG_PROD_PAGE_SIZE, sorted.length);
+          pagerEl.innerHTML=`
+            <span style="color:var(--tx2);">${pFrom.toLocaleString()}–${pTo.toLocaleString()} / 전체 ${sorted.length.toLocaleString()}개</span>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <button class="btn btn-sm" onclick="_rgProdPage=0;renderRgProdSection()" ${_rgProdPage===0?'disabled':''}>처음</button>
+              <button class="btn btn-sm" onclick="_rgProdPage--;renderRgProdSection()" ${_rgProdPage===0?'disabled':''}>◀</button>
+              <span style="padding:0 6px;">${_rgProdPage+1} / ${rgMaxP}</span>
+              <button class="btn btn-sm" onclick="_rgProdPage++;renderRgProdSection()" ${_rgProdPage>=rgMaxP-1?'disabled':''}>▶</button>
+              <button class="btn btn-sm" onclick="_rgProdPage=${rgMaxP-1};renderRgProdSection()" ${_rgProdPage>=rgMaxP-1?'disabled':''}>끝</button>
+            </div>`;
+        }
+      }
       if(tFoot){
         const t=optList.reduce((s,o)=>({revenue:s.revenue+o.revenue,qty:s.qty+o.qty,orders:s.orders+o.orders,visitors:s.visitors+o.visitors,views:s.views+o.views,cart:s.cart+o.cart}),{revenue:0,qty:0,orders:0,visitors:0,views:0,cart:0});
         const convT=t.visitors>0?(t.orders/t.visitors*100):0;
@@ -14793,7 +14965,10 @@ async function renderRgProdSection(){
           <td></td>
         </tr>`;
       }
-    } else { if(tEmpty) tEmpty.style.display='block'; if(tbl) tbl.style.display='none'; if(tFoot) tFoot.innerHTML=''; }
+    } else {
+      if(tEmpty) tEmpty.style.display='block'; if(tbl) tbl.style.display='none'; if(tFoot) tFoot.innerHTML='';
+      const pagerEl=document.getElementById('rgProdPager'); if(pagerEl) pagerEl.innerHTML='';
+    }
   }
   document.querySelectorAll('[data-rg-k]').forEach(el=>{
     el.textContent=_rgSort.key===el.dataset.rgK ? (_rgSort.dir===-1?' ▼':' ▲') : '';
@@ -14837,8 +15012,79 @@ async function renderRgProdSection(){
   }
 }
 
+// ── 제품별 판매량 추이 팝업 (일별/월별 토글) — 매칭된 옵션이면 같은 매칭명으로 묶인 전체 옵션을 함께 집계 ──
+let _rgProdChartMode='daily';   // 'daily' | 'monthly'
+let _rgProdChartOptionIds=[];
+let _rgProdChartCv=null;
+async function openRgProdChart(optionId, displayName){
+  const mappedCode=_rgOptionMap[optionId];
+  let ids=[optionId];
+  if(mappedCode){
+    ids=Object.keys(_rgOptionMap).filter(oid=>_rgOptionMap[oid]===mappedCode);
+  }
+  _rgProdChartOptionIds=ids;
+  const titleEl=document.getElementById('rgProdChartTitle');
+  if(titleEl) titleEl.textContent='📊 '+(displayName||'판매량 추이');
+  const months=_rgMonthsAvailable(); // 최신순 정렬
+  if(months.length) await rgEnsureProdMonths(months[months.length-1], months[0]);
+  _rgProdChartMode='daily';
+  renderRgProdChartModeBtns();
+  renderRgProdChart();
+  openModal('rgProdChartModal');
+}
+function setRgProdChartMode(mode){
+  _rgProdChartMode=mode;
+  renderRgProdChartModeBtns();
+  renderRgProdChart();
+}
+function renderRgProdChartModeBtns(){
+  const el=document.getElementById('rgProdChartModeBtns'); if(!el) return;
+  el.innerHTML=[['daily','일별'],['monthly','월별']].map(([m,l])=>
+    `<button class="rfbtn${_rgProdChartMode===m?' active':''}" onclick="setRgProdChartMode('${m}')">${l}</button>`).join('');
+}
+function renderRgProdChart(){
+  const ids=new Set(_rgProdChartOptionIds);
+  let rows=[];
+  Object.values(_rgProdCache).forEach(arr=>{ (arr||[]).forEach(r=>{ if(ids.has(r.optionId)) rows.push(r); }); });
+
+  let labels=[], qtyData=[];
+  if(_rgProdChartMode==='daily'){
+    const byDate={};
+    rows.forEach(r=>{ byDate[r.date]=(byDate[r.date]||0)+(r.qty||0); });
+    const keys=Object.keys(byDate).sort();
+    labels=keys.map(k=>k.slice(5).replace('-','/'));
+    qtyData=keys.map(k=>byDate[k]);
+  } else {
+    const byMonth={};
+    rows.forEach(r=>{ const m=r.date.slice(0,7); byMonth[m]=(byMonth[m]||0)+(r.qty||0); });
+    const keys=Object.keys(byMonth).sort();
+    labels=keys;
+    qtyData=keys.map(k=>byMonth[k]);
+  }
+
+  const ctx=document.getElementById('rgProdChartCv');
+  if(!ctx) return;
+  if(_rgProdChartCv){ _rgProdChartCv.destroy(); _rgProdChartCv=null; }
+  _rgProdChartCv=new Chart(ctx.getContext('2d'),{
+    type:'bar',
+    data:{labels, datasets:[{label:'판매량',data:qtyData,
+      backgroundColor:'rgba(49,130,246,0.32)',borderColor:'rgba(49,130,246,0.8)',borderWidth:1,borderRadius:4,borderSkipped:false,
+      datalabels:{anchor:'end',align:'end',color:'#3182F6',font:{size:10,weight:'700'},formatter:v=>v>0?v.toLocaleString():''}
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      layout:{padding:{top:20}},
+      plugins:{legend:{display:false},datalabels:{display:true},
+        tooltip:{callbacks:{label:c=>`판매량: ${c.parsed.y.toLocaleString()}개`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},color:'var(--tx2)'}},
+        y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{font:{size:10},color:'var(--tx2)'}}
+      }
+    }
+  });
+}
+
 // ── 옵션ID ↔ 백데이터 상품 매칭 모달 ──
-function openRgMatchModal(optionId){
+async function openRgMatchModal(optionId){
   _rgMatchTargetId=optionId;
   let target=null;
   Object.keys(_rgProdCache).some(ym=>{
@@ -14854,14 +15100,24 @@ function openRgMatchModal(optionId){
   if(unmatchBtn) unmatchBtn.style.display = _rgOptionMap[optionId] ? '' : 'none';
   const searchEl=document.getElementById('rgMatchSearch');
   if(searchEl) searchEl.value='';
-  renderRgMatchList();
   openModal('rgMatchModal');
+  // 백데이터가 비어있으면(초기 로드 실패 등) 검색이 항상 빈 결과로 보이므로, 모달을 여는 시점에 방어적으로 다시 로드
+  const listEl=document.getElementById('rgMatchList');
+  if(!_bdData.length){
+    if(listEl) listEl.innerHTML='<div class="rev-empty" style="padding:16px;">백데이터 불러오는 중...</div>';
+    await loadBackdata();
+  }
+  renderRgMatchList();
 }
 function renderRgMatchList(){
   const q=(document.getElementById('rgMatchSearch')?.value||'').toLowerCase().trim();
   const listEl=document.getElementById('rgMatchList'); if(!listEl) return;
+  if(!_bdData.length){
+    listEl.innerHTML='<div class="rev-empty" style="padding:16px;">백데이터가 비어있습니다 — 매출관리 &gt; 백데이터 탭에서 먼저 등록하세요</div>';
+    return;
+  }
   let list=_bdData;
-  if(q) list=list.filter(r=>(r.code||'').toLowerCase().includes(q)||(r.name||'').toLowerCase().includes(q));
+  if(q) list=list.filter(r=>String(r.code||'').toLowerCase().includes(q)||String(r.name||'').toLowerCase().includes(q));
   list=list.slice(0,80);
   const curCode=_rgOptionMap[_rgMatchTargetId];
   listEl.innerHTML = list.length ? list.map(r=>`
@@ -14873,21 +15129,21 @@ function renderRgMatchList(){
       ${String(r.code)===String(curCode)?'<span style="color:var(--pr);font-size:12px;flex-shrink:0;">✓ 선택됨</span>':''}
     </div>`).join('') : '<div class="rev-empty" style="padding:16px;">검색 결과가 없습니다</div>';
 }
+// 저장 직전에 다시 불러와서 병합하지 않고, 이미 로드돼있는 인메모리 맵 위에 바로 얹어서 저장한다.
+// (재조회가 실패/지연되면 빈 객체로 덮어써 cloudKvSave의 "급격한 축소" 안전장치에 걸려 저장이 조용히 스킵되는 문제가 있었음 — force로 우회)
 async function rgSelectMatch(code){
   if(!_rgMatchTargetId) return;
-  const latest=await cloudKvLoad('rg_option_map')||{};
-  latest[_rgMatchTargetId]=code;
-  await cloudKvSave('rg_option_map', latest);
-  _rgOptionMap=latest;
+  _rgOptionMap = {..._rgOptionMap, [_rgMatchTargetId]: code};
+  await cloudKvSave('rg_option_map', _rgOptionMap, {force:true});
   closeModal('rgMatchModal');
   renderRgProdSection();
 }
 async function rgUnmatchOption(){
   if(!_rgMatchTargetId) return;
-  const latest=await cloudKvLoad('rg_option_map')||{};
-  delete latest[_rgMatchTargetId];
-  await cloudKvSave('rg_option_map', latest);
-  _rgOptionMap=latest;
+  const next={..._rgOptionMap};
+  delete next[_rgMatchTargetId];
+  _rgOptionMap=next;
+  await cloudKvSave('rg_option_map', _rgOptionMap, {force:true});
   closeModal('rgMatchModal');
   renderRgProdSection();
 }
