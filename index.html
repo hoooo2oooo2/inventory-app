@@ -3772,6 +3772,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div><b>제품명</b><br><span id="rvwDetProduct"></span></div>
       <div><b>수량</b><br><span id="rvwDetQty"></span></div>
     </div>
+    <div id="rvwDetChangeBox" style="border:2px solid #DC2626;border-radius:8px;padding:9px 12px;margin-bottom:14px;">
+      <div style="font-weight:700;font-size:11.5px;color:#DC2626;margin-bottom:5px;">⚠️ 별점/전시상태 변경 이력</div>
+      <div id="rvwDetChangeList" style="font-size:12px;color:var(--tx);line-height:1.7;"></div>
+    </div>
     <div style="margin-bottom:12px;">
       <div class="pc-lbl" style="font-weight:700;font-size:12.5px;margin-bottom:4px;">리뷰 상세내용</div>
       <div id="rvwDetContent" style="white-space:pre-wrap;font-size:12.5px;color:var(--tx);background:var(--bg2,rgba(127,127,127,.04));border-radius:8px;padding:10px;max-height:120px;overflow-y:auto;"></div>
@@ -9709,6 +9713,19 @@ async function rvwOnDisplayStatusChange(reviewId, val){
   await cloudKvSave(rvwMKey(m), _rvwMonths[m]);
   rvwRerenderCurrentTab();
 }
+// 리뷰 상세 팝업 안에 해당 리뷰건의 별점/전시상태 변경 이력을 표시 — 변경 이력이 없어도
+// 박스 자체는 항상 보여줘서 "이 리뷰는 변경된 적 없음"을 바로 확인할 수 있게 함
+function rvwRenderDetChangeLog(changeLog){
+  const el = document.getElementById('rvwDetChangeList'); if(!el) return;
+  const log = changeLog || [];
+  if(!log.length){ el.innerHTML = '<span style="color:var(--tx2);">변경 이력 없음</span>'; return; }
+  const star = n => '★'.repeat(n)+'☆'.repeat(Math.max(0,5-n));
+  el.innerHTML = log.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(ev=>{
+    const desc = ev.field==='rating' ? `별점 ${star(ev.from)} → ${star(ev.to)}` : `전시상태 ${rvwEsc(ev.from)} → ${rvwEsc(ev.to)}`;
+    const srcLabel = ev.source==='excel' ? '엑셀 업로드' : '직원 수기수정';
+    return `<div>${rvwEsc(ev.date)} · ${desc} <span style="color:var(--tx2);">(${srcLabel})</span></div>`;
+  }).join('');
+}
 function rvwOpenDetail(reviewId){
   const er = _rvwRowCache[reviewId]; if(!er) return;
   document.getElementById('rvwDetDate').textContent = er.reviewDate;
@@ -9719,6 +9736,7 @@ function rvwOpenDetail(reviewId){
   document.getElementById('rvwDetPhone').textContent = er.displayPhone || '-';
   document.getElementById('rvwDetProduct').textContent = er.matchProduct || '-';
   document.getElementById('rvwDetQty').textContent = (er.displayQty!==''&&er.displayQty!=null) ? er.displayQty : '-';
+  rvwRenderDetChangeLog(er.changeLog);
   document.getElementById('rvwDetContent').textContent = er.content;
   document.getElementById('rvwDetProgress').value = er.manage.progressNote||'';
   document.getElementById('rvwDetManagerNote').value = er.manage.managerNote||'';
