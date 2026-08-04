@@ -3615,7 +3615,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   .rvw-tbl th:nth-child(14),.rvw-tbl td:nth-child(14){width:7%;}   /* 실장님 오더내용 */
   .rvw-tbl th:nth-child(15),.rvw-tbl td:nth-child(15){width:4.5%;} /* 제품금액 */
   .rvw-tbl th:nth-child(16),.rvw-tbl td:nth-child(16){width:4.5%;} /* 원가금액 */
-  .rvw-tbl th:nth-child(17),.rvw-tbl td:nth-child(17){width:4.5%;} /* 손실금액 */
+  .rvw-tbl th:nth-child(17),.rvw-tbl td:nth-child(17){width:4.5%;} /* 마진 */
   .rvw-tbl th:nth-child(18),.rvw-tbl td:nth-child(18){width:3.5%;} /* 담당자(축소) */
   </style>
 
@@ -3700,7 +3700,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <th>리뷰작성일</th><th>별점</th><th>리뷰번호</th><th>상품주문번호</th><th>아이디</th>
             <th>이름</th><th>전화번호</th><th>제품명</th><th>수량</th><th>리뷰 상세내용</th>
             <th>전시상태</th><th>처리결과</th><th>진행내용</th><th>실장님 오더내용</th>
-            <th>제품금액</th><th>원가금액</th><th>손실금액</th><th>담당자</th>
+            <th>제품금액</th><th>원가금액</th><th>마진</th><th>담당자</th>
           </tr></thead>
           <tbody id="rvwDataTbody"></tbody>
         </table>
@@ -3724,7 +3724,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <th>리뷰작성일</th><th>별점</th><th>리뷰번호</th><th>상품주문번호</th><th>아이디</th>
             <th>이름</th><th>전화번호</th><th>제품명</th><th>수량</th><th>리뷰 상세내용</th>
             <th>전시상태</th><th>처리결과</th><th>진행내용</th><th>실장님 오더내용</th>
-            <th>제품금액</th><th>원가금액</th><th>손실금액</th><th>담당자</th>
+            <th>제품금액</th><th>원가금액</th><th>마진</th><th>담당자</th>
           </tr></thead>
           <tbody id="rvwDoneTbody"></tbody>
         </table>
@@ -3748,7 +3748,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <th>리뷰작성일</th><th>별점</th><th>리뷰번호</th><th>상품주문번호</th><th>아이디</th>
             <th>이름</th><th>전화번호</th><th>제품명</th><th>수량</th><th>리뷰 상세내용</th>
             <th>전시상태</th><th>처리결과</th><th>진행내용</th><th>실장님 오더내용</th>
-            <th>제품금액</th><th>원가금액</th><th>손실금액</th><th>담당자</th>
+            <th>제품금액</th><th>원가금액</th><th>마진</th><th>담당자</th>
           </tr></thead>
           <tbody id="rvwBlindTbody"></tbody>
         </table>
@@ -9401,7 +9401,7 @@ async function rvwLoadManage(){
   _rvwManage = obj || {};
   _rvwManageLoaded = true;
 }
-function rvwManageDefaults(){ return {status:'진행전', progressNote:'', managerNote:'', productAmount:'', costAmount:'', lossAmount:'', assignee:'', manualName:'', manualPhone:'', manualQty:''}; }
+function rvwManageDefaults(){ return {status:'진행전', progressNote:'', managerNote:'', productAmount:'', costAmount:'', marginAmount:'', assignee:'', manualName:'', manualPhone:'', manualQty:''}; }
 function rvwGetManage(reviewId){ return _rvwManage[reviewId] ? {...rvwManageDefaults(), ..._rvwManage[reviewId]} : rvwManageDefaults(); }
 async function rvwSetManage(reviewId, patch){
   const cur = _rvwManage[reviewId] ? {..._rvwManage[reviewId]} : rvwManageDefaults();
@@ -9606,6 +9606,10 @@ function rvwEnrichRow(r){
     // 제품금액/원가금액도 매출관리 통합(판매가/매입) 매칭값을 기본으로 쓰고, 수기입력이 있으면 그걸 우선 표시
     displayProductAmount: (manage.productAmount!==''&&manage.productAmount!=null) ? manage.productAmount : (match?(match.salePrice??''):''),
     displayCostAmount: (manage.costAmount!==''&&manage.costAmount!=null) ? manage.costAmount : (match?(match.costPrice??''):''),
+    // 마진 — 매칭된 주문이 있으면 매출관리 통합 데이터의 마진(정산금액-원가금액-배송비)을 그대로 표시(수정불가),
+    // 매칭이 안 되면 자동계산할 근거가 없으므로 직접 입력 가능
+    hasMatch: !!match,
+    matchMargin: match ? (match.margin ?? null) : null,
     // 전시상태(정상/블라인드) — 업로드 원본값을 두 값 중 하나로 정규화
     displayStatus: r.displayStatus==='블라인드' ? '블라인드' : '정상',
     manage
@@ -9652,7 +9656,9 @@ function rvwRowHtml(er){
     <td class="rvw-content-cell rvw-clickable" ondblclick="rvwOpenDetail('${er.reviewId}')" title="더블클릭: 전체보기">${mg.managerNote?rvwEsc(mg.managerNote):'<span style="color:var(--tx2);">-</span>'}</td>
     <td><input type="number" class="rvw-amt-inp" value="${(er.displayProductAmount!==''&&er.displayProductAmount!=null)?er.displayProductAmount:''}" onchange="rvwOnAmountChange('${er.reviewId}','productAmount',this.value)"></td>
     <td><input type="number" class="rvw-amt-inp" value="${(er.displayCostAmount!==''&&er.displayCostAmount!=null)?er.displayCostAmount:''}" onchange="rvwOnAmountChange('${er.reviewId}','costAmount',this.value)"></td>
-    <td><input type="number" class="rvw-amt-inp" value="${mg.lossAmount??''}" onchange="rvwOnAmountChange('${er.reviewId}','lossAmount',this.value)"></td>
+    <td>${er.hasMatch
+      ? `<span style="font-weight:700;color:${(er.matchMargin??0)<0?'#DC2626':'var(--tx)'};">${er.matchMargin!=null?Number(er.matchMargin).toLocaleString()+'원':'-'}</span>`
+      : `<input type="number" class="rvw-amt-inp" placeholder="마진 입력" value="${mg.marginAmount??''}" onchange="rvwOnAmountChange('${er.reviewId}','marginAmount',this.value)">`}</td>
     <td><select class="rvw-assignee-sel" onchange="rvwOnAssigneeChange('${er.reviewId}',this.value)">
       <option value="">-</option>
       ${RVW_ASSIGNEES.map(a=>`<option value="${a}" ${a===mg.assignee?'selected':''}>${a}</option>`).join('')}
