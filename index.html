@@ -3636,6 +3636,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
       </div>
       <div class="rvw-kpi-row" id="rvwKpiRow"></div>
+      <div class="rvw-kpi-row" id="rvwAlertRow" style="margin-bottom:16px;"></div>
       <div class="rvw-chart-row">
         <div class="rvw-chart-card" style="max-width:320px;">
           <div class="rvw-chart-title">평점 비율</div>
@@ -3649,6 +3650,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="rvw-chart-card">
         <div class="rvw-chart-title">제품별 평균 평점 (리뷰 10건 이상, 낮은 순)</div>
         <div class="rvw-chart-box" style="height:280px;"><canvas id="rvwProductChart"></canvas></div>
+      </div>
+      <div class="rvw-chart-card">
+        <div class="rvw-chart-title">🚨 제품별 클레임율 <span style="font-weight:400;color:var(--tx2);font-size:11.5px;">(1~2점 비율 · 리뷰 5건 이상 · 높은 순)</span></div>
+        <div style="overflow-x:auto;">
+          <table class="rvw-tbl" style="table-layout:auto;">
+            <thead><tr><th>상품명</th><th>리뷰수</th><th>클레임율</th><th>1점</th><th>2점</th><th>3점</th><th>4점</th><th>5점</th></tr></thead>
+            <tbody id="rvwClaimTbody"></tbody>
+          </table>
+        </div>
+        <div class="rvw-empty" id="rvwClaimEmpty" style="display:none;">데이터가 없습니다.</div>
       </div>
       <div class="rvw-chart-card">
         <div class="rvw-chart-title">⭐ 저평점(1~4점)인데 내용은 긍정적인 리뷰 <span style="font-weight:400;color:var(--tx2);font-size:11.5px;">(키워드 기반 자동 추정 · 참고용)</span></div>
@@ -3774,6 +3785,23 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;gap:8px;">
       <button class="btn" style="flex:1;" onclick="closeModal('rvwDetailModal')">닫기</button>
       <button class="btn btn-pr" id="rvwDetSaveBtn" style="flex:1;" onclick="rvwSaveDetail()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 리뷰 변경 이력(별점/전시상태) 팝업 -->
+<div class="modal-overlay" id="rvwChangeLogModal">
+  <div class="modal" style="max-width:680px;">
+    <h3 id="rvwClTitle">변경 이력</h3>
+    <div style="border:2px solid #DC2626;border-radius:10px;padding:10px;max-height:440px;overflow-y:auto;">
+      <table class="rvw-tbl" style="table-layout:auto;">
+        <thead><tr><th>변경일</th><th>상품명</th><th>리뷰번호</th><th>변경내용</th><th>변경경로</th></tr></thead>
+        <tbody id="rvwClTbody"></tbody>
+      </table>
+      <div class="rvw-empty" id="rvwClEmpty" style="display:none;">변경 이력이 없습니다.</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn" style="flex:1;" onclick="closeModal('rvwChangeLogModal')">닫기</button>
     </div>
   </div>
 </div>
@@ -9426,6 +9454,7 @@ async function rvwCollectRows(monthSelId){
   return rows;
 }
 function rvwEsc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function rvwNowStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
 async function reviewInit(){
   await rvwLoadIndex();
@@ -9651,6 +9680,7 @@ async function rvwOnRatingChange(reviewId, val){
   _rvwMonths[m] = latest || _rvwMonths[m] || {};
   const row = _rvwMonths[m][reviewId]; if(!row) return;
   if(row.rating===n) return;
+  (row.changeLog ||= []).push({date:rvwNowStr(), field:'rating', from:row.rating, to:n, source:'manual'});
   row.rating = n;
   await cloudKvSave(rvwMKey(m), _rvwMonths[m]);
   rvwRerenderCurrentTab();
@@ -9666,6 +9696,7 @@ async function rvwOnDisplayStatusChange(reviewId, val){
   _rvwMonths[m] = latest || _rvwMonths[m] || {};
   const row = _rvwMonths[m][reviewId]; if(!row) return;
   if(row.displayStatus===ds) return;
+  (row.changeLog ||= []).push({date:rvwNowStr(), field:'displayStatus', from:(row.displayStatus||'정상'), to:ds, source:'manual'});
   row.displayStatus = ds;
   await cloudKvSave(rvwMKey(m), _rvwMonths[m]);
   rvwRerenderCurrentTab();
@@ -9811,10 +9842,88 @@ async function rvwRenderAnalysis(){
     <div class="rvw-kpi-card"><div class="rvw-kpi-label">평균 평점</div><div class="rvw-kpi-value star">${total?avg.toFixed(2)+'⭐':'-'}</div></div>
     <div class="rvw-kpi-card"><div class="rvw-kpi-label">최근 30일 평균 평점</div><div class="rvw-kpi-value star">${recentRows.length?avg30.toFixed(2)+'⭐':'-'}</div></div>
     <div class="rvw-kpi-card"><div class="rvw-kpi-label">최근 30일 리뷰수</div><div class="rvw-kpi-value">${recentRows.length.toLocaleString()}건</div></div>`;
+  rvwRenderAlertRow(rows);
   rvwRenderDonut(rows);
   rvwRenderTrend(rows);
   rvwRenderProductChart(rows);
+  rvwRenderClaimTable(rows);
   rvwRenderSentiment(rows);
+}
+// ── 별점/전시상태 변경 이력 수집(엑셀 재업로드로 감지된 변경 + 직원 수기 수정 모두 포함) ──
+let _rvwLastChangeEvents = {rating:[], blind:[]};
+function rvwCollectChangeEvents(rows){
+  const rating=[], blind=[];
+  rows.forEach(r=>{
+    (r.changeLog||[]).forEach(ev=>{
+      const item = {reviewId:r.reviewId, productName:r.productName||r.productId, ...ev};
+      if(ev.field==='rating') rating.push(item);
+      else if(ev.field==='displayStatus' && ev.from==='정상' && ev.to==='블라인드') blind.push(item);
+    });
+  });
+  rating.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  blind.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return {rating, blind};
+}
+function rvwRenderAlertRow(rows){
+  const events = rvwCollectChangeEvents(rows);
+  _rvwLastChangeEvents = events;
+  const el = document.getElementById('rvwAlertRow');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="rvw-kpi-card" style="cursor:pointer;border:1.5px solid #DC2626;" onclick="rvwOpenChangeModal('rating')">
+      <div class="rvw-kpi-label">⚠️ 별점 변경 건수 <span style="font-weight:400;">(엑셀 재업로드 감지 + 수기수정)</span></div>
+      <div class="rvw-kpi-value" style="color:#DC2626;">${events.rating.length.toLocaleString()}건</div>
+    </div>
+    <div class="rvw-kpi-card" style="cursor:pointer;border:1.5px solid #DC2626;" onclick="rvwOpenChangeModal('blind')">
+      <div class="rvw-kpi-label">⚠️ 정상→블라인드 전환 건수</div>
+      <div class="rvw-kpi-value" style="color:#DC2626;">${events.blind.length.toLocaleString()}건</div>
+    </div>`;
+}
+function rvwOpenChangeModal(kind){
+  const events = kind==='rating' ? _rvwLastChangeEvents.rating : _rvwLastChangeEvents.blind;
+  document.getElementById('rvwClTitle').textContent = kind==='rating' ? '⭐ 별점 변경 이력' : '🚫 전시상태 정상→블라인드 전환 이력';
+  const tb=document.getElementById('rvwClTbody');
+  const emptyEl=document.getElementById('rvwClEmpty');
+  if(!events.length){ tb.innerHTML=''; emptyEl.style.display='block'; }
+  else{
+    emptyEl.style.display='none';
+    const star = n => '★'.repeat(n)+'☆'.repeat(Math.max(0,5-n));
+    tb.innerHTML = events.map(ev=>{
+      const desc = ev.field==='rating' ? `${star(ev.from)} → ${star(ev.to)}` : `${rvwEsc(ev.from)} → ${rvwEsc(ev.to)}`;
+      return `<tr>
+        <td>${rvwEsc(ev.date)}</td>
+        <td>${rvwEsc(ev.productName)}</td>
+        <td>${rvwEsc(ev.reviewId)}</td>
+        <td>${desc}</td>
+        <td>${ev.source==='excel'?'엑셀 업로드':'직원 수기수정'}</td>
+      </tr>`;
+    }).join('');
+  }
+  openModal('rvwChangeLogModal');
+}
+// ── 제품별 클레임율(1~2점 비율) 테이블 ──
+function rvwRenderClaimTable(rows){
+  const tb = document.getElementById('rvwClaimTbody'); if(!tb) return;
+  const emptyEl = document.getElementById('rvwClaimEmpty');
+  const byProd = {};
+  rows.forEach(r=>{ const key=r.productName||r.productId; (byProd[key] ||= []).push(r.rating); });
+  const entries = Object.entries(byProd).map(([name,arr])=>{
+    const total = arr.length;
+    const counts = [1,2,3,4,5].map(v=>arr.filter(x=>x===v).length);
+    const claimRate = total ? (counts[0]+counts[1])/total*100 : 0;
+    return {name, total, counts, claimRate};
+  }).filter(e=>e.total>=5).sort((a,b)=> b.claimRate-a.claimRate || b.total-a.total);
+  if(!entries.length){ tb.innerHTML=''; if(emptyEl) emptyEl.style.display='block'; return; }
+  if(emptyEl) emptyEl.style.display='none';
+  tb.innerHTML = entries.map(e=>{
+    const pct = n => e.total ? (n/e.total*100).toFixed(1)+'%' : '-';
+    return `<tr>
+      <td>${rvwEsc(e.name)}</td>
+      <td>${e.total.toLocaleString()}건</td>
+      <td style="color:${e.claimRate>=20?'#DC2626':'var(--tx)'};font-weight:${e.claimRate>=20?800:400};">${e.claimRate.toFixed(1)}%</td>
+      <td>${pct(e.counts[0])}</td><td>${pct(e.counts[1])}</td><td>${pct(e.counts[2])}</td><td>${pct(e.counts[3])}</td><td>${pct(e.counts[4])}</td>
+    </tr>`;
+  }).join('');
 }
 function _rvwKill(k){ if(_rvwCharts[k]){ _rvwCharts[k].destroy(); _rvwCharts[k]=null; } }
 function rvwRenderDonut(rows){
@@ -9983,7 +10092,7 @@ async function rvwPickFiles(fileList){
   const files=[...fileList].filter(f=>/\.xlsx?$/i.test(f.name));
   if(!files.length){ toast('엑셀(.xlsx) 파일만 업로드할 수 있습니다.'); return; }
   await rvwLoadIndex();
-  let ok=0, totalNew=0, totalDup=0;
+  let ok=0, totalNew=0, totalDup=0, totalChanged=0;
   const touched = new Set();
   const refreshed = new Set();   // 다른 PC 동시저장 대비 — 이번 업로드에서 이미 최신본으로 갱신한 달
   for(const file of files){
@@ -10003,7 +10112,24 @@ async function rvwPickFiles(fileList){
         }
         if(_rvwMonths[m][row.reviewId]){
           totalDup++;
-          continue;   // 기존에 저장된 데이터를 보존 — 새로 업로드된 중복 리뷰는 버림
+          // 기존 리뷰(중복)라도 별점/전시상태가 바뀌어 있으면 변경 이력을 남기고 최신값으로 갱신
+          // (나머지 필드는 기존 데이터 보존 — 재업로드로 통째로 덮어쓰지 않음)
+          const existing = _rvwMonths[m][row.reviewId];
+          const newDs = row.displayStatus==='블라인드' ? '블라인드' : '정상';
+          const oldDs = existing.displayStatus==='블라인드' ? '블라인드' : '정상';
+          let rowChanged = false;
+          if(row.rating && existing.rating!==row.rating){
+            (existing.changeLog ||= []).push({date:rvwNowStr(), field:'rating', from:existing.rating, to:row.rating, source:'excel'});
+            existing.rating = row.rating;
+            rowChanged = true;
+          }
+          if(oldDs!==newDs){
+            (existing.changeLog ||= []).push({date:rvwNowStr(), field:'displayStatus', from:oldDs, to:newDs, source:'excel'});
+            existing.displayStatus = newDs;
+            rowChanged = true;
+          }
+          if(rowChanged){ totalChanged++; touched.add(m); }
+          continue;
         }
         totalNew++;
         _rvwMonths[m][row.reviewId] = row;
@@ -10018,7 +10144,8 @@ async function rvwPickFiles(fileList){
     for(const m of touched) await cloudKvSave(rvwMKey(m), _rvwMonths[m]);
     await cloudKvSave(RVW_IDX_KEY, _rvwIdx);
     rvwBuildMonthSelects();
-    toast(`✅ 리뷰 ${totalNew}건 신규 저장 (기존 데이터 보존, 중복 ${totalDup}건 제외)`);
+    const changedMsg = totalChanged>0 ? `, 별점/전시상태 변경 감지 ${totalChanged}건` : '';
+    toast(`✅ 리뷰 ${totalNew}건 신규 저장 (기존 데이터 보존, 중복 ${totalDup}건 제외${changedMsg})`);
     if(_rvwTab==='data') rvwRenderData(); else rvwRenderAnalysis();
   }
   const fi=document.getElementById('rvwFile'); if(fi) fi.value='';
