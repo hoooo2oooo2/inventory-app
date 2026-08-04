@@ -17732,7 +17732,8 @@ async function openColMapModal(ch){
     hintEl.textContent = '💡 파일을 먼저 선택하면 실제 헤더명이 표시됩니다. (지금은 열 번호만 표시)';
   }
   const curMap = getChMap(ch);
-  const maxCol = Math.max(headerRow.length, 40);
+  const curVals = REV_COL_FIELDS.map(([key])=>curMap[key]).filter(v=>v!=null);
+  const maxCol = Math.max(headerRow.length, 100, ...(curVals.length?[Math.max(...curVals)+1]:[]));
   document.getElementById('revColModalFields').innerHTML = REV_COL_FIELDS.map(([key,label])=>{
     if(ch==='쿠팡' && key==='settlement'){
       return `<div class="field"><label>${label}</label><input disabled value="판매가 × 0.88 자동 반영" style="color:var(--tx2);"></div>`;
