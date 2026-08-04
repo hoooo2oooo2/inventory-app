@@ -744,6 +744,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-revenue .rev-up-hint{font-size:10px;color:var(--tx2);}
 #page-revenue .rev-up-done{font-size:11px;color:#059669;font-weight:600;}
 #page-revenue .rev-up-remove{position:absolute;top:6px;right:8px;font-size:14px;color:var(--tx2);cursor:pointer;line-height:1;}
+#page-revenue .rev-up-gear{position:absolute;top:6px;left:8px;font-size:13px;color:var(--tx2);cursor:pointer;line-height:1;opacity:.6;}
+#page-revenue .rev-up-gear:hover{opacity:1;color:var(--pr);}
 #page-revenue .rev-submit{display:block;width:100%;padding:13px;background:var(--pr);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-top:16px;transition:background .15s;}
 #page-revenue .rev-submit:hover{background:#2171E5;}
 #page-revenue .rev-empty{text-align:center;padding:40px;color:var(--tx2);font-size:13px;}
@@ -5508,6 +5510,22 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ma">
       <button class="btn" onclick="closeModal('bdModal')">취소</button>
       <button class="btn btn-pr" onclick="saveBdModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="revColModal">
+  <div class="modal" style="max-width:640px;max-height:82vh;overflow-y:auto;">
+    <h3>가져올 열 설정 — <span id="revColModalCh"></span></h3>
+    <div style="font-size:11px;color:var(--tx2);margin-bottom:10px;line-height:1.5;">
+      엑셀에서 각 항목에 해당하는 열을 선택하세요. <b>선택하지 않은 항목은 기존 설정을 그대로 유지</b>합니다.
+      (구분·매입금액·마진·마진율·단가는 백데이터 기준 자동 계산이라 설정 대상이 아닙니다.)
+      <div id="revColModalHint" style="margin-top:4px;color:#185FA5;"></div>
+    </div>
+    <div class="field-grid" id="revColModalFields"></div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('revColModal')">취소</button>
+      <button class="btn btn-pr" onclick="saveRevColModal()">저장하기</button>
     </div>
   </div>
 </div>
@@ -17627,6 +17645,7 @@ function renderRevUpSlots(){
       ondragleave="document.getElementById('revSlot-${safeId}')?.classList.remove('drag-over')"
       ondrop="revDrop(event,'${ch}')"
       onclick="document.getElementById('revFileInp-${safeId}')?.click()">
+      <span class="rev-up-gear" title="가져올 열 설정" onclick="event.stopPropagation();openColMapModal('${ch}')">⚙</span>
       ${f
         ?`<div class="rev-up-icon">✅</div><div class="rev-up-ch">${ch}</div><div class="rev-up-done" style="word-break:break-all;">${f.name}</div><span class="rev-up-remove" onclick="event.stopPropagation();removeRevFile('${ch}')">✕</span>`
         :`<div class="rev-up-icon">📂</div><div class="rev-up-ch">${ch}</div><div class="rev-up-hint">클릭 또는 드래그</div>`}
@@ -17658,6 +17677,103 @@ const CH_MAPS = {
   // 전화구매건: 이미 통합 포맷 / 날짜는 행마다(0열) / 주문번호·상품번호 없음(공란)
   '전화구매건':   { dateCol:0, orderNo:null, buyer:3, receiver:4, phone1:5, phone2:6, zip:7, addr:8, itemNo:null, itemCode:10, modelName:11, orderQty:12, salePrice:13, settlement:14, settleFn:null, perRowDate:true },
 };
+
+// ── 판매처별 컬럼 매핑 사용자 설정 (cloudKv 'rev_col_map') ──
+//   위 CH_MAPS(기본값) 위에 사용자가 지정한 열만 덮어씀. 지정 안 한 항목은 기존값(기본값 또는 이전 저장값) 유지.
+//   쿠팡은 정산금액 열이 따로 없어 항상 판매가열 값 × 0.88로 자동 계산(사용자 설정 대상 아님).
+let _revColOverrides = {};
+let _revColLoaded = false;
+async function loadRevColOverrides(force){
+  if(_revColLoaded && !force) return;
+  _revColOverrides = (await cloudKvLoad('rev_col_map')) || {};
+  _revColLoaded = true;
+}
+// 채널의 실효 컬럼 매핑(기본값 + 사용자 설정 병합)
+function getChMap(channelName){
+  const base = CH_MAPS[channelName] || {};
+  const ov = _revColOverrides[channelName] || {};
+  const merged = { ...base, ...ov };
+  if(channelName==='쿠팡'){ merged.settlement = merged.salePrice; merged.settleFn = v=>v*0.88; }
+  return merged;
+}
+// 채널 매핑이 파싱 가능한 수준으로 채워졌는지(필수 항목) 확인
+function isChMapUsable(map){
+  return map && map.modelName!=null && map.itemCode!=null && map.salePrice!=null && map.settlement!=null && map.orderQty!=null;
+}
+// 0-based 열 인덱스 → 엑셀 열 문자(A, B, ..., Z, AA, ...)
+function colLetter(n){
+  let s='', x=Number(n)+1;
+  while(x>0){ const r=(x-1)%26; s=String.fromCharCode(65+r)+s; x=Math.floor((x-1)/26); }
+  return s;
+}
+
+// ── 컬럼 설정 모달 ──
+const REV_COL_FIELDS = [
+  ['orderNo','주문번호'], ['buyer','구매자'], ['receiver','수취인'],
+  ['phone1','연락처1'], ['phone2','연락처2'], ['zip','우편'], ['addr','주소'],
+  ['itemNo','상품번호'], ['itemCode','코드'], ['modelName','모델명'],
+  ['orderQty','수량'], ['salePrice','판매가'], ['settlement','정산'],
+];
+let _revColModalCh = null;
+async function openColMapModal(ch){
+  await loadRevColOverrides();
+  _revColModalCh = ch;
+  document.getElementById('revColModalCh').textContent = ch;
+  const hintEl = document.getElementById('revColModalHint');
+  const file = _revUpFiles[ch];
+  let headerRow = [];
+  if(file){
+    try{
+      const rows = await readXlsxRows(file);
+      headerRow = rows[0]||[];
+      hintEl.textContent = `📄 "${file.name}"의 실제 헤더명을 보여줍니다.`;
+    }catch(e){ hintEl.textContent = '⚠️ 헤더를 읽지 못했습니다 — 열 번호로 선택하세요.'; }
+  } else {
+    hintEl.textContent = '💡 파일을 먼저 선택하면 실제 헤더명이 표시됩니다. (지금은 열 번호만 표시)';
+  }
+  const curMap = getChMap(ch);
+  const maxCol = Math.max(headerRow.length, 40);
+  document.getElementById('revColModalFields').innerHTML = REV_COL_FIELDS.map(([key,label])=>{
+    if(ch==='쿠팡' && key==='settlement'){
+      return `<div class="field"><label>${label}</label><input disabled value="판매가 × 0.88 자동 반영" style="color:var(--tx2);"></div>`;
+    }
+    const curVal = curMap[key];
+    let optsHtml = `<option value="">— 선택 안함${curVal!=null?` (현재 ${colLetter(curVal)}열 유지)`:''} —</option>`;
+    for(let i=0;i<maxCol;i++){
+      const txt = headerRow[i]!=null && headerRow[i]!=='' ? String(headerRow[i]) : '';
+      const sel = (i===curVal) ? ' selected' : '';
+      optsHtml += `<option value="${i}"${sel}>${colLetter(i)}열${txt?' — '+escAttr(txt):''}</option>`;
+    }
+    return `<div class="field"><label>${label}</label><select id="revColSel_${key}">${optsHtml}</select></div>`;
+  }).join('');
+  openModal('revColModal');
+}
+async function saveRevColModal(){
+  const ch = _revColModalCh;
+  if(!ch) return;
+  const updates = {};
+  REV_COL_FIELDS.forEach(([key])=>{
+    if(ch==='쿠팡' && key==='settlement') return;
+    const sel = document.getElementById('revColSel_'+key);
+    if(!sel || sel.value==='') return;
+    updates[key] = Number(sel.value);
+  });
+  if(Object.keys(updates).length===0){ closeModal('revColModal'); return; }
+  const btn = document.querySelector('#revColModal .btn-pr');
+  if(btn){ btn.disabled=true; btn.textContent='저장 중...'; }
+  try{
+    const latest = (await cloudKvLoad('rev_col_map')) || {};
+    latest[ch] = { ...(latest[ch]||{}), ...updates };
+    await cloudKvSave('rev_col_map', latest);
+    _revColOverrides = latest;
+    closeModal('revColModal');
+    alert(`✅ [${ch}] 가져올 열 설정이 저장되었습니다.`);
+  }catch(e){
+    alert('저장 실패: '+e.message);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='저장하기'; }
+  }
+}
 
 // 셀 값 → 숫자 변환
 function _n(v){ if(v==null||v==='') return null; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?null:n; }
@@ -17766,8 +17882,11 @@ function applyShipGroupDedup(rows){
 
 // 채널 파일 파싱 → revenue 행 배열 반환
 async function parseChannelFile(file, channelName){
-  const map = CH_MAPS[channelName];
-  if(!map){ console.warn('매핑 없음:', channelName); return {rows:[], missing:[]}; }
+  await loadRevColOverrides();
+  const map = getChMap(channelName);
+  if(!isChMapUsable(map)){
+    throw new Error('가져올 열이 설정되지 않았습니다 — 슬롯의 ⚙ 버튼에서 컬럼을 먼저 설정하세요.');
+  }
 
   const xlsxRows = await readXlsxRows(file);
   const bdMap = getBdMap();
