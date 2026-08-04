@@ -4712,6 +4712,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <tbody id="revDlyRgTbody"></tbody>
           <tfoot id="revDlyRgTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
         </table></div>
+        <div id="revDlyRgPager" style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:0.5px solid var(--bd);font-size:11px;"></div>
       </div>
 
       <!-- 제품별 판매량 증감 분석 (실시간) -->
@@ -14510,6 +14511,9 @@ function setDlySort(key){
   renderDailyReport();
 }
 const DLY_PAGE_SIZE=15;
+const DLY_RG_PAGE_SIZE=20;
+let _dlyRgProdPage=0;      // 일일보고 › 로켓그로스 제품별 판매 현황 페이지(0-based)
+let _dlyRgPeriodLabel='';  // 페이지 이동 시 재사용할 기간 라벨
 let _revDlyDnut=null;
 let _dlyProdListCache=[];   // 제품별 판매현황 현재 렌더 목록(더블클릭 → 그래프 팝업에서 참조)
 let _dlyProdChart=null;
@@ -14557,7 +14561,7 @@ function renderDailyReport(){
   const chs=sortCh([...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(monPfx)).map(r=>r.ch).filter(Boolean))]);
   const cEl=document.getElementById('revDlyChBtns');
   const rgBtnHtml = Object.keys(_rgDailyTotals).length
-    ? `<button class="rfbtn${_dlyFilter.ch==='로켓그로스'?' active':''}" onclick="setDlyFilter('ch','로켓그로스')">🚀 로켓그로스</button>` : '';
+    ? `<button class="rfbtn${Array.isArray(_dlyFilter.ch)&&_dlyFilter.ch.includes('로켓그로스')?' active':''}" onclick="setDlyFilter('ch','로켓그로스')">🚀 로켓그로스</button>` : '';
   if(cEl) cEl.innerHTML=`<button class="rfbtn${_dlyFilter.ch==='ALL'?' active':''}" onclick="setDlyFilter('ch','ALL')">전체</button>`
     +chs.map(c=>`<button class="rfbtn${chMatchDly(c)&&_dlyFilter.ch!=='ALL'?' active':''}" onclick="setDlyFilter('ch','${c}')">${c}</button>`).join('')
     +rgBtnHtml;
@@ -14603,8 +14607,11 @@ function renderDailyReport(){
   if(dlyRgMissing.length){
     Promise.all(dlyRgMissing.map(ym=>rgEnsureProdMonths(ym,ym))).then(()=>renderDailyReport());
   }
-  const rgChSelected = _dlyFilter.ch==='로켓그로스';
-  const rgActive = _dlyFilter.ch==='ALL'||rgChSelected;
+  // rgIncluded: 로켓그로스가 선택 범위에 포함(전체, 또는 다중선택에 포함) / rgOnly: 로켓그로스만 단독 선택(전용 카드로 전환)
+  const rgIncluded = _dlyFilter.ch==='ALL' || (Array.isArray(_dlyFilter.ch) && _dlyFilter.ch.includes('로켓그로스'));
+  const rgOnly = Array.isArray(_dlyFilter.ch) && _dlyFilter.ch.length===1 && _dlyFilter.ch[0]==='로켓그로스';
+  const rgChSelected = rgOnly; // (하위 호환용 별칭)
+  const rgActive = rgIncluded;
   const curFrom=_dlyFilter.day!==null?`${_dlyFilter.year}-${monStr}-${pad(_dlyFilter.day)}`:`${_dlyFilter.year}-${monStr}-01`;
   const curTo=_dlyFilter.day!==null?curFrom:`${_dlyFilter.year}-${monStr}-31`;
   const prevFrom=_dlyFilter.day!==null?`${prevY}-${prevMonStr}-${pad(_dlyFilter.day)}`:`${prevY}-${prevMonStr}-01`;
@@ -14665,10 +14672,10 @@ function renderDailyReport(){
     return;
   }
   if(mainGrid) mainGrid.style.display='';
-  // '전체' 선택 중이면 일반 채널 표 아래에 로켓그로스 제품별 현황도 같이 보여준다.
+  // '전체' 또는 다중선택에 로켓그로스가 포함돼 있으면 일반 채널 표 아래에 로켓그로스 제품별 현황도 같이 보여준다.
   // (그동안 '전체'에서는 위 정산금액 KPI에만 로켓그로스 금액이 합산되고 표에는 전혀 안 보여서
-  //  "전체인데 왜 로켓그로스는 안 보이냐"는 혼란이 있었음 — 특정 채널(스마트스토어 등) 단독 선택 시에는 계속 숨김)
-  if(_dlyFilter.ch==='ALL' && Object.keys(_rgDailyTotals).length){
+  //  "전체인데 왜 로켓그로스는 안 보이냐"는 혼란이 있었음 — 로켓그로스가 선택 범위에 없을 때만 숨김)
+  if(rgIncluded && Object.keys(_rgDailyTotals).length){
     if(rgCard) rgCard.style.display='';
     renderDlyRgCard(periodLabel);
   } else {
@@ -14847,14 +14854,36 @@ async function renderDlyRgCard(periodLabel){
     o.marginRate=o.settlement>0?(o.margin/o.settlement*100):0;
   });
   const sorted=[...optList].sort((a,b)=>b.revenue-a.revenue);
+  _dlyRgPeriodLabel=periodLabel;
 
   const sub=document.getElementById('revDlyRgSub');
   if(sub) sub.textContent=periodLabel;
   const tbl=document.getElementById('revDlyRgTbl'), tEmpty=document.getElementById('revDlyRgEmpty'), tBody=document.getElementById('revDlyRgTbody'), tFoot=document.getElementById('revDlyRgTfoot');
+  const pagerEl=document.getElementById('revDlyRgPager');
   if(!tBody) return;
   if(sorted.length){
     if(tEmpty) tEmpty.style.display='none'; if(tbl) tbl.style.display='';
-    tBody.innerHTML=sorted.map(o=>`<tr>
+    const rgMaxPage=Math.max(0,Math.ceil(sorted.length/DLY_RG_PAGE_SIZE)-1);
+    if(_dlyRgProdPage>rgMaxPage) _dlyRgProdPage=rgMaxPage;
+    const rgStart=_dlyRgProdPage*DLY_RG_PAGE_SIZE;
+    const pageList=sorted.slice(rgStart, rgStart+DLY_RG_PAGE_SIZE);
+    if(pagerEl){
+      if(sorted.length<=DLY_RG_PAGE_SIZE){ pagerEl.innerHTML=''; }
+      else {
+        const rgMaxP=rgMaxPage+1;
+        const from=rgStart+1, to=Math.min(rgStart+DLY_RG_PAGE_SIZE,sorted.length);
+        pagerEl.innerHTML=`
+          <span style="color:var(--tx2);">${from.toLocaleString()}–${to.toLocaleString()} / 전체 ${sorted.length.toLocaleString()}개</span>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <button class="btn btn-sm" onclick="_dlyRgProdPage=0;renderDlyRgCard(_dlyRgPeriodLabel)" ${_dlyRgProdPage===0?'disabled':''}>처음</button>
+            <button class="btn btn-sm" onclick="_dlyRgProdPage--;renderDlyRgCard(_dlyRgPeriodLabel)" ${_dlyRgProdPage===0?'disabled':''}>◀</button>
+            <span style="padding:0 6px;">${_dlyRgProdPage+1} / ${rgMaxP}</span>
+            <button class="btn btn-sm" onclick="_dlyRgProdPage++;renderDlyRgCard(_dlyRgPeriodLabel)" ${_dlyRgProdPage>=rgMaxP-1?'disabled':''}>▶</button>
+            <button class="btn btn-sm" onclick="_dlyRgProdPage=${rgMaxP-1};renderDlyRgCard(_dlyRgPeriodLabel)" ${_dlyRgProdPage>=rgMaxP-1?'disabled':''}>끝</button>
+          </div>`;
+      }
+    }
+    tBody.innerHTML=pageList.map(o=>`<tr>
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;" title="${o.displayName}${o.marginKnown?'':' (원가 미매칭 — 마진 계산 제외)'}">${o.displayName}${o.marginKnown?'':' ⚠️'}</td>
       <td style="text-align:right;font-weight:600;">${fmt(o.revenue)}</td>
       <td style="text-align:right;">${fmt(o.settlement)}</td>
@@ -14890,6 +14919,7 @@ async function renderDlyRgCard(periodLabel){
     }
   } else {
     if(tEmpty) tEmpty.style.display='block'; if(tbl) tbl.style.display='none'; if(tFoot) tFoot.innerHTML='';
+    if(pagerEl) pagerEl.innerHTML='';
   }
 }
 
@@ -14898,10 +14928,10 @@ function setDlyFilter(type, val){
   else if(type==='month'){_dlyFilter.month=val;_dlyFilter.day=null;}
   else if(type==='day') _dlyFilter.day=(val===null||val==='null')?null:Number(val);
   else if(type==='ch'){
-    if(val==='ALL'||val==='로켓그로스'){
+    if(val==='ALL'){
       _dlyFilter.ch=val;
     } else {
-      // 일반 판매처: 다중 선택 토글 ('전체'·'로켓그로스' 상태에서 클릭하면 새로 시작)
+      // 판매처(로켓그로스 포함): 다중 선택 토글 ('전체' 상태에서 클릭하면 새로 시작)
       let cur=Array.isArray(_dlyFilter.ch)?[..._dlyFilter.ch]:[];
       if(cur.includes(val)) cur=cur.filter(c=>c!==val);
       else cur=[...cur, val];
@@ -14910,6 +14940,7 @@ function setDlyFilter(type, val){
   }
   _dlyTypeFilter='ALL';   // 기간·판매처 변경 시 구분 필터 초기화
   _dlyProdPage=0;
+  _dlyRgProdPage=0;
   renderDailyReport();
 }
 
@@ -16524,8 +16555,10 @@ async function openDlyProdChart(i){
   mSel.value=_dlyFilter.month;
 
   // 메인 필터에서 판매처가 2개 이상 중복 선택돼 있으면, 그 채널들을 각각 별도 그래프(이중/다중 그래프)로 표시
-  const isMulti=Array.isArray(_dlyFilter.ch)&&_dlyFilter.ch.length>1;
-  _dlyProdChartChs=isMulti?[..._dlyFilter.ch]:null;
+  // (이 팝업은 일반 채널 상품 전용이므로 로켓그로스는 비교 대상에서 제외)
+  const _dlyChsNoRg=Array.isArray(_dlyFilter.ch)?_dlyFilter.ch.filter(c=>c!=='로켓그로스'):_dlyFilter.ch;
+  const isMulti=Array.isArray(_dlyChsNoRg)&&_dlyChsNoRg.length>1;
+  _dlyProdChartChs=isMulti?[..._dlyChsNoRg]:null;
   const chSel=document.getElementById('dlyProdChSel'), chLbl=document.getElementById('dlyProdChLbl'), chNote=document.getElementById('dlyProdChMultiNote');
   chSel.style.display=isMulti?'none':'';
   if(chLbl) chLbl.style.display=isMulti?'none':'';
@@ -16534,7 +16567,7 @@ async function openDlyProdChart(i){
   } else {
     if(chNote) chNote.style.display='none';
     chSel.innerHTML='<option value="ALL">전체</option>'+REV_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
-    const curCh=Array.isArray(_dlyFilter.ch)?_dlyFilter.ch[0]:_dlyFilter.ch;
+    const curCh=Array.isArray(_dlyChsNoRg)?_dlyChsNoRg[0]:_dlyChsNoRg;
     chSel.value=curCh&&REV_CHANNELS.includes(curCh)?curCh:'ALL';
   }
   openModal('dlyProdChartModal');
