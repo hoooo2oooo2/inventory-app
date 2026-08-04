@@ -3660,6 +3660,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </table>
         </div>
         <div class="rvw-empty" id="rvwClaimEmpty" style="display:none;">데이터가 없습니다.</div>
+        <div id="rvwClaimPager"></div>
       </div>
       <div class="rvw-chart-card">
         <div class="rvw-chart-title">⭐ 저평점(1~4점)인데 내용은 긍정적인 리뷰 <span style="font-weight:400;color:var(--tx2);font-size:11.5px;">(키워드 기반 자동 추정 · 참고용)</span></div>
@@ -3670,6 +3671,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </table>
         </div>
         <div class="rvw-empty" id="rvwSentimentEmpty" style="display:none;">해당하는 리뷰가 없습니다.</div>
+        <div id="rvwSentimentPager"></div>
       </div>
     </div>
   </div>
@@ -9831,6 +9833,8 @@ async function rvwRenderAnalysis(){
   const seq = ++_rvwAnLoadSeq;
   const rows = await rvwCollectRows('rvwAnMonthSel');
   if(seq!==_rvwAnLoadSeq) return;
+  await rvwEnsureRevMatchFor(rows);   // 클레임율 테이블에 매칭된 상품명을 쓰기 위해 매출 데이터 매칭
+  if(seq!==_rvwAnLoadSeq) return;
   const total = rows.length;
   const avg = total ? rows.reduce((s,r)=>s+r.rating,0)/total : 0;
   const d30 = new Date(Date.now()-30*86400000);
@@ -9901,21 +9905,48 @@ function rvwOpenChangeModal(kind){
   }
   openModal('rvwChangeLogModal');
 }
-// ── 제품별 클레임율(1~2점 비율) 테이블 ──
+// ── 페이지네이션 공통 컨트롤(10개씩) ──
+function rvwPagerHtml(page, totalPages, totalCount, prevFn, nextFn){
+  if(totalCount<=10) return '';
+  return `<div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:10px;">
+    <button class="btn btn-sm" ${page<=1?'disabled':''} onclick="${prevFn}">‹ 이전</button>
+    <span style="font-size:11.5px;color:var(--tx2);">${page} / ${totalPages} 페이지 (총 ${totalCount.toLocaleString()}건)</span>
+    <button class="btn btn-sm" ${page>=totalPages?'disabled':''} onclick="${nextFn}">다음 ›</button>
+  </div>`;
+}
+// 매출관리 통합(주문번호 매칭)으로 매칭된 상품명이 있으면 그걸 쓰고, 없으면 리뷰 원본 상품명 사용
+function rvwClaimProductName(r){
+  const match = rvwMatchOrder(r.orderNo);
+  return (match && match.modelName) ? match.modelName : (r.productName||r.productId);
+}
+// ── 제품별 클레임율(1~2점 비율) 테이블 — 10개씩 페이지네이션 ──
+let _rvwClaimEntries = [];
+let _rvwClaimPage = 1;
 function rvwRenderClaimTable(rows){
-  const tb = document.getElementById('rvwClaimTbody'); if(!tb) return;
-  const emptyEl = document.getElementById('rvwClaimEmpty');
   const byProd = {};
-  rows.forEach(r=>{ const key=r.productName||r.productId; (byProd[key] ||= []).push(r.rating); });
-  const entries = Object.entries(byProd).map(([name,arr])=>{
+  rows.forEach(r=>{ const key=rvwClaimProductName(r); (byProd[key] ||= []).push(r.rating); });
+  _rvwClaimEntries = Object.entries(byProd).map(([name,arr])=>{
     const total = arr.length;
     const counts = [1,2,3,4,5].map(v=>arr.filter(x=>x===v).length);
     const claimRate = total ? (counts[0]+counts[1])/total*100 : 0;
     return {name, total, counts, claimRate};
   }).filter(e=>e.total>=5).sort((a,b)=> b.claimRate-a.claimRate || b.total-a.total);
-  if(!entries.length){ tb.innerHTML=''; if(emptyEl) emptyEl.style.display='block'; return; }
+  _rvwClaimPage = 1;
+  rvwRenderClaimPage();
+}
+function rvwRenderClaimPage(){
+  const tb = document.getElementById('rvwClaimTbody'); if(!tb) return;
+  const emptyEl = document.getElementById('rvwClaimEmpty');
+  const pagerEl = document.getElementById('rvwClaimPager');
+  const entries = _rvwClaimEntries;
+  if(!entries.length){ tb.innerHTML=''; if(emptyEl) emptyEl.style.display='block'; if(pagerEl) pagerEl.innerHTML=''; return; }
   if(emptyEl) emptyEl.style.display='none';
-  tb.innerHTML = entries.map(e=>{
+  const perPage = 10;
+  const totalPages = Math.max(1, Math.ceil(entries.length/perPage));
+  _rvwClaimPage = Math.min(Math.max(1,_rvwClaimPage), totalPages);
+  const start = (_rvwClaimPage-1)*perPage;
+  const pageItems = entries.slice(start, start+perPage);
+  tb.innerHTML = pageItems.map(e=>{
     const pct = n => e.total ? (n/e.total*100).toFixed(1)+'%' : '-';
     return `<tr>
       <td>${rvwEsc(e.name)}</td>
@@ -9924,7 +9955,9 @@ function rvwRenderClaimTable(rows){
       <td>${pct(e.counts[0])}</td><td>${pct(e.counts[1])}</td><td>${pct(e.counts[2])}</td><td>${pct(e.counts[3])}</td><td>${pct(e.counts[4])}</td>
     </tr>`;
   }).join('');
+  if(pagerEl) pagerEl.innerHTML = rvwPagerHtml(_rvwClaimPage, totalPages, entries.length, 'rvwClaimPageGo(-1)', 'rvwClaimPageGo(1)');
 }
+function rvwClaimPageGo(delta){ _rvwClaimPage += delta; rvwRenderClaimPage(); }
 function _rvwKill(k){ if(_rvwCharts[k]){ _rvwCharts[k].destroy(); _rvwCharts[k]=null; } }
 function rvwRenderDonut(rows){
   const ctx = document.getElementById('rvwDonutChart'); if(!ctx) return;
@@ -10005,20 +10038,36 @@ function rvwIsLowRatingPositive(row){
   const {pos,neg} = rvwSentimentScore(row.content);
   return pos>0 && pos>neg;
 }
+// ── 저평점 긍정 리뷰 목록 — 10개씩 페이지네이션 ──
+let _rvwSentimentRows = [];
+let _rvwSentimentPage = 1;
 function rvwRenderSentiment(rows){
-  const flagged = rows.filter(rvwIsLowRatingPositive).sort((a,b)=>(b.reviewDate||'').localeCompare(a.reviewDate||'')).slice(0,50);
+  _rvwSentimentRows = rows.filter(rvwIsLowRatingPositive).sort((a,b)=>(b.reviewDate||'').localeCompare(a.reviewDate||''));
+  _rvwSentimentPage = 1;
+  rvwRenderSentimentPage();
+}
+function rvwRenderSentimentPage(){
   const tb=document.getElementById('rvwSentimentTbody');
   const emptyEl=document.getElementById('rvwSentimentEmpty');
-  if(!flagged.length){ tb.innerHTML=''; emptyEl.style.display='block'; return; }
+  const pagerEl=document.getElementById('rvwSentimentPager');
+  const flagged = _rvwSentimentRows;
+  if(!flagged.length){ tb.innerHTML=''; emptyEl.style.display='block'; if(pagerEl) pagerEl.innerHTML=''; return; }
   emptyEl.style.display='none';
-  tb.innerHTML = flagged.map(r=>`
+  const perPage = 10;
+  const totalPages = Math.max(1, Math.ceil(flagged.length/perPage));
+  _rvwSentimentPage = Math.min(Math.max(1,_rvwSentimentPage), totalPages);
+  const start = (_rvwSentimentPage-1)*perPage;
+  const pageItems = flagged.slice(start, start+perPage);
+  tb.innerHTML = pageItems.map(r=>`
     <tr>
       <td>${rvwEsc(r.productName)}</td>
       <td class="rvw-star">${'★'.repeat(r.rating)}${'☆'.repeat(Math.max(0,5-r.rating))}</td>
       <td class="rvw-content-cell" title="${rvwEsc(r.content)}">${rvwEsc(r.content)}</td>
       <td>${rvwEsc(r.reviewDate)}</td>
     </tr>`).join('');
+  if(pagerEl) pagerEl.innerHTML = rvwPagerHtml(_rvwSentimentPage, totalPages, flagged.length, 'rvwSentimentPageGo(-1)', 'rvwSentimentPageGo(1)');
 }
+function rvwSentimentPageGo(delta){ _rvwSentimentPage += delta; rvwRenderSentimentPage(); }
 
 // ── 엑셀 업로드: 드래그앤드롭 + 파싱 + 월별 샤딩 저장(리뷰글번호 키로 자동 중복갱신) ──
 function _rvwInitDrop(){
