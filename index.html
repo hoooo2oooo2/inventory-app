@@ -14662,19 +14662,11 @@ function renderDailyReport(){
     document.getElementById('revDlyK4s').innerHTML=adPrev?diffHtml(adDly,adPrev):'<span style="color:var(--tx2);">해당 기간·판매처</span>';
   }
 
-  // 로켓그로스 채널을 직접 선택한 경우 — 일반 채널용 그리드 대신 전용 카드로 전환하고 여기서 렌더 종료
+  // 로켓그로스가 선택 범위에 포함되면(단독 선택 포함) 일반 채널용 표에도 로켓그로스 제품을 합쳐서 보여준다.
+  // 방문자·전환율 등 로켓그로스 전용 지표는 아래 전용 카드(rgCard)로 별도 표시.
   const mainGrid=document.getElementById('revDlyMainGrid');
   const rgCard=document.getElementById('revDlyRgCard');
-  if(rgChSelected){
-    if(mainGrid) mainGrid.style.display='none';
-    if(rgCard) rgCard.style.display='';
-    renderDlyRgCard(periodLabel);
-    return;
-  }
   if(mainGrid) mainGrid.style.display='';
-  // '전체' 또는 다중선택에 로켓그로스가 포함돼 있으면 일반 채널 표 아래에 로켓그로스 제품별 현황도 같이 보여준다.
-  // (그동안 '전체'에서는 위 정산금액 KPI에만 로켓그로스 금액이 합산되고 표에는 전혀 안 보여서
-  //  "전체인데 왜 로켓그로스는 안 보이냐"는 혼란이 있었음 — 로켓그로스가 선택 범위에 없을 때만 숨김)
   if(rgIncluded && Object.keys(_rgDailyTotals).length){
     if(rgCard) rgCard.style.display='';
     renderDlyRgCard(periodLabel);
@@ -14690,11 +14682,6 @@ function renderDailyReport(){
   const chLabelDly=_dlyFilter.ch==='ALL'?'전체':(Array.isArray(_dlyFilter.ch)?_dlyFilter.ch.join('·'):_dlyFilter.ch);
   if(sub) sub.textContent=`${periodLabel} ${chLabelDly}`+(adDly>0?` · 광고비 -${fmt(adDly)} (마진 반영)`:'');
 
-  if(!rows.length){
-    if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return;
-  }
-  if(empty) empty.style.display='none'; if(tbl) tbl.style.display='';
-
   // 제품별 집계 (택배건수 = 합포장 기준 고유 배송 건수)
   const byProd={};
   rows.forEach(r=>{
@@ -14705,7 +14692,26 @@ function renderDailyReport(){
   });
   // cnt = 고유 배송 건수
   Object.values(byProd).forEach(v=>{ v.cnt=v.pkgs.size; });
+  // 로켓그로스 병합(선택 범위에 포함된 경우, 선택된 기간 curFrom~curTo 기준) — 같은 모델명이면 합산, 없으면 새 행
+  if(rgIncluded){
+    Object.keys(_rgProdCache).forEach(ym=>{
+      (_rgProdCache[ym]||[]).forEach(r=>{
+        if(!r.date||r.date<curFrom||r.date>curTo) return;
+        const name=rgResolveName(r.optionId)||r.productName||'미상';
+        const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
+        const fin=rgCalcRowFinance(r);
+        if(!byProd[name]) byProd[name]={type:rgResolveType(r.optionId)||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
+        byProd[name].qty+=qty; byProd[name].saleTotal+=r.revenue||0; byProd[name].settle+=fin.settlement;
+        byProd[name].margin+=(fin.margin!=null?fin.margin:0); byProd[name].cnt+=(r.orders||0);
+      });
+    });
+  }
   const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
+
+  if(!prodList.length){
+    if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return;
+  }
+  if(empty) empty.style.display='none'; if(tbl) tbl.style.display='';
 
   // '구분' 헤더 필터 옵션 채우기 (선택값 유지, 없으면 전체로)
   const typeSel=document.getElementById('dlyTypeFilter');
@@ -14784,9 +14790,18 @@ function renderDailyReport(){
     el.textContent = _dlySort.key===el.dataset.dlyK ? (_dlySort.dir===-1?' ▼':' ▲') : '';
   });
 
-  // 제품구분 도넛
+  // 제품구분 도넛 (로켓그로스가 선택 범위에 포함되면 같은 기간 정산금액도 합산)
   const byType={};
   rows.forEach(r=>{const t=r.itemType||'기타';if(!byType[t])byType[t]=0;byType[t]+=r.settlement||0;});
+  if(rgIncluded){
+    Object.keys(_rgProdCache).forEach(ym=>{
+      (_rgProdCache[ym]||[]).forEach(r=>{
+        if(!r.date||r.date<curFrom||r.date>curTo) return;
+        const t=rgResolveType(r.optionId)||'기타';
+        byType[t]=(byType[t]||0)+rgCalcRowFinance(r).settlement;
+      });
+    });
+  }
   const typeEntries=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
   const dnutCtx=document.getElementById('revDlyDnut');
   const dnutEmpty=document.getElementById('revDlyDnutEmpty');
