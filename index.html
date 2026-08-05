@@ -12238,8 +12238,20 @@ async function recalcShippingForKey(channel,item_no,feeObj){
       return !b || b.shipping_fee!==r.shipping_fee || b.margin!==r.margin || b.margin_rate!==r.margin_rate || b.ship_qty!==r.ship_qty;
     }).map(r=>({id:r.id, shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}));
 
-    for(let i=0;i<upd.length;i+=500){ await sb.from('revenue').upsert(upd.slice(i,i+500)); }
-    totalChanged += upd.length;
+    // upsert(INSERT ... ON CONFLICT)는 대상 행이 항상 이미 존재함에도 INSERT 단계에서 여기 담지 않은
+    // NOT NULL 컬럼(예: item_code, order_no 등)까지 값이 있어야 해서 500 오류가 날 수 있다.
+    // 이 행들은 방금 id로 직접 조회해온 기존 행이므로 update로 바꿔 그 문제를 원천적으로 피한다.
+    const CHUNK=20;
+    let failCount=0;
+    for(let i=0;i<upd.length;i+=CHUNK){
+      const chunk=upd.slice(i,i+CHUNK);
+      await Promise.all(chunk.map(({id,...vals})=>
+        sb.from('revenue').update(vals).eq('id',id).then(({error})=>{
+          if(error){ failCount++; console.error(`택배비 재계산 저장 실패(id=${id}):`, error.message); }
+        })
+      ));
+    }
+    totalChanged += (upd.length-failCount);
   }
   if(totalChanged){ await reloadRevLoadedYears(); }  // 메모리 갱신(적재된 연도만)
   return totalChanged;
