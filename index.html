@@ -16833,6 +16833,8 @@ async function downloadDailyExcel(){
   const chArr = chFilter==='ALL' ? null : (Array.isArray(chFilter)?chFilter:[chFilter]);
   const chMatch = c => !chArr || chArr.includes(c);
   const chLabel = chFilter==='ALL' ? '전체' : (Array.isArray(chFilter)?chFilter.join('·'):chFilter);
+  // 판매처 필터에 로켓그로스가 포함된 경우(전체 선택 포함) — 별도 전용뷰 데이터라 _revData엔 없으므로 아래에서 직접 병합한다
+  const rgIncludedEx = chFilter==='ALL' || (Array.isArray(chFilter) && chFilter.includes('로켓그로스'));
   const selMonRows=_revData.filter(r=>r.year===selY&&r.date?.startsWith(selMonStr)&&chMatch(r.ch));
   const selDays=[...new Set(selMonRows.map(r=>parseInt(r.date.split('-')[1])))].sort((a,b)=>a-b);
   const endDay=_dlyFilter.day!==null?_dlyFilter.day:(selDays.length?selDays[selDays.length-1]:1);
@@ -16921,6 +16923,26 @@ async function downloadDailyExcel(){
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
   Object.values(byProd).forEach(v=>{v.cnt=v.pkgs.size;});
+  // ── 로켓그로스 병합(판매처 필터에 로켓그로스가 포함된 경우, 다운로드 기준일 범위 기준) ──
+  //    같은 모델명(백데이터 매칭명)의 다른 판매처 행이 있으면 합산, 없으면 새 행을 만든다.
+  //    rgQtyByName: 이 제품 수량 중 로켓그로스 기여분 — 비고란 '그로스' 표시에 사용.
+  const rgQtyByName={};
+  if(rgIncludedEx){
+    const rgPeriodFrom=_dlyFilter.day!==null?`${selY}-${selMonStr}-${pad(endDay)}`:`${selY}-${selMonStr}-01`;
+    const rgPeriodTo=`${selY}-${selMonStr}-${pad(endDay)}`;
+    Object.keys(_rgProdCache).forEach(ym=>{
+      (_rgProdCache[ym]||[]).forEach(r=>{
+        if(!r.date||r.date<rgPeriodFrom||r.date>rgPeriodTo) return;
+        const name=rgResolveName(r.optionId)||r.productName||'미상';
+        const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
+        const fin=rgCalcRowFinance(r);
+        if(!byProd[name]) byProd[name]={type:rgResolveType(r.optionId)||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
+        byProd[name].qty+=qty; byProd[name].saleTotal+=r.revenue||0; byProd[name].settle+=fin.settlement;
+        byProd[name].margin+=(fin.margin!=null?fin.margin:0); byProd[name].cnt+=(r.orders||0);
+        rgQtyByName[name]=(rgQtyByName[name]||0)+qty;
+      });
+    });
+  }
   // 구분(B열) 텍스트 내림차순 우선 정렬, 같은 구분 안에서는 매출액(정산금액) 내림차순
   const prodList=Object.entries(byProd).sort((a,b)=>{
     const catCmp=String(b[1].type||'').localeCompare(String(a[1].type||''),'ko');
@@ -16940,6 +16962,12 @@ async function downloadDailyExcel(){
   if(!_revYearsLoaded.has(selY-1)) await ensureRevYear(selY-1);
   const dkey=d=>`${d.getFullYear()}|${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const histFrom=new Date(refDate); histFrom.setDate(histFrom.getDate()-(DAILY_HIST_DAYS-1));
+  // 로켓그로스가 판매처 필터에 포함돼 있으면, 위 히스토리 구간(최대 61일 과거까지)에 걸친 월 샤드를 모두 로드
+  if(rgIncludedEx){
+    const rgFromYm=`${histFrom.getFullYear()}-${pad(histFrom.getMonth()+1)}`;
+    const rgToYm=`${refDate.getFullYear()}-${pad(refDate.getMonth()+1)}`;
+    await rgEnsureProdMonths(rgFromYm, rgToYm);
+  }
   const dailyQty={};   // 모델명 → { 'YYYY|MM-DD': 주문수량 }
   _revData.forEach(r=>{
     if(!chMatch(r.ch)) return;
@@ -16951,6 +16979,21 @@ async function downloadDailyExcel(){
     const k=r.year+'|'+r.date;
     (dailyQty[name]=dailyQty[name]||{})[k]=(dailyQty[name][k]||0)+(r.orderQty||0);
   });
+  // 로켓그로스 일별 판매수량도 같은 모델명(백데이터 매칭명) 아래 병합 — 일별 판매수량 컬럼·전주대비·신규판정에 반영
+  if(rgIncludedEx){
+    Object.keys(_rgProdCache).forEach(ym=>{
+      (_rgProdCache[ym]||[]).forEach(r=>{
+        if(!r.date) return;
+        const [ry,rm,rd]=r.date.split('-').map(Number);
+        const d=new Date(ry,rm-1,rd);
+        if(d<histFrom||d>refDate) return;
+        const name=rgResolveName(r.optionId)||r.productName||'미상';
+        const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
+        const k=ry+'|'+r.date.slice(5);
+        (dailyQty[name]=dailyQty[name]||{})[k]=(dailyQty[name][k]||0)+qty;
+      });
+    });
+  }
   const qtyOn=(name,d)=>(dailyQty[name]||{})[dkey(d)]||0;
   const silentBefore=(name,d)=>{
     for(let i=1;i<=NEW_SILENCE_DAYS;i++){
@@ -17003,7 +17046,9 @@ async function downloadDailyExcel(){
   s2.push(['모델명','구분','주문수량','택배건수','판매가합','마진','마진율','비고','전주대비', ...dateHeaders]);
   prodList.forEach(([name,v])=>{
     const daily=dateCols.map(d=>qtyOn(name,d));
-    s2.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.margin,v.settle>0?v.margin/v.settle:0,'',weekTrend(name).text, ...daily]);
+    const rgQ=rgQtyByName[name]||0;
+    const remark=rgQ<=0?'':(rgQ>=v.qty?'그로스':`그로스 판매 ${rgQ}개`);
+    s2.push([name,v.type,v.qty,v.cnt,v.saleTotal,v.margin,v.settle>0?v.margin/v.settle:0,remark,weekTrend(name).text, ...daily]);
   });
   const tQ=prodList.reduce((s,[,v])=>s+v.qty,0), tC=prodList.reduce((s,[,v])=>s+v.cnt,0),
         tS=prodList.reduce((s,[,v])=>s+v.saleTotal,0), tSt=prodList.reduce((s,[,v])=>s+v.settle,0),
