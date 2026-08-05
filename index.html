@@ -14697,8 +14697,9 @@ function renderDailyReport(){
     Object.keys(_rgProdCache).forEach(ym=>{
       (_rgProdCache[ym]||[]).forEach(r=>{
         if(!r.date||r.date<curFrom||r.date>curTo) return;
-        const name=rgResolveName(r.optionId)||r.productName||'미상';
         const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
+        if(qty<=0) return;   // 로켓그로스 원본은 판매 0건인 날도 조회수 등 지표 행이 찍힘 — 실제 판매수량 있는 것만 반영
+        const name=rgResolveName(r.optionId)||r.productName||'미상';
         const fin=rgCalcRowFinance(r);
         if(!byProd[name]) byProd[name]={type:rgResolveType(r.optionId)||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
         byProd[name].qty+=qty; byProd[name].saleTotal+=r.revenue||0; byProd[name].settle+=fin.settlement;
@@ -16948,8 +16949,9 @@ async function downloadDailyExcel(){
     Object.keys(_rgProdCache).forEach(ym=>{
       (_rgProdCache[ym]||[]).forEach(r=>{
         if(!r.date||r.date<rgPeriodFrom||r.date>rgPeriodTo) return;
-        const name=rgResolveName(r.optionId)||r.productName||'미상';
         const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
+        if(qty<=0) return;   // 로켓그로스 원본은 판매 0건인 날도 조회수 등 지표 행이 찍힘 — 실제 판매수량 있는 것만 반영
+        const name=rgResolveName(r.optionId)||r.productName||'미상';
         const fin=rgCalcRowFinance(r);
         if(!byProd[name]) byProd[name]={type:rgResolveType(r.optionId)||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
         byProd[name].qty+=qty; byProd[name].saleTotal+=r.revenue||0; byProd[name].settle+=fin.settlement;
