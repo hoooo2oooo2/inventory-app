@@ -4470,6 +4470,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
               <th>구분</th>
               <th>상품명</th>
               <th style="text-align:right;">공급가(단가)</th>
+              <th class="ns" style="text-align:center;width:70px;" title="이 코드로 주문 1건이 들어오면 실제 몇 개가 판매된 것인지 — 일일보고 주문수량에 반영">개입수</th>
               <th class="ns" style="text-align:center;width:60px;">관리</th>
             </tr></thead>
             <tbody id="bdTbody"></tbody>
@@ -11952,6 +11953,10 @@ let _revDailyChart = null;
 let _bdLoaded = false;
 let _bdLoadPromise = null;
 let _revLoaded = false;
+// 백데이터 코드별 개입수(몇개입 세트인지) — cloudKv 'bd_pack_multiplier' = { code(소문자): n }
+// 일일보고 주문수량 집계 시 해당 코드로 들어온 주문수량에 곱해서 실제 판매 개수로 보정한다.
+let _bdPackMultiplier = {};
+let _bdPackMultiplierLoaded = false;
 
 // 백데이터(상품 단가 목록)를 1회만 로드 — 단가계산기 검색 등에서 공용 사용
 function pcEnsureBackdata(){
@@ -11972,6 +11977,7 @@ async function loadRevenuePage(){
   if(!_rgOptionMapLoaded) await loadRgOptionMap();
   if(!_rgPackMultiplierLoaded) await loadRgPackMultiplier();
   if(!_rgFeeMapLoaded) await loadRgFeeMap();
+  if(!_bdPackMultiplierLoaded) await loadBdPackMultiplier();
   _renderRevCurrentPage();
 }
 
@@ -12342,6 +12348,26 @@ async function loadBackdata(){
     _bdLoaded = true;
     renderBdTable();
   } catch(e){ console.warn('backdata 로드 실패:',e); }
+}
+async function loadBdPackMultiplier(){
+  try{
+    const d=await cloudKvLoad('bd_pack_multiplier');
+    _bdPackMultiplier=(d && typeof d==='object' && !Array.isArray(d)) ? d : {};
+  }catch(e){ _bdPackMultiplier={}; }
+  _bdPackMultiplierLoaded=true;
+}
+// 코드(대소문자 무시)의 개입수 — 미설정·1 이하면 배수 없음(1)
+function bdQtyMultiplier(code){
+  const n=Number(_bdPackMultiplier[(code||'').toLowerCase()]);
+  return (n && n>1) ? n : 1;
+}
+async function bdSetPackMultiplier(code, val){
+  const n=Math.max(1, parseInt(val)||1);
+  const key=(code||'').toLowerCase();
+  if(!key) return;
+  _bdPackMultiplier={..._bdPackMultiplier, [key]: n};
+  await cloudKvSave('bd_pack_multiplier', _bdPackMultiplier, {force:true});
+  renderBdTable();
 }
 
 async function saveBdToSupabase(row, isEdit){
@@ -14683,11 +14709,12 @@ function renderDailyReport(){
   if(sub) sub.textContent=`${periodLabel} ${chLabelDly}`+(adDly>0?` · 광고비 -${fmt(adDly)} (마진 반영)`:'');
 
   // 제품별 집계 (택배건수 = 합포장 기준 고유 배송 건수)
+  //   주문수량은 백데이터에 설정된 개입수(코드별 몇개입 세트)를 곱해서 실제 판매 개수로 집계한다.
   const byProd={};
   rows.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
     if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
-    byProd[k].qty+=r.orderQty||0; byProd[k].pkgs.add(pkgKey(r));
+    byProd[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode); byProd[k].pkgs.add(pkgKey(r));
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
   // cnt = 고유 배송 건수
@@ -16931,11 +16958,12 @@ async function downloadDailyExcel(){
   U.book_append_sheet(wb,wsT,'제품구분비중');
 
   // ── 제품별_판매현황 시트 (구분별 배경색 + 마진율 5%미만 빨강 강조 + 최근 31일 일별 판매수량 + 신규 하이라이트) ──
+  //    주문수량은 백데이터에 설정된 개입수(코드별 몇개입 세트)를 곱해서 실제 판매 개수로 집계한다.
   const byProd={};
   dayRowsForBreakdown.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
     if(!byProd[k])byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
-    byProd[k].qty+=r.orderQty||0; byProd[k].pkgs.add(pkgKey(r));
+    byProd[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode); byProd[k].pkgs.add(pkgKey(r));
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
   Object.values(byProd).forEach(v=>{v.cnt=v.pkgs.size;});
@@ -16994,7 +17022,7 @@ async function downloadDailyExcel(){
     if(d<histFrom||d>refDate) return;
     const name=r.modelName||r.itemCode||'미상';
     const k=r.year+'|'+r.date;
-    (dailyQty[name]=dailyQty[name]||{})[k]=(dailyQty[name][k]||0)+(r.orderQty||0);
+    (dailyQty[name]=dailyQty[name]||{})[k]=(dailyQty[name][k]||0)+(r.orderQty||0)*bdQtyMultiplier(r.itemCode);
   });
   // 로켓그로스 일별 판매수량도 같은 모델명(백데이터 매칭명) 아래 병합 — 일별 판매수량 컬럼·전주대비·신규판정에 반영
   if(rgIncludedEx){
@@ -17897,6 +17925,10 @@ function renderBdTable(){
       <td>${r.type||'—'}</td>
       <td style="font-weight:500;">${r.name||'—'}</td>
       <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</td>
+      <td style="text-align:center;">
+        <input type="number" min="1" value="${bdQtyMultiplier(r.code)}" style="width:48px;text-align:center;padding:3px 4px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);font-size:12px;"
+          onchange="bdSetPackMultiplier('${String(r.code||'').replace(/'/g,"\\'")}', this.value)">
+      </td>
       <td style="text-align:center;"><button class="btn btn-sm" onclick="openBdEdit('${String(r.id).replace(/'/g,"\\'")}')">수정</button></td>
     </tr>`).join('');
 }
