@@ -8865,7 +8865,16 @@ async function dsMgConfirmRestore(){
 
 let _dCache={};
 let _dCacheVer=null;
-async function loadDailyCache(force){
+// 여러 화면이 거의 동시에 loadDailyCache를 호출해도 진행 중인 fetch 하나를 공유
+// (안 그러면 각자 전체 daily_sales를 중복 다운로드 — [[loadRevenueYear]]와 동일한 문제)
+let _dailyCacheLoadPromise = null;
+function loadDailyCache(force){
+  if(_dailyCacheLoadPromise) return _dailyCacheLoadPromise;
+  const p = _loadDailyCacheImpl(force).finally(()=>{ _dailyCacheLoadPromise=null; });
+  _dailyCacheLoadPromise = p;
+  return p;
+}
+async function _loadDailyCacheImpl(force){
   // egress 절약: 버전(행수|최대id|스탬프)이 그대로면 재다운로드 생략
   //  · 같은 세션 내(메모리 보유) → 즉시 반환
   //  · 새로고침 직후(메모리 없음) → IndexedDB에서 복원
@@ -12442,9 +12451,19 @@ async function loadRevYearRange(){
 }
 
 // 특정 연도만 로드해 _revData에 병합(이미 있으면 교체)
-async function loadRevenueYear(year){
-  if(year==null) return;
+// 동시에 여러 곳(리뷰관리 매칭, 월별/일별 화면 등)에서 같은 연도를 요청하면 진행 중인
+// fetch 하나를 공유한다 — 안 그러면 각자 "아직 로드 안 됨"으로 보고 동시에 전체를
+// 중복 다운로드해 egress가 배로 나간다(2026-08-06 매출 egress 급증 사고 원인).
+let _revYearLoadPromises = {};
+function loadRevenueYear(year){
+  if(year==null) return Promise.resolve();
   year=Number(year);
+  if(_revYearLoadPromises[year]) return _revYearLoadPromises[year];
+  const p = _loadRevenueYearImpl(year).finally(()=>{ delete _revYearLoadPromises[year]; });
+  _revYearLoadPromises[year] = p;
+  return p;
+}
+async function _loadRevenueYearImpl(year){
   // egress 절약: 버전이 캐시와 같으면 IndexedDB에서 즉시 복원(다운로드 생략)
   const ver=await _revYearVer(year);
   if(ver){
@@ -19435,7 +19454,15 @@ async function _rgDailyVer(){
   }catch(e){ return null; }
 }
 
-async function loadRgDailyCache(force){
+// [[loadDailyCache]]와 동일 이유로 동시 호출 시 진행 중인 fetch 공유
+let _rgDailyCacheLoadPromise = null;
+function loadRgDailyCache(force){
+  if(_rgDailyCacheLoadPromise) return _rgDailyCacheLoadPromise;
+  const p = _loadRgDailyCacheImpl(force).finally(()=>{ _rgDailyCacheLoadPromise=null; });
+  _rgDailyCacheLoadPromise = p;
+  return p;
+}
+async function _loadRgDailyCacheImpl(force){
   // egress 절약: 버전이 그대로면 IndexedDB에서 즉시 복원(다운로드 생략)
   const ver=await _rgDailyVer();
   if(!force && ver && _rgDCacheVer===ver && Object.keys(_rgDailyCache).length) return;
