@@ -1507,25 +1507,30 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bd);flex-wrap:wrap;flex-shrink:0;}
 .lbx-panel-title{font-size:16px;font-weight:800;color:var(--tx);letter-spacing:-.01em;}
 .lbx-panel-tools{display:flex;gap:8px;flex-wrap:wrap;}
-/* 좌측 박스 리스트 */
+/* 좌측 박스 리스트 — 컴팩트 + 상태 강조 리스트뷰 */
 .lbx-tablewrap2{flex:1;overflow:auto;}
-.lbx-table2{width:100%;border-collapse:collapse;font-size:13px;}
-.lbx-table2 thead th{position:sticky;top:0;background:var(--bg2);color:var(--tx2);font-weight:700;font-size:11px;padding:11px 16px;border-bottom:1px solid var(--bd);text-align:center;z-index:1;}
+.lbx-table2{width:100%;border-collapse:collapse;font-size:12.5px;}
+.lbx-table2 thead th{position:sticky;top:0;background:var(--bg2);color:var(--tx2);font-weight:700;font-size:10.5px;padding:8px 14px;border-bottom:1px solid var(--bd);text-align:center;z-index:1;letter-spacing:.02em;}
 .lbx-table2 thead th.l{text-align:left;}
-.lbx-table2 td{padding:13px 16px;border-bottom:1px solid var(--bd);text-align:center;vertical-align:middle;}
+.lbx-table2 tbody tr:nth-child(even){background:color-mix(in srgb, var(--bg2) 45%, transparent);}
+.lbx-table2 td{padding:7px 14px;border-bottom:1px solid var(--bd);text-align:center;vertical-align:middle;}
 .lbx-table2 td.l{text-align:left;}
-.lbx-row2:hover{background:var(--bg2);}
+.lbx-table2 td:first-child{border-left:3px solid transparent;}
+.lbx-row2:hover{background:var(--prl)!important;}
 .lbx-row2.hidden-row{opacity:.4;}
-.lbx-tag-company{display:inline-block;font-size:11.5px;font-weight:700;color:var(--tx2);background:var(--bg2);border-radius:20px;padding:4px 12px;white-space:nowrap;}
-.lbx-strong2{font-weight:800;font-size:15px;color:var(--tx);cursor:pointer;}
-.lbx-strong2:hover{color:var(--pr);text-decoration:underline;}
-.lbx-boxno2{display:inline-block;font-weight:700;font-size:13px;color:#1D4ED8;background:#EFF6FF;border-radius:7px;padding:3px 10px;font-variant-numeric:tabular-nums;white-space:nowrap;}
-.lbx-stockcell2{white-space:nowrap;}
-.lbx-stock-inp2{width:76px;padding:6px 8px;border:1.5px solid var(--bd);border-radius:8px;font-size:14px;font-weight:800;text-align:right;color:var(--tx);background:var(--bg);}
-.lbx-stock-inp2:focus{outline:none;border-color:var(--pr);}
-.lbx-stock-inp2.need{border-color:#DC2626;color:#DC2626;}
-.lbx-stock-inp2.near{border-color:#F59E0B;color:#B45309;}
-.lbx-stockdate2{font-size:10.5px;color:var(--tx2);margin-top:4px;}
+.lbx-row2.st-need td:first-child{border-left-color:#DC2626;}
+.lbx-row2.st-near td:first-child{border-left-color:#F59E0B;}
+.lbx-tag-company{display:inline-block;font-size:10.5px;font-weight:700;color:var(--tx2);background:var(--bg2);border-radius:20px;padding:3px 10px;white-space:nowrap;}
+.lbx-strong2{font-weight:700;font-size:13px;color:var(--tx);cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.lbx-strong2 i{font-style:normal;font-size:12px;opacity:.75;}
+.lbx-strong2:hover{color:var(--pr);}
+.lbx-boxno2{display:inline-block;font-weight:700;font-size:12px;color:#1D4ED8;background:#EFF6FF;border-radius:20px;padding:2px 9px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.lbx-stockcell2{white-space:nowrap;padding-top:5px;padding-bottom:5px;}
+.lbx-stock-inp2{width:58px;padding:4px 6px;border:none;border-radius:20px;font-size:13px;font-weight:800;text-align:center;color:var(--pr);background:var(--prl);}
+.lbx-stock-inp2:focus{outline:2px solid var(--pr);outline-offset:1px;}
+.lbx-stock-inp2.need{background:#FEE2E2;color:#DC2626;}
+.lbx-stock-inp2.near{background:#FEF3C7;color:#B45309;}
+.lbx-stockdate2{font-size:10px;color:var(--tx2);margin-top:3px;}
 .lbx-need2{color:#DC2626;font-weight:800;}
 .lbx-near2{color:#B45309;font-weight:800;}
 /* 우측: 상단(미니 캘린더 + 박스현황 버튼) + 하단(주문리스트) */
@@ -7509,13 +7514,13 @@ function logiBoxRender(){
     const stTag = st==='need' ? ' · <span class="lbx-need2">부족</span>' : st==='near' ? ' · <span class="lbx-near2">임박</span>' : '';
     const lastOrder=_lbxLastOrderDate(b.id);
     const editTip = (ls && ls.by) ? `최근 수정: ${ls.by} · ${ls.date}` : '';
-    return `<tr class="lbx-row2${b.hidden?' hidden-row':''}">
+    return `<tr class="lbx-row2${st==='need'?' st-need':st==='near'?' st-near':''}${b.hidden?' hidden-row':''}">
       <td class="l"><span class="lbx-tag-company">${_logiEsc(b.company||'-')}</span></td>
-      <td class="l"><span class="lbx-strong2" ondblclick="lbxBoxDetail(${b.id})" title="더블클릭: 상세보기">${_logiEsc(b.name||'-')}</span>${b.hidden?'<span class="lbx-hidebadge">숨김</span>':''}</td>
+      <td class="l"><span class="lbx-strong2" ondblclick="lbxBoxDetail(${b.id})" title="더블클릭: 상세보기"><i>📦</i>${_logiEsc(b.name||'-')}</span>${b.hidden?'<span class="lbx-hidebadge">숨김</span>':''}</td>
       <td><span class="lbx-boxno2">${_logiEsc(b.boxNo)||'-'}</span></td>
       <td class="lbx-stockcell2">
         <input class="lbx-stock-inp2 ${stCls}" type="number" value="${stVal}" placeholder="-" title="${_logiEsc(editTip)}" onchange="logiBoxSetStock(${b.id}, this.value)">
-        <div class="lbx-stockdate2">${lastOrder?`마지막주문 ${lastOrder.slice(5)}`:'주문 이력 없음'}${stTag}</div>
+        <div class="lbx-stockdate2">${lastOrder?`최근주문 ${lastOrder.slice(5)}`:'주문 이력 없음'}${stTag}</div>
       </td>
     </tr>`;
   }).join('');
@@ -7742,28 +7747,30 @@ function lbxOpenDayModal(dateStr){
 function _lbxRenderDayModalBody(){
   const wrap=document.getElementById('lbxDayModalBody'); if(!wrap) return;
   const orders=(_logiOrders||[]).filter(o=>o.date===_lbxDayModalDate);
-  wrap.innerHTML = orders.length ? orders.map(o=>_lbxOrderTicketHtml(o,false)).join('') : `<div class="lbx-rcv-empty">이 날짜의 주문이 없습니다.</div>`;
+  wrap.innerHTML = orders.length ? _lbxOrderTicketHtml(_lbxDayModalDate, orders, false) : `<div class="lbx-rcv-empty">이 날짜의 주문이 없습니다.</div>`;
 }
 
-// ── 공용 주문 티켓 카드 렌더러 (날짜 팝업 · 진행중/완료 리스트 공용) ──
-function _lbxOrderTicketHtml(o, showDate){
-  const items=o.items||[];
+// ── 공용 주문 티켓 카드 렌더러 — 같은 날짜의 주문은 모두 묶어서 한 카드로 표시 ──
+function _lbxOrderTicketHtml(dateStr, orders, showDate){
+  const items=orders.flatMap(o=>(o.items||[]).map(it=>Object.assign({}, it, { _oid:o.id })));
   const done=items.length>0 && items.every(_rcvDone);
   const any=items.some(_rcvDone);
   const badge = done ? '<span class="lbx-rcv-badge done">✅ 입고 완료</span>'
               : any  ? '<span class="lbx-rcv-badge partial">🔵 일부 입고</span>'
               :        '<span class="lbx-rcv-badge wait">⏳ 입고 대기</span>';
   const total=items.reduce((s,it)=>s+_lbxNum(it.amount),0);
+  const byList=[...new Set(orders.map(o=>o.by).filter(Boolean))];
   const rows=items.map(it=>{
+    const oid=it._oid;
     const rcv=_rcvDone(it);
     const rq = it.receivedQty!=null?it.receivedQty:it.boxCount;
     const action = rcv
       ? `<span class="lbx-rcv-ok">✓ ${_lbxComma(rq)}박스${it.receivedAt?`<br><small>${it.receivedAt}</small>`:''}</span>`
-      : `<input class="lbx-rcv-qty" id="rcvq-${o.id}-${it.id}" type="number" min="0" value="${_lbxNum(it.boxCount)}">`;
+      : `<input class="lbx-rcv-qty" id="rcvq-${oid}-${it.id}" type="number" min="0" value="${_lbxNum(it.boxCount)}">`;
     const doneBtn = rcv
-      ? `<button class="lbx-row-btn" title="입고취소" onclick="logiRcvUndo(${o.id},${it.id})">↩️</button>`
-      : `<button class="lbx-row-btn edit" title="입고확인" onclick="logiRcvConfirm(${o.id},${it.id})">✅</button>`;
-    const editBtn = rcv ? '' : `<button class="lbx-row-btn edit" title="수량 수정" onclick="logiOrderEditItemQty(${o.id},${it.id})">✏️</button>`;
+      ? `<button class="lbx-row-btn" title="입고취소" onclick="logiRcvUndo(${oid},${it.id})">↩️</button>`
+      : `<button class="lbx-row-btn edit" title="입고확인" onclick="logiRcvConfirm(${oid},${it.id})">✅</button>`;
+    const editBtn = rcv ? '' : `<button class="lbx-row-btn edit" title="수량 수정" onclick="logiOrderEditItemQty(${oid},${it.id})">✏️</button>`;
     return `<div class="lbx-oticket-item${rcv?' rcv-done':''}">
       <div class="lbx-oticket-ic">📦</div>
       <div class="lbx-oticket-main">
@@ -7772,21 +7779,29 @@ function _lbxOrderTicketHtml(o, showDate){
       </div>
       <div class="lbx-oticket-amt">${_lbxComma(it.amount)}원</div>
       <div style="min-width:82px;text-align:center;font-size:12px;">${action}</div>
-      <div class="lbx-oticket-actions">${doneBtn}${editBtn}<button class="lbx-row-btn del" title="삭제" onclick="logiOrderDeleteItem(${o.id},${it.id})">🗑️</button></div>
+      <div class="lbx-oticket-actions">${doneBtn}${editBtn}<button class="lbx-row-btn del" title="삭제" onclick="logiOrderDeleteItem(${oid},${it.id})">🗑️</button></div>
     </div>`;
   }).join('');
   return `<div class="lbx-oticket">
     <div class="lbx-oticket-head">
-      ${showDate?`<span class="lbx-rcv-date">📅 ${o.date||'-'}</span>`:''}
-      ${o.by?`<span class="lbx-rcv-by">담당: ${_logiEsc(o.by)}</span>`:''}
+      ${showDate?`<span class="lbx-rcv-date">📅 ${dateStr||'-'}</span>`:''}
+      ${byList.length?`<span class="lbx-rcv-by">담당: ${_logiEsc(byList.join(', '))}</span>`:''}
       ${badge}
       <span style="margin-left:auto;font-weight:800;font-size:13px;color:var(--tx);">합계 ${_lbxComma(total)}원</span>
-      <button class="btn btn-sm" onclick="logiOrderDeleteOrder(${o.id})">전체삭제</button>
+      <button class="btn btn-sm" onclick="logiOrderDeleteDateGroup('${dateStr}')">전체삭제</button>
     </div>
     ${rows}
   </div>`;
 }
-// ── 주문 관리 리스트 (진행중/완료 토글) ──
+async function logiOrderDeleteDateGroup(dateStr){
+  if(!confirm(`${dateStr}의 주문 전체를 삭제할까요?`)) return;
+  await _lbxReloadOrders();
+  _logiOrders=_logiOrders.filter(x=>x.date!==dateStr);
+  await cloudKvSave('logi_box_orders', _logiOrders);
+  toast('삭제되었습니다.');
+  _lbxRefreshOrderViews();
+}
+// ── 주문 관리 리스트 (진행중/완료 토글) — 같은 날짜의 주문을 모두 묶어서 표시 ──
 let _lbxOrderFilter='wait';
 function lbxOrderSetFilter(f){
   _lbxOrderFilter=f;
@@ -7795,13 +7810,15 @@ function lbxOrderSetFilter(f){
 }
 function lbxOrderListRender(){
   const wrap=document.getElementById('lbxOrderListView'); if(!wrap) return;
-  const orders=(_logiOrders||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  const filtered=orders.filter(o=>{
-    const items=o.items||[];
+  const byDate={};
+  (_logiOrders||[]).forEach(o=>{ (byDate[o.date]=byDate[o.date]||[]).push(o); });
+  const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  const filtered=dates.filter(d=>{
+    const items=byDate[d].flatMap(o=>o.items||[]);
     const done=items.length>0 && items.every(_rcvDone);
     return _lbxOrderFilter==='done' ? done : !done;
   });
-  wrap.innerHTML = filtered.length ? filtered.map(o=>_lbxOrderTicketHtml(o,true)).join('') : `<div class="lbx-rcv-empty">${_lbxOrderFilter==='done'?'완료된':'진행중인'} 주문이 없습니다.</div>`;
+  wrap.innerHTML = filtered.length ? filtered.map(d=>_lbxOrderTicketHtml(d, byDate[d], true)).join('') : `<div class="lbx-rcv-empty">${_lbxOrderFilter==='done'?'완료된':'진행중인'} 주문이 없습니다.</div>`;
 }
 function _lbxRefreshOrderViews(){
   lbxCalRender();
@@ -7839,14 +7856,6 @@ async function logiOrderDeleteItem(orderId, boxId){
   o.items=(o.items||[]).filter(x=>x.id!==boxId);
   if(!o.items.length) _logiOrders=_logiOrders.filter(x=>x.id!==orderId);
   else o.total=o.items.reduce((s,x)=>s+_lbxNum(x.amount),0);
-  await cloudKvSave('logi_box_orders', _logiOrders);
-  toast('삭제되었습니다.');
-  _lbxRefreshOrderViews();
-}
-async function logiOrderDeleteOrder(orderId){
-  if(!confirm('이 주문 전체를 삭제할까요?')) return;
-  await _lbxReloadOrders();
-  _logiOrders=_logiOrders.filter(x=>x.id!==orderId);
   await cloudKvSave('logi_box_orders', _logiOrders);
   toast('삭제되었습니다.');
   _lbxRefreshOrderViews();
