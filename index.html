@@ -1584,6 +1584,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-oticket-sub{font-size:11px;color:var(--tx2);margin-top:2px;}
 .lbx-oticket-amt{font-weight:800;font-size:13px;color:var(--tx);white-space:nowrap;flex-shrink:0;}
 .lbx-oticket-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;}
+/* 진행중/완료 리스트 — 건별 요약 행(클릭 시 날짜 팝업) */
+.lbx-order-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--bd);border-radius:12px;cursor:pointer;flex-wrap:wrap;transition:all .12s;}
+.lbx-order-row:hover{border-color:var(--pr);background:var(--prl);}
+.lbx-order-row-date{font-weight:800;font-size:13px;color:var(--tx);}
+.lbx-order-row-cnt{font-size:11px;color:var(--tx2);background:var(--bg2);border-radius:20px;padding:2px 9px;}
+.lbx-order-row-amt{margin-left:auto;font-weight:800;font-size:13px;color:var(--tx);}
+.lbx-order-row-arrow{color:var(--tx2);font-size:16px;font-weight:800;}
 /* 박스 상세 모달 — 조회/수정 겸용 */
 .lbx-detail-inp{width:100%;padding:6px 8px;border:1px solid var(--bd);border-radius:7px;font-size:13px;color:var(--tx);background:var(--bg);box-sizing:border-box;}
 .lbx-detail-inp:focus{outline:none;border-color:var(--pr);}
@@ -7760,11 +7767,11 @@ function lbxOpenDayModal(dateStr){
 function _lbxRenderDayModalBody(){
   const wrap=document.getElementById('lbxDayModalBody'); if(!wrap) return;
   const orders=(_logiOrders||[]).filter(o=>o.date===_lbxDayModalDate);
-  wrap.innerHTML = orders.length ? _lbxOrderTicketHtml(_lbxDayModalDate, orders, false) : `<div class="lbx-rcv-empty">이 날짜의 주문이 없습니다.</div>`;
+  wrap.innerHTML = orders.length ? _lbxOrderTicketHtml(_lbxDayModalDate, orders) : `<div class="lbx-rcv-empty">이 날짜의 주문이 없습니다.</div>`;
 }
 
 // ── 공용 주문 티켓 카드 렌더러 — 같은 날짜의 주문은 모두 묶어서 한 카드로 표시 ──
-function _lbxOrderTicketHtml(dateStr, orders, showDate){
+function _lbxOrderTicketHtml(dateStr, orders){
   const items=orders.flatMap(o=>(o.items||[]).map(it=>Object.assign({}, it, { _oid:o.id })));
   const done=items.length>0 && items.every(_rcvDone);
   const any=items.some(_rcvDone);
@@ -7797,7 +7804,6 @@ function _lbxOrderTicketHtml(dateStr, orders, showDate){
   }).join('');
   return `<div class="lbx-oticket">
     <div class="lbx-oticket-head">
-      ${showDate?`<span class="lbx-rcv-date">📅 ${dateStr||'-'}</span>`:''}
       ${byList.length?`<span class="lbx-rcv-by">담당: ${_logiEsc(byList.join(', '))}</span>`:''}
       ${badge}
       <span style="margin-left:auto;font-weight:800;font-size:13px;color:var(--tx);">합계 ${_lbxComma(total)}원</span>
@@ -7831,7 +7837,26 @@ function lbxOrderListRender(){
     const done=items.length>0 && items.every(_rcvDone);
     return _lbxOrderFilter==='done' ? done : !done;
   });
-  wrap.innerHTML = filtered.length ? filtered.map(d=>_lbxOrderTicketHtml(d, byDate[d], true)).join('') : `<div class="lbx-rcv-empty">${_lbxOrderFilter==='done'?'완료된':'진행중인'} 주문이 없습니다.</div>`;
+  wrap.innerHTML = filtered.length ? filtered.map(d=>_lbxOrderRowHtml(d, byDate[d])).join('') : `<div class="lbx-rcv-empty">${_lbxOrderFilter==='done'?'완료된':'진행중인'} 주문이 없습니다.</div>`;
+}
+// 진행중/완료 리스트의 건별 요약 행 — 클릭하면 그 날짜 전체 주문을 팝업(lbxOpenDayModal)으로 표시
+function _lbxOrderRowHtml(dateStr, orders){
+  const items=orders.flatMap(o=>o.items||[]);
+  const done=items.length>0 && items.every(_rcvDone);
+  const any=items.some(_rcvDone);
+  const badge = done ? '<span class="lbx-rcv-badge done">✅ 입고 완료</span>'
+              : any  ? '<span class="lbx-rcv-badge partial">🔵 일부 입고</span>'
+              :        '<span class="lbx-rcv-badge wait">⏳ 입고 대기</span>';
+  const total=items.reduce((s,it)=>s+_lbxNum(it.amount),0);
+  const byList=[...new Set(orders.map(o=>o.by).filter(Boolean))];
+  return `<div class="lbx-order-row" onclick="lbxOpenDayModal('${dateStr}')">
+    <span class="lbx-order-row-date">📅 ${dateStr}</span>
+    <span class="lbx-order-row-cnt">${_lbxComma(items.length)}건</span>
+    ${badge}
+    ${byList.length?`<span class="lbx-rcv-by">담당: ${_logiEsc(byList.join(', '))}</span>`:''}
+    <span class="lbx-order-row-amt">합계 ${_lbxComma(total)}원</span>
+    <span class="lbx-order-row-arrow">›</span>
+  </div>`;
 }
 function _lbxRefreshOrderViews(){
   lbxCalRender();
