@@ -1501,6 +1501,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px;margin-top:8px;font-size:13px;}
 .lbx-detail-grid .k{color:var(--tx2);font-size:11px;font-weight:600;margin-bottom:2px;}
 .lbx-detail-grid .v{color:var(--tx);font-weight:700;}
+/* 현재고 수정 이력 리스트 */
+.lbx-hist-row{display:flex;align-items:center;justify-content:space-between;padding:9px 4px;border-bottom:1px solid var(--bd);font-size:13px;}
+.lbx-hist-row:last-child{border-bottom:none;}
+.lbx-hist-date{color:var(--tx2);font-size:12px;}
+.lbx-hist-val{font-weight:800;color:var(--tx);}
+.lbx-hist-by{font-size:11px;color:var(--tx2);margin-left:6px;}
 /* ═══ 택배박스 v3 — 화면 정확히 좌/우 절반, 미니 캘린더 + 박스현황 버튼 + 주문리스트 ═══ */
 .lbx-wrap3{padding:16px;height:calc(100vh - 110px);box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .lbx-panel{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
@@ -1508,7 +1514,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-panel-title{font-size:16px;font-weight:800;color:var(--tx);letter-spacing:-.01em;}
 .lbx-panel-tools{display:flex;gap:8px;flex-wrap:wrap;}
 /* 좌측 박스 리스트 — 컴팩트 + 상태 강조 리스트뷰 */
-.lbx-tablewrap2{flex:1;overflow:auto;}
+.lbx-tablewrap2{flex:1;min-height:0;overflow:auto;}
 .lbx-table2{width:100%;border-collapse:collapse;font-size:12.5px;}
 .lbx-table2 thead th{position:sticky;top:0;background:var(--bg2);color:var(--tx2);font-weight:700;font-size:10.5px;padding:8px 14px;border-bottom:1px solid var(--bd);text-align:center;z-index:1;letter-spacing:.02em;}
 .lbx-table2 thead th.l{text-align:left;}
@@ -1531,6 +1537,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-stock-inp2.need{background:#FEE2E2;color:#DC2626;}
 .lbx-stock-inp2.near{background:#FEF3C7;color:#B45309;}
 .lbx-stockdate2{font-size:10px;color:var(--tx2);margin-top:3px;}
+.lbx-stockedit2{font-size:9.5px;color:var(--tx2);margin-top:2px;cursor:pointer;}
+.lbx-stockedit2:hover{color:var(--pr);text-decoration:underline;}
 .lbx-need2{color:#DC2626;font-weight:800;}
 .lbx-near2{color:#B45309;font-weight:800;}
 /* 우측: 상단(미니 캘린더 + 박스현황 버튼) + 하단(주문리스트) */
@@ -1564,7 +1572,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-order-panel-head{margin-bottom:10px;flex-shrink:0;}
 .lbx-order-filter{display:flex;gap:6px;}
 /* 주문 티켓 카드 (날짜 팝업/주문리스트 공용) */
-.lbx-order-list2{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;}
+.lbx-order-list2{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;}
 .lbx-oticket{border:1px solid var(--bd);border-radius:12px;overflow:hidden;}
 .lbx-oticket-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);flex-wrap:wrap;}
 .lbx-oticket-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--bd);}
@@ -2316,6 +2324,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 현재고 수정 이력 모달 -->
+<div class="modal-overlay" id="lbxStockHistModal">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="lbxStockHistTitle">현재고 수정 이력</h3>
+    <div id="lbxStockHistBody" style="max-height:56vh;overflow:auto;margin-top:8px;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('lbxStockHistModal')">닫기</button></div>
+  </div>
+</div>
+
 <!-- 날짜별 주문 모달 (캘린더 더블클릭) -->
 <div class="modal-overlay" id="lbxDayModal">
   <div class="modal" style="max-width:560px;">
@@ -2355,7 +2372,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- 택배박스 주문 모달 -->
 <div class="modal-overlay" id="lbxOrderModal">
   <div class="modal" style="max-width:560px;">
-    <h3>🛒 택배박스 주문 <span style="font-size:12px;color:var(--tx2);font-weight:500;">(종류당 최대 5박스)</span></h3>
+    <h3>🛒 택배박스 주문</h3>
     <label class="lbx-datelab" style="margin:2px 0 10px;">주문일
       <input type="date" id="lbxOrderDate">
     </label>
@@ -7388,7 +7405,6 @@ function _taskWireIframeF9(frameEl){
 let _logiBoxes = null;            // 박스 배열 (cloud KV: 'logi_boxes')
 let _logiBoxDate = null;          // 현재고 기준일 (YYYY-MM-DD)
 let _logiBoxNextId = 1;
-const LBX_MAX_ORDER = 5;
 
 function _lbxToday(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function _lbxNum(v){ const n=Number(v); return isNaN(n)?0:n; }
@@ -7513,14 +7529,15 @@ function logiBoxRender(){
     const stCls = st==='need' ? 'need' : st==='near' ? 'near' : '';
     const stTag = st==='need' ? ' · <span class="lbx-need2">부족</span>' : st==='near' ? ' · <span class="lbx-near2">임박</span>' : '';
     const lastOrder=_lbxLastOrderDate(b.id);
-    const editTip = (ls && ls.by) ? `최근 수정: ${ls.by} · ${ls.date}` : '';
+    const editInfo = ls ? `수정 ${ls.date.slice(5)}${ls.by?` · ${_logiEsc(ls.by)}`:''}` : '수정 이력 없음';
     return `<tr class="lbx-row2${st==='need'?' st-need':st==='near'?' st-near':''}${b.hidden?' hidden-row':''}">
       <td class="l"><span class="lbx-tag-company">${_logiEsc(b.company||'-')}</span></td>
       <td class="l"><span class="lbx-strong2" ondblclick="lbxBoxDetail(${b.id})" title="더블클릭: 상세보기"><i>📦</i>${_logiEsc(b.name||'-')}</span>${b.hidden?'<span class="lbx-hidebadge">숨김</span>':''}</td>
       <td><span class="lbx-boxno2">${_logiEsc(b.boxNo)||'-'}</span></td>
       <td class="lbx-stockcell2">
-        <input class="lbx-stock-inp2 ${stCls}" type="number" value="${stVal}" placeholder="-" title="${_logiEsc(editTip)}" onchange="logiBoxSetStock(${b.id}, this.value)">
+        <input class="lbx-stock-inp2 ${stCls}" type="number" value="${stVal}" placeholder="-" onchange="logiBoxSetStock(${b.id}, this.value)">
         <div class="lbx-stockdate2">${lastOrder?`최근주문 ${lastOrder.slice(5)}`:'주문 이력 없음'}${stTag}</div>
+        <div class="lbx-stockedit2" onclick="lbxStockHistory(${b.id})" title="클릭: 현재고 수정 이력 보기">${editInfo} 📜</div>
       </td>
     </tr>`;
   }).join('');
@@ -7597,7 +7614,7 @@ async function logiBoxDelete(id){
   await cloudKvSave('logi_boxes', _logiBoxes);
   logiBoxRender();
 }
-// ── 주문 (박스 선택 + 박스 수량, 최대 5박스) ──
+// ── 주문 (박스 선택 + 박스 수량) ──
 function logiBoxOpenOrder(presetDate, presetBoxId){
   const list=(_logiBoxes||[]).filter(b=>!b.hidden);
   if(!list.length){ toast('먼저 택배박스를 등록하세요. (숨긴 박스는 주문 목록에서 제외됩니다)'); return; }
@@ -7610,7 +7627,7 @@ function logiBoxOpenOrder(presetDate, presetBoxId){
       <input type="checkbox" value="${b.id}" onchange="logiBoxOrderToggle(${b.id})">
       <span class="lbx-order-info">${_logiEsc(b.name||'(명칭없음)')}${_lbxNameTag(b)} <small>· ${_logiEsc(b.company||'-')} · 박스당 ${_lbxComma(b.qtyPerBox)}개 · ${_lbxComma(b.pricePerBox)}원</small></span>
       <span class="lbx-order-stock">${stockTxt}${st==='need'?' ⚠️':''}</span>
-      <input class="lbx-order-qty" type="number" min="1" max="5" placeholder="박스수(최대5)" id="lbxoq-${b.id}" disabled oninput="logiBoxOrderClamp(this);logiBoxOrderSum()">
+      <input class="lbx-order-qty" type="number" min="1" placeholder="박스수" id="lbxoq-${b.id}" disabled oninput="logiBoxOrderSum()">
     </label>`;
   }).join('');
   document.getElementById('lbxOrderSum').textContent='';
@@ -7635,10 +7652,6 @@ function logiBoxOrderToggle(id){
   qty.disabled=!cb.checked;
   qty.value = cb.checked ? (qty.value||1) : '';
   logiBoxOrderSum();
-}
-// 한 종류당 최대 5박스로 제한 (선택 종류 수는 제한 없음)
-function logiBoxOrderClamp(el){
-  if(_lbxNum(el.value)>LBX_MAX_ORDER){ el.value=LBX_MAX_ORDER; toast(`한 종류당 최대 ${LBX_MAX_ORDER}박스까지 주문할 수 있습니다.`); }
 }
 function _logiBoxOrderRows(){
   const rows=[];
@@ -7879,7 +7892,7 @@ async function logiRcvUndo(orderId, boxId){
   _lbxRefreshOrderViews();
 }
 
-// ── 주문시점 분석 → 권장 주문수량(최대 5박스) ──
+// ── 주문시점 분석 → 권장 주문수량 ──
 function _lbxAvgOrderInterval(b){
   const dates=[...new Set((_logiOrders||[]).filter(o=>(o.items||[]).some(it=>it.id===b.id)).map(o=>o.date))].sort();
   if(dates.length<2) return null;
@@ -7909,7 +7922,7 @@ function _lbxRecommend(b){
   const daily=_lbxDailyRate(b);
   if(daily==null){
     if(b.safetyStock>0 && stock<b.safetyStock){
-      const q=Math.max(1, Math.min(LBX_MAX_ORDER, Math.ceil(b.safetyStock-stock)));
+      const q=Math.max(1, Math.ceil(b.safetyStock-stock));
       return { qty:q, reason:`안전재고(${_lbxComma(b.safetyStock)}박스) 대비 부족분 기준` };
     }
     return { qty:0, reason:'현재고·주문 데이터가 더 쌓이면 소진 속도를 분석해 권장수량을 계산합니다.' };
@@ -7917,8 +7930,8 @@ function _lbxRecommend(b){
   const interval=_lbxAvgOrderInterval(b);
   const cycle = interval!=null ? interval : 14;
   const needed = Math.ceil(daily*cycle - stock);
-  const qty = Math.max(0, Math.min(LBX_MAX_ORDER, needed));
-  const reason = `일평균 소진 ${daily.toFixed(2)}박스 · 평균 주문주기 ${Math.round(cycle)}일 기준 (현재고 ${_lbxComma(stock)}박스, 1회 최대 ${LBX_MAX_ORDER}박스)`;
+  const qty = Math.max(0, needed);
+  const reason = `일평균 소진 ${daily.toFixed(2)}박스 · 평균 주문주기 ${Math.round(cycle)}일 기준 (현재고 ${_lbxComma(stock)}박스)`;
   return { qty, reason };
 }
 function _lbxDetailRecoHtml(b){
@@ -8018,6 +8031,17 @@ function lbxDetailQuickOrder(){
   const id=Number(document.getElementById('lbxDetailModal').dataset.boxId);
   closeModal('lbxDetailModal');
   logiBoxOpenOrder(null, id);
+}
+// ── 현재고 수정 이력 팝업 ──
+function lbxStockHistory(id){
+  const b=(_logiBoxes||[]).find(x=>x.id===id); if(!b) return;
+  document.getElementById('lbxStockHistTitle').textContent = `📦 ${b.name||b.company||'박스'} — 현재고 수정 이력`;
+  const body=document.getElementById('lbxStockHistBody');
+  const log=_lbxLog(b).slice().sort((a,c)=>c.date.localeCompare(a.date));
+  body.innerHTML = log.length
+    ? log.map(e=>`<div class="lbx-hist-row"><span class="lbx-hist-date">${e.date}${e.by?`<span class="lbx-hist-by">${_logiEsc(e.by)}</span>`:''}</span><span class="lbx-hist-val">${_lbxComma(e.qty)}박스</span></div>`).join('')
+    : `<div class="lbx-rcv-empty" style="padding:20px 0;">기록된 현재고가 없습니다.</div>`;
+  openModal('lbxStockHistModal');
 }
 
 // ══════════════════════════════════════════════
