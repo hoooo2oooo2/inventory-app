@@ -12186,18 +12186,14 @@ async function recalcShippingForKey(channel,item_no,feeObj){
       return !b || b.shipping_fee!==r.shipping_fee || b.margin!==r.margin || b.margin_rate!==r.margin_rate || b.ship_qty!==r.ship_qty;
     }).map(r=>({id:r.id, shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}));
 
-    // upsert(INSERT ... ON CONFLICT)는 대상 행이 항상 이미 존재함에도 INSERT 단계에서 여기 담지 않은
-    // NOT NULL 컬럼(예: item_code, order_no 등)까지 값이 있어야 해서 500 오류가 날 수 있다.
-    // 이 행들은 방금 id로 직접 조회해온 기존 행이므로 update로 바꿔 그 문제를 원천적으로 피한다.
-    const CHUNK=20;
+    // 건별 update 대신 bulk_update_revenue RPC로 한 청크(최대 2000건)당 요청 1건만 보낸다
+    // (예전엔 건마다 PATCH를 날려 8/6 저녁 택배비 재적용 1회로 egress가 700MB+ 나간 사고가 있었음)
+    const CHUNK=2000;
     let failCount=0;
     for(let i=0;i<upd.length;i+=CHUNK){
       const chunk=upd.slice(i,i+CHUNK);
-      await Promise.all(chunk.map(({id,...vals})=>
-        sb.from('revenue').update(vals).eq('id',id).then(({error})=>{
-          if(error){ failCount++; console.error(`택배비 재계산 저장 실패(id=${id}):`, error.message); }
-        })
-      ));
+      const {error}=await sb.rpc('bulk_update_revenue',{updates:chunk});
+      if(error){ failCount+=chunk.length; console.error('택배비 재계산 저장 실패:', error.message); }
     }
     totalChanged += (upd.length-failCount);
   }
@@ -18038,11 +18034,10 @@ async function propagateBdPriceChange(bdRow, oldPrice){
     const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
     return {id:r.id,unit_cost:unitCost,cost_price:costPrice,margin,margin_rate:marginRate};
   });
-  const CHUNK=100;
+  const CHUNK=2000;
   for(let i=0;i<updates.length;i+=CHUNK){
-    await Promise.all(updates.slice(i,i+CHUNK).map(u=>
-      sb.from('revenue').update({unit_cost:u.unit_cost,cost_price:u.cost_price,margin:u.margin,margin_rate:u.margin_rate}).eq('id',u.id)
-    ));
+    const {error}=await sb.rpc('bulk_update_revenue',{updates:updates.slice(i,i+CHUNK)});
+    if(error) console.warn('단가 전파 저장 실패:', error.message);
   }
   if(updates.length) _bumpRev(curYear);
   if(_revLoaded){
@@ -18107,12 +18102,11 @@ async function resyncRevenuePrices(){
           upd.push({id:r.id,unit_cost:unitCost,cost_price:costPrice,margin,margin_rate:marginRate});
         }
       });
-      // 배치 업데이트
-      const CHUNK=80;
+      // 배치 업데이트 — bulk_update_revenue RPC로 청크당 요청 1건만
+      const CHUNK=2000;
       for(let i=0;i<upd.length;i+=CHUNK){
-        await Promise.all(upd.slice(i,i+CHUNK).map(u=>
-          sb.from('revenue').update({unit_cost:u.unit_cost,cost_price:u.cost_price,margin:u.margin,margin_rate:u.margin_rate}).eq('id',u.id)
-        ));
+        const {error}=await sb.rpc('bulk_update_revenue',{updates:upd.slice(i,i+CHUNK)});
+        if(error) console.warn('단가 일괄반영 저장 실패:', error.message);
       }
       // 메모리 반영
       if(_revLoaded && upd.length){
@@ -18175,11 +18169,10 @@ async function resyncRevenueTypes(){
           upd.push({id:r.id,item_type:newType});
         }
       });
-      const CHUNK=80;
+      const CHUNK=2000;
       for(let i=0;i<upd.length;i+=CHUNK){
-        await Promise.all(upd.slice(i,i+CHUNK).map(u=>
-          sb.from('revenue').update({item_type:u.item_type}).eq('id',u.id)
-        ));
+        const {error}=await sb.rpc('bulk_update_revenue',{updates:upd.slice(i,i+CHUNK)});
+        if(error) console.warn('구분 일괄반영 저장 실패:', error.message);
       }
       if(_revLoaded && upd.length){
         const m=new Map(upd.map(u=>[u.id,u]));
