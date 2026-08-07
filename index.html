@@ -8823,13 +8823,28 @@ async function _loadDailyCacheImpl(force){
   if(!force && ver){
     const c=await _idbGet('daily_all');
     if(c && c.ver===ver && c.map){ _dCache=c.map; _dCacheVer=ver; return; }
+    // 캐시는 있는데 버전이 다름 — 행수·최대id가 그대로면(추가/삭제 없이 기존 값만 수정된 것)
+    // updated_at 기준으로 바뀐 행만 받아 캐시에 병합(전체 재다운로드 생략). 조금이라도
+    // 안 맞으면 아래 전체 재로드로 안전하게 폴백 — [[loadRevenueYear]]와 동일한 원칙.
+    if(c && c.map){
+      const [cCount,cMaxId] = String(c.ver).split('|');
+      const [nCount,nMaxId] = String(ver).split('|');
+      if(cCount && cCount===nCount && cMaxId===nMaxId && c.maxUpdatedAt){
+        const merged = await _tryIncrementalDailyMerge(false, c.map, c.maxUpdatedAt);
+        if(merged){
+          _dCache=merged.map; _dCacheVer=ver;
+          _idbSet('daily_all',{ver,map:_dCache,maxUpdatedAt:merged.maxUpdatedAt});
+          return;
+        }
+      }
+    }
   }
   // 날짜 제한 없이 전체 daily_sales 데이터 로드 (페이지네이션)
   _dCache={};
-  let from=0; const pageSize=1000;
+  let from=0; const pageSize=1000; let maxUpdatedAt='';
   while(true){
     const {data,error}=await sb.from('daily_sales')
-      .select('code,sale_date,qty')
+      .select('code,sale_date,qty,updated_at')
       .eq('is_rg',false)
       .order('sale_date')
       .range(from, from+pageSize-1);
@@ -8837,12 +8852,35 @@ async function _loadDailyCacheImpl(force){
     data.forEach(r=>{
       if(!_dCache[r.code])_dCache[r.code]={};
       _dCache[r.code][r.sale_date]=((_dCache[r.code][r.sale_date]||0)+r.qty);
+      if(r.updated_at && r.updated_at>maxUpdatedAt) maxUpdatedAt=r.updated_at;
     });
     if(data.length<pageSize) break;
     from+=pageSize;
   }
   _dCacheVer=ver;
-  if(ver){ _idbSet('daily_all',{ver,map:_dCache}); }
+  if(ver){ _idbSet('daily_all',{ver,map:_dCache,maxUpdatedAt}); }
+}
+
+// daily_sales 증분 병합 — 캐시된 map에 저장된 마지막 동기화 시점(sinceUpdatedAt) 이후로
+// 바뀐 행만 받아와 덮어씌운다. code+sale_date+is_rg가 유일하므로(upsert onConflict 대상)
+// 그냥 덮어쓰기만 해도 안전하다. 호출 쪽에서 이미 "행수·최대id 불변"을 확인한 뒤에만
+// 부르므로, 여기선 실패/애매하면 무조건 null을 돌려줘서 전체 재로드로 안전하게 넘어가게 한다.
+async function _tryIncrementalDailyMerge(isRg, cachedMap, sinceUpdatedAt){
+  try{
+    const {data,error} = await sb.from('daily_sales')
+      .select('code,sale_date,qty,updated_at')
+      .eq('is_rg',isRg).gt('updated_at',sinceUpdatedAt);
+    if(error) return null;
+    if(!data || !data.length) return {map:cachedMap, maxUpdatedAt:sinceUpdatedAt};
+    const map = {...cachedMap};
+    let maxUpdatedAt = sinceUpdatedAt;
+    data.forEach(r=>{
+      map[r.code] = {...(map[r.code]||{})};
+      map[r.code][r.sale_date] = r.qty||0;
+      if(r.updated_at && r.updated_at>maxUpdatedAt) maxUpdatedAt=r.updated_at;
+    });
+    return {map, maxUpdatedAt};
+  }catch(e){ console.warn('daily_sales 증분 동기화 실패, 전체 재로드로 대체:', e); return null; }
 }
 async function loadDailySales(code,start,end){
   const out={};
@@ -19435,12 +19473,25 @@ async function _loadRgDailyCacheImpl(force){
   if(!force && ver){
     const c=await _idbGet('daily_rg_all');
     if(c && c.ver===ver && c.map){ _rgDailyCache=c.map; _rgDCacheVer=ver; return; }
+    // [[loadDailyCache]]와 동일한 증분 병합 — 행수·최대id가 그대로일 때만 시도, 안 맞으면 전체 재로드
+    if(c && c.map){
+      const [cCount,cMaxId] = String(c.ver).split('|');
+      const [nCount,nMaxId] = String(ver).split('|');
+      if(cCount && cCount===nCount && cMaxId===nMaxId && c.maxUpdatedAt){
+        const merged = await _tryIncrementalDailyMerge(true, c.map, c.maxUpdatedAt);
+        if(merged){
+          _rgDailyCache=merged.map; _rgDCacheVer=ver;
+          _idbSet('daily_rg_all',{ver,map:_rgDailyCache,maxUpdatedAt:merged.maxUpdatedAt});
+          return;
+        }
+      }
+    }
   }
   _rgDailyCache = {};
-  let from=0; const pageSize=1000;
+  let from=0; const pageSize=1000; let maxUpdatedAt='';
   while(true){
     const {data,error} = await sb.from('daily_sales')
-      .select('code,sale_date,qty')
+      .select('code,sale_date,qty,updated_at')
       .eq('is_rg',true)
       .order('sale_date')
       .range(from, from+pageSize-1);
@@ -19448,12 +19499,13 @@ async function _loadRgDailyCacheImpl(force){
     data.forEach(r=>{
       if(!_rgDailyCache[r.code]) _rgDailyCache[r.code]={};
       _rgDailyCache[r.code][r.sale_date] = (_rgDailyCache[r.code][r.sale_date]||0)+r.qty;
+      if(r.updated_at && r.updated_at>maxUpdatedAt) maxUpdatedAt=r.updated_at;
     });
     if(data.length<pageSize) break;
     from+=pageSize;
   }
   _rgDCacheVer=ver;
-  if(ver){ _idbSet('daily_rg_all',{ver,map:_rgDailyCache}); }
+  if(ver){ _idbSet('daily_rg_all',{ver,map:_rgDailyCache,maxUpdatedAt}); }
 }
 
 // RG 출고된 제품 목록 (products 중 is_rg 데이터 있는 것)
