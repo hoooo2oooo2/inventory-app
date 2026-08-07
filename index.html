@@ -12352,7 +12352,7 @@ async function deleteBdFromSupabase(id){
 
 // ── revenue 데이터 Supabase 로드 (연도별 지연 로딩으로 egress 절감) ──
 //    기본은 최신 연도 1개만 로드, 나머지 연도는 탭에서 그 연도를 선택할 때 로드.
-const REV_COLS = 'id,year,sale_date,channel,order_no,buyer,receiver,phone1,phone2,zip,address,item_no,item_type,item_code,model_name,order_qty,ship_qty,shipping_fee,sale_price,settlement,cost_price,margin,margin_rate,unit_cost';
+const REV_COLS = 'id,year,sale_date,channel,order_no,buyer,receiver,phone1,phone2,zip,address,item_no,item_type,item_code,model_name,order_qty,ship_qty,shipping_fee,sale_price,settlement,cost_price,margin,margin_rate,unit_cost,updated_at';
 let _revYearsLoaded = new Set();   // 현재 _revData에 적재된 연도
 let _revYearRange = [];            // 사용 가능한 전체 연도(내림차순) — 가벼운 min/max 쿼리로 파악
 
@@ -12364,7 +12364,8 @@ function _revMapRow(r){
     phone1:r.phone1, phone2:r.phone2, zip:r.zip, addr:r.address,
     itemNo:r.item_no, itemType:r.item_type, itemCode:r.item_code, modelName:r.model_name,
     orderQty:r.order_qty, shipQty:r.ship_qty, shipping:r.shipping_fee, salePrice:r.sale_price,
-    settlement:r.settlement, costPrice:r.cost_price, margin:r.margin, marginRate:r.margin_rate, unitCost:r.unit_cost
+    settlement:r.settlement, costPrice:r.cost_price, margin:r.margin, marginRate:r.margin_rate, unitCost:r.unit_cost,
+    updatedAt:r.updated_at
   };
 }
 // 버튼 등에 쓸 연도 목록(내림차순)
@@ -12408,6 +12409,23 @@ async function _loadRevenueYearImpl(year){
       _revYearsLoaded.add(year);
       return;
     }
+    // 캐시는 있는데 버전(행수|최대id|스탬프)이 다름 — 행수·최대id가 그대로면 추가/삭제 없이
+    // 기존 행 몇 개만 수정된 것이므로, updated_at 기준으로 바뀐 행만 받아 캐시에 덮어씌운다
+    // (전체 재다운로드 생략). 조금이라도 안 맞으면(추가/삭제 등 애매한 경우) 아래 전체 재로드로
+    // 안전하게 폴백 — 절대 잘못된 값을 보여주지 않도록, 조건이 완벽히 맞을 때만 증분 경로를 탄다.
+    if(c && Array.isArray(c.rows)){
+      const [cCount,cMaxId] = String(c.ver).split('|');
+      const [nCount,nMaxId] = String(ver).split('|');
+      if(cCount && cCount===nCount && cMaxId===nMaxId){
+        const merged = await _tryIncrementalRevenueMerge(year, c.rows);
+        if(merged){
+          _revData=_revData.filter(r=>r.year!==year).concat(merged);
+          _revYearsLoaded.add(year);
+          _idbSet('rev_y_'+year,{ver,rows:merged});
+          return;
+        }
+      }
+    }
   }
   const PAGE=1000; let all=[], from=0;
   while(true){
@@ -12423,6 +12441,22 @@ async function _loadRevenueYearImpl(year){
   _revData=_revData.filter(r=>r.year!==year).concat(mapped);
   _revYearsLoaded.add(year);
   if(ver){ _idbSet('rev_y_'+year,{ver,rows:mapped}); }   // 다음 새로고침부터 재사용
+}
+
+// 캐시된 행 중 가장 최신 updated_at 이후로 바뀐 행만 받아와 캐시에 덮어씌운다.
+// 호출 쪽에서 이미 "행수·최대id 불변(추가/삭제 없음)"을 확인한 뒤에만 부르므로,
+// 여기선 실패/애매한 경우 무조건 null을 돌려줘서 호출부가 안전하게 전체 재로드로 넘어가게 한다.
+async function _tryIncrementalRevenueMerge(year, cachedRows){
+  try{
+    let maxUpdated='';
+    for(const r of cachedRows){ if(r.updatedAt && r.updatedAt>maxUpdated) maxUpdated=r.updatedAt; }
+    if(!maxUpdated) return null;   // updated_at 없는 구버전 캐시(이번 마이그레이션 이전 저장분) — 전체 재로드로
+    const {data,error} = await sb.from('revenue').select(REV_COLS).eq('year',year).gt('updated_at',maxUpdated);
+    if(error) return null;
+    if(!data || !data.length) return cachedRows;   // 바뀐 행 없음(스탬프만 갱신됨) — 캐시 그대로 사용
+    const updMap = new Map(data.map(r=>[r.id, _revMapRow(r)]));
+    return cachedRows.map(r => updMap.has(r.id) ? updMap.get(r.id) : r);
+  }catch(e){ console.warn('revenue 증분 동기화 실패, 전체 재로드로 대체:', e); return null; }
 }
 
 // 연도 데이터 보장(없으면 로드)
