@@ -1860,6 +1860,38 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- ═══ 업무보고서 고정 등록 (기간 설정) ═══ -->
+<div class="modal-overlay" id="rpPinCreateModal">
+  <div class="modal" style="max-width:340px;">
+    <h3 id="rpPinCreateModalTitle" style="margin:0 0 10px;">📌 고정</h3>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:8px;">언제까지 상단에 고정할까요? 비워두면 직접 해제할 때까지 계속 고정됩니다.</div>
+    <div class="cl-lbl">고정 종료일 (선택)</div>
+    <input type="date" id="rpPinUntilInput"
+      style="width:100%;height:36px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;margin-top:4px;">
+    <div class="ma" style="margin-top:16px;">
+      <button class="btn" onclick="rpPinCreateCancel()">취소</button>
+      <button class="btn btn-pr" onclick="rpPinCreateConfirm()">📌 고정</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 업무보고서 고정 해제 (날짜 지정 / 전체) ═══ -->
+<div class="modal-overlay" id="rpUnpinModal">
+  <div class="modal" style="max-width:340px;">
+    <h3 style="margin:0 0 10px;">📌 고정 해제</h3>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">지정한 날짜부터 해제하거나(이전 날짜는 고정된 채로 유지), 날짜 구분 없이 전체 기간 고정을 해제할 수 있습니다.</div>
+    <div class="cl-lbl">이 날짜부터 해제</div>
+    <input type="date" id="rpUnpinDateInput"
+      style="width:100%;height:36px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;margin-top:4px;margin-bottom:10px;">
+    <button class="btn btn-pr" style="width:100%;margin-bottom:10px;" onclick="rpUnpinFromDate()">📅 이 날짜부터 해제</button>
+    <div style="text-align:center;font-size:11px;color:var(--tx2);margin-bottom:10px;">— 또는 —</div>
+    <button class="btn" style="width:100%;color:#DC2626;" onclick="rpUnpinAll()">🗑 날짜 지정 없이 전체 해제</button>
+    <div class="ma" style="margin-top:14px;">
+      <button class="btn" onclick="rpUnpinCancel()">취소</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ 마이페이지 (계정/권한) ═══ -->
 <div class="modal-overlay" id="myPageModal">
   <div class="modal um-modal">
@@ -21649,76 +21681,133 @@ function reportEditBlockCancel(id, section){
   if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item,sec); form.replaceWith(tpl.content.firstElementChild); }
 }
 
-// 📌 블럭 고정 (스냅샷 방식 — 원본 수정해도 고정 내용 유지)
+// 'YYYY-MM-DD' 다음날 문자열 (고정 종료일→deleted_at 환산용: deleted_at은 '처음으로 안 보이는 날')
+function _rpNextDayStr(ds){
+  const d=new Date(ds+'T00:00:00'); if(isNaN(d)) return ds;
+  d.setDate(d.getDate()+1);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+
+// 📌 블럭 고정 — 이미 고정되어 있으면 해제 팝업(날짜지정/전체), 아니면 등록 팝업(기간 설정)을 연다.
 function reportTogglePin(id, section){
   const key=_reportFindBlockKey(id)||_reportKey();
   const entry=_reportAllData[key]; if(!entry) return;
   const sec=section||_reportFindBlockSection(id,entry);
   const content=_rpContentOf(entry,sec);
   const item=content.find(i=>i.id===id); if(!item) return;
-  const gp=_rpGlobalPins();
-  const pArr=sec==='pm'?gp.pinned_pm:gp.pinned_am;
-  const existIdx=pArr.findIndex(p=>p.source_id===id);
-  if(existIdx>=0){
-    pArr.splice(existIdx,1); item.pinned=false;
-  } else {
-    pArr.push({id:'gp_'+Date.now()+Math.random().toString(36).slice(2,4),
-      source_id:id,type:'block',
-      task:item.task,time:item.time||'',
-      linked_title:item.linked_title||null,linked_type:item.linked_type||null,
-      pinned_at:new Date().toISOString()});
-    item.pinned=true;
+  if(item.pinned){
+    const gp=_rpGlobalPins();
+    const pArr=sec==='pm'?gp.pinned_pm:gp.pinned_am;
+    const pin=pArr.find(p=>p.source_id===id);
+    if(pin){ _rpOpenUnpinPopup(pin.id, sec); return; }
+    item.pinned=false; // 스냅샷을 못 찾은 예외 상황 — 표시만 정리
+    _rpRenderPinned(); _reportAutoSave();
+    return;
   }
-  const el=document.querySelector(`[data-id="${id}"]`);
-  if(el){
-    el.classList.toggle('pinned',item.pinned);
-    const btns=el.querySelectorAll('.rp-block-btn');
-    const pinBtn=btns[1];
-    if(pinBtn){ pinBtn.textContent=item.pinned?'📌':'📍'; pinBtn.title=item.pinned?'고정 해제':'상단 고정'; }
-  }
-  _rpRenderPinned(); _reportAutoSave();
+  _rpOpenPinCreatePopup(id, sec, 'block');
 }
-// 텍스트 라인 고정
+// 텍스트 라인 고정 — 이미 고정되어 있으면 해제 팝업, 아니면 등록 팝업(기간 설정)을 연다.
 function reportPinLine(id, section){
   const entry=_reportGetEntry();
   const content=_rpContentOf(entry,section);
   const item=content.find(i=>i.id===id); if(!item||item.type!=='line') return;
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
-  const existIdx=pArr.findIndex(p=>p.source_id===id);
-  if(existIdx>=0){ pArr.splice(existIdx,1); toast('고정 해제됨'); }
-  else {
-    pArr.push({id:'gp_'+Date.now()+Math.random().toString(36).slice(2,4),
-      source_id:id,type:'text',text:item.text||'',pinned_at:new Date().toISOString()});
-    toast('📌 상단에 고정됨');
-  }
-  _rpRenderPinned(); _reportAutoSave();
+  const curDate=_reportDate||_reportTodayStr();
+  const pin=pArr.find(p=>p.source_id===id && (!p.deleted_at||p.deleted_at>curDate));
+  if(pin){ _rpOpenUnpinPopup(pin.id, section); return; }
+  _rpOpenPinCreatePopup(id, section, 'text');
 }
-// 고정 스냅샷 삭제 (고정 영역의 ✕ 버튼)
-function _rpPinFieldAt(pin, field, date){
-  const relevant=(pin.edits||[]).filter(e=>e.field===field&&e.date<=date).sort((a,b)=>b.date.localeCompare(a.date));
-  return relevant.length ? relevant[0].value : (pin[field]??'');
+
+// ── 고정 등록 팝업 (기간 설정) ──
+let _rpPinPending = null; // {id, section, kind:'block'|'text'}
+function _rpOpenPinCreatePopup(id, section, kind){
+  _rpPinPending = {id, section, kind};
+  const t=document.getElementById('rpPinCreateModalTitle'); if(t) t.textContent = kind==='text' ? '📌 내용 고정' : '📌 업무 고정';
+  const inp=document.getElementById('rpPinUntilInput'); if(inp) inp.value='';
+  openModal('rpPinCreateModal');
 }
-function reportEditPin(pinId, section, field, el){
+function rpPinCreateCancel(){ _rpPinPending=null; closeModal('rpPinCreateModal'); }
+function rpPinCreateConfirm(){
+  if(!_rpPinPending) return;
+  const {id, section, kind} = _rpPinPending;
+  const until = (document.getElementById('rpPinUntilInput')?.value||'').trim();
+  const today = _reportDate||_reportTodayStr();
+  if(until && until<today){ toast('종료일은 오늘 이후로 선택하세요.'); return; }
+  closeModal('rpPinCreateModal');
+  _rpPinPending = null;
+  if(kind==='text') _rpDoPinLine(id, section, until);
+  else _rpDoPinBlock(id, section, until);
+}
+function _rpDoPinBlock(id, section, until){
+  const key=_reportFindBlockKey(id)||_reportKey();
+  const entry=_reportAllData[key]; if(!entry) return;
+  const content=_rpContentOf(entry,section);
+  const item=content.find(i=>i.id===id); if(!item) return;
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
-  const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
-  const val=((el.value!=null?el.value:el.textContent)||'').trim();
-  const today=_reportDate||_reportTodayStr();
-  if(!pin.edits) pin.edits=[];
-  const existing=pin.edits.find(e=>e.date===today&&e.field===field);
-  if(existing){ if(existing.value===val) return; existing.value=val; }
-  else { pin.edits.push({date:today,field,value:val}); }
-  _reportAutoSave();
+  pArr.push({id:'gp_'+Date.now()+Math.random().toString(36).slice(2,4),
+    source_id:id,type:'block',
+    task:item.task,time:item.time||'',
+    linked_title:item.linked_title||null,linked_type:item.linked_type||null,
+    pinned_at:new Date().toISOString(),
+    deleted_at: until ? _rpNextDayStr(until) : null});
+  item.pinned=true;
+  const el=document.querySelector(`[data-id="${id}"]`);
+  if(el){
+    el.classList.add('pinned');
+    const pinBtn=el.querySelectorAll('.rp-block-btn')[1];
+    if(pinBtn){ pinBtn.textContent='📌'; pinBtn.title='고정 해제'; }
+  }
+  _rpRenderPinned(); _reportAutoSave();
+  toast(until ? `📌 ${until}까지 고정됨` : '📌 상단에 고정됨(무기한)');
+}
+function _rpDoPinLine(id, section, until){
+  const entry=_reportGetEntry();
+  const content=_rpContentOf(entry,section);
+  const item=content.find(i=>i.id===id); if(!item||item.type!=='line') return;
+  const gp=_rpGlobalPins();
+  const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
+  pArr.push({id:'gp_'+Date.now()+Math.random().toString(36).slice(2,4),
+    source_id:id,type:'text',text:item.text||'',pinned_at:new Date().toISOString(),
+    deleted_at: until ? _rpNextDayStr(until) : null});
+  _rpRenderPinned(); _reportAutoSave();
+  toast(until ? `📌 ${until}까지 고정됨` : '📌 상단에 고정됨(무기한)');
+}
+
+// ── 고정 해제 팝업 (날짜 지정 / 전체 기간) ──
+let _rpUnpinTarget = null; // {pinId, section}
+function _rpOpenUnpinPopup(pinId, section){
+  _rpUnpinTarget = {pinId, section};
+  const inp=document.getElementById('rpUnpinDateInput');
+  if(inp) inp.value = _reportDate||_reportTodayStr();
+  openModal('rpUnpinModal');
+}
+function rpUnpinCancel(){ _rpUnpinTarget=null; closeModal('rpUnpinModal'); }
+function rpUnpinFromDate(){
+  if(!_rpUnpinTarget) return;
+  const {pinId, section} = _rpUnpinTarget;
+  const dateVal=(document.getElementById('rpUnpinDateInput')?.value||'').trim();
+  if(!dateVal){ toast('해제할 날짜를 선택하세요.'); return; }
+  closeModal('rpUnpinModal'); _rpUnpinTarget=null;
+  _rpApplyUnpin(pinId, section, dateVal, false);
+}
+function rpUnpinAll(){
+  if(!_rpUnpinTarget) return;
+  const {pinId, section} = _rpUnpinTarget;
+  closeModal('rpUnpinModal'); _rpUnpinTarget=null;
+  _rpApplyUnpin(pinId, section, null, true);
 }
 // 업무별 고정 핀 해제 — 고정목록에서 제거함과 동시에, 원본 블럭의 📌 고정 상태도 함께 풀어준다.
 // (예전엔 목록에서만 사라지고 원본 블럭은 계속 '고정됨'으로 남아 다시 열어보면 안 풀린 것처럼 보였음)
-function reportDelPinById(pinId, section){
+// full=true면 날짜 구분 없이 완전히 삭제, false면 fromDate부터만 해제(이전 날짜는 고정된 채로 유지)
+function _rpApplyUnpin(pinId, section, fromDate, full){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
-  const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
-  // 오늘 이후부터만 삭제 — 이전 날짜는 고정 내용 그대로 유지
-  pin.deleted_at=_reportDate||_reportTodayStr();
+  const idx=pArr.findIndex(p=>p.id===pinId); if(idx<0) return;
+  const pin=pArr[idx];
+  if(full) pArr.splice(idx,1);
+  else pin.deleted_at=fromDate;
   if(pin.type==='block' && pin.source_id){
     const key=_reportFindBlockKey(pin.source_id);
     const entry=key ? _reportAllData[key] : null;
@@ -21739,6 +21828,26 @@ function reportDelPinById(pinId, section){
     }
   }
   _rpRenderPinned(); _reportAutoSave();
+  toast(full ? '고정이 전체 해제되었습니다.' : `${fromDate}부터 고정 해제됩니다.`);
+}
+// ✕ 버튼(고정 영역) — 날짜지정/전체 해제 팝업을 연다.
+function reportDelPinById(pinId, section){ _rpOpenUnpinPopup(pinId, section); }
+
+function _rpPinFieldAt(pin, field, date){
+  const relevant=(pin.edits||[]).filter(e=>e.field===field&&e.date<=date).sort((a,b)=>b.date.localeCompare(a.date));
+  return relevant.length ? relevant[0].value : (pin[field]??'');
+}
+function reportEditPin(pinId, section, field, el){
+  const gp=_rpGlobalPins();
+  const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
+  const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
+  const val=((el.value!=null?el.value:el.textContent)||'').trim();
+  const today=_reportDate||_reportTodayStr();
+  if(!pin.edits) pin.edits=[];
+  const existing=pin.edits.find(e=>e.date===today&&e.field===field);
+  if(existing){ if(existing.value===val) return; existing.value=val; }
+  else { pin.edits.push({date:today,field,value:val}); }
+  _reportAutoSave();
 }
 // 고정 블록 위/아래 순서 변경 (dir: -1=위, 1=아래) — 화면에 보이는 항목 기준으로 교환
 function reportMovePin(pinId, section, dir){
