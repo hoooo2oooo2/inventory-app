@@ -1866,14 +1866,18 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- ═══ 업무보고서 고정 등록 (기간 설정) ═══ -->
+<!-- ═══ 업무보고서 고정 등록 (날짜 다중 선택) ═══ -->
 <div class="modal-overlay" id="rpPinCreateModal">
-  <div class="modal" style="max-width:340px;">
+  <div class="modal" style="max-width:360px;">
     <h3 id="rpPinCreateModalTitle" style="margin:0 0 10px;">📌 고정</h3>
-    <div style="font-size:12px;color:var(--tx2);margin-bottom:8px;">언제까지 상단에 고정할까요? 비워두면 직접 해제할 때까지 계속 고정됩니다.</div>
-    <div class="cl-lbl">고정 종료일 (선택)</div>
-    <input type="date" id="rpPinUntilInput"
-      style="width:100%;height:36px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;margin-top:4px;">
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:8px;">고정할 날짜를 선택해 추가하세요. 여러 날짜를 골라 그 날짜에만 고정할 수 있습니다. 하나도 추가하지 않으면 직접 해제할 때까지 계속 고정됩니다.</div>
+    <div class="cl-lbl">날짜 추가</div>
+    <div style="display:flex;gap:6px;margin-top:4px;margin-bottom:8px;">
+      <input type="date" id="rpPinDateAddInput"
+        style="flex:1;height:36px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;">
+      <button class="btn" onclick="rpPinCreateAddDate()">+ 추가</button>
+    </div>
+    <div id="rpPinCreateDateChips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:16px;margin-bottom:6px;"></div>
     <div class="ma" style="margin-top:16px;">
       <button class="btn" onclick="rpPinCreateCancel()">취소</button>
       <button class="btn btn-pr" onclick="rpPinCreateConfirm()">📌 고정</button>
@@ -21410,7 +21414,7 @@ function _rpRenderPinned(){
     const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
     if(!pArr.length){ div.innerHTML=''; return; }
     const curDate=_reportDate||_reportTodayStr();
-    const visible=pArr.filter(p=>(!p.deleted_at||p.deleted_at>curDate) && !(p.excluded_dates||[]).includes(curDate));
+    const visible=pArr.filter(p=>_rpPinVisibleOn(p,curDate));
     if(!visible.length){ div.innerHTML=''; return; }
     div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+visible.map((p,i)=>{
       // 위/아래 순서 변경 버튼 (첫/마지막은 비활성)
@@ -21724,14 +21728,16 @@ function reportEditBlockCancel(id, section){
   if(form){ const tpl=document.createElement('template'); tpl.innerHTML=_rpBlockHTML(item,sec); form.replaceWith(tpl.content.firstElementChild); }
 }
 
-// 'YYYY-MM-DD' 다음날 문자열 (고정 종료일→deleted_at 환산용: deleted_at은 '처음으로 안 보이는 날')
-function _rpNextDayStr(ds){
-  const d=new Date(ds+'T00:00:00'); if(isNaN(d)) return ds;
-  d.setDate(d.getDate()+1);
-  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+// 고정 항목이 특정 날짜(curDate)에 보여야 하는지 — only_dates(다중 날짜 지정)가 있으면 그 날짜들에서만,
+// 없으면 기존 deleted_at(해제 시점)/excluded_dates(하루만 해제) 기준
+function _rpPinVisibleOn(p, curDate){
+  if(p.only_dates && !p.only_dates.includes(curDate)) return false;
+  if(p.deleted_at && p.deleted_at<=curDate) return false;
+  if((p.excluded_dates||[]).includes(curDate)) return false;
+  return true;
 }
 
-// 📌 블럭 고정 — 이미 고정되어 있으면 해제 팝업(날짜지정/전체), 아니면 등록 팝업(기간 설정)을 연다.
+// 📌 블럭 고정 — 이미 고정되어 있으면 해제 팝업(날짜지정/전체), 아니면 등록 팝업(날짜 다중 선택)을 연다.
 function reportTogglePin(id, section){
   const key=_reportFindBlockKey(id)||_reportKey();
   const entry=_reportAllData[key]; if(!entry) return;
@@ -21749,7 +21755,7 @@ function reportTogglePin(id, section){
   }
   _rpOpenPinCreatePopup(id, sec, 'block');
 }
-// 텍스트 라인 고정 — 이미 고정되어 있으면 해제 팝업, 아니면 등록 팝업(기간 설정)을 연다.
+// 텍스트 라인 고정 — 이미 고정되어 있으면 해제 팝업, 아니면 등록 팝업(날짜 다중 선택)을 연다.
 function reportPinLine(id, section){
   const entry=_reportGetEntry();
   const content=_rpContentOf(entry,section);
@@ -21757,32 +21763,51 @@ function reportPinLine(id, section){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   const curDate=_reportDate||_reportTodayStr();
-  const pin=pArr.find(p=>p.source_id===id && (!p.deleted_at||p.deleted_at>curDate));
+  const pin=pArr.find(p=>p.source_id===id && _rpPinVisibleOn(p,curDate));
   if(pin){ _rpOpenUnpinPopup(pin.id, section); return; }
   _rpOpenPinCreatePopup(id, section, 'text');
 }
 
-// ── 고정 등록 팝업 (기간 설정) ──
+// ── 고정 등록 팝업 (날짜 다중 선택 — 여러 날짜를 골라 그 날짜에만 고정) ──
 let _rpPinPending = null; // {id, section, kind:'block'|'text'}
+let _rpPinCreateDates = []; // 선택된 날짜들 ('YYYY-MM-DD'[]) — 비어있으면 무기한 고정
 function _rpOpenPinCreatePopup(id, section, kind){
   _rpPinPending = {id, section, kind};
+  _rpPinCreateDates = [];
   const t=document.getElementById('rpPinCreateModalTitle'); if(t) t.textContent = kind==='text' ? '📌 내용 고정' : '📌 업무 고정';
-  const inp=document.getElementById('rpPinUntilInput'); if(inp) inp.value='';
+  const inp=document.getElementById('rpPinDateAddInput'); if(inp) inp.value='';
+  _rpRenderPinCreateChips();
   openModal('rpPinCreateModal');
 }
-function rpPinCreateCancel(){ _rpPinPending=null; closeModal('rpPinCreateModal'); }
+function rpPinCreateAddDate(){
+  const inp=document.getElementById('rpPinDateAddInput');
+  const v=(inp?.value||'').trim();
+  if(!v){ toast('날짜를 선택하세요.'); return; }
+  if(!_rpPinCreateDates.includes(v)){ _rpPinCreateDates.push(v); _rpPinCreateDates.sort(); }
+  if(inp) inp.value='';
+  _rpRenderPinCreateChips();
+}
+function rpPinCreateRemoveDate(idx){
+  _rpPinCreateDates.splice(idx,1);
+  _rpRenderPinCreateChips();
+}
+function _rpRenderPinCreateChips(){
+  const wrap=document.getElementById('rpPinCreateDateChips'); if(!wrap) return;
+  wrap.innerHTML = _rpPinCreateDates.length
+    ? _rpPinCreateDates.map((d,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:12px;padding:3px 8px;font-size:11.5px;font-weight:700;color:var(--tx);">${_admFmtDate(d)}<button style="border:none;background:none;cursor:pointer;color:#B45309;font-weight:800;padding:0;line-height:1;" onclick="rpPinCreateRemoveDate(${i})">✕</button></span>`).join('')
+    : `<span style="font-size:11.5px;color:var(--tx2);">추가된 날짜 없음 — 무기한 고정</span>`;
+}
+function rpPinCreateCancel(){ _rpPinPending=null; _rpPinCreateDates=[]; closeModal('rpPinCreateModal'); }
 function rpPinCreateConfirm(){
   if(!_rpPinPending) return;
   const {id, section, kind} = _rpPinPending;
-  const until = (document.getElementById('rpPinUntilInput')?.value||'').trim();
-  const today = _reportDate||_reportTodayStr();
-  if(until && until<today){ toast('종료일은 오늘 이후로 선택하세요.'); return; }
+  const dates = [..._rpPinCreateDates];
   closeModal('rpPinCreateModal');
-  _rpPinPending = null;
-  if(kind==='text') _rpDoPinLine(id, section, until);
-  else _rpDoPinBlock(id, section, until);
+  _rpPinPending = null; _rpPinCreateDates=[];
+  if(kind==='text') _rpDoPinLine(id, section, dates);
+  else _rpDoPinBlock(id, section, dates);
 }
-function _rpDoPinBlock(id, section, until){
+function _rpDoPinBlock(id, section, dates){
   const key=_reportFindBlockKey(id)||_reportKey();
   const entry=_reportAllData[key]; if(!entry) return;
   const content=_rpContentOf(entry,section);
@@ -21794,7 +21819,7 @@ function _rpDoPinBlock(id, section, until){
     task:item.task,time:item.time||'',
     linked_title:item.linked_title||null,linked_type:item.linked_type||null,
     pinned_at:new Date().toISOString(),
-    deleted_at: until ? _rpNextDayStr(until) : null});
+    only_dates: dates.length ? dates : null});
   item.pinned=true;
   const el=document.querySelector(`[data-id="${id}"]`);
   if(el){
@@ -21803,9 +21828,9 @@ function _rpDoPinBlock(id, section, until){
     if(pinBtn){ pinBtn.textContent='📌'; pinBtn.title='고정 해제'; }
   }
   _rpRenderPinned(); _reportAutoSave();
-  toast(until ? `📌 ${until}까지 고정됨` : '📌 상단에 고정됨(무기한)');
+  toast(dates.length ? `📌 ${dates.length}개 날짜에 고정됨` : '📌 상단에 고정됨(무기한)');
 }
-function _rpDoPinLine(id, section, until){
+function _rpDoPinLine(id, section, dates){
   const entry=_reportGetEntry();
   const content=_rpContentOf(entry,section);
   const item=content.find(i=>i.id===id); if(!item||item.type!=='line') return;
@@ -21813,9 +21838,9 @@ function _rpDoPinLine(id, section, until){
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   pArr.push({id:'gp_'+Date.now()+Math.random().toString(36).slice(2,4),
     source_id:id,type:'text',text:item.text||'',pinned_at:new Date().toISOString(),
-    deleted_at: until ? _rpNextDayStr(until) : null});
+    only_dates: dates.length ? dates : null});
   _rpRenderPinned(); _reportAutoSave();
-  toast(until ? `📌 ${until}까지 고정됨` : '📌 상단에 고정됨(무기한)');
+  toast(dates.length ? `📌 ${dates.length}개 날짜에 고정됨` : '📌 상단에 고정됨(무기한)');
 }
 
 // ── 고정 해제 팝업 (날짜 지정 / 전체 기간) ──
@@ -21862,8 +21887,13 @@ function _rpApplyUnpin(pinId, section, dateVal, mode){
   } else if(mode==='fromDate'){
     pin.deleted_at=dateVal;
   } else if(mode==='onlyDate'){
-    if(!pin.excluded_dates) pin.excluded_dates=[];
-    if(!pin.excluded_dates.includes(dateVal)) pin.excluded_dates.push(dateVal);
+    if(pin.only_dates){
+      // 날짜 다중 선택으로 만든 고정이면 그 날짜를 목록에서 제거
+      pin.only_dates = pin.only_dates.filter(d=>d!==dateVal);
+    } else {
+      if(!pin.excluded_dates) pin.excluded_dates=[];
+      if(!pin.excluded_dates.includes(dateVal)) pin.excluded_dates.push(dateVal);
+    }
   }
   // 해당 날짜만 숨기는 경우는 다른 날짜엔 여전히 고정 상태이므로 원본 블럭의 pinned 표시는 건드리지 않는다.
   if(mode!=='onlyDate' && pin.type==='block' && pin.source_id){
@@ -21913,7 +21943,7 @@ function reportMovePin(pinId, section, dir){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   const curDate=_reportDate||_reportTodayStr();
-  const visible=pArr.filter(p=>(!p.deleted_at||p.deleted_at>curDate) && !(p.excluded_dates||[]).includes(curDate));
+  const visible=pArr.filter(p=>_rpPinVisibleOn(p,curDate));
   const vIdx=visible.findIndex(p=>p.id===pinId);
   if(vIdx<0) return;
   const target=visible[vIdx+dir];
