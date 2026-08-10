@@ -1861,6 +1861,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <button class="btn btn-sm" onclick="closeModal('collabAdminSummaryModal')">✕ 닫기</button>
     </div>
     <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">선택한 달의 업무보고서에 등록된 소요시간 기준입니다. 각 담당자의 진행전 · 진행중 · 완료 프로젝트가 표시됩니다.</div>
+    <div id="admStatusFilterRow" style="display:flex;gap:6px;margin-bottom:10px;"></div>
     <div id="collabAdminSummaryBody" style="max-height:65vh;overflow-y:auto;"></div>
   </div>
 </div>
@@ -20958,10 +20959,14 @@ function collabOpenDone(){
 
 // ── 담당자별 전체 소요시간 집계 팝업 (관리자 전용, 월 단위) ──
 let _admSummaryYm = null; // 'YYYY-MM' — 팝업 열 때마다 이번 달로 초기화
+let _admSummaryStatusFilter = 'all'; // 'all'|'plan'|'doing'|'done' — 팝업 열 때마다 전체로 초기화
+const _ADM_STATUS_TABS = [ ['all','전체'], ['plan','진행전'], ['doing','진행중'], ['done','완료'] ];
 function _admCurrentYm(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
 function collabOpenAdminSummary(){
   if(!_isDesignAdmin()){ toast('관리자만 볼 수 있습니다.'); return; }
   _admSummaryYm = _admCurrentYm();
+  _admSummaryStatusFilter = 'all';
+  _admRenderStatusFilter();
   _renderAdminSummary();
   openModal('collabAdminSummaryModal');
 }
@@ -20971,14 +20976,30 @@ function _admSummaryMonthNav(dir){
   _admSummaryYm = d.getFullYear()+'-'+pad(d.getMonth()+1);
   _renderAdminSummary();
 }
+function _admSetStatusFilter(status){
+  _admSummaryStatusFilter = status;
+  _admRenderStatusFilter();
+  _renderAdminSummary();
+}
+function _admRenderStatusFilter(){
+  const row = document.getElementById('admStatusFilterRow');
+  if(!row) return;
+  row.innerHTML = _ADM_STATUS_TABS.map(([k,label])=>{
+    const on = _admSummaryStatusFilter===k;
+    const c = k==='all' ? '#475569' : (COLLAB_STATUS[k]?.color||'#888');
+    const style = on ? `background:${c};border-color:${c};color:#fff;` : `color:${c};border-color:${c}55;`;
+    return `<button class="cf-chip" style="flex:none;padding:4px 12px;${style}" onclick="_admSetStatusFilter('${k}')">${label}</button>`;
+  }).join('');
+}
 function _renderAdminSummary(){
   const ym = _admSummaryYm;
   const lbl = document.getElementById('admSummaryYmLabel');
   if(lbl){ const [y,m] = ym.split('-').map(Number); lbl.textContent = `${y}년 ${m}월`; }
   const body = document.getElementById('collabAdminSummaryBody');
   if(!body) return;
+  const statusFilter = _admSummaryStatusFilter;
   body.innerHTML = COLLAB_DESIGN_STAFF.map(person=>{
-    const tasks = _collabTasks.filter(t=>!t.weekly && t.assignee===person)
+    const tasks = _collabTasks.filter(t=>!t.weekly && t.assignee===person && (statusFilter==='all'||t.status===statusFilter))
       .sort((a,b)=>{
         const so=(_COLLAB_ST_ORD[a.status??'plan']??2)-(_COLLAB_ST_ORD[b.status??'plan']??2);
         return so || new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at);
