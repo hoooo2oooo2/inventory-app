@@ -1853,9 +1853,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="modal" style="max-width:640px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <h3 style="margin:0;">📊 담당자별 프로젝트 소요시간</h3>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="btn btn-sm" onclick="_admSummaryMonthNav(-1)">‹</button>
+        <span id="admSummaryYmLabel" style="font-size:13px;font-weight:800;min-width:88px;text-align:center;color:var(--tx);">2026년 8월</span>
+        <button class="btn btn-sm" onclick="_admSummaryMonthNav(1)">›</button>
+      </div>
       <button class="btn btn-sm" onclick="closeModal('collabAdminSummaryModal')">✕ 닫기</button>
     </div>
-    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">각 담당자의 진행전 · 진행중 · 완료 프로젝트와, 업무보고서에 등록된 소요시간 합계입니다.</div>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">선택한 달의 업무보고서에 등록된 소요시간 기준입니다. 각 담당자의 진행전 · 진행중 · 완료 프로젝트가 표시됩니다.</div>
     <div id="collabAdminSummaryBody" style="max-height:65vh;overflow-y:auto;"></div>
   </div>
 </div>
@@ -20951,10 +20956,27 @@ function collabOpenDone(){
   openModal('collabDoneModal');
 }
 
-// ── 담당자별 전체 소요시간 집계 팝업 (관리자 전용) ──
+// ── 담당자별 전체 소요시간 집계 팝업 (관리자 전용, 월 단위) ──
+let _admSummaryYm = null; // 'YYYY-MM' — 팝업 열 때마다 이번 달로 초기화
+function _admCurrentYm(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
 function collabOpenAdminSummary(){
   if(!_isDesignAdmin()){ toast('관리자만 볼 수 있습니다.'); return; }
+  _admSummaryYm = _admCurrentYm();
+  _renderAdminSummary();
+  openModal('collabAdminSummaryModal');
+}
+function _admSummaryMonthNav(dir){
+  const [y,m] = _admSummaryYm.split('-').map(Number);
+  const d = new Date(y, m-1+dir, 1);
+  _admSummaryYm = d.getFullYear()+'-'+pad(d.getMonth()+1);
+  _renderAdminSummary();
+}
+function _renderAdminSummary(){
+  const ym = _admSummaryYm;
+  const lbl = document.getElementById('admSummaryYmLabel');
+  if(lbl){ const [y,m] = ym.split('-').map(Number); lbl.textContent = `${y}년 ${m}월`; }
   const body = document.getElementById('collabAdminSummaryBody');
+  if(!body) return;
   body.innerHTML = COLLAB_DESIGN_STAFF.map(person=>{
     const tasks = _collabTasks.filter(t=>!t.weekly && t.assignee===person)
       .sort((a,b)=>{
@@ -20965,13 +20987,13 @@ function collabOpenAdminSummary(){
     const color = COLLAB_PERSON_COLOR[person]||'#888';
     const rows = tasks.length ? tasks.map(t=>{
       const st = COLLAB_STATUS[t.status] || COLLAB_STATUS.plan;
-      const byDate = _collabTaskLoggedByDate(t);
+      const byDate = _collabTaskLoggedByDate(t).filter(d=>d.date.startsWith(ym));
       const mins = byDate.reduce((s,d)=>s+d.mins,0);
       totalMin += mins;
       const detId = '_admDet_'+t.id;
       const detailBody = byDate.length
         ? byDate.map(d=>`<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${_admFmtDate(d.date)}</span><span style="color:#2563EB;font-weight:700;">${_collabFmtMinutes(d.mins)}</span></div>`).join('')
-        : `<div style="color:var(--tx2);">업무보고서에 등록된 소요시간이 없습니다.</div>`;
+        : `<div style="color:var(--tx2);">이 달에 업무보고서에 등록된 소요시간이 없습니다.</div>`;
       return `<div class="adm-task-row" style="cursor:pointer;" onclick="_adminToggleDetail('${detId}')">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:0.5px solid var(--bd);">
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:var(--tx);">${_esc(t.title)}</span>
@@ -20989,7 +21011,6 @@ function collabOpenAdminSummary(){
       ${rows}
     </div>`;
   }).join('');
-  openModal('collabAdminSummaryModal');
 }
 // 관리자 소요시간 팝업 — 업무 클릭 시 날짜별 상세 펼치기/접기
 function _adminToggleDetail(id){
