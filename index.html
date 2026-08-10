@@ -1879,11 +1879,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div class="modal-overlay" id="rpUnpinModal">
   <div class="modal" style="max-width:340px;">
     <h3 style="margin:0 0 10px;">📌 고정 해제</h3>
-    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">지정한 날짜부터 해제하거나(이전 날짜는 고정된 채로 유지), 날짜 구분 없이 전체 기간 고정을 해제할 수 있습니다.</div>
-    <div class="cl-lbl">이 날짜부터 해제</div>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">특정 날짜만 해제하거나, 지정한 날짜부터 해제하거나(이전 날짜는 고정된 채로 유지), 날짜 구분 없이 전체 기간 고정을 해제할 수 있습니다.</div>
+    <div class="cl-lbl">날짜 선택</div>
     <input type="date" id="rpUnpinDateInput"
       style="width:100%;height:36px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:13px;outline:none;box-sizing:border-box;margin-top:4px;margin-bottom:10px;">
-    <button class="btn btn-pr" style="width:100%;margin-bottom:10px;" onclick="rpUnpinFromDate()">📅 이 날짜부터 해제</button>
+    <button class="btn btn-pr" style="width:100%;margin-bottom:8px;" onclick="rpUnpinThisDateOnly()">📌 이 날짜만 해제</button>
+    <button class="btn" style="width:100%;margin-bottom:10px;" onclick="rpUnpinFromDate()">📅 이 날짜부터 해제</button>
     <div style="text-align:center;font-size:11px;color:var(--tx2);margin-bottom:10px;">— 또는 —</div>
     <button class="btn" style="width:100%;color:#DC2626;" onclick="rpUnpinAll()">🗑 날짜 지정 없이 전체 해제</button>
     <div class="ma" style="margin-top:14px;">
@@ -21367,7 +21368,7 @@ function _rpRenderPinned(){
     const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
     if(!pArr.length){ div.innerHTML=''; return; }
     const curDate=_reportDate||_reportTodayStr();
-    const visible=pArr.filter(p=>!p.deleted_at||p.deleted_at>curDate);
+    const visible=pArr.filter(p=>(!p.deleted_at||p.deleted_at>curDate) && !(p.excluded_dates||[]).includes(curDate));
     if(!visible.length){ div.innerHTML=''; return; }
     div.innerHTML=`<div class="rp-pinned-title">📌 고정됨</div>`+visible.map((p,i)=>{
       // 위/아래 순서 변경 버튼 (첫/마지막은 비활성)
@@ -21784,31 +21785,46 @@ function _rpOpenUnpinPopup(pinId, section){
   openModal('rpUnpinModal');
 }
 function rpUnpinCancel(){ _rpUnpinTarget=null; closeModal('rpUnpinModal'); }
+function rpUnpinThisDateOnly(){
+  if(!_rpUnpinTarget) return;
+  const {pinId, section} = _rpUnpinTarget;
+  const dateVal=(document.getElementById('rpUnpinDateInput')?.value||'').trim();
+  if(!dateVal){ toast('해제할 날짜를 선택하세요.'); return; }
+  closeModal('rpUnpinModal'); _rpUnpinTarget=null;
+  _rpApplyUnpin(pinId, section, dateVal, 'onlyDate');
+}
 function rpUnpinFromDate(){
   if(!_rpUnpinTarget) return;
   const {pinId, section} = _rpUnpinTarget;
   const dateVal=(document.getElementById('rpUnpinDateInput')?.value||'').trim();
   if(!dateVal){ toast('해제할 날짜를 선택하세요.'); return; }
   closeModal('rpUnpinModal'); _rpUnpinTarget=null;
-  _rpApplyUnpin(pinId, section, dateVal, false);
+  _rpApplyUnpin(pinId, section, dateVal, 'fromDate');
 }
 function rpUnpinAll(){
   if(!_rpUnpinTarget) return;
   const {pinId, section} = _rpUnpinTarget;
   closeModal('rpUnpinModal'); _rpUnpinTarget=null;
-  _rpApplyUnpin(pinId, section, null, true);
+  _rpApplyUnpin(pinId, section, null, 'all');
 }
 // 업무별 고정 핀 해제 — 고정목록에서 제거함과 동시에, 원본 블럭의 📌 고정 상태도 함께 풀어준다.
 // (예전엔 목록에서만 사라지고 원본 블럭은 계속 '고정됨'으로 남아 다시 열어보면 안 풀린 것처럼 보였음)
-// full=true면 날짜 구분 없이 완전히 삭제, false면 fromDate부터만 해제(이전 날짜는 고정된 채로 유지)
-function _rpApplyUnpin(pinId, section, fromDate, full){
+// mode: 'onlyDate'=해당 날짜 하루만 숨김(앞뒤 날짜는 그대로 고정 유지) / 'fromDate'=그 날짜부터 계속 해제(이전 날짜는 유지) / 'all'=날짜 구분 없이 완전히 삭제
+function _rpApplyUnpin(pinId, section, dateVal, mode){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   const idx=pArr.findIndex(p=>p.id===pinId); if(idx<0) return;
   const pin=pArr[idx];
-  if(full) pArr.splice(idx,1);
-  else pin.deleted_at=fromDate;
-  if(pin.type==='block' && pin.source_id){
+  if(mode==='all'){
+    pArr.splice(idx,1);
+  } else if(mode==='fromDate'){
+    pin.deleted_at=dateVal;
+  } else if(mode==='onlyDate'){
+    if(!pin.excluded_dates) pin.excluded_dates=[];
+    if(!pin.excluded_dates.includes(dateVal)) pin.excluded_dates.push(dateVal);
+  }
+  // 해당 날짜만 숨기는 경우는 다른 날짜엔 여전히 고정 상태이므로 원본 블럭의 pinned 표시는 건드리지 않는다.
+  if(mode!=='onlyDate' && pin.type==='block' && pin.source_id){
     const key=_reportFindBlockKey(pin.source_id);
     const entry=key ? _reportAllData[key] : null;
     if(entry){
@@ -21828,7 +21844,8 @@ function _rpApplyUnpin(pinId, section, fromDate, full){
     }
   }
   _rpRenderPinned(); _reportAutoSave();
-  toast(full ? '고정이 전체 해제되었습니다.' : `${fromDate}부터 고정 해제됩니다.`);
+  const msg = mode==='all' ? '고정이 전체 해제되었습니다.' : mode==='onlyDate' ? `${dateVal}에만 고정이 해제됩니다.` : `${dateVal}부터 고정 해제됩니다.`;
+  toast(msg);
 }
 // ✕ 버튼(고정 영역) — 날짜지정/전체 해제 팝업을 연다.
 function reportDelPinById(pinId, section){ _rpOpenUnpinPopup(pinId, section); }
@@ -21854,7 +21871,7 @@ function reportMovePin(pinId, section, dir){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   const curDate=_reportDate||_reportTodayStr();
-  const visible=pArr.filter(p=>!p.deleted_at||p.deleted_at>curDate);
+  const visible=pArr.filter(p=>(!p.deleted_at||p.deleted_at>curDate) && !(p.excluded_dates||[]).includes(curDate));
   const vIdx=visible.findIndex(p=>p.id===pinId);
   if(vIdx<0) return;
   const target=visible[vIdx+dir];
