@@ -21315,13 +21315,13 @@ function _rpRenderPinned(){
       if(p.type==='text'){
         const txt=_esc(_rpPinFieldAt(p,'text',curDate));
         return `<div class="rp-pinned-item"><span class="rp-pin-editable" style="flex:1;" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span>
-          ${mv}<button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
+          ${mv}<button class="rp-block-btn" title="고정 해제" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
       }
       const task=_esc(_rpPinFieldAt(p,'task',curDate));
       const time=_rpPinFieldAt(p,'time',curDate);
       const timeSelOpts=`<option value=""${!time?' selected':''}>시간 미설정</option>`+RP_TIME_OPTS.map(o=>`<option${time===o?' selected':''}>${o}</option>`).join('');
       return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b> — <select class="rp-pin-time-sel" onchange="reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select>${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
-        ${mv}<button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
+        ${mv}<button class="rp-block-btn" title="고정 해제" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
     }).join('');
   });
 }
@@ -21682,12 +21682,33 @@ function reportEditPin(pinId, section, field, el){
   else { pin.edits.push({date:today,field,value:val}); }
   _reportAutoSave();
 }
+// 업무별 고정 핀 해제 — 고정목록에서 제거함과 동시에, 원본 블럭의 📌 고정 상태도 함께 풀어준다.
+// (예전엔 목록에서만 사라지고 원본 블럭은 계속 '고정됨'으로 남아 다시 열어보면 안 풀린 것처럼 보였음)
 function reportDelPinById(pinId, section){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
   // 오늘 이후부터만 삭제 — 이전 날짜는 고정 내용 그대로 유지
   pin.deleted_at=_reportDate||_reportTodayStr();
+  if(pin.type==='block' && pin.source_id){
+    const key=_reportFindBlockKey(pin.source_id);
+    const entry=key ? _reportAllData[key] : null;
+    if(entry){
+      for(const sec of ['am','pm']){
+        const item=_rpContentOf(entry,sec).find(i=>i.id===pin.source_id);
+        if(item){
+          item.pinned=false;
+          const el=document.querySelector(`[data-id="${pin.source_id}"]`);
+          if(el){
+            el.classList.remove('pinned');
+            const pinBtn=el.querySelectorAll('.rp-block-btn')[1];
+            if(pinBtn){ pinBtn.textContent='📍'; pinBtn.title='상단 고정'; }
+          }
+          break;
+        }
+      }
+    }
+  }
   _rpRenderPinned(); _reportAutoSave();
 }
 // 고정 블록 위/아래 순서 변경 (dir: -1=위, 1=아래) — 화면에 보이는 항목 기준으로 교환
