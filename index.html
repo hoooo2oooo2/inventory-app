@@ -151,6 +151,7 @@ body.design-scope #collabManager .postit-foot{margin-top:2px;}
 .rp-pin-editable{border-radius:3px;outline:none;min-width:10px;}
 .rp-pin-editable:hover{background:rgba(0,0,0,.06);}
 .rp-pin-editable:focus{background:#fff8dc;box-shadow:0 0 0 1.5px #FCD34D;}
+.rp-pin-time-sel{font-size:11.5px;font-family:inherit;color:var(--tx);background:#fff;border:1px solid #FCD34D;border-radius:3px;padding:1px 3px;outline:none;}
 .rp-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);border-radius:0 0 12px 12px;}
 /* 에디터 — 텍스트 라인 + 블럭 혼합 */
 .rp-editor{min-height:80px;padding:6px 10px 10px;outline:none;}
@@ -1847,6 +1848,18 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- ═══ 디자인팀 담당자별 전체 소요시간 (관리자 전용) ═══ -->
+<div class="modal-overlay" id="collabAdminSummaryModal">
+  <div class="modal" style="max-width:640px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">📊 담당자별 프로젝트 소요시간</h3>
+      <button class="btn btn-sm" onclick="closeModal('collabAdminSummaryModal')">✕ 닫기</button>
+    </div>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">각 담당자의 진행전 · 진행중 · 완료 프로젝트와, 업무보고서에 등록된 소요시간 합계입니다.</div>
+    <div id="collabAdminSummaryBody" style="max-height:65vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
 <!-- ═══ 마이페이지 (계정/권한) ═══ -->
 <div class="modal-overlay" id="myPageModal">
   <div class="modal um-modal">
@@ -1955,6 +1968,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <div style="display:flex;align-items:center;gap:8px;">
               <span id="collabSync" style="font-size:11px;color:var(--tx2);">동기화 대기…</span>
               <button class="collab-done-btn" style="color:#B45309;background:#FEF3C7;" onclick="collabDownloadOpener()" title="📂 PC당 1회 실행 필요">📂 폴더열기</button>
+              <button class="collab-done-btn" id="collabAdminSummaryBtn" style="display:none;color:#fff;background:#7C3AED;" onclick="collabOpenAdminSummary()">📊 전체 소요시간</button>
               <button class="collab-done-btn" onclick="collabOpenDone()">✅ 완료목록</button>
               <button class="collab-done-btn" style="color:#fff;background:#05C072;" id="planProjAddBtn" onclick="_designScopePerson ? collabOpenNew(_designScopePerson) : planProjOpenNew()">＋ 프로젝트 등록</button>
             </div>
@@ -20288,6 +20302,11 @@ let _planFormAssignees = [];
 let _planFormPriority = 'mid';
 
 function _collabCanEdit(){ return _menuPerm('collab')==='edit'; }
+// 디자인팀 전체 소요시간 집계 팝업 — admin / 조신성 계정만 노출
+function _isDesignAdmin(){
+  const u = window.__CURRENT_USER; if(!u) return false;
+  return u.username==='admin' || u.name==='조신성' || u.username==='조신성';
+}
 
 function loadCollabPage(){
   // 직원 스코프(유현/보라/연정) 즉시 적용 — 보고서 패널이 비동기 렌더되기 전에 직원 고정
@@ -20537,13 +20556,39 @@ function _collabFmtTime(iso){
 }
 // 로컬 날짜(YYYY-MM-DD)
 function _collabDayStr(iso){ const d=new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
-// 소요시간 (생성→완료) 일/시간/분
-function _collabDur(a,b){
-  let ms = new Date(b)-new Date(a); if(isNaN(ms)||ms<0) ms=0;
-  const tot = Math.floor(ms/60000);
-  const days=Math.floor(tot/1440), hrs=Math.floor((tot%1440)/60), mins=tot%60;
-  let s=''; if(days)s+=days+'일 '; if(hrs)s+=hrs+'시간 '; s+=mins+'분';
+// 업무보고서 소요시간 옵션 → 분 환산 (범위 표기는 중간값)
+const RP_TIME_MINUTES = {
+  '10분이내':10,'10분':10,'20분':20,'30분':30,'30~1시간이내':45,
+  '1시간':60,'2시간':120,'3시간':180,'4시간':240,'5시간':300
+};
+function _rpTimeToMinutes(t){ return RP_TIME_MINUTES[t] || 0; }
+// 분 → '일/시간/분' 표기 (총 0분이면 '-')
+function _collabFmtMinutes(mins){
+  mins = Math.max(0, Math.round(mins||0));
+  if(!mins) return '-';
+  const days=Math.floor(mins/1440), hrs=Math.floor((mins%1440)/60), m=mins%60;
+  let s=''; if(days)s+=days+'일 '; if(hrs)s+=hrs+'시간 '; if(m||!s)s+=m+'분';
   return s.trim();
+}
+// 프로젝트/업무(task)에 업무보고서로 등록된 소요시간 합계(분) — 담당자 본인 업무보고서의 연동 블럭만 집계
+// (plan→task 전환 이전에 기록된 블럭도 orig_plan_id로 함께 잡음)
+function _collabTaskLoggedMinutes(task){
+  if(!task) return 0;
+  const ids = new Set([task.id]);
+  if(task.orig_plan_id) ids.add(task.orig_plan_id);
+  let total = 0;
+  for(const key in _reportAllData){
+    if(!key.startsWith(task.assignee+'|')) continue;
+    const entry = _reportAllData[key];
+    ['content_am','content_pm'].forEach(sec=>{
+      (entry[sec]||[]).forEach(item=>{
+        if(item && item.type==='block' && item.linked_task_id && ids.has(item.linked_task_id)){
+          total += _rpTimeToMinutes(item.time);
+        }
+      });
+    });
+  }
+  return total;
 }
 // 완료 후 다음날부터는 보드에서 숨기고 완료목록으로 이동
 function _collabArchived(t){
@@ -20638,7 +20683,7 @@ function _collabCardHTML(t, canEdit, editOnDbl){
   // 직원 페이지: 더블클릭 시 수정 팝업 / 협업업무 보드: 더블클릭 시 펼치기
   const dblAction = (editOnDbl && canEdit) ? `collabOpenEdit('${t.id}')` : `collabToggleExpand(event,'${t.id}')`;
   const doneBox = (t.status==='done' && t.completed_at)
-    ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabDur(t.created_at, t.completed_at)}</b></div>`
+    ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabFmtMinutes(_collabTaskLoggedMinutes(t))}</b></div>`
     : '';
   const cardBg = t.color || _collabPastel(t.id);
   return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};background:${cardBg};" draggable="${canEdit&&!isExp}"
@@ -20777,6 +20822,8 @@ function _applyDesignScope(){
   if(projTitle) projTitle.textContent = scoped ? `📋 ${person} 진행중인 프로젝트` : '📋 진행 예정 프로젝트';
   const projAddBtn = document.getElementById('planProjAddBtn');
   if(projAddBtn) projAddBtn.textContent = scoped ? '＋ 업무 등록' : '＋ 프로젝트 등록';
+  const adminBtn = document.getElementById('collabAdminSummaryBtn');
+  if(adminBtn) adminBtn.style.display = _isDesignAdmin() ? '' : 'none';
   // 스코프 시 보고서 패널을 해당 직원으로 고정 후 재렌더
   if(scoped && _reportPerson !== person){
     _reportPerson = person;
@@ -20849,12 +20896,44 @@ function collabOpenDone(){
         <div style="font-size:11px;color:var(--tx2);margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;">
           <span>🕒 등록 ${_collabFmtTime(t.created_at)}</span>
           <span>✅ 완료 ${_collabFmtTime(t.completed_at)}</span>
-          <span style="color:#2563EB;">⏱ 소요 <b>${_collabDur(t.created_at, t.completed_at)}</b></span>
+          <span style="color:#2563EB;">⏱ 소요 <b>${_collabFmtMinutes(_collabTaskLoggedMinutes(t))}</b></span>
         </div>
       </div>`;
     }).join('');
   }
   openModal('collabDoneModal');
+}
+
+// ── 담당자별 전체 소요시간 집계 팝업 (관리자 전용) ──
+function collabOpenAdminSummary(){
+  if(!_isDesignAdmin()){ toast('관리자만 볼 수 있습니다.'); return; }
+  const body = document.getElementById('collabAdminSummaryBody');
+  body.innerHTML = COLLAB_PEOPLE.map(person=>{
+    const tasks = _collabTasks.filter(t=>!t.weekly && t.assignee===person)
+      .sort((a,b)=>{
+        const so=(_COLLAB_ST_ORD[a.status??'plan']??2)-(_COLLAB_ST_ORD[b.status??'plan']??2);
+        return so || new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at);
+      });
+    const totalMin = tasks.reduce((s,t)=>s+_collabTaskLoggedMinutes(t),0);
+    const color = COLLAB_PERSON_COLOR[person]||'#888';
+    const rows = tasks.length ? tasks.map(t=>{
+      const st = COLLAB_STATUS[t.status] || COLLAB_STATUS.plan;
+      const mins = _collabTaskLoggedMinutes(t);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:0.5px solid var(--bd);">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:var(--tx);">${_esc(t.title)}</span>
+        <span style="font-size:10.5px;font-weight:800;color:#fff;background:${st.color};padding:1px 7px;border-radius:8px;flex-shrink:0;">${st.label}</span>
+        <span style="font-size:11.5px;color:#2563EB;font-weight:700;flex-shrink:0;min-width:64px;text-align:right;">⏱ ${_collabFmtMinutes(mins)}</span>
+      </div>`;
+    }).join('') : `<div style="padding:10px 8px;color:var(--tx2);font-size:12px;">등록된 프로젝트가 없습니다.</div>`;
+    return `<div style="border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:${color}18;">
+        <span style="font-weight:800;color:${color};font-size:13.5px;">● ${person}</span>
+        <span style="font-size:11.5px;color:var(--tx2);">총 <b style="color:#2563EB;">${_collabFmtMinutes(totalMin)}</b> · ${tasks.length}건</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+  openModal('collabAdminSummaryModal');
 }
 
 function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -21240,7 +21319,8 @@ function _rpRenderPinned(){
       }
       const task=_esc(_rpPinFieldAt(p,'task',curDate));
       const time=_rpPinFieldAt(p,'time',curDate);
-      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b>${time?` — <span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','time',this)">${_esc(time)}</span>`:''}${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
+      const timeSelOpts=`<option value=""${!time?' selected':''}>시간 미설정</option>`+RP_TIME_OPTS.map(o=>`<option${time===o?' selected':''}>${o}</option>`).join('');
+      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b> — <select class="rp-pin-time-sel" onchange="reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select>${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
         ${mv}<button class="rp-block-btn" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
     }).join('');
   });
@@ -21594,7 +21674,7 @@ function reportEditPin(pinId, section, field, el){
   const gp=_rpGlobalPins();
   const pArr=section==='pm'?gp.pinned_pm:gp.pinned_am;
   const pin=pArr.find(p=>p.id===pinId); if(!pin) return;
-  const val=(el.textContent||'').trim();
+  const val=((el.value!=null?el.value:el.textContent)||'').trim();
   const today=_reportDate||_reportTodayStr();
   if(!pin.edits) pin.edits=[];
   const existing=pin.edits.find(e=>e.date===today&&e.field===field);
@@ -21725,7 +21805,8 @@ async function rpBlockSave(){
       _collabTasks.push({
         id:'ct'+Date.now()+Math.random().toString(36).slice(2,5),
         assignee:_reportPerson, title:proj.title, detail:proj.detail||'',
-        status:'doing', color:proj.color||null, created_at:new Date().toISOString(), updated_at:new Date().toISOString()
+        status:'doing', color:proj.color||null, orig_plan_id:proj.id,
+        created_at:new Date().toISOString(), updated_at:new Date().toISOString()
       });
       _planProjects = _planProjects.filter(p=>p.id!==linked.id);
       renderCollab();
@@ -22304,6 +22385,7 @@ async function collabDrop(ev, person){
       status: 'plan',
       color: proj.color || null,
       order: _collabMaxOrder(person)+1,
+      orig_plan_id: proj.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
