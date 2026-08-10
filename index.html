@@ -20268,6 +20268,7 @@ function loadCalPage() {
 const COLLAB_MANAGER = '실장님';
 const COLLAB_PEOPLE = ['실장님','유현','보라','연정'];
 const COLLAB_ALL = COLLAB_PEOPLE;
+const COLLAB_DESIGN_STAFF = COLLAB_PEOPLE.filter(p=>p!=='실장님'); // 전체 소요시간 집계: 실장님 제외
 const COLLAB_PERSON_COLOR = { '실장님':'#0D9488', '유현':'#3182F6', '보라':'#8B5CF6', '연정':'#EC4899' };
 const COLLAB_STATUS = {
   plan:  { label:'진행예정', color:'#05C072' },
@@ -20570,25 +20571,38 @@ function _collabFmtMinutes(mins){
   let s=''; if(days)s+=days+'일 '; if(hrs)s+=hrs+'시간 '; if(m||!s)s+=m+'분';
   return s.trim();
 }
-// 프로젝트/업무(task)에 업무보고서로 등록된 소요시간 합계(분) — 담당자 본인 업무보고서의 연동 블럭만 집계
-// (plan→task 전환 이전에 기록된 블럭도 orig_plan_id로 함께 잡음)
-function _collabTaskLoggedMinutes(task){
-  if(!task) return 0;
+// 프로젝트/업무(task)에 업무보고서로 등록된 소요시간을 날짜별로 집계 — 담당자 본인 업무보고서의 연동 블럭만 집계
+// (plan→task 전환 이전에 기록된 블럭도 orig_plan_id로 함께 잡음) → [{date:'YYYY-MM-DD', mins}] (날짜 오름차순)
+function _collabTaskLoggedByDate(task){
+  if(!task) return [];
   const ids = new Set([task.id]);
   if(task.orig_plan_id) ids.add(task.orig_plan_id);
-  let total = 0;
+  const byDate = {};
   for(const key in _reportAllData){
     if(!key.startsWith(task.assignee+'|')) continue;
+    const date = key.slice(task.assignee.length+1);
+    if(!date) continue;
     const entry = _reportAllData[key];
     ['content_am','content_pm'].forEach(sec=>{
       (entry[sec]||[]).forEach(item=>{
         if(item && item.type==='block' && item.linked_task_id && ids.has(item.linked_task_id)){
-          total += _rpTimeToMinutes(item.time);
+          const m=_rpTimeToMinutes(item.time);
+          if(m) byDate[date]=(byDate[date]||0)+m;
         }
       });
     });
   }
-  return total;
+  return Object.keys(byDate).sort().map(date=>({date, mins:byDate[date]}));
+}
+// 프로젝트/업무(task)에 업무보고서로 등록된 소요시간 합계(분)
+function _collabTaskLoggedMinutes(task){
+  return _collabTaskLoggedByDate(task).reduce((s,d)=>s+d.mins,0);
+}
+// 'YYYY-MM-DD' → 'M월 D일(요일)'
+function _admFmtDate(ds){
+  const d=new Date(ds+'T00:00:00'); if(isNaN(d)) return ds;
+  const days=['일','월','화','수','목','금','토'];
+  return `${d.getMonth()+1}월 ${d.getDate()}일(${days[d.getDay()]})`;
 }
 // 완료 후 다음날부터는 보드에서 숨기고 완료목록으로 이동
 function _collabArchived(t){
@@ -20908,21 +20922,30 @@ function collabOpenDone(){
 function collabOpenAdminSummary(){
   if(!_isDesignAdmin()){ toast('관리자만 볼 수 있습니다.'); return; }
   const body = document.getElementById('collabAdminSummaryBody');
-  body.innerHTML = COLLAB_PEOPLE.map(person=>{
+  body.innerHTML = COLLAB_DESIGN_STAFF.map(person=>{
     const tasks = _collabTasks.filter(t=>!t.weekly && t.assignee===person)
       .sort((a,b)=>{
         const so=(_COLLAB_ST_ORD[a.status??'plan']??2)-(_COLLAB_ST_ORD[b.status??'plan']??2);
         return so || new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at);
       });
-    const totalMin = tasks.reduce((s,t)=>s+_collabTaskLoggedMinutes(t),0);
+    let totalMin = 0;
     const color = COLLAB_PERSON_COLOR[person]||'#888';
     const rows = tasks.length ? tasks.map(t=>{
       const st = COLLAB_STATUS[t.status] || COLLAB_STATUS.plan;
-      const mins = _collabTaskLoggedMinutes(t);
-      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:0.5px solid var(--bd);">
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:var(--tx);">${_esc(t.title)}</span>
-        <span style="font-size:10.5px;font-weight:800;color:#fff;background:${st.color};padding:1px 7px;border-radius:8px;flex-shrink:0;">${st.label}</span>
-        <span style="font-size:11.5px;color:#2563EB;font-weight:700;flex-shrink:0;min-width:64px;text-align:right;">⏱ ${_collabFmtMinutes(mins)}</span>
+      const byDate = _collabTaskLoggedByDate(t);
+      const mins = byDate.reduce((s,d)=>s+d.mins,0);
+      totalMin += mins;
+      const detId = '_admDet_'+t.id;
+      const detailBody = byDate.length
+        ? byDate.map(d=>`<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>${_admFmtDate(d.date)}</span><span style="color:#2563EB;font-weight:700;">${_collabFmtMinutes(d.mins)}</span></div>`).join('')
+        : `<div style="color:var(--tx2);">업무보고서에 등록된 소요시간이 없습니다.</div>`;
+      return `<div class="adm-task-row" style="cursor:pointer;" onclick="_adminToggleDetail('${detId}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:0.5px solid var(--bd);">
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;color:var(--tx);">${_esc(t.title)}</span>
+          <span style="font-size:10.5px;font-weight:800;color:#fff;background:${st.color};padding:1px 7px;border-radius:8px;flex-shrink:0;">${st.label}</span>
+          <span style="font-size:11.5px;color:#2563EB;font-weight:700;flex-shrink:0;min-width:70px;text-align:right;">⏱ ${_collabFmtMinutes(mins)} ▾</span>
+        </div>
+        <div id="${detId}" style="display:none;padding:6px 10px 8px 16px;background:var(--bg);font-size:11px;color:var(--tx2);border-bottom:0.5px solid var(--bd);">${detailBody}</div>
       </div>`;
     }).join('') : `<div style="padding:10px 8px;color:var(--tx2);font-size:12px;">등록된 프로젝트가 없습니다.</div>`;
     return `<div style="border:0.5px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:12px;">
@@ -20934,6 +20957,12 @@ function collabOpenAdminSummary(){
     </div>`;
   }).join('');
   openModal('collabAdminSummaryModal');
+}
+// 관리자 소요시간 팝업 — 업무 클릭 시 날짜별 상세 펼치기/접기
+function _adminToggleDetail(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
 
 function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
