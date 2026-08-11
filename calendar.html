@@ -985,6 +985,41 @@ async function cloudLoad(person) {
   } catch(e) { console.warn('cloudLoad 실패', e); return null; }
 }
 
+// ── 폴링 egress 절약: data 없이 kind+updated_at만 가볍게 조회해 변경 여부만 확인 ──
+// (revenue/daily_sales에 쓰는 cloudKvVersion과 같은 패턴 — 바뀐 게 없으면 전체 데이터는 받지 않음)
+async function cloudCheckVersion(person, kinds) {
+  if (!sbCal) return null;
+  try {
+    let q = sbCal.from('work_calendar').select('kind,updated_at').eq('person', person);
+    if (kinds) q = q.in('kind', kinds);
+    const { data, error } = await q;
+    if (error) { console.warn('cloudCheckVersion 오류', error.message); return null; }
+    return data || [];
+  } catch(e) { console.warn('cloudCheckVersion 실패', e); return null; }
+}
+function _calStamp(rows) { return (rows || []).map(r => `${r.kind}:${r.updated_at}`).sort().join('|'); }
+const _calVerCache = {}; // key: 'main:'+person → 마지막으로 실제 반영한 tasks/notes/reports 버전 스탬프
+
+// 특정 담당자의 kind 하나만 로드({ok, exists, value}) — 다른 kind는 건드리지 않아 payload 최소화
+async function cloudLoadKind(person, kind) {
+  if (!sbCal) return { ok: false };
+  try {
+    const { data, error } = await sbCal.from('work_calendar').select('data').eq('person', person).eq('kind', kind).maybeSingle();
+    if (error) { console.warn('cloudLoadKind 오류', error.message, kind); return { ok: false }; }
+    return { ok: true, exists: !!data, value: data ? data.data : undefined };
+  } catch(e) { console.warn('cloudLoadKind 실패', kind, e); return { ok: false }; }
+}
+// 3명 프로젝트(kind='projects')만의 버전 스탬프 — person,updated_at만 조회(무거운 data 제외)
+async function _projVerStamp() {
+  if (!sbCal) return null;
+  try {
+    const { data, error } = await sbCal.from('work_calendar')
+      .select('person,updated_at').in('person', PROJ_PERSONS).eq('kind', 'projects');
+    if (error) { console.warn('_projVerStamp 오류', error.message); return null; }
+    return (data || []).map(r => `${r.person}:${r.updated_at}`).sort().join('|');
+  } catch(e) { console.warn('_projVerStamp 실패', e); return null; }
+}
+
 // 로컬 캐시 즉시 표시 → 클라우드 최신본으로 갱신(없으면 로컬 데이터를 클라우드로 1회 마이그레이션)
 async function loadPersonData(p) {
   try { S.tasks    = JSON.parse(localStorage.getItem('work-cal-' + p)          || '{}'); } catch { S.tasks = {}; }
@@ -1003,9 +1038,14 @@ async function loadPersonData(p) {
     localStorage.setItem('work-cal-reports-' + p,  JSON.stringify(N.reports));
     renderCalendar(); renderTasks(); updateToolButtons();
     _calReady = true;
+    // 방금 받은 버전으로 캐시 시드 → 다음 60초 주기에 곧바로 중복 재조회하지 않도록
+    cloudCheckVersion(p, ['tasks', 'notes', 'reports']).then(rows => {
+      if (rows !== null) _calVerCache['main:' + p] = _calStamp(rows);
+    });
   } else if (cloud && cloud._empty) {
     // 클라우드 비어있음 → 이 PC의 기존 로컬 데이터를 클라우드로 올림(최초 1회)
     _calReady = true;
+    _calVerCache['main:' + p] = ''; // 빈 상태도 캐시해서 다음 주기 중복 조회 방지(실제 저장되면 스탬프가 바뀌어 자동 반영됨)
     const hasLocal = Object.keys(S.tasks).length || Object.keys(N.notes).length || Object.keys(N.reports).length;
     if (hasLocal) {
       cloudSave('tasks', S.tasks);
@@ -1019,12 +1059,22 @@ async function loadPersonData(p) {
 }
 
 // 현재 담당자 데이터를 클라우드 최신본으로 주기적 갱신 (편집 중이 아닐 때만)
+// egress 절약: 먼저 kind+updated_at만 가볍게 확인하고, 실제로 바뀐 경우에만 전체 데이터를 받는다.
 async function refreshCurrentFromCloud() {
   if (!sbCal || !_calReady) return;
+  if (document.hidden) return; // 백그라운드 탭은 폴링 생략
   if (document.querySelector('.overlay.open')) return; // 모달 편집 중이면 건드리지 않음
   const p = S.person;
+  const verRows = await cloudCheckVersion(p, ['tasks', 'notes', 'reports']);
+  if (verRows === null) return; // 조회 오류 — 다음 주기에 재시도
+  const stamp = _calStamp(verRows);
+  const cacheKey = 'main:' + p;
+  if (_calVerCache[cacheKey] === stamp) return; // 변경 없음 → 전체 데이터 요청 생략
   const cloud = await cloudLoad(p);
-  if (!cloud || cloud._empty || S.person !== p) return;   // 클라우드에 아직 데이터가 없을 뿐인데 undefined로 덮어써 S.tasks가 깨지는 것 방지
+  if (!cloud) return; // 오류 — 캐시는 갱신하지 않고 다음 주기에 재시도
+  if (S.person !== p) return; // 로드 중 담당자가 바뀌면 중단
+  _calVerCache[cacheKey] = stamp; // 정상 응답 확인(데이터 없음도 포함) → 캐시 갱신해 다음 주기 중복 요청 방지
+  if (cloud._empty) return; // 클라우드에 아직 데이터가 없을 뿐인데 undefined로 덮어써 S.tasks가 깨지는 것 방지
   const changed = JSON.stringify(cloud.tasks) !== JSON.stringify(S.tasks)
                || JSON.stringify(cloud.notes) !== JSON.stringify(N.notes)
                || JSON.stringify(cloud.reports) !== JSON.stringify(N.reports);
@@ -1164,6 +1214,7 @@ async function saveProjectsFor(person) {
 }
 
 // 3명 모두의 프로젝트 로드 (로컬 즉시 표시 → 클라우드 최신본 갱신)
+// egress 절약: work_calendar 전체(kind='projects' 외 tasks/notes/reports까지) 대신 projects 하나만 조회
 async function loadAllProjects(initial) {
   if (initial) {
     PROJ_PERSONS.forEach(p => {
@@ -1174,26 +1225,36 @@ async function loadAllProjects(initial) {
     renderProjects();
   }
   for (const p of PROJ_PERSONS) {
-    const cloud = await cloudLoad(p);
-    if (cloud && !cloud._empty) {
-      P.byPerson[p] = Array.isArray(cloud.projects) ? cloud.projects : [];
+    const res = await cloudLoadKind(p, 'projects');
+    if (!res.ok) continue; // 오류 → 로컬 캐시 유지
+    if (res.exists) {
+      P.byPerson[p] = Array.isArray(res.value) ? res.value : [];
       localStorage.setItem('work-cal-projects-' + p, JSON.stringify(P.byPerson[p]));
-    } else if (cloud && cloud._empty) {
-      if ((P.byPerson[p] || []).length) saveProjectsFor(p); // 최초 1회 마이그레이션
+    } else if ((P.byPerson[p] || []).length) {
+      saveProjectsFor(p); // 클라우드에 없고 로컬엔 있음 → 최초 1회 마이그레이션
     }
   }
   renderProjects();
+  // 방금 받은 버전으로 캐시 시드 → 다음 60초 주기에 곧바로 중복 재조회하지 않도록
+  const st = await _projVerStamp();
+  if (st !== null) _calVerCache.proj = st;
 }
 
 // 편집 중이 아닐 때만 주기적으로 3명 프로젝트 갱신
+// egress 절약: person,updated_at만(무거운 data 제외) 먼저 확인하고, 바뀐 게 있을 때만 실제 데이터를 받는다.
 async function refreshAllProjects() {
   if (!sbCal || !_calReady) return;
+  if (document.hidden) return; // 백그라운드 탭은 폴링 생략
   if (document.querySelector('.overlay.open')) return;
+  const stamp = await _projVerStamp();
+  if (stamp === null) return; // 조회 오류 — 다음 주기에 재시도
+  if (_calVerCache.proj === stamp) return; // 3명 모두 변경 없음 → 전체 로드 생략
+  _calVerCache.proj = stamp;
   let changed = false;
   for (const p of PROJ_PERSONS) {
-    const cloud = await cloudLoad(p);
-    if (!cloud) continue;
-    const arr = (cloud && !cloud._empty && Array.isArray(cloud.projects)) ? cloud.projects : [];
+    const res = await cloudLoadKind(p, 'projects');
+    if (!res.ok) continue;
+    const arr = (res.exists && Array.isArray(res.value)) ? res.value : [];
     if (JSON.stringify(arr) !== JSON.stringify(P.byPerson[p] || [])) {
       P.byPerson[p] = arr;
       localStorage.setItem('work-cal-projects-' + p, JSON.stringify(arr));
@@ -2010,6 +2071,10 @@ function setupCalendar() {
   setInterval(() => { renderTasks(); renderCalendar(); renderProjects(); }, 30000); // 날짜 바뀌면 완료 항목 자동 이동
   setInterval(refreshCurrentFromCloud, 60000); // 클라우드 공유 데이터 주기적 동기화
   setInterval(refreshAllProjects, 60000);       // 3명 프로젝트 클라우드 동기화
+  // 백그라운드에 있는 동안은 폴링을 건너뛰므로(egress 절약), 탭이 다시 보이면 즉시 한 번 갱신
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { refreshCurrentFromCloud(); refreshAllProjects(); }
+  });
   checkAlerts();
 }
 
