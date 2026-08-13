@@ -6494,6 +6494,18 @@ async function cloudKvVersion(kind){
     return data ? data.updated_at : null;
   }catch{ return undefined; }
 }
+// cloudKvVersion의 다건 버전 — kind 여러 개를 한 번의 쿼리로 조회(개별 폴링을 합쳐 요청 수를 줄임).
+// 반환: {kind: updated_at} 맵 | undefined(조회 실패 → 변경판정 제외). 존재하지 않는 kind는 맵에 없음(=null과 동일하게 취급).
+async function cloudKvVersions(kinds){
+  if(!kinds || !kinds.length) return {};
+  try{
+    const { data, error } = await sb.from('work_calendar').select('kind,updated_at').eq('person','__app__').in('kind',kinds);
+    if(error) return undefined;
+    const map = {};
+    (data||[]).forEach(r=>{ map[r.kind] = r.updated_at; });
+    return map;
+  }catch{ return undefined; }
+}
 
 // ── 일일 자동 백업: 하루 1회 work_calendar(person='__app__') 전체를 kv_backup_YYYY-MM-DD 로 스냅샷 저장 ──
 //    기존 기능 데이터는 읽기만 하고 절대 건드리지 않음 — 인증/저장 버그 등으로 데이터가 사라져 보일 때 복구용 참고 자료.
@@ -9486,8 +9498,8 @@ async function reviewInit(){
 
 // ── 다른 PC 실시간 반영 — 리뷰관리 화면이 열려있는 동안만 30초 간격으로 버전(updated_at)만
 //    가볍게 확인하고, 바뀐 게 있을 때만 실제 데이터를 다시 받아와 재렌더링한다.
-//    cloudKvVersion은 updated_at 한 줄만 읽어오는 저비용 조회라 egress 부담이 거의 없음
-//    (물류/협업 기능에서 이미 쓰는 것과 동일한 패턴).
+//    cloudKvVersions로 열람 중인 달 + review_manage를 한 쿼리로 묶어서 조회 — 예전엔 달 수만큼
+//    개별 요청이 나가 열람 달이 많을수록 폴링 요청도 비례해서 늘었음(egress 원인, 2026-08-13 수정).
 let _rvwPollTimer = null;
 let _rvwPollVer = {};
 function _rvwStopPoll(){
@@ -9499,26 +9511,30 @@ function _rvwStartPoll(){
   _rvwPollTimer = setInterval(_rvwPollTick, 30000);
 }
 async function _rvwPollTick(){
+  if(document.hidden) return;   // 백그라운드 탭은 폴링 생략
   try{
     let dirty = false;
-    const vMg = await cloudKvVersion(REVIEW_MANAGE_KEY);
-    if(vMg !== undefined){
-      if(_rvwPollVer.manage !== undefined && vMg !== _rvwPollVer.manage){
-        _rvwManage = (await cloudKvLoad(REVIEW_MANAGE_KEY)) || {};
-        dirty = true;
-      }
-      _rvwPollVer.manage = vMg;
+    // 열람 중인 달이 몇 개든 버전 확인은 쿼리 1건으로 묶어서 보낸다(egress 절약).
+    const monthKeys = Object.keys(_rvwMonths).map(rvwMKey);
+    const versions = await cloudKvVersions([REVIEW_MANAGE_KEY, ...monthKeys]);
+    if(versions === undefined) return; // 조회 오류 — 다음 주기에 재시도
+
+    const vMg = Object.prototype.hasOwnProperty.call(versions, REVIEW_MANAGE_KEY) ? versions[REVIEW_MANAGE_KEY] : null;
+    if(_rvwPollVer.manage !== undefined && vMg !== _rvwPollVer.manage){
+      _rvwManage = (await cloudKvLoad(REVIEW_MANAGE_KEY)) || {};
+      dirty = true;
     }
+    _rvwPollVer.manage = vMg;
+
     for(const m of Object.keys(_rvwMonths)){
       const key = 'm:'+m;
-      const v = await cloudKvVersion(rvwMKey(m));
-      if(v !== undefined){
-        if(_rvwPollVer[key] !== undefined && v !== _rvwPollVer[key]){
-          _rvwMonths[m] = (await cloudKvLoad(rvwMKey(m))) || {};
-          dirty = true;
-        }
-        _rvwPollVer[key] = v;
+      const mk = rvwMKey(m);
+      const v = Object.prototype.hasOwnProperty.call(versions, mk) ? versions[mk] : null;
+      if(_rvwPollVer[key] !== undefined && v !== _rvwPollVer[key]){
+        _rvwMonths[m] = (await cloudKvLoad(mk)) || {};
+        dirty = true;
       }
+      _rvwPollVer[key] = v;
     }
     if(dirty) rvwRerenderCurrentTab();
   }catch(e){ console.warn('리뷰관리 실시간 갱신 폴링 실패', e); }
