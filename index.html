@@ -4877,6 +4877,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-tbl-head" style="flex-wrap:wrap;gap:6px;padding:8px 16px;">
             <span class="rev-tbl-title">🏆 제품별 매출 순위</span>
             <span style="font-size:11px;color:var(--tx2);" id="rgProdSub"></span>
+            <input type="text" id="rgProdSearch" placeholder="상품명 또는 옵션 ID 검색" oninput="setRgProdSearch(this.value)" style="font-size:11px;padding:3px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);width:180px;">
             <div style="display:flex;align-items:center;gap:6px;margin-left:auto;font-size:11px;color:var(--tx2);">
               기간
               <input type="date" id="rgProdFrom" onchange="setRgProdRange()" style="font-size:11px;padding:3px 6px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);">
@@ -15473,6 +15474,12 @@ function setRgTypeFilter(val){
   _rgProdPage=0;
   renderRgProdSection();
 }
+let _rgProdSearch='';
+function setRgProdSearch(val){
+  _rgProdSearch=(val||'').trim().toLowerCase();
+  _rgProdPage=0;
+  renderRgProdSection();
+}
 
 function renderRgContent(){
   const ym=_rgSelMonth; if(!ym) return;
@@ -15642,7 +15649,17 @@ async function renderRgProdSection(){
     typeSel.innerHTML='<option value="ALL">전체</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');
     typeSel.value=_rgTypeFilter;
   }
-  const viewList=_rgTypeFilter==='ALL'?optList:optList.filter(o=>o.itemType===_rgTypeFilter);
+  let viewList=_rgTypeFilter==='ALL'?optList:optList.filter(o=>o.itemType===_rgTypeFilter);
+  if(_rgProdSearch){
+    const q=_rgProdSearch;
+    viewList=viewList.filter(o=>
+      (o.displayName&&o.displayName.toLowerCase().includes(q))||
+      (o.productName&&o.productName.toLowerCase().includes(q))||
+      (o.optionName&&o.optionName.toLowerCase().includes(q))||
+      (o.mappedName&&o.mappedName.toLowerCase().includes(q))||
+      (o.optionId&&String(o.optionId).toLowerCase().includes(q))
+    );
+  }
 
   const grossQtyTotal=viewList.reduce((s,o)=>s+o.grossQty,0);
   const cancelQtyTotal=viewList.reduce((s,o)=>s+o.cancelQty,0);
