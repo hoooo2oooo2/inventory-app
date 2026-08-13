@@ -6866,9 +6866,13 @@ async function _logiCheckNew(){ await _logiCheckNewNotice(); await _logiCheckNew
 let _logiVer = { notices:undefined, handovers:undefined };
 async function _logiPollTick(){
   if(document.hidden) return;   // 보이지 않는 탭은 폴링 정지(돌아오면 visibilitychange로 1회 점검)
-  const [vn, vh] = await Promise.all([cloudKvVersion('logi_notices'), cloudKvVersion('logi_handovers')]);
-  if(vn!==undefined && vn!==_logiVer.notices){ _logiVer.notices = vn; await _logiCheckNewNotice(); }
-  if(vh!==undefined && vh!==_logiVer.handovers){ _logiVer.handovers = vh; await _logiCheckNewHandover(); }
+  // 공지사항 + 전달사항 버전 확인을 쿼리 1건으로 묶는다(예전엔 매 틱 2건씩, 2026-08-13 수정).
+  const versions = await cloudKvVersions(['logi_notices','logi_handovers']);
+  if(versions === undefined) return; // 조회 오류 — 다음 주기에 재시도
+  const vn = Object.prototype.hasOwnProperty.call(versions,'logi_notices') ? versions.logi_notices : null;
+  const vh = Object.prototype.hasOwnProperty.call(versions,'logi_handovers') ? versions.logi_handovers : null;
+  if(vn!==_logiVer.notices){ _logiVer.notices = vn; await _logiCheckNewNotice(); }
+  if(vh!==_logiVer.handovers){ _logiVer.handovers = vh; await _logiCheckNewHandover(); }
 }
 // 다른 PC에 "방금 변경됨" 신호 전송 (Supabase Broadcast — DB realtime publication 불필요)
 function _logiBroadcast(){
