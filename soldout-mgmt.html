@@ -695,6 +695,7 @@ const LONG_SOLDOUT_DAYS = 30;
 function longSoldoutList(){
   const out = [];
   state.products.forEach(p=>{
+    if(p.discontinued) return;
     state.sites.forEach(s=>{
       const cell = getCell(p, s.id);
       if(!cell.soldout) return;
