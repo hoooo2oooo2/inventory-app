@@ -5629,10 +5629,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <option value="">사용 안 함 (직접 입력한 택배비 사용)</option>
         <option value="30000">판매가 3만원 이상 무료배송 (3,000원 부과)</option>
         <option value="50000">판매가 5만원 이상 무료배송 (3,000원 부과)</option>
+        <option value="FREE">무료배송 (3,000원 부과)</option>
+        <option value="PAID">유료배송 (0원 부과)</option>
+        <option value="LARGE">대형 무료배송 (5,000원 부과)</option>
+        <option value="ODD">이형 무료배송 (13,000원 부과)</option>
       </select>
     </div>
     <div class="field" id="shipFeeField"><label>택배비 (원) *</label><input id="shipFee" type="number" min="0" placeholder="예: 3000"></div>
-    <p style="font-size:11px;color:var(--tx2);margin:6px 0 0;">무료배송 기준을 선택하면 해당 판매가 이상 주문에는 3,000원이, 미만 주문에는 0원이 자동 부과됩니다.<br>저장 시 해당 판매처·상품번호의 기존 통합 데이터 배송비·마진이 즉시 재계산됩니다.</p>
+    <p style="font-size:11px;color:var(--tx2);margin:6px 0 0;">판매가 기준(3만원↑/5만원↑)을 선택하면 해당 판매가 이상 주문에는 3,000원, 미만 주문에는 0원이 자동 부과됩니다.<br>무료배송/유료배송/대형 무료배송/이형 무료배송은 판매가와 무관하게 각각 3,000원/0원/5,000원/13,000원이 고정 부과됩니다.<br>저장 시 해당 판매처·상품번호의 기존 통합 데이터 배송비·마진이 즉시 재계산됩니다.</p>
     <div class="ma">
       <button class="btn" onclick="closeModal('shipModal')">취소</button>
       <button class="btn btn-pr" onclick="saveShipModal()">저장</button>
@@ -11950,6 +11954,21 @@ let _shipData = [];          // 택배비 [{id,channel,item_no,item_name,fee}]
 let _shipMap = {};           // `channel|item_no` → fee
 let _shipLoaded = false;
 let _shipTableExists = true; // shipping_fees 테이블 존재 여부
+// 무료배송기준(freeship) 값: 숫자 문자열('30000'/'50000')이면 "판매가 그 금액 이상일 때만 무료배송"
+// (이상이면 3,000원 부과, 미만이면 0원 — 기존 방식) / 아래 4개 키는 판매가와 무관하게 항상 고정 금액 부과
+const SHIP_FREESHIP_FLAT = {FREE:3000, PAID:0, LARGE:5000, ODD:13000};
+const SHIP_FREESHIP_LABELS = {FREE:'무료배송', PAID:'유료배송', LARGE:'대형 무료배송', ODD:'이형 무료배송'};
+// freeship 설정과 판매가로 실제 부과할 택배비를 계산 (recalc·업로드 파싱 공용)
+function shipFreeshipFee(freeship, salePrice){
+  if(!freeship) return 0;
+  if(freeship in SHIP_FREESHIP_FLAT) return SHIP_FREESHIP_FLAT[freeship];
+  const th=Number(freeship);
+  return (salePrice||0) >= th ? 3000 : 0;
+}
+// 관리 화면 표/모달에서 판매가와 무관하게 보여줄 대표 금액 (가격기준형은 기존과 동일하게 3,000원으로 표시)
+function shipFreeshipDisplayFee(freeship){
+  return (freeship in SHIP_FREESHIP_FLAT) ? SHIP_FREESHIP_FLAT[freeship] : 3000;
+}
 let _revTrendChart = null;
 let _revDnutChart = null;
 let _revDailyChart = null;
@@ -12058,13 +12077,17 @@ function renderShipTable(){
     <td>${r.channel}</td>
     <td style="font-size:11px;">${r.item_no}</td>
     <td style="font-size:11px;">${r.item_name||''}</td>
-    <td style="text-align:right;font-weight:600;">${r.freeship? '3,000원' : (r.fee||0).toLocaleString()+'원'}</td>
+    <td style="text-align:right;font-weight:600;">${r.freeship? shipFreeshipDisplayFee(r.freeship).toLocaleString()+'원' : (r.fee||0).toLocaleString()+'원'}</td>
     <td style="text-align:center;"><input type="checkbox" ${r.perUnit?'checked':''} ${r.freeship?'disabled':''} onchange="toggleShipPerUnit(${r.id},this.checked)" title="체크 시 구매수량×배송비"></td>
     <td style="text-align:center;">
-      <select style="font-size:11px;padding:2px 4px;" onchange="toggleShipFreeship(${r.id},this.value)" title="선택 시 판매가 기준 무료배송 부과">
+      <select style="font-size:11px;padding:2px 4px;" onchange="toggleShipFreeship(${r.id},this.value)" title="선택 시 판매가 기준 또는 상품 유형별 고정 택배비 부과">
         <option value="" ${!r.freeship?'selected':''}>미사용</option>
         <option value="30000" ${r.freeship==='30000'?'selected':''}>3만원↑</option>
         <option value="50000" ${r.freeship==='50000'?'selected':''}>5만원↑</option>
+        <option value="FREE" ${r.freeship==='FREE'?'selected':''}>무료배송</option>
+        <option value="PAID" ${r.freeship==='PAID'?'selected':''}>유료배송</option>
+        <option value="LARGE" ${r.freeship==='LARGE'?'selected':''}>대형무료</option>
+        <option value="ODD" ${r.freeship==='ODD'?'selected':''}>이형무료</option>
       </select>
     </td>
     <td style="text-align:center;white-space:nowrap;">
@@ -12087,7 +12110,7 @@ async function toggleShipPerUnit(id, checked){
 async function toggleShipFreeship(id, value){
   const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
   r.freeship=value;
-  if(value){ r.perUnit=false; r.fee=3000; }
+  if(value){ r.perUnit=false; r.fee=shipFreeshipDisplayFee(value); }
   await _shipPersist();
   const n=await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:r.perUnit, freeship:r.freeship});
   renderShipTable();
@@ -12097,7 +12120,7 @@ async function toggleShipFreeship(id, value){
 function _shipModalFreeshipChange(){
   const fs=document.getElementById('shipFreeship').value;
   const feeField=document.getElementById('shipFeeField');
-  if(fs){ feeField.style.display='none'; document.getElementById('shipFee').value=3000; }
+  if(fs){ feeField.style.display='none'; document.getElementById('shipFee').value=shipFreeshipDisplayFee(fs); }
   else { feeField.style.display=''; }
 }
 
@@ -12130,7 +12153,7 @@ async function saveShipModal(){
   const item_no=document.getElementById('shipItemNo').value.trim();
   const item_name=document.getElementById('shipName').value.trim();
   const freeship=document.getElementById('shipFreeship').value;
-  const fee=freeship ? 3000 : (parseInt(document.getElementById('shipFee').value)||0);
+  const fee=freeship ? shipFreeshipDisplayFee(freeship) : (parseInt(document.getElementById('shipFee').value)||0);
   if(!channel||!item_no){ alert('판매처와 상품번호는 필수입니다.'); return; }
   const btn=document.querySelector('#shipModal .btn-pr');
   if(btn){ btn.disabled=true; btn.textContent='저장 중...'; }
@@ -12150,7 +12173,7 @@ async function saveShipModal(){
     closeModal('shipModal');
     // 해당 판매처·상품번호의 통합 데이터 배송비·마진 즉시 재계산
     const n=await recalcShippingForKey(channel,item_no,{fee,perUnit,freeship});
-    addHistory({menu:'매출관리',type:'edit',code:item_no,name:item_name||channel,desc:`배송비 ${id?'수정':'등록'} (${channel})`,before:'-',after:freeship?`무료배송기준 ${Number(freeship).toLocaleString()}원↑ (3,000원 부과)`:`${fee}원`,user:'수동'});
+    addHistory({menu:'매출관리',type:'edit',code:item_no,name:item_name||channel,desc:`배송비 ${id?'수정':'등록'} (${channel})`,before:'-',after:freeship?`${SHIP_FREESHIP_LABELS[freeship]||(Number(freeship).toLocaleString()+'원↑ 무료배송')} (${fee.toLocaleString()}원 부과)`:`${fee}원`,user:'수동'});
     alert(`저장 완료. 통합 데이터 ${n}건의 배송비·마진을 재계산했습니다.`);
   }catch(e){ alert('저장 실패: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='저장'; } }
@@ -12224,7 +12247,7 @@ async function recalcShippingForKey(channel,item_no,feeObj){
       if(r.item_no!==item_no) continue;
       let newFee;
       if(feeObj!=null){
-        if(feeObj.freeship){ newFee = (r.sale_price||0) >= Number(feeObj.freeship) ? 3000 : 0; }
+        if(feeObj.freeship){ newFee = shipFreeshipFee(feeObj.freeship, r.sale_price||0); }
         else newFee = feeObj.perUnit ? (feeObj.fee||0)*(r.order_qty||0) : (feeObj.fee||0);
       }
       else newFee = calcShippingFee(channel,r.item_type,r.sale_price||0);
@@ -18667,12 +18690,13 @@ async function parseChannelFile(file, channelName){
     settle = Math.round(settle);
 
     // 배송비: 택배비 테이블(판매처+상품번호) 우선, 없으면 판매일보 함수
-    //  - 무료배송기준(freeship) 설정 시: 판매가가 기준 이상이면 3,000원, 미만이면 0원
+    //  - 무료배송기준(freeship) 설정 시: 가격기준형(숫자)은 판매가 기준 이상 3,000원/미만 0원,
+    //    고정형(FREE/PAID/LARGE/ODD)은 판매가와 무관하게 3,000/0/5,000/13,000원 고정 부과
     //  - 수량비례(perUnit) 체크 시: 배송비 × 구매수량
     const itemNo    = (map.itemNo==null) ? '' : _s(r[map.itemNo]);
     const manual    = _shipMap[`${channelName}|${itemNo}`];
     const shipping  = manual
-      ? (manual.freeship ? (salePrice >= Number(manual.freeship) ? 3000 : 0)
+      ? (manual.freeship ? shipFreeshipFee(manual.freeship, salePrice)
                           : (manual.perUnit ? (manual.fee||0)*orderQty : (manual.fee||0)))
       : calcShippingFee(channelName, itemType, salePrice);
 
