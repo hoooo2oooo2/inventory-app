@@ -1242,6 +1242,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* 소장재고 체크리스트 — 실무자가 가장 많이 쓰는 메인 영역: 스크롤 없이 한눈에 보이도록 크게 */
 .lh2-main{max-height:calc(100vh - 160px);}
 .lh2-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;gap:10px;}
+.lh2-chk-search{flex:1;max-width:240px;padding:7px 12px;border:1px solid var(--bd);border-radius:9px;font-size:12.5px;color:var(--tx);background:var(--bg);}
 .lh2-title{font-size:17px;font-weight:800;color:var(--tx);letter-spacing:-0.01em;}
 .lh2-add{padding:7px 14px;border:none;border-radius:9px;background:var(--pr);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;}
 .lh2-add:hover{filter:brightness(1.05);}
@@ -2084,6 +2085,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <section class="lh2-card lh2-main">
         <div class="lh2-head">
           <span class="lh2-title">✅ 소장재고 체크리스트</span>
+          <input id="lhChkSearch" class="lh2-chk-search" type="text" placeholder="🔍 제품명 검색" oninput="logiRenderChk()">
           <button class="lh2-donebtn" id="logiChkDoneBtn" onclick="logiChkDoneList()">완료목록</button>
         </div>
         <div class="lh2-chk-add">
@@ -8267,8 +8269,13 @@ function logiRenderChk(){
   const doneCount = all.filter(c=>c.checked).length;
   const btn = document.getElementById('logiChkDoneBtn');
   if(btn) btn.textContent = `완료목록${doneCount?` (${doneCount})`:''}`;
-  const list = all.filter(c=>!c.checked);
-  if(!list.length){ tb.innerHTML = `<tr><td colspan="4" class="logi-empty" style="padding:20px 0;">진행 중인 품목이 없습니다. 제품명과 수량을 입력해 추가하세요.</td></tr>`; return; }
+  let list = all.filter(c=>!c.checked);
+  const q = (document.getElementById('lhChkSearch')?.value||'').trim().toLowerCase();
+  if(q) list = list.filter(c=>(c.name||'').toLowerCase().includes(q));
+  if(!list.length){
+    tb.innerHTML = `<tr><td colspan="4" class="logi-empty" style="padding:20px 0;">${q?'검색 결과가 없습니다.':'진행 중인 품목이 없습니다. 제품명과 수량을 입력해 추가하세요.'}</td></tr>`;
+    return;
+  }
   tb.innerHTML = list.map(c=>{
     const meta = `등록자 ${_logiEsc(c.createdBy||'-')} · ${_logiEsc(c.createdAt||'-')} · 초기수량 ${c.initQty==null?'-':_lbxNum(c.initQty)}`;
     return `<tr class="${c.checked?'chk-done':''}"${c.checked?'':` style="background:${_logiCardColor(c.id)};"`}>
