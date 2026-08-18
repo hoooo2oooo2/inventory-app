@@ -844,6 +844,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-kpi-add:hover{border-color:#059669;color:#059669;}
 .cmb-kpi-empty{font-size:11px;color:var(--tx2);padding:4px 2px;align-self:center;}
 .cmb-kpi-grp-n{font-size:9.5px;opacity:.7;margin-left:1px;}
+.cmb-kpi-card.cmb-kpi-grp-active{border-color:#3182F6;background:#EEF4FF;}
+.cmb-kpi-card.cmb-kpi-grp-active .cmb-kpi-card-nm{color:#3182F6;}
 /* 위탁 배송건 */
 .cs-tabcontent{height:calc(100vh - 140px);overflow-y:auto;padding:16px 18px;}
 .cs-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
@@ -2716,8 +2718,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- 가운데: 선택 제품 리스트 (1/3) -->
       <div class="cmb-sel card">
-        <div class="cmb-cat-bar" id="cmbKpiGroupBar" style="border-bottom:0.5px solid var(--bd);"></div>
-        <div class="cmb-kpi-bar" id="cmbKpiBar"></div>
+        <div class="cmb-kpi-bar" id="cmbKpiGroupBar"></div>
+        <div class="cmb-kpi-bar" id="cmbKpiBar" style="display:none;"></div>
         <div class="cmb-card-head">
           <span>📋 선택 제품 리스트 <b id="cmbEditFlag" style="display:none;color:#D97706;font-size:11px;font-weight:700;margin-left:6px;"></b></span>
           <div style="display:flex;gap:6px;">
@@ -24188,25 +24190,26 @@ async function cmbInitKpiBars(){
   cmbRenderKpiBar();
 }
 // 대분류 칩 바 — 클릭하면 그 대분류의 카드만 아래에 표시(전체/미분류 포함)
+// 대분류가 예전 KPI 카드 자리를 차지 — 대분류 카드를 클릭해야 그 밑(cmbKpiBar)에 소분류 카드가 펼쳐진다(아코디언, 같은 대분류 재클릭 시 접힘)
 function cmbRenderKpiGroupBar(){
   const bar = document.getElementById('cmbKpiGroupBar'); if(!bar) return;
   const ungroupedN = _cmbKpiCards.filter(c=>!c.groupId).length;
-  let html = `<button class="cmb-cat-chip ${_cmbActiveKpiGroup===''?'active':''}" onclick="cmbKpiGroupFilter('')">전체 <span class="cmb-kpi-grp-n">${_cmbKpiCards.length}</span></button>`;
-  html += _cmbKpiGroups.map(g=>{
-    const n = _cmbKpiCards.filter(c=>c.groupId===g.id).length;
-    return `<button class="cmb-cat-chip ${_cmbActiveKpiGroup===g.id?'active':''}" onclick="cmbKpiGroupFilter('${_cmbEsc(g.id)}')">${_cmbEsc(g.name)} <span class="cmb-kpi-grp-n">${n}</span></button>`;
-  }).join('');
-  if(ungroupedN>0){
-    html += `<button class="cmb-cat-chip ${_cmbActiveKpiGroup==='__UNGROUPED__'?'active':''}" onclick="cmbKpiGroupFilter('__UNGROUPED__')">미분류 <span class="cmb-kpi-grp-n">${ungroupedN}</span></button>`;
-  }
-  html += `<button class="cmb-cat-add" onclick="cmbKpiAddGroup()">＋ 대분류 추가</button>`;
-  bar.innerHTML = html;
+  const grpCard = (gid, label, n) => `
+    <div class="cmb-kpi-card ${_cmbActiveKpiGroup===gid?'cmb-kpi-grp-active':''}" onclick="cmbKpiGroupFilter('${_cmbEsc(gid)}')" title="클릭하면 아래에 이 대분류의 카드가 펼쳐집니다">
+      <div class="cmb-kpi-card-nm">📁 ${_cmbEsc(label)}</div>
+      <div class="cmb-kpi-card-meta">${n}개 카드</div>
+    </div>`;
+  let html = grpCard('__ALL__', '전체', _cmbKpiCards.length);
+  html += _cmbKpiGroups.map(g=>grpCard(g.id, g.name, _cmbKpiCards.filter(c=>c.groupId===g.id).length)).join('');
+  if(ungroupedN>0) html += grpCard('__UNGROUPED__', '미분류', ungroupedN);
+  const emptyHtml = _cmbKpiGroups.length ? '' : `<span class="cmb-kpi-empty">대분류를 추가하고 그 안에 카드를 담아보세요</span>`;
+  bar.innerHTML = emptyHtml + html + `<button class="cmb-kpi-add" onclick="cmbKpiAddGroup()">＋ 대분류 추가</button>`;
 }
+// 대분류 클릭 → 토글(같은 걸 다시 누르면 접힘) → 밑의 소분류 바를 펼치거나 접는다
 function cmbKpiGroupFilter(gid){
-  _cmbActiveKpiGroup = gid;
+  _cmbActiveKpiGroup = (_cmbActiveKpiGroup===gid) ? '' : gid;
   cmbRenderKpiGroupBar();
   cmbRenderKpiBar();
-  const bar = document.getElementById('cmbKpiBar'); if(bar) bar.scrollLeft = 0;
 }
 async function cmbKpiAddGroup(){
   const name = (prompt('대분류 이름을 입력하세요.')||'').trim();
@@ -24220,11 +24223,14 @@ async function cmbKpiAddGroup(){
   toast(`'${name}' 대분류를 추가했습니다.`);
   cmbKpiAssignOpen(group.id); // 곧바로 기존 카드를 이 대분류로 옮길 수 있는 모달을 연다
 }
+// 대분류 밑에 펼쳐지는 소분류(KPI 카드) 바 — 대분류가 선택되어 있을 때만 보인다
 function cmbRenderKpiBar(){
   const bar = document.getElementById('cmbKpiBar'); if(!bar) return;
+  if(!_cmbActiveKpiGroup){ bar.style.display='none'; bar.innerHTML=''; return; }
+  bar.style.display='flex';
   let list = _cmbKpiCards;
   if(_cmbActiveKpiGroup==='__UNGROUPED__') list = list.filter(c=>!c.groupId);
-  else if(_cmbActiveKpiGroup) list = list.filter(c=>c.groupId===_cmbActiveKpiGroup);
+  else if(_cmbActiveKpiGroup!=='__ALL__') list = list.filter(c=>c.groupId===_cmbActiveKpiGroup);
   const cardsHtml = list.map(s=>`
     <div class="cmb-kpi-card" onclick="cmbKpiAdd('${_cmbEsc(s.id)}')" title="클릭하면 이 카드의 부속이 선택 제품 리스트에 추가됩니다">
       <button class="cmb-kpi-move" onclick="event.stopPropagation();cmbKpiMoveOpen('${_cmbEsc(s.id)}')" title="다른 대분류로 이동">⇄</button>
@@ -24236,6 +24242,7 @@ function cmbRenderKpiBar(){
     ? `<span class="cmb-kpi-empty">이 대분류에는 카드가 없습니다.</span>`
     : `<span class="cmb-kpi-empty">카드를 추가하면 여기서 클릭 한 번으로 부속을 불러올 수 있어요</span>`);
   bar.innerHTML = emptyHtml + cardsHtml + `<button class="cmb-kpi-add" onclick="cmbKpiAddCard()">＋ 카드 추가</button>`;
+  bar.scrollLeft = 0;
 }
 // KPI 카드 클릭 → 해당 카드의 부속을 선택 제품 리스트에 병합 추가(기존 항목은 수량 합산)
 function cmbKpiAdd(id){
@@ -24259,7 +24266,7 @@ async function cmbKpiAddCard(){
   if(!name) return;
   const total = _cmbSel.reduce((a,s)=>a+s.amount,0);
   const items = _cmbSel.map(s=>({...s}));
-  const groupId = (_cmbActiveKpiGroup && _cmbActiveKpiGroup!=='__UNGROUPED__') ? _cmbActiveKpiGroup : null;
+  const groupId = (_cmbActiveKpiGroup && _cmbActiveKpiGroup!=='__UNGROUPED__' && _cmbActiveKpiGroup!=='__ALL__') ? _cmbActiveKpiGroup : null;
   _cmbKpiCards.unshift({
     id: Date.now()+'_'+Math.random().toString(36).slice(2,7),
     name, items, total, date:_cmbToday(),
