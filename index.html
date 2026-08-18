@@ -772,6 +772,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-table tbody td.cmb-cd{text-align:left;font-size:10.5px;color:var(--tx2);font-family:ui-monospace,monospace;}
 .cmb-table tbody tr:hover{background:var(--bg2);}
 .cmb-table tbody tr.cmb-on{background:#EEF4FF;}
+.cmb-table tbody tr.cmb-ss{background:#E0F7FF;}
+.cmb-table tbody tr.cmb-ss.cmb-on{background:#C7ECFC;}
 .cmb-qty-inp{width:46px;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
 .cmb-qty-inp:focus{border-color:#3182F6;background:var(--bg);}
 .cmb-price-inp{width:56px;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
@@ -23633,6 +23635,11 @@ let _cmbSub = 'single';
 
 function _cmbEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function _cmbWon(n){ return (Math.round(Number(n)||0)).toLocaleString('ko-KR')+'원'; }
+// 단가수정 권한 — admin / 조신성 계정만 (다른 직원이 실수로 단가를 바꾸는 사고 방지)
+function _cmbIsPriceAdmin(){
+  const u = window.__CURRENT_USER; if(!u) return false;
+  return u.username==='admin' || u.name==='조신성' || u.username==='조신성';
+}
 
 // 하위탭 전환
 function pcSwitchSub(sub){
@@ -23646,6 +23653,9 @@ function pcSwitchSub(sub){
 
 // 진입 초기화
 function cmbInit(){
+  const priceBtn = document.getElementById('cmbPriceEditBtn');
+  if(priceBtn) priceBtn.style.display = _cmbIsPriceAdmin() ? '' : 'none';
+  if(!_cmbIsPriceAdmin()) _cmbPriceEditMode = false;
   if(!_cmbEditsLoaded){ cmbLoadProductEdits().then(()=>cmbRenderList()); }
   cmbRenderList();
   cmbRenderSel();
@@ -23672,7 +23682,10 @@ function cmbRenderList(){
     const supCell = _cmbPriceEditMode
       ? `<input type="number" min="0" class="cmb-price-inp" value="${p.supply!=null?p.supply:''}" placeholder="—" onchange="cmbEditPrice('${_cmbEsc(p.code)}','supply',this.value)">`
       : `<span class="cmb-price-disp">${p.supply!=null?Number(p.supply).toLocaleString('ko-KR'):'—'}</span>`;
-    return `<tr class="${st.checked?'cmb-on':''}" data-code="${_cmbEsc(p.code)}">
+    const delCell = _cmbPriceEditMode ? `<button class="cmb-del-x" title="제품 삭제" onclick="cmbDeleteProduct('${_cmbEsc(p.code)}')">✕</button>` : '';
+    const isSS = /^ss/i.test(p.code||'');
+    const rowCls = [st.checked?'cmb-on':'', isSS?'cmb-ss':''].filter(Boolean).join(' ');
+    return `<tr class="${rowCls}" data-code="${_cmbEsc(p.code)}">
       <td style="text-align:center;"><input type="checkbox" ${st.checked?'checked':''} onchange="cmbCheck('${_cmbEsc(p.code)}',this.checked)"></td>
       <td class="cmb-cd">${_cmbEsc(p.code)}</td>
       <td class="cmb-nm">${_cmbEsc(p.name)}</td>
@@ -23680,7 +23693,7 @@ function cmbRenderList(){
       <td>${arrCell}</td>
       <td>${supCell}</td>
       <td><input type="number" min="0" class="cmb-qty-inp" value="${st.qty!=null?_cmbEsc(st.qty):''}" placeholder="0" oninput="cmbQty('${_cmbEsc(p.code)}',this.value)"></td>
-      <td style="text-align:center;"><button class="cmb-del-x" title="제품 삭제" onclick="cmbDeleteProduct('${_cmbEsc(p.code)}')">✕</button></td>
+      <td style="text-align:center;">${delCell}</td>
     </tr>`;
   }).join('');
   if(!shown.length) tb.innerHTML = `<tr><td colspan="8" class="cmb-empty">검색 결과가 없습니다.</td></tr>`;
@@ -23727,6 +23740,7 @@ let _cmbEditsLoaded = false;
 let _cmbPriceEditMode = false; // true인 동안만 표에서 한국단가/공급가 직접 수정 가능
 
 function cmbTogglePriceEdit(){
+  if(!_cmbIsPriceAdmin()){ toast('단가수정은 관리자 계정만 가능합니다.'); return; }
   _cmbPriceEditMode = !_cmbPriceEditMode;
   const btn = document.getElementById('cmbPriceEditBtn');
   if(btn){
@@ -23762,6 +23776,7 @@ async function cmbLoadProductEdits(){
 
 // 표에서 한국단가/공급가 셀 직접 수정 → override로 저장(다른 PC에도 즉시 공유)
 async function cmbEditPrice(code, field, val){
+  if(!_cmbIsPriceAdmin()){ toast('단가수정은 관리자 계정만 가능합니다.'); cmbRenderList(); return; }
   const n = val==='' ? null : Math.round(Number(val));
   if(val!=='' && (isNaN(n) || n<0)){ toast('올바른 숫자를 입력하세요.'); cmbRenderList(); return; }
   const p = COMBO_PRODUCTS.find(x=>x.code===code); if(!p) return;
@@ -23827,6 +23842,7 @@ async function cmbAddProdConfirm(){
 }
 
 async function cmbDeleteProduct(code){
+  if(!_cmbIsPriceAdmin()){ toast('제품 삭제는 관리자 계정만 가능합니다.'); return; }
   const p = COMBO_PRODUCTS.find(x=>x.code===code); if(!p) return;
   if(!confirm(`[${p.code}] ${p.name} 제품을 목록에서 삭제할까요?\n(이미 저장된 세트·리스트에는 영향 없음)`)) return;
   const isExtra = _cmbExtra.some(x=>x.code===code);
