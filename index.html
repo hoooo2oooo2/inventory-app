@@ -5580,6 +5580,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="field"><label>공급가(단가, 원)</label><input id="bdPrice" type="number" min="0" placeholder="0"></div>
     </div>
     <div class="field"><label>상품명 *</label><input id="bdName" placeholder="상품명을 입력하세요"></div>
+    <div class="field" id="bdEffDateField" style="display:none;">
+      <label>공급가 변경 반영 시작일</label>
+      <input id="bdEffDate" type="date">
+      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">선택한 날짜부터의 통합 데이터에 새 공급가·마진이 반영됩니다.</div>
+    </div>
     <div class="ma">
       <button class="btn" onclick="closeModal('bdModal')">취소</button>
       <button class="btn btn-pr" onclick="saveBdModal()">저장</button>
@@ -18072,6 +18077,7 @@ function openBdAdd(){
   document.getElementById('bdName').value='';
   document.getElementById('bdPrice').value='';
   document.getElementById('bdEditKey').value='';
+  document.getElementById('bdEffDateField').style.display='none';
   openModal('bdModal');
 }
 
@@ -18086,23 +18092,28 @@ function openBdEdit(id){
   document.getElementById('bdName').value=r.name||'';
   document.getElementById('bdPrice').value=r.price!=null?r.price:'';
   document.getElementById('bdEditKey').value=String(r.id);
+  const today=new Date();
+  const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  document.getElementById('bdEffDate').value=defEffDate;
+  document.getElementById('bdEffDateField').style.display='';
   openModal('bdModal');
 }
 
 // 백데이터 공급가 변경 시 매칭된 revenue 레코드 일괄 재계산
-// 수정일 기준 "해당 월 1일"부터 이후 데이터에 반영
+// 사용자가 지정한 반영 시작일(effDate, 'YYYY-MM-DD')부터 이후 데이터에 반영 (미지정 시 이번 달 1일)
 //  ※ revenue.sale_date 는 "MM-DD" 형식, year 는 별도 컬럼
-async function propagateBdPriceChange(bdRow, oldPrice){
+async function propagateBdPriceChange(bdRow, oldPrice, effDate){
   const newPrice = bdRow.price!=null?bdRow.price:0;
   if(newPrice===(oldPrice!=null?oldPrice:0)) return 0;
   const code = bdRow.code||'';
   const isSharedCode = SHARED_BD_CODES.has(code.toLowerCase())||!code;
   const bdNameKey = normName(bdRow.name);
 
-  // 오늘 기준: 올해 + 이번 달 1일(MM-01) 이후
   const today = new Date();
-  const curYear  = today.getFullYear();
-  const monthMD  = `${String(today.getMonth()+1).padStart(2,'0')}-01`; // 예: "06-01"
+  const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  const eff = /^\d{4}-\d{2}-\d{2}$/.test(effDate||'') ? effDate : defEffDate;
+  const curYear  = parseInt(eff.slice(0,4),10);
+  const monthMD  = eff.slice(5); // 예: "06-01" 또는 사용자가 지정한 "MM-DD"
 
   let revRows=[];
   try{
@@ -18316,8 +18327,9 @@ async function saveBdModal(){
         // 공급가 변경 시 매칭된 revenue 단가·마진 일괄 재계산
         if(price !== oldPrice){
           if(saveBtn) saveBtn.textContent='단가 반영 중...';
+          const effDate=document.getElementById('bdEffDate').value;
           try{
-            const cnt=await propagateBdPriceChange(row, oldPrice);
+            const cnt=await propagateBdPriceChange(row, oldPrice, effDate);
             if(cnt>0) console.log(`백데이터 단가 변경 → revenue ${cnt}건 업데이트`);
           } catch(pe){ console.warn('단가 전파 실패:',pe); }
         }
