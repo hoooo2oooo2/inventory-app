@@ -2679,8 +2679,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
         <div class="cmb-left-meta" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span>총 <span id="cmbCount">0</span>개 · 체크 <b id="cmbCheckedN">0</b>개</span>
-          <div style="display:flex;gap:6px;">
-            <button class="cmb-cat-add" id="cmbPriceEditBtn" onclick="cmbTogglePriceEdit()" title="켜면 한국단가/공급가를 표에서 직접 수정할 수 있습니다">🔒 단가수정</button>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div id="cmbAdminTools" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span id="cmbUploadMetaTxt" style="font-size:10px;color:var(--tx2);white-space:nowrap;"></span>
+              <button class="cmb-cat-add" onclick="cmbDownloadTemplate()" title="현재 제품 목록을 엑셀로 다운로드 — 단가 수정 후 그대로 재업로드하면 됩니다">⬇ 양식</button>
+              <button class="cmb-cat-add" onclick="document.getElementById('cmbUploadInput').click()" title="엑셀 업로드로 한국단가/공급가 일괄 수정 + 신제품 일괄 추가">📥 엑셀 업로드</button>
+              <input type="file" id="cmbUploadInput" accept=".xlsx,.xls" style="display:none;" onchange="cmbHandleUpload(event)">
+              <button class="cmb-cat-add" id="cmbPriceEditBtn" onclick="cmbTogglePriceEdit()" title="켜면 한국단가/공급가를 표에서 직접 수정할 수 있습니다">🔒 단가수정</button>
+            </div>
             <button class="cmb-cat-add" onclick="cmbAddProdOpen()" title="새 제품을 목록에 추가">＋ 제품 추가</button>
           </div>
         </div>
@@ -23653,9 +23659,11 @@ function pcSwitchSub(sub){
 
 // 진입 초기화
 function cmbInit(){
-  const priceBtn = document.getElementById('cmbPriceEditBtn');
-  if(priceBtn) priceBtn.style.display = _cmbIsPriceAdmin() ? '' : 'none';
-  if(!_cmbIsPriceAdmin()) _cmbPriceEditMode = false;
+  const adminTools = document.getElementById('cmbAdminTools');
+  const isAdmin = _cmbIsPriceAdmin();
+  if(adminTools) adminTools.style.display = isAdmin ? 'flex' : 'none';
+  if(!isAdmin) _cmbPriceEditMode = false;
+  if(isAdmin && !_cmbUploadMetaLoaded) cmbLoadUploadMeta();
   if(!_cmbEditsLoaded){ cmbLoadProductEdits().then(()=>cmbRenderList()); }
   cmbRenderList();
   cmbRenderSel();
@@ -23814,6 +23822,83 @@ async function cmbSyncItemPrice(code, p){
   if(selChanged) cmbRenderSel();
   if(setsChanged){ cmbRenderSaved(); await cloudKvSave('combo_sets', _cmbSets); }
   if(kpiChanged){ cmbRenderKpiBar(); await cloudKvSave('combo_kpi_cards', _cmbKpiCards); }
+}
+
+// ── 엑셀 업로드로 한국단가/공급가 일괄 반영 + 신제품 일괄 추가(관리자 전용) ──
+// 양식: [코드, 상품명, 박스당수량, 한국단가, 공급가] — 1행은 헤더로 간주하고 건너뜀.
+// 기존 코드는 값이 실제로 달라졌을 때만 override 갱신(동일 값이면 그대로 유지), 없는 코드는 신제품으로 추가.
+let _cmbUploadMeta = { date:null, author:null };
+let _cmbUploadMetaLoaded = false;
+function _cmbNow(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+async function cmbLoadUploadMeta(){
+  const d = await cloudKvLoad('combo_upload_meta');
+  _cmbUploadMeta = (d && typeof d==='object' && !Array.isArray(d)) ? d : { date:null, author:null };
+  _cmbUploadMetaLoaded = true;
+  cmbRenderUploadMeta();
+}
+function cmbRenderUploadMeta(){
+  const el = document.getElementById('cmbUploadMetaTxt'); if(!el) return;
+  el.textContent = _cmbUploadMeta.date ? `최근 업로드: ${_cmbUploadMeta.date}${_cmbUploadMeta.author?' · '+_cmbUploadMeta.author:''}` : '';
+}
+function cmbDownloadTemplate(){
+  const aoa = [['코드','상품명','박스당수량','한국단가','공급가']];
+  COMBO_PRODUCTS.forEach(p=>aoa.push([p.code, p.name, p.box!=null?p.box:'', p.arrival!=null?p.arrival:'', p.supply!=null?p.supply:'']));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:16},{wch:36},{wch:10},{wch:12},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '조합계산기단가');
+  const d = new Date();
+  XLSX.writeFile(wb, `조합계산기_단가_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.xlsx`);
+}
+async function cmbHandleUpload(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  if(!_cmbIsPriceAdmin()){ toast('엑셀 업로드는 관리자 계정만 가능합니다.'); return; }
+  let rows;
+  try{ rows = await readXlsxRows(file); }
+  catch(err){ alert('파일 읽기 실패: '+err.message); return; }
+  if(!rows.length){ alert('빈 파일입니다.'); return; }
+  const seen = new Set();
+  const changedCodes = [];
+  let added=0, updated=0, unchanged=0, bad=0;
+  for(let i=1;i<rows.length;i++){ // 1행은 헤더
+    const r = rows[i]; if(!r || r.every(v=>v===''||v==null)) continue;
+    const code = _s(r[0]), name = _s(r[1]);
+    if(!code || !name){ bad++; continue; }
+    if(seen.has(code)) continue; // 같은 파일 내 중복 코드는 첫 줄만 반영
+    seen.add(code);
+    const box = _n(r[2]), arrival = _n(r[3]), supply = _n(r[4]);
+    const existing = COMBO_PRODUCTS.find(p=>p.code===code);
+    if(existing){
+      const ov = {..._cmbOverrides[code]};
+      let changed = false;
+      if(arrival!=null && arrival!==existing.arrival){ ov.arrival = arrival; changed = true; }
+      if(supply!=null && supply!==existing.supply){ ov.supply = supply; changed = true; }
+      if(changed){ _cmbOverrides[code] = ov; updated++; changedCodes.push(code); }
+      else unchanged++;
+    } else {
+      _cmbExtra.push({ code, name, box, arrival, supply });
+      added++;
+    }
+  }
+  if(added+updated===0){
+    alert(`반영할 변경사항이 없습니다.\n(동일 ${unchanged}건${bad?` · 코드/상품명 누락 ${bad}건 제외`:''})`);
+    return;
+  }
+  if(!confirm(`엑셀 반영 내용\n\n신규 추가: ${added}건\n단가 수정: ${updated}건\n변경 없음(유지): ${unchanged}건${bad?`\n코드/상품명 누락 제외: ${bad}건`:''}\n\n적용할까요?`)) return;
+  await cloudKvSave('combo_price_overrides', _cmbOverrides);
+  await cloudKvSave('combo_extra_products', _cmbExtra);
+  cmbRebuildProducts();
+  for(const code of changedCodes){
+    const p = COMBO_PRODUCTS.find(x=>x.code===code);
+    if(p) await cmbSyncItemPrice(code, p);
+  }
+  _cmbUploadMeta = { date:_cmbNow(), author:(window.__CURRENT_USER&&window.__CURRENT_USER.name)||'' };
+  await cloudKvSave('combo_upload_meta', _cmbUploadMeta);
+  cmbRenderUploadMeta();
+  cmbRenderList();
+  toast(`엑셀 반영 완료 — 신규 ${added}건 · 수정 ${updated}건`);
 }
 
 function cmbAddProdOpen(){
