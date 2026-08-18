@@ -776,6 +776,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-qty-inp:focus{border-color:#3182F6;background:var(--bg);}
 .cmb-price-inp{width:56px;border:1px solid var(--bd);border-radius:6px;padding:3px 4px;font-size:11px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
 .cmb-price-inp:focus{border-color:#3182F6;background:var(--bg);}
+.cmb-price-disp{display:inline-block;width:56px;text-align:right;padding:3px 4px;font-size:11px;color:var(--tx2);}
+.cmb-price-edit-on{border-style:solid!important;border-color:#D97706!important;background:#FFFBEB!important;color:#D97706!important;}
 .cmb-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;}
 .cmb-sel,.cmb-saved{flex:1 1 0;min-width:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--bd);border-radius:12px;}
 .cmb-card-head{padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--tx);flex-shrink:0;}
@@ -2675,7 +2677,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         </div>
         <div class="cmb-left-meta" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span>총 <span id="cmbCount">0</span>개 · 체크 <b id="cmbCheckedN">0</b>개</span>
-          <button class="cmb-cat-add" onclick="cmbAddProdOpen()" title="새 제품을 목록에 추가">＋ 제품 추가</button>
+          <div style="display:flex;gap:6px;">
+            <button class="cmb-cat-add" id="cmbPriceEditBtn" onclick="cmbTogglePriceEdit()" title="켜면 한국단가/공급가를 표에서 직접 수정할 수 있습니다">🔒 단가수정</button>
+            <button class="cmb-cat-add" onclick="cmbAddProdOpen()" title="새 제품을 목록에 추가">＋ 제품 추가</button>
+          </div>
         </div>
       </div>
       <div class="cmb-table-wrap">
@@ -23661,13 +23666,19 @@ function cmbRenderList(){
   const shown = list.slice(0, MAX);
   tb.innerHTML = shown.map(p=>{
     const st = _cmbState[p.code] || {};
+    const arrCell = _cmbPriceEditMode
+      ? `<input type="number" min="0" class="cmb-price-inp" value="${p.arrival!=null?p.arrival:''}" placeholder="—" onchange="cmbEditPrice('${_cmbEsc(p.code)}','arrival',this.value)">`
+      : `<span class="cmb-price-disp">${p.arrival!=null?Number(p.arrival).toLocaleString('ko-KR'):'—'}</span>`;
+    const supCell = _cmbPriceEditMode
+      ? `<input type="number" min="0" class="cmb-price-inp" value="${p.supply!=null?p.supply:''}" placeholder="—" onchange="cmbEditPrice('${_cmbEsc(p.code)}','supply',this.value)">`
+      : `<span class="cmb-price-disp">${p.supply!=null?Number(p.supply).toLocaleString('ko-KR'):'—'}</span>`;
     return `<tr class="${st.checked?'cmb-on':''}" data-code="${_cmbEsc(p.code)}">
       <td style="text-align:center;"><input type="checkbox" ${st.checked?'checked':''} onchange="cmbCheck('${_cmbEsc(p.code)}',this.checked)"></td>
       <td class="cmb-cd">${_cmbEsc(p.code)}</td>
       <td class="cmb-nm">${_cmbEsc(p.name)}</td>
       <td>${p.box!=null?p.box:'—'}</td>
-      <td><input type="number" min="0" class="cmb-price-inp" value="${p.arrival!=null?p.arrival:''}" placeholder="—" onchange="cmbEditPrice('${_cmbEsc(p.code)}','arrival',this.value)"></td>
-      <td><input type="number" min="0" class="cmb-price-inp" value="${p.supply!=null?p.supply:''}" placeholder="—" onchange="cmbEditPrice('${_cmbEsc(p.code)}','supply',this.value)"></td>
+      <td>${arrCell}</td>
+      <td>${supCell}</td>
       <td><input type="number" min="0" class="cmb-qty-inp" value="${st.qty!=null?_cmbEsc(st.qty):''}" placeholder="0" oninput="cmbQty('${_cmbEsc(p.code)}',this.value)"></td>
       <td style="text-align:center;"><button class="cmb-del-x" title="제품 삭제" onclick="cmbDeleteProduct('${_cmbEsc(p.code)}')">✕</button></td>
     </tr>`;
@@ -23680,8 +23691,15 @@ function cmbRenderList(){
 function cmbCheck(code, on){
   _cmbState[code] = _cmbState[code] || {};
   _cmbState[code].checked = on;
+  if(on && !_cmbState[code].qty){ _cmbState[code].qty = '1'; }
   const tr = document.querySelector(`#cmbTbody tr[data-code="${CSS.escape(code)}"]`);
-  if(tr) tr.classList.toggle('cmb-on', on);
+  if(tr){
+    tr.classList.toggle('cmb-on', on);
+    if(on){
+      const qi = tr.querySelector('.cmb-qty-inp');
+      if(qi && !qi.value) qi.value = '1';
+    }
+  }
   cmbUpdateCheckedCount();
 }
 function cmbQty(code, val){ _cmbState[code] = _cmbState[code] || {}; _cmbState[code].qty = val; }
@@ -23706,6 +23724,17 @@ let _cmbOverrides = {};   // code -> {arrival?, supply?} (수정된 값만)
 let _cmbExtra = [];       // 사용자가 추가한 제품 [{code,name,box,arrival,supply}]
 let _cmbDeleted = [];     // 삭제(숨김) 처리된 기본 제품 코드 목록
 let _cmbEditsLoaded = false;
+let _cmbPriceEditMode = false; // true인 동안만 표에서 한국단가/공급가 직접 수정 가능
+
+function cmbTogglePriceEdit(){
+  _cmbPriceEditMode = !_cmbPriceEditMode;
+  const btn = document.getElementById('cmbPriceEditBtn');
+  if(btn){
+    btn.textContent = _cmbPriceEditMode ? '🔓 수정중(완료)' : '🔒 단가수정';
+    btn.classList.toggle('cmb-price-edit-on', _cmbPriceEditMode);
+  }
+  cmbRenderList();
+}
 
 function cmbRebuildProducts(){
   const delSet = new Set(_cmbDeleted);
@@ -23739,6 +23768,37 @@ async function cmbEditPrice(code, field, val){
   p[field] = n;
   _cmbOverrides[code] = { ..._cmbOverrides[code], [field]: n };
   await cloudKvSave('combo_price_overrides', _cmbOverrides);
+  await cmbSyncItemPrice(code, p);
+  cmbRenderList();
+}
+
+// 단가 수정 시, 이미 선택/저장된 항목 중 같은 상품(code)의 단가·금액도 basis(한국단가×1.1 / 공급가) 기준으로 재계산해 동기화
+async function cmbSyncItemPrice(code, p){
+  const recalc = it => {
+    if(it.code !== code) return false;
+    const base = it.basis==='arrival' ? p.arrival : p.supply;
+    if(base==null) return false;
+    const unit = it.basis==='arrival' ? Math.round(base*1.1) : base;
+    if(unit === it.unit) return false;
+    it.unit = unit;
+    it.amount = unit * it.qty;
+    return true;
+  };
+  let selChanged = false, setsChanged = false, kpiChanged = false;
+  _cmbSel.forEach(it=>{ if(recalc(it)) selChanged = true; });
+  _cmbSets.forEach(s=>{
+    let changed = false;
+    (s.items||[]).forEach(it=>{ if(recalc(it)) changed = true; });
+    if(changed){ s.total = (s.items||[]).reduce((a,x)=>a+x.amount,0); setsChanged = true; }
+  });
+  _cmbKpiCards.forEach(s=>{
+    let changed = false;
+    (s.items||[]).forEach(it=>{ if(recalc(it)) changed = true; });
+    if(changed){ s.total = (s.items||[]).reduce((a,x)=>a+x.amount,0); kpiChanged = true; }
+  });
+  if(selChanged) cmbRenderSel();
+  if(setsChanged){ cmbRenderSaved(); await cloudKvSave('combo_sets', _cmbSets); }
+  if(kpiChanged){ cmbRenderKpiBar(); await cloudKvSave('combo_kpi_cards', _cmbKpiCards); }
 }
 
 function cmbAddProdOpen(){
