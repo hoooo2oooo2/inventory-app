@@ -13,6 +13,15 @@
   }
 })();
 </script>
+<script>
+// 저장된 테마를 스타일시트 적용 전에 미리 세팅(화면 깜빡임 방지). 기기(브라우저)별로 저장됨.
+(function(){
+  try{
+    var t = localStorage.getItem('theme_mode');
+    if(t==='dark' || t==='light') document.documentElement.setAttribute('data-theme', t);
+  }catch(e){}
+})();
+</script>
 <!-- 캐시 무효화: 항상 최신 index.html을 받도록(이전 버전 캐시로 인한 오류 방지) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -41,8 +50,86 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
 :root{--pr:#3182F6;--prl:#EEF4FF;--bg:#fff;--bg2:#F7F8FA;--bd:rgba(0,0,0,0.08);--tx:#191919;--tx2:#888;}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;}
+}
+:root[data-theme="dark"]{--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;}
 body{background:var(--bg2);min-height:100vh;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
+/* ══ 다크모드 토글 (기기별 localStorage 저장) ══ */
+.theme-toggle{display:flex;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:20px;padding:3px;cursor:pointer;}
+.theme-toggle span{font-size:13px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--tx2);}
+.theme-toggle span.on{background:var(--bg);color:var(--pr);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+
+/* ══ 세로 사이드바 레이아웃 (body.sidebar-mode일 때만 적용, 꺼져있으면 기존 레이아웃 100% 그대로) ══ */
+/* 이지어드민 방식: 대분류(부서탭)는 기존처럼 위쪽 가로 유지, 소분류(메뉴)만 왼쪽 세로로 이동 */
+body.sidebar-mode #mainMenuNav{display:none;}
+body.sidebar-mode .page{margin-left:200px;}
+#appSidebar{display:none;position:fixed;top:90px;left:0;bottom:0;width:200px;background:var(--bg2);border-right:0.5px solid var(--bd);overflow-y:auto;z-index:99;padding:10px 8px 16px;flex-direction:column;gap:2px;}
+body.sidebar-mode #appSidebar{display:flex;}
+.sb-home{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--pr);background:var(--prl);position:relative;margin-bottom:8px;cursor:pointer;user-select:none;flex-shrink:0;}
+.sb-home::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:0 3px 3px 0;background:var(--pr);}
+.sb-home.active{background:var(--pr);color:#fff;}
+.sb-home.active::before{background:transparent;}
+.sb-flat-items{display:flex;flex-direction:column;gap:1px;padding-top:4px;border-top:0.5px solid var(--bd);}
+.sb-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;font-size:13px;color:var(--tx2);cursor:pointer;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none;}
+.sb-item:hover{background:var(--bg);color:var(--tx);}
+.sb-item.active{background:var(--prl);color:var(--pr);font-weight:600;}
+.sb-item.active::before{content:"";position:absolute;left:0;top:5px;bottom:5px;width:3px;border-radius:0 3px 3px 0;background:var(--pr);}
+/* 사이드바 모드에서 표는 헤더/셀 간격만 줄이고 글씨 크기는 그대로 유지(요청사항) — 데이터 손실 없이 폭 확보 */
+body.sidebar-mode thead th{padding:7px 6px;}
+body.sidebar-mode td{padding:6px 6px;}
+/* 매출관리 등 상단 고정 서브내비/필터의 위치 — 부서탭(deptNav) 실제 높이에 맞춰 JS가 --sb-stack-h를 계산해 넣음 */
+body.sidebar-mode #page-revenue .rev-subnav{top:var(--sb-stack-h,90px);}
+body.sidebar-mode #page-revenue .rev-filter-sticky{top:calc(var(--sb-stack-h,90px) + 38px);}
+body.sidebar-mode #rpage-backdata .bd-right{top:calc(var(--sb-stack-h,90px) + 46px);}
+
+/* ══ 홈 (맞춤 위젯 대시보드) ══ */
+#page-home{padding:20px 24px 32px;}
+.home-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;flex-wrap:wrap;}
+.home-head h2{font-size:16px;font-weight:700;}
+.home-sample-tag{font-size:10.5px;color:var(--tx2);background:var(--bg2);border:0.5px solid var(--bd);border-radius:20px;padding:3px 9px;margin-left:8px;}
+.home-editbtn{font-size:12px;font-weight:600;color:var(--pr);background:var(--prl);border:none;border-radius:8px;padding:7px 13px;cursor:pointer;}
+.home-editbtn.on{background:var(--pr);color:#fff;}
+.home-counter{font-size:11.5px;color:var(--tx2);margin:10px 0 12px;}
+.hw-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:104px;gap:12px;grid-auto-flow:dense;}
+.hw-tile{position:relative;border-radius:12px;border:0.5px solid var(--bd);background:var(--bg2);padding:12px 13px;display:flex;flex-direction:column;cursor:pointer;overflow:hidden;transition:border-color .12s;}
+.hw-tile:hover{border-color:rgba(0,0,0,0.16);}
+.hw-tile.s1{grid-column:span 1;grid-row:span 1;}
+.hw-tile.s2{grid-column:span 2;grid-row:span 1;}
+.hw-tile.s3{grid-column:span 2;grid-row:span 2;}
+.hw-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.hw-cat{display:flex;align-items:center;gap:6px;min-width:0;}
+.hw-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.hw-label{font-size:11.5px;font-weight:700;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hw-num{font-size:21px;font-weight:700;letter-spacing:-.01em;margin-top:auto;}
+.hw-num small{font-size:11.5px;font-weight:500;color:var(--tx2);margin-left:2px;}
+.hw-cap{font-size:10.5px;color:var(--tx2);margin-top:2px;}
+.hw-list{display:flex;flex-direction:column;gap:4px;margin-top:6px;flex:1;min-height:0;}
+.hw-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--tx);}
+.hw-row span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.hw-row .v{color:var(--tx2);flex-shrink:0;}
+.hw-editrow{display:flex;align-items:center;gap:6px;position:absolute;top:8px;right:8px;}
+.hw-sizebtns{display:flex;gap:3px;background:var(--bg);border:0.5px solid var(--bd);border-radius:7px;padding:2px;}
+.hw-sizebtns button{border:none;background:none;font-size:9.5px;font-weight:700;color:var(--tx2);padding:2px 6px;border-radius:5px;cursor:pointer;}
+.hw-sizebtns button.on{background:var(--pr);color:#fff;}
+.hw-rmbtn{border:0.5px solid var(--bd);background:var(--bg);color:var(--tx2);width:20px;height:20px;border-radius:6px;font-size:12px;cursor:pointer;flex-shrink:0;}
+.hw-rmbtn:hover{color:#DC2626;}
+.hw-addtile{align-items:center;justify-content:center;color:var(--tx2);font-size:12px;font-weight:600;gap:6px;flex-direction:row;background:var(--bg);border-style:dashed;border-color:rgba(0,0,0,0.16);}
+.hw-addtile:hover{color:var(--pr);border-color:var(--pr);background:var(--prl);}
+.hw-picker{border:0.5px solid var(--bd);border-radius:12px;background:var(--bg2);padding:14px;margin-top:14px;display:none;}
+.hw-picker.show{display:block;}
+.hw-picker-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.hw-picker-title{font-size:12.5px;font-weight:700;}
+.hw-picker-count{font-size:11px;color:var(--tx2);}
+.hw-picker-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.hw-pk-item{display:flex;align-items:center;gap:7px;border:0.5px solid var(--bd);background:var(--bg);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:12px;}
+.hw-pk-item.checked{border-color:var(--pr);background:var(--prl);color:var(--pr);font-weight:600;}
+.hw-pk-item.disabled{opacity:.4;cursor:not-allowed;}
+.hw-pk-box{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--tx2);flex-shrink:0;position:relative;}
+.hw-pk-item.checked .hw-pk-box{background:var(--pr);border-color:var(--pr);}
+.hw-pk-item.checked .hw-pk-box::after{content:"";position:absolute;left:3px;top:0px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+.hw-empty{padding:60px 20px;text-align:center;color:var(--tx2);font-size:13px;line-height:1.8;}
 
 /* TOPBAR */
 .topbar{background:var(--bg);border-bottom:0.5px solid var(--bd);padding:0 16px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
@@ -1685,6 +1772,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.08a</span>
   </div>
   <div class="tbr">
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="화면 테마 (이 컴퓨터에만 저장됩니다)">
+      <span id="themeSunBtn">☀️</span><span id="themeMoonBtn">🌙</span>
+    </div>
+    <button class="btn btn-sm" id="sidebarModeBtn" onclick="toggleSidebarMode()" title="세로 사이드바 메뉴로 전환 (이 컴퓨터에만 적용, 언제든 되돌릴 수 있어요)">☰ 사이드바 메뉴</button>
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
     <button class="btn btn-pr" id="addTopBtn" style="display:none;">+ 추가</button>
     <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
@@ -1927,6 +2018,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 세로 사이드바 (사이드바 모드일 때만 보임, JS가 내용을 채웁니다) -->
+<nav id="appSidebar"></nav>
+
 <!-- NAV -->
 <div class="nav-stack">
 <!-- 부서 탭 -->
@@ -1963,6 +2057,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni" id="nav-logibox" onclick="goMenu('logibox')" style="display:none;">📮 택배박스</div>
   <div class="ni" id="nav-coupangad" onclick="goMenu('coupangad')" style="display:none;">👥 인사관리</div>
 </nav>
+</div>
+
+<!-- ═══ 홈 (직원별 맞춤 위젯, 사이드바 모드에서만 진입 가능) ═══ -->
+<div class="page" id="page-home">
+  <div class="home-head">
+    <h2>내 홈<span class="home-sample-tag" id="homeSampleTag">위젯 안 숫자는 아직 샘플입니다 · 실제 데이터 연결 예정</span></h2>
+    <button class="home-editbtn" id="homeEditBtn" onclick="hwToggleEdit()">편집</button>
+  </div>
+  <div class="home-counter">위젯 <b id="hwCntNum">0</b>/5개 사용 중 — 칸을 눌러 크기(S·M·L)를 바꾸면 표시되는 정보량도 같이 바뀝니다.</div>
+  <div class="hw-grid" id="hwGrid"></div>
+  <div class="hw-picker" id="hwPicker">
+    <div class="hw-picker-head"><span class="hw-picker-title">위젯 추가</span><span class="hw-picker-count" id="hwPkCount">0/5 선택됨</span></div>
+    <div class="hw-picker-grid" id="hwPkGrid"></div>
+  </div>
 </div>
 
 <!-- ═══ 쿠팡 광고 관리 (운영관리 — 독립 대시보드 iframe) ═══ -->
@@ -6021,6 +6129,7 @@ function _revealApp(sess){
   const who = document.getElementById('whoami');
   if(who) who.innerHTML = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원') + ' <span style="opacity:.5;">▾</span>';
   applyPermissions();
+  _initSidebarModeOnBoot();
   logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
   poStartWatch();   // 전화구매건 미입금 알림 감시 (메뉴 진입 안 해도 권한자에게 뜨도록)
   taskStartWatch();   // 계정 간 업무 요청 실시간 알림 감시 시작
@@ -6086,6 +6195,194 @@ async function logout(){
   try{ await sb.auth.signOut(); }catch{}
   try{ localStorage.removeItem('inv_remember_id'); }catch{}
   location.reload();
+}
+
+// ══════════════════════════════════════════════
+// 다크모드 — 기기(브라우저)별 localStorage 저장, 껐다 켜도 유지됨
+// ══════════════════════════════════════════════
+function _currentTheme(){
+  const saved = document.documentElement.getAttribute('data-theme');
+  if(saved==='dark'||saved==='light') return saved;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function _renderThemeBtn(){
+  const t=_currentTheme();
+  document.getElementById('themeSunBtn')?.classList.toggle('on', t==='light');
+  document.getElementById('themeMoonBtn')?.classList.toggle('on', t==='dark');
+}
+function toggleTheme(){
+  const next = _currentTheme()==='dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try{ localStorage.setItem('theme_mode', next); }catch(e){}
+  _renderThemeBtn();
+}
+_renderThemeBtn();
+
+// ══════════════════════════════════════════════
+// 세로 사이드바 레이아웃 — 기기별 localStorage 저장(언제든 버튼 하나로 원래 레이아웃으로 복구)
+// ══════════════════════════════════════════════
+function _sidebarModeOn(){ return localStorage.getItem('layout_mode')==='sidebar'; }
+function _renderSidebarModeBtn(){
+  const on=_sidebarModeOn();
+  const b=document.getElementById('sidebarModeBtn'); if(!b) return;
+  b.textContent = on ? '☰ 기존 메뉴로 돌아가기' : '☰ 사이드바 메뉴';
+  b.classList.toggle('btn-pr', on);
+}
+function toggleSidebarMode(){
+  const on=!_sidebarModeOn();
+  try{ localStorage.setItem('layout_mode', on?'sidebar':'top'); }catch(e){}
+  document.body.classList.toggle('sidebar-mode', on);
+  _renderSidebarModeBtn();
+  if(on) renderSidebar();
+}
+function _initSidebarModeOnBoot(){
+  const on=_sidebarModeOn();
+  document.body.classList.toggle('sidebar-mode', on);
+  _renderSidebarModeBtn();
+  if(on) renderSidebar();
+}
+
+// ══════════════════════════════════════════════
+// 세로 사이드바 렌더링 — 실제 DEPTS/MENUS/_menuPerm을 그대로 재사용(권한 로직 중복 없음)
+// ══════════════════════════════════════════════
+function goHome(){
+  currentPage='home';
+  document.querySelectorAll('.page.active').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-home')?.classList.add('active');
+  const addBtn=document.getElementById('addTopBtn'); if(addBtn) addBtn.style.display='none';
+  const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none';
+  document.querySelectorAll('#deptNav .ni').forEach(el=>el.classList.remove('active'));
+  renderSidebar();
+  hwRender();
+}
+// 대분류(부서탭)는 기존 deptNav를 그대로 쓰고, 여기서는 활성 부서의 소분류만 세로로 렌더링(이지어드민 방식)
+function renderSidebar(){
+  const root=document.getElementById('appSidebar'); if(!root) return;
+  const u=window.__CURRENT_USER; if(!u){ root.innerHTML=''; return; }
+  _sbFixStickyOffsets();
+  const dept = DEPTS.find(d=>d.id===_activeDept);
+  const items = dept ? dept.menus.filter(m=>_menuPerm(m)!=='none') : [];
+  let html = `<div class="sb-home ${currentPage==='home'?'active':''}" onclick="goHome()">🏠 홈</div>`;
+  html += `<div class="sb-flat-items">` + items.map(m=>{
+      const active = currentPage===m.id || (m.id==='rgrevenue' && currentPage==='revenue' && _revPage==='rocket');
+      return `<div class="sb-item ${active?'active':''}" onclick="${m.id==='rgrevenue'?'goGrowthRevenue()':`goMenu('${m.id}')`}">${_menuLabel(m.id)}</div>`;
+    }).join('') + `</div>`;
+  root.innerHTML = html;
+}
+// 부서탭(deptNav) 실제 렌더링 높이를 측정해 상단 고정요소 위치를 픽셀 단위로 정확히 맞춤
+function _sbFixStickyOffsets(){
+  const topbar = document.querySelector('.topbar');
+  const deptNav = document.getElementById('deptNav');
+  const th = topbar ? topbar.offsetHeight : 50;
+  const dh = (deptNav && deptNav.offsetParent!==null) ? deptNav.offsetHeight : 0;
+  document.documentElement.style.setProperty('--sb-stack-h', (th+dh)+'px');
+}
+window.addEventListener('resize', ()=>{ if(_sidebarModeOn()) _sbFixStickyOffsets(); });
+
+// ══════════════════════════════════════════════
+// 홈 맞춤 위젯 — 직원별 저장(기존 즐겨찾기와 동일하게 localStorage, 계정별)
+// ══════════════════════════════════════════════
+const HW_CATALOG_IDS = ['inv','order','sales','revenue','review','consign','rgmgmt','collab','logistock'];
+const HW_COLORS = { inv:'#185FA5', order:'#D97706', sales:'#0F6E56', revenue:'#059669', review:'#534AB7', consign:'#185FA5', rgmgmt:'#DC2626', collab:'#534AB7', logistock:'#D97706' };
+const HW_DEFAULT = [ {id:'inv',size:2}, {id:'revenue',size:3}, {id:'order',size:1} ];
+
+function _hwKey(){ const u=window.__CURRENT_USER; return 'home_widgets_'+(u?u.username:'anon'); }
+function hwLoadState(){
+  try{ const raw=localStorage.getItem(_hwKey()); if(raw) return JSON.parse(raw); }catch(e){}
+  return HW_DEFAULT.slice();
+}
+function hwSaveState(){ try{ localStorage.setItem(_hwKey(), JSON.stringify(hwState)); }catch(e){} }
+let hwState = [];
+let hwStateLoaded = false;
+let hwEditing = false;
+let hwPickerOpen = false;
+
+function hwAvailableIds(){
+  // 요구사항: 직원별로 숨김 처리(권한 없음)된 메뉴는 위젯 후보에도 노출되지 않음
+  return HW_CATALOG_IDS.filter(id=>_menuPerm(id)!=='none');
+}
+function hwContent(id, size){
+  const SAMPLE = {
+    inv:{s:['7','건','재고부족 임박'], m:['7','건 임박',[['SSCD073A 경광등','재고 7'],['SSARI-Y 밭아리등','재고 18']]], l:['재고부족 임박',[['SSCD073A 경광등','재고 7'],['SSARI-Y 밭아리등','재고 18'],['SSCR100A 크라운등','재고 33']]]},
+    order:{s:['4','건','발주 대기'], m:['4','건 대기',[['경광등 4LED 재발주','D-1'],['밭아리등 노란빛','D-2']]], l:['발주 대기',[['경광등 4LED 재발주','D-1'],['밭아리등 노란빛','D-2'],['크라운 정원등','D-4']]]},
+    sales:{s:['312','건','오늘 판매'], m:['312','건 오늘',[['전일 대비','+6.2%'],['이번주 누적','1,840건']]], l:['오늘 판매',[['전일 대비','+6.2%'],['이번주 누적','1,840건'],['베스트 상품','경광등 4LED']]]},
+    revenue:{s:['2,410','만원','이번달 매출'], m:['2,410','만원',[['전일 대비','+6.2%'],['목표 대비','72%']]], l:['이번달 매출',[['11번가','980만'],['쿠팡 로켓','760만'],['스마트스토어','670만']]]},
+    review:{s:['2','건','미답변 리뷰'], m:['2','건 미답변',[['★☆☆ 불빛이 약해요','1시간'],['★★★ 배송 빨라요','3시간']]], l:['미답변 리뷰',[['★☆☆ 불빛이 약해요','1시간 전'],['★★★ 배송 빨라요','3시간 전'],['★★★★ 설치 어려움','어제']]]},
+    consign:{s:['12','건','오늘 배송'], m:['12','건 오늘',[['배송중','8건'],['배송완료','4건']]], l:['오늘 배송',[['대양전자','완료'],['한빛조명','배송중'],['서울라이팅','배송중']]]},
+    rgmgmt:{s:['340','만원','로켓그로스 금주'], m:['340','만원',[['전주 대비','-4.1%'],['재고 회전율','양호']]], l:['로켓그로스 금주',[['솔라 정원등 세트','88건'],['경광등 4LED','61건']]]},
+    collab:{s:['2','건','오늘 일정'], m:['2','건 오늘',[['14:00 발주 회의',''],['17:00 디자인 리뷰','']]], l:['오늘 일정',[['10:00 모음전 마감','완료'],['14:00 발주 회의','진행중'],['17:00 디자인 리뷰','예정']]]},
+    logistock:{s:['4','건','발주건 정리 대기'], m:['4','건 대기',[['경광등 4LED','300개'],['밭아리등','200개']]], l:['발주건 정리 대기',[['경광등 4LED','300개'],['밭아리등','200개'],['크라운 정원등','150개']]]}
+  };
+  const d = SAMPLE[id]; if(!d) return '';
+  if(size===1){ return `<div class="hw-num">${d.s[0]}<small>${d.s[1]}</small></div><div class="hw-cap">${d.s[2]}</div>`; }
+  if(size===2){ return `<div class="hw-num">${d.m[0]}<small>${d.m[1]}</small></div><div class="hw-list">`+d.m[2].map(r=>`<div class="hw-row"><span>${r[0]}</span><span class="v">${r[1]}</span></div>`).join('')+`</div>`; }
+  return `<div class="hw-cap" style="font-size:11px;font-weight:700;color:var(--tx);margin-bottom:2px;">${d.l[0]}</div><div class="hw-list">`+d.l[1].map(r=>`<div class="hw-row"><span>${r[0]}</span><span class="v">${r[1]}</span></div>`).join('')+`</div>`;
+}
+function hwRender(){
+  if(!hwStateLoaded){ hwState = hwLoadState(); hwStateLoaded = true; }
+  const avail = hwAvailableIds();
+  hwState = hwState.filter(w=>avail.includes(w.id)); // 권한 사라진 위젯은 자동 제거
+  const grid=document.getElementById('hwGrid'); if(!grid) return;
+  grid.innerHTML='';
+  hwState.forEach(w=>{
+    const tile=document.createElement('div');
+    tile.className='hw-tile s'+w.size;
+    tile.innerHTML = `<div class="hw-top"><div class="hw-cat"><span class="hw-dot" style="background:${HW_COLORS[w.id]||'#888'}"></span><span class="hw-label">${_menuLabel(w.id)}</span></div></div>`+hwContent(w.id,w.size);
+    if(hwEditing){
+      const ctrl=document.createElement('div'); ctrl.className='hw-editrow';
+      const sb=document.createElement('div'); sb.className='hw-sizebtns';
+      [1,2,3].forEach(n=>{
+        const b=document.createElement('button'); b.textContent=({1:'S',2:'M',3:'L'})[n];
+        if(w.size===n) b.className='on';
+        b.onclick=(e)=>{ e.stopPropagation(); w.size=n; hwSaveState(); hwRender(); };
+        sb.appendChild(b);
+      });
+      const rm=document.createElement('button'); rm.className='hw-rmbtn'; rm.textContent='✕';
+      rm.onclick=(e)=>{ e.stopPropagation(); hwState=hwState.filter(s=>s!==w); hwSaveState(); hwRender(); hwRenderPicker(); };
+      ctrl.appendChild(sb); ctrl.appendChild(rm);
+      tile.appendChild(ctrl);
+    } else {
+      tile.onclick=()=>goMenu(w.id);
+    }
+    grid.appendChild(tile);
+  });
+  if(hwEditing && hwState.length<5){
+    const add=document.createElement('div'); add.className='hw-tile s1 hw-addtile';
+    add.innerHTML='<span style="font-size:16px;line-height:1;">+</span><span>위젯 추가</span>';
+    add.onclick=()=>{ hwPickerOpen=!hwPickerOpen; document.getElementById('hwPicker').classList.toggle('show',hwPickerOpen); hwRenderPicker(); };
+    grid.appendChild(add);
+  }
+  if(!hwState.length && !hwEditing){
+    grid.innerHTML = `<div class="hw-empty" style="grid-column:1/-1;">아직 추가한 위젯이 없습니다.<br>"편집"을 눌러 원하는 메뉴를 최대 5개까지 골라보세요.</div>`;
+  }
+  document.getElementById('hwCntNum').textContent = hwState.length;
+}
+function hwRenderPicker(){
+  const pk=document.getElementById('hwPkGrid'); if(!pk) return;
+  pk.innerHTML='';
+  document.getElementById('hwPkCount').textContent = hwState.length+'/5 선택됨';
+  hwAvailableIds().forEach(id=>{
+    const picked = hwState.find(s=>s.id===id);
+    const full = hwState.length>=5 && !picked;
+    const el=document.createElement('div');
+    el.className='hw-pk-item'+(picked?' checked':'')+(full?' disabled':'');
+    el.innerHTML = `<span class="hw-pk-box"></span><span class="hw-dot" style="background:${HW_COLORS[id]||'#888'}"></span><span>${_menuLabel(id)}</span>`;
+    el.onclick=()=>{
+      if(picked){ hwState=hwState.filter(s=>s!==picked); }
+      else if(!full){ hwState.push({id:id,size:2}); }
+      hwSaveState(); hwRender(); hwRenderPicker();
+    };
+    pk.appendChild(el);
+  });
+}
+function hwToggleEdit(){
+  hwEditing=!hwEditing;
+  const btn=document.getElementById('homeEditBtn');
+  btn.textContent = hwEditing?'완료':'편집';
+  btn.classList.toggle('on', hwEditing);
+  if(!hwEditing){ hwPickerOpen=false; document.getElementById('hwPicker')?.classList.remove('show'); }
+  hwRender();
+  if(hwEditing) hwRenderPicker();
 }
 
 // ══════════════════════════════════════════════
@@ -6190,6 +6487,7 @@ function updateNavVisibility(){
   // 로켓그로스 탭에서 매출관리 화면에 들어온 경우(로켓그로스 매출), 매출관리 소분류탭 바는 숨김
   const revSubnav = document.querySelector('#page-revenue .rev-subnav');
   if(revSubnav) revSubnav.style.display = (_activeDept==='growth') ? 'none' : '';
+  if(_sidebarModeOn()) renderSidebar();
 }
 
 // 권한 키 목록(계정 권한표용): 일반 메뉴 + 매출관리 하위탭
@@ -9360,6 +9658,7 @@ function goPage(p){
   // 다시 들어오면 reviewInit()이 _rvwStartPoll()로 재시작함
   if(p!=='review') _rvwStopPoll();
   currentPage=p;
+  if(_sidebarModeOn()) renderSidebar();
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
