@@ -54,6 +54,23 @@
   :root:not([data-theme="light"]){--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;}
 }
 :root[data-theme="dark"]{--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;}
+/* 포스트잇/고정메모 카드는 배경이 항상 밝은 파스텔색이라(다크모드에서도 그대로) 글씨는 계속 어둡게 고정 — 안 그러면 밝은 배경에 흰 글씨로 안 보임 */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .postit-title,
+  :root:not([data-theme="light"]) .postit-detail,
+  :root:not([data-theme="light"]) .rp-pinned-item,
+  :root:not([data-theme="light"]) .rp-pinned-item .rp-line,
+  :root:not([data-theme="light"]) .rp-block.pinned,
+  :root:not([data-theme="light"]) .rp-block.pinned .rp-line,
+  :root:not([data-theme="light"]) .rp-section-pinned .rp-line{color:#1A1A1A;}
+}
+:root[data-theme="dark"] .postit-title,
+:root[data-theme="dark"] .postit-detail,
+:root[data-theme="dark"] .rp-pinned-item,
+:root[data-theme="dark"] .rp-pinned-item .rp-line,
+:root[data-theme="dark"] .rp-block.pinned,
+:root[data-theme="dark"] .rp-block.pinned .rp-line,
+:root[data-theme="dark"] .rp-section-pinned .rp-line{color:#1A1A1A;}
 body{background:var(--bg2);min-height:100vh;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
 /* ══ 다크모드 토글 (기기별 localStorage 저장) ══ */
@@ -64,7 +81,7 @@ body{background:var(--bg2);min-height:100vh;}
 /* ══ 세로 사이드바 레이아웃 (body.sidebar-mode일 때만 적용, 꺼져있으면 기존 레이아웃 100% 그대로) ══ */
 /* 이지어드민 방식: 대분류(부서탭)는 기존처럼 위쪽 가로 유지, 소분류(메뉴)만 왼쪽 세로로 이동 */
 body.sidebar-mode #mainMenuNav{display:none;}
-body.sidebar-mode .page{margin-left:200px;}
+body.sidebar-mode .page{margin-left:200px;min-width:0;}
 #appSidebar{display:none;position:fixed;top:90px;left:0;bottom:0;width:200px;background:var(--bg2);border-right:0.5px solid var(--bd);overflow-y:auto;z-index:99;padding:10px 8px 16px;flex-direction:column;gap:2px;}
 body.sidebar-mode #appSidebar{display:flex;}
 .sb-home{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--pr);background:var(--prl);position:relative;margin-bottom:8px;cursor:pointer;user-select:none;flex-shrink:0;}
@@ -6130,6 +6147,7 @@ function _revealApp(sess){
   if(who) who.innerHTML = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원') + ' <span style="opacity:.5;">▾</span>';
   applyPermissions();
   _initSidebarModeOnBoot();
+  if(_sidebarModeOn()) goHome();   // 사이드바 모드에선 로그인 직후 항상 홈 화면부터 보여줌
   logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
   poStartWatch();   // 전화구매건 미입금 알림 감시 (메뉴 진입 안 해도 권한자에게 뜨도록)
   taskStartWatch();   // 계정 간 업무 요청 실시간 알림 감시 시작
@@ -6264,8 +6282,8 @@ function renderSidebar(){
   const items = dept ? dept.menus.filter(m=>_menuPerm(m)!=='none') : [];
   let html = `<div class="sb-home ${currentPage==='home'?'active':''}" onclick="goHome()">🏠 홈</div>`;
   html += `<div class="sb-flat-items">` + items.map(m=>{
-      const active = currentPage===m.id || (m.id==='rgrevenue' && currentPage==='revenue' && _revPage==='rocket');
-      return `<div class="sb-item ${active?'active':''}" onclick="${m.id==='rgrevenue'?'goGrowthRevenue()':`goMenu('${m.id}')`}">${_menuLabel(m.id)}</div>`;
+      const active = currentPage===m || (m==='rgrevenue' && currentPage==='revenue' && _revPage==='rocket');
+      return `<div class="sb-item ${active?'active':''}" onclick="${m==='rgrevenue'?'goGrowthRevenue()':`goMenu('${m}')`}">${_menuLabel(m)}</div>`;
     }).join('') + `</div>`;
   root.innerHTML = html;
 }
@@ -6284,7 +6302,7 @@ window.addEventListener('resize', ()=>{ if(_sidebarModeOn()) _sbFixStickyOffsets
 // ══════════════════════════════════════════════
 const HW_CATALOG_IDS = ['inv','order','sales','revenue','review','consign','rgmgmt','collab','logistock'];
 const HW_COLORS = { inv:'#185FA5', order:'#D97706', sales:'#0F6E56', revenue:'#059669', review:'#534AB7', consign:'#185FA5', rgmgmt:'#DC2626', collab:'#534AB7', logistock:'#D97706' };
-const HW_DEFAULT = [ {id:'inv',size:2}, {id:'revenue',size:3}, {id:'order',size:1} ];
+const HW_DEFAULT = [ {id:'inv',size:2}, {id:'order',size:2}, {id:'revenue',size:2} ];
 
 function _hwKey(){ const u=window.__CURRENT_USER; return 'home_widgets_'+(u?u.username:'anon'); }
 function hwLoadState(){
