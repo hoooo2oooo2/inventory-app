@@ -13,6 +13,16 @@
   }
 })();
 </script>
+<script>
+// 저장된 테마를 스타일시트 적용 전에 미리 세팅(화면 깜빡임 방지). 기기(브라우저)별로 저장됨.
+// 실제로 다크모드를 볼 수 있는지는 로그인 후 역할(마스터) 확인 결과로 다시 확정됨(아래 _revealApp 참고).
+(function(){
+  try{
+    var t = localStorage.getItem('theme_mode');
+    if(t==='dark') document.documentElement.setAttribute('data-theme', 'dark');
+  }catch(e){}
+})();
+</script>
 <!-- 캐시 무효화: 항상 최신 index.html을 받도록(이전 버전 캐시로 인한 오류 방지) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -41,8 +51,22 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
 :root{--pr:#3182F6;--prl:#EEF4FF;--bg:#fff;--bg2:#F7F8FA;--bd:rgba(0,0,0,0.08);--tx:#191919;--tx2:#888;}
+/* 다크모드는 마스터 계정 전용 — data-theme="dark"는 마스터가 토글을 눌렀을 때만 JS가 세팅함(아래 참고) */
+:root[data-theme="dark"]{--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;}
 body{background:var(--bg2);min-height:100vh;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
+.theme-toggle{display:none;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:20px;padding:3px;cursor:pointer;}
+.theme-toggle.show{display:flex;}
+.theme-toggle span{font-size:13px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--tx2);}
+.theme-toggle span.on{background:var(--bg);color:var(--pr);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+/* 포스트잇/고정메모/프로젝트카드는 배경이 항상 밝은 파스텔색이라(다크모드에서도 안 바뀜) 글씨는 계속 어둡게 고정 */
+:root[data-theme="dark"] .postit-title,
+:root[data-theme="dark"] .postit-detail,
+:root[data-theme="dark"] .rp-pinned-item,
+:root[data-theme="dark"] .rp-pinned-item .rp-line,
+:root[data-theme="dark"] .rp-block.pinned,
+:root[data-theme="dark"] .rp-block.pinned .rp-line,
+:root[data-theme="dark"] .rp-section-pinned .rp-line{color:#1A1A1A;}
 
 /* TOPBAR */
 .topbar{background:var(--bg);border-bottom:0.5px solid var(--bd);padding:0 16px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
@@ -1685,6 +1709,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.08a</span>
   </div>
   <div class="tbr">
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="화면 테마 (이 컴퓨터에만 저장됩니다 · 마스터 전용)">
+      <span id="themeSunBtn">☀️</span><span id="themeMoonBtn">🌙</span>
+    </div>
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
     <button class="btn btn-pr" id="addTopBtn" style="display:none;">+ 추가</button>
     <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
@@ -6024,6 +6051,7 @@ function _revealApp(sess){
   const who = document.getElementById('whoami');
   if(who) who.innerHTML = '👤 ' + (sess.name || sess.username) + (sess.role==='master' ? ' · 마스터' : ' · 직원') + ' <span style="opacity:.5;">▾</span>';
   applyPermissions();
+  _initThemeForRole();
   logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
   poStartWatch();   // 전화구매건 미입금 알림 감시 (메뉴 진입 안 해도 권한자에게 뜨도록)
   taskStartWatch();   // 계정 간 업무 요청 실시간 알림 감시 시작
@@ -6089,6 +6117,42 @@ async function logout(){
   try{ await sb.auth.signOut(); }catch{}
   try{ localStorage.removeItem('inv_remember_id'); }catch{}
   location.reload();
+}
+
+// ══════════════════════════════════════════════
+// 다크모드 — 마스터 계정 전용 기능. 기기(브라우저)별 localStorage 저장, 껐다 켜도 유지됨.
+// 직원 계정은 토글 버튼 자체가 안 보이고, 이 기기에 저장된 값과 무관하게 항상 라이트모드로 강제됨.
+// ══════════════════════════════════════════════
+function _currentTheme(){
+  return document.documentElement.getAttribute('data-theme')==='dark' ? 'dark' : 'light';
+}
+function _renderThemeBtn(){
+  const t=_currentTheme();
+  document.getElementById('themeSunBtn')?.classList.toggle('on', t==='light');
+  document.getElementById('themeMoonBtn')?.classList.toggle('on', t==='dark');
+}
+function toggleTheme(){
+  if(!(window.__CURRENT_USER && window.__CURRENT_USER.role==='master')) return; // 이중 방어: 직원 계정은 클릭돼도 무시
+  const next = _currentTheme()==='dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try{ localStorage.setItem('theme_mode', next); }catch(e){}
+  _renderThemeBtn();
+  _applyChartTheme();
+}
+// 로그인 성공 후(역할 확정 후) 호출 — 마스터가 아니면 이 기기 설정과 무관하게 무조건 라이트모드
+function _initThemeForRole(){
+  const isMaster = !!(window.__CURRENT_USER && window.__CURRENT_USER.role==='master');
+  document.getElementById('themeToggle')?.classList.toggle('show', isMaster);
+  if(!isMaster){ document.documentElement.setAttribute('data-theme','light'); }
+  _renderThemeBtn();
+  _applyChartTheme();
+}
+// Chart.js는 <canvas>에 직접 그려서 CSS 변수가 안 먹음 — 테마에 맞춰 기본 글자색을 코드로 지정
+function _applyChartTheme(){
+  if(typeof Chart==='undefined') return;
+  const dark = _currentTheme()==='dark';
+  Chart.defaults.color = dark ? '#C7C7CC' : '#666';
+  Chart.defaults.borderColor = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)';
 }
 
 // ══════════════════════════════════════════════
