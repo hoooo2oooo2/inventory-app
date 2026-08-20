@@ -5894,9 +5894,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <span class="rev-filter-lbl" id="dlyProdChLbl" style="margin-left:8px;">판매처</span>
       <select class="sel" id="dlyProdChSel" onchange="renderDlyProdChart()"></select>
       <span id="dlyProdChMultiNote" style="display:none;font-size:11px;color:var(--tx2);margin-left:8px;"></span>
+      <span class="rev-filter-lbl" style="margin-left:8px;">검색기간</span>
+      <input type="month" class="sel" id="dlyProdRangeFrom" onchange="renderDlyProdChart()">
+      <span class="rev-filter-lbl">~</span>
+      <input type="month" class="sel" id="dlyProdRangeTo" onchange="renderDlyProdChart()">
+      <button class="btn btn-sm" onclick="clearDlyProdRange()">해제</button>
     </div>
     <div class="rev-kpi" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px;">
-      <div class="rev-kpi-card"><div class="rev-kpi-lbl">📦 선택월 판매수량 합계</div><div class="rev-kpi-val" id="dlyProdKpiMonth" style="color:#3182F6;">—</div></div>
+      <div class="rev-kpi-card"><div class="rev-kpi-lbl" id="dlyProdKpiMonthLbl">📦 선택월 판매수량 합계</div><div class="rev-kpi-val" id="dlyProdKpiMonth" style="color:#3182F6;">—</div></div>
       <div class="rev-kpi-card"><div class="rev-kpi-lbl">📅 최근 7일 판매량</div><div class="rev-kpi-val" id="dlyProdKpiWeek" style="color:#059669;">—</div></div>
     </div>
     <div style="position:relative;height:260px;">
@@ -16841,6 +16846,9 @@ async function openDlyProdChart(i){
   const mSel=document.getElementById('dlyProdMonthSel');
   mSel.innerHTML=Array.from({length:12},(_,idx)=>idx+1).map(m=>`<option value="${m}">${m}월</option>`).join('');
   mSel.value=_dlyFilter.month;
+  ySel.disabled=false; mSel.disabled=false;
+  const rFromEl=document.getElementById('dlyProdRangeFrom'), rToEl=document.getElementById('dlyProdRangeTo');
+  if(rFromEl) rFromEl.value=''; if(rToEl) rToEl.value='';
 
   // 메인 필터에서 판매처가 2개 이상 중복 선택돼 있으면, 그 채널들을 각각 별도 그래프(이중/다중 그래프)로 표시
   // (로켓그로스도 일반 채널과 동일하게 비교 대상에 포함된다)
@@ -16893,26 +16901,67 @@ async function dlyProdDailyQty(name, year, month, chKey){
   return arr;
 }
 
+// 시작~종료(YYYY-MM) 사이의 {y,m} 목록(양끝 포함)
+function _dlyMonthRange(from,to){
+  const [fy,fm]=from.split('-').map(Number), [ty,tm]=to.split('-').map(Number);
+  const out=[]; let y=fy,m=fm;
+  while(y<ty||(y===ty&&m<=tm)){ out.push({y,m}); m++; if(m>12){m=1;y++;} }
+  return out;
+}
+
+function clearDlyProdRange(){
+  const f=document.getElementById('dlyProdRangeFrom'), t=document.getElementById('dlyProdRangeTo');
+  if(f) f.value=''; if(t) t.value='';
+  renderDlyProdChart();
+}
+
 async function renderDlyProdChart(){
   const name=_dlyProdChartKey; if(!name) return;
-  const year=Number(document.getElementById('dlyProdYearSel').value);
-  const month=Number(document.getElementById('dlyProdMonthSel').value);
-  if(!year||!month) return;
-  await ensureRevYear(year);
-  const daysInMonth=new Date(year,month,0).getDate();
+  const ySel=document.getElementById('dlyProdYearSel'), mSel=document.getElementById('dlyProdMonthSel');
+  const rFromEl=document.getElementById('dlyProdRangeFrom'), rToEl=document.getElementById('dlyProdRangeTo');
+  let rangeFrom=rFromEl?.value||'', rangeTo=rToEl?.value||'';
+  if(rangeFrom&&rangeTo&&rangeFrom>rangeTo){ [rangeFrom,rangeTo]=[rangeTo,rangeFrom]; if(rFromEl)rFromEl.value=rangeFrom; if(rToEl)rToEl.value=rangeTo; }
+  const rangeMode=!!(rangeFrom&&rangeTo);
+  if(ySel) ySel.disabled=rangeMode;
+  if(mSel) mSel.disabled=rangeMode;
 
   const multi=_dlyProdChartChs;   // null이면 단일/전체 모드
   const ch=multi?null:(document.getElementById('dlyProdChSel').value||'ALL');
+  const titleEl=document.getElementById('dlyProdChartTitle');
+  const kpiLbl=document.getElementById('dlyProdKpiMonthLbl');
 
-  // 선택 연/월/판매처(들) 일별 판매수량 — 다중이면 채널별로 분리 집계(로켓그로스 포함)
-  const seriesData={};
-  if(multi){
-    for(const c of multi){ seriesData[c]=await dlyProdDailyQty(name,year,month,c); }
+  let labels, seriesData={};
+  if(rangeMode){
+    // 검색기간 지정 시: 월별 집계 그래프로 자동 전환
+    const months=_dlyMonthRange(rangeFrom,rangeTo);
+    const chsForRange=multi||[ch];
+    for(const c of chsForRange){
+      const monthly=[];
+      for(const {y,m} of months) monthly.push((await dlyProdDailyQty(name,y,m,c)).reduce((a,b)=>a+b,0));
+      seriesData[multi?c:'__ALL__']=monthly;
+    }
+    labels=months.map(({y,m})=>`${y}-${String(m).padStart(2,'0')}`);
+    const rangeTotal=Object.values(seriesData).reduce((s,arr)=>s+arr.reduce((a,b)=>a+b,0),0);
+    if(kpiLbl) kpiLbl.textContent='📦 선택기간 판매수량 합계';
+    document.getElementById('dlyProdKpiMonth').textContent=rangeTotal.toLocaleString()+'개';
+    if(titleEl) titleEl.textContent=`📊 ${name} — 월별 판매수량 (${rangeFrom} ~ ${rangeTo})`;
   } else {
-    seriesData.__ALL__=await dlyProdDailyQty(name,year,month,ch);
+    // 검색기간 미지정 시: 선택 연/월 기준 일별 판매수량(기존 동작)
+    const year=Number(ySel.value), month=Number(mSel.value);
+    if(!year||!month) return;
+    await ensureRevYear(year);
+    const daysInMonth=new Date(year,month,0).getDate();
+    if(multi){
+      for(const c of multi){ seriesData[c]=await dlyProdDailyQty(name,year,month,c); }
+    } else {
+      seriesData.__ALL__=await dlyProdDailyQty(name,year,month,ch);
+    }
+    labels=Array.from({length:daysInMonth},(_,idx)=>String(idx+1)+'일');
+    const monthTotal=Object.values(seriesData).reduce((s,arr)=>s+arr.reduce((a,b)=>a+b,0),0);
+    if(kpiLbl) kpiLbl.textContent='📦 선택월 판매수량 합계';
+    document.getElementById('dlyProdKpiMonth').textContent=monthTotal.toLocaleString()+'개';
+    if(titleEl) titleEl.textContent=`📊 ${name} — 일별 판매수량`;
   }
-  const monthTotal=Object.values(seriesData).reduce((s,arr)=>s+arr.reduce((a,b)=>a+b,0),0);
-  document.getElementById('dlyProdKpiMonth').textContent=monthTotal.toLocaleString()+'개';
 
   // 최근 7일(오늘 기준 달력일) — 월 경계를 걸치면 그 달의 일별 배열을 따로 조회해 합산
   const today=new Date();
@@ -16932,7 +16981,6 @@ async function renderDlyProdChart(){
   document.getElementById('dlyProdKpiWeek').textContent=week7.toLocaleString()+'개';
 
   // 그래프 — 다중 판매처면 채널별 시리즈를 각각의 색으로, 단일이면 기존과 동일한 단색 막대
-  const labels=Array.from({length:daysInMonth},(_,idx)=>String(idx+1)+'일');
   if(_dlyProdChart) _dlyProdChart.destroy();
   const ctx=document.getElementById('dlyProdChartCv').getContext('2d');
   const allQty=Object.values(seriesData).flat();
