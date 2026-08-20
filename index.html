@@ -3983,6 +3983,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <option value="제이">제이</option>
           </select></label>
           <label>할증(%) <input type="number" id="foSurcharge" value="0" min="0" step="0.1" style="width:60px;" oninput="foRecalc()"></label>
+          <label>할인(%) <input type="number" id="foDiscount" value="0" min="0" step="0.1" style="width:60px;" oninput="foRecalc()"></label>
         </div>
         <div class="fo-order-tbl-wrap">
           <table class="fo-tbl" id="foTbl">
@@ -3998,6 +3999,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
                 <th style="width:80px;">총금액</th>
                 <th style="width:90px;">총금액VAT+</th>
                 <th style="width:80px;">할증금액</th>
+                <th style="width:80px;">할인금액</th>
                 <th style="width:32px;"></th>
               </tr>
             </thead>
@@ -4010,6 +4012,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
                 <td id="ftTotalAmt"></td>
                 <td id="ftTotalVat"></td>
                 <td id="ftTotalSur"></td>
+                <td id="ftTotalDisc"></td>
                 <td></td>
               </tr>
             </tfoot>
@@ -23111,20 +23114,22 @@ function foSyncRows(){
 function foRecalc(){
   foSyncRows();
   const sur = parseFloat(document.getElementById('foSurcharge')?.value)||0;
-  let tQty=0, tAmt=0, tVat=0, tSur=0;
+  const disc = parseFloat(document.getElementById('foDiscount')?.value)||0;
+  let tQty=0, tAmt=0, tVat=0, tSur=0, tDisc=0;
   _foCurRows.forEach((row,i)=>{
     const qty=(row.qtyBox||0)*(row.boxes||0);
     const amt=qty*(row.price||0);
     const vat=Math.round(amt*1.1);
     const surAmt=Math.round(vat*(sur/100));
-    tQty+=qty; tAmt+=Math.round(amt); tVat+=vat; tSur+=surAmt;
+    const discAmt=Math.round(vat*(disc/100));
+    tQty+=qty; tAmt+=Math.round(amt); tVat+=vat; tSur+=surAmt; tDisc+=discAmt;
     const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v?Math.round(v).toLocaleString():'0'; };
-    set(`fo_qty_${i}`,qty); set(`fo_amt_${i}`,amt); set(`fo_vat_${i}`,vat); set(`fo_sur_${i}`,surAmt);
+    set(`fo_qty_${i}`,qty); set(`fo_amt_${i}`,amt); set(`fo_vat_${i}`,vat); set(`fo_sur_${i}`,surAmt); set(`fo_disc_${i}`,discAmt);
   });
   const fmt=v=>Math.round(v).toLocaleString();
   const se=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(v); };
-  se('ftTotalQty',tQty); se('ftTotalAmt',tAmt); se('ftTotalVat',tVat); se('ftTotalSur',tSur);
-  const totalPayable=tVat+tSur;
+  se('ftTotalQty',tQty); se('ftTotalAmt',tAmt); se('ftTotalVat',tVat); se('ftTotalSur',tSur); se('ftTotalDisc',tDisc);
+  const totalPayable=tVat+tSur-tDisc;
   const pay1=Math.round(totalPayable/2);
   const el1=document.getElementById('foPay1'), el2=document.getElementById('foPay2');
   if(el1) el1.textContent=pay1.toLocaleString()+'원';
@@ -23135,12 +23140,14 @@ function foRenderOrderTable(){
   const tbody=document.getElementById('foTblBody');
   if(!tbody) return;
   const sur=parseFloat(document.getElementById('foSurcharge')?.value)||0;
+  const disc=parseFloat(document.getElementById('foDiscount')?.value)||0;
   const inp=(id,type,val,ph)=>`<input id="${id}" type="${type}" value="${val}" placeholder="${ph}" oninput="foRecalc()" style="width:100%;border:none;outline:none;font:inherit;padding:3px 5px;box-sizing:border-box;${type==='number'?'text-align:right;':''}">`;
   tbody.innerHTML = _foCurRows.map((row,i)=>{
     const qty=(row.qtyBox||0)*(row.boxes||0);
     const amt=Math.round(qty*(row.price||0));
     const vat=Math.round(amt*1.1);
     const surAmt=Math.round(vat*(sur/100));
+    const discAmt=Math.round(vat*(disc/100));
     const fmt=v=>v?Math.round(v).toLocaleString():'0';
     return `<tr>
       <td style="text-align:center;font-size:11px;color:var(--tx2);">${i+1}</td>
@@ -23153,6 +23160,7 @@ function foRenderOrderTable(){
       <td class="fo-ro" id="fo_amt_${i}">${fmt(amt)}</td>
       <td class="fo-ro" id="fo_vat_${i}">${fmt(vat)}</td>
       <td class="fo-ro" id="fo_sur_${i}">${fmt(surAmt)}</td>
+      <td class="fo-ro" id="fo_disc_${i}">${fmt(discAmt)}</td>
       <td style="text-align:center;"><button class="fo-item-del" onclick="foRemoveRow(${i})" title="삭제">✕</button></td>
     </tr>`;
   }).join('');
@@ -23167,15 +23175,16 @@ async function foSaveOrder(){
   const date=document.getElementById('foOrderDate')?.value||new Date().toISOString().slice(0,10);
   const vendor=document.getElementById('foOrderVendor')?.value||'';
   const sur=parseFloat(document.getElementById('foSurcharge')?.value)||0;
+  const disc=parseFloat(document.getElementById('foDiscount')?.value)||0;
   const rows=JSON.parse(JSON.stringify(_foCurRows));
   if(_foCurOrderId){
     const idx=_foOrders.findIndex(o=>o.id===_foCurOrderId);
-    if(idx>=0){ _foOrders[idx]={id:_foCurOrderId,date,vendor,sur,rows,savedAt:new Date().toISOString()}; }
+    if(idx>=0){ _foOrders[idx]={id:_foCurOrderId,date,vendor,sur,disc,rows,savedAt:new Date().toISOString()}; }
     else { _foCurOrderId=null; }
   }
   if(!_foCurOrderId){
     const newId='fo'+Date.now();
-    _foOrders.unshift({id:newId,date,vendor,sur,rows,savedAt:new Date().toISOString()});
+    _foOrders.unshift({id:newId,date,vendor,sur,disc,rows,savedAt:new Date().toISOString()});
     _foCurOrderId=newId;
   }
   await _foFlushOrders();
@@ -23187,6 +23196,7 @@ function foNewOrder(){
   _foCurOrderId=null; _foCurRows=[];
   const d=document.getElementById('foOrderDate'); if(d) d.value=new Date().toISOString().slice(0,10);
   const s=document.getElementById('foSurcharge'); if(s) s.value='0';
+  const ds=document.getElementById('foDiscount'); if(ds) ds.value='0';
   foRenderOrderTable();
   document.querySelectorAll('.fo-ol-card').forEach(c=>c.classList.remove('active'));
 }
@@ -23199,6 +23209,7 @@ function foLoadOrder(id){
   const d=document.getElementById('foOrderDate'); if(d) d.value=o.date||'';
   const vs=document.getElementById('foOrderVendor'); if(vs) vs.value=o.vendor||'태광';
   const s=document.getElementById('foSurcharge'); if(s) s.value=o.sur||0;
+  const ds=document.getElementById('foDiscount'); if(ds) ds.value=o.disc||0;
   foRenderOrderTable();
   document.querySelectorAll('.fo-ol-card').forEach(c=>c.classList.remove('active'));
   const card=document.querySelector(`.fo-ol-card[data-id="${id}"]`);
@@ -23229,18 +23240,22 @@ function foRenderOrderList(){
     const isActive=o.id===_foCurOrderId;
     const cnt=(o.rows||[]).length;
     const vc=VC[o.vendor]||'#555';
-    // 총금액VAT+, 할증금액 계산
-    let tVat=0, tSur=0;
+    // 총금액VAT+, 할증금액, 할인금액 계산
+    let tVat=0, tSur=0, tDisc=0;
     (o.rows||[]).forEach(r=>{
       const qty=(r.qtyBox||0)*(r.boxes||0);
       const vat=Math.round(qty*(r.price||0)*1.1);
       tVat+=vat;
       tSur+=Math.round(vat*((o.sur||0)/100));
+      tDisc+=Math.round(vat*((o.disc||0)/100));
     });
-    const totalPay=tVat+tSur;
+    const totalPay=tVat+tSur-tDisc;
     const pay1=Math.round(totalPay/2);
     const pay2=totalPay-pay1;
     const fmt=v=>v.toLocaleString('ko-KR');
+    const adjParts=[];
+    if(tSur>0) adjParts.push(`+할증 ${fmt(tSur)}원`);
+    if(tDisc>0) adjParts.push(`-할인 ${fmt(tDisc)}원`);
     return `<div class="fo-ol-card${isActive?' active':''}" data-id="${o.id}" data-vendor="${o.vendor||''}" onclick="foLoadOrder('${o.id}')">
       <div style="flex:1;min-width:0;">
         <div class="fo-ol-date" style="display:flex;align-items:center;gap:5px;">
@@ -23248,7 +23263,7 @@ function foRenderOrderList(){
           <span style="font-size:10px;font-weight:700;color:${vc};background:${vc}18;border-radius:4px;padding:1px 5px;">${o.vendor||''}</span>
           <span style="font-size:9.5px;color:var(--tx2);">${cnt}품목</span>
         </div>
-        <div style="margin-top:3px;font-size:11px;font-weight:700;color:var(--tx);">총 ${fmt(tVat)}원 <span style="font-weight:400;color:var(--tx2);font-size:10px;">(VAT+)</span>${tSur>0?` +할증 ${fmt(tSur)}원 <span style="font-weight:400;color:var(--tx2);font-size:10px;">= 합계</span> <span style="color:${vc};">${fmt(totalPay)}원</span>`:''}</div>
+        <div style="margin-top:3px;font-size:11px;font-weight:700;color:var(--tx);">총 ${fmt(tVat)}원 <span style="font-weight:400;color:var(--tx2);font-size:10px;">(VAT+)</span>${adjParts.length?` ${adjParts.join(' ')} <span style="font-weight:400;color:var(--tx2);font-size:10px;">= 합계</span> <span style="color:${vc};">${fmt(totalPay)}원</span>`:''}</div>
         <div style="margin-top:2px;display:flex;gap:8px;font-size:10px;color:var(--tx2);">
           <span>1차 <b style="color:${vc};">${fmt(pay1)}원</b></span>
           <span>2차 <b style="color:${vc};">${fmt(pay2)}원</b></span>
