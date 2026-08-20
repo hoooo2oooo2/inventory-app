@@ -4799,6 +4799,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <div class="rev-tbl-head" style="flex-shrink:0;">
             <span class="rev-tbl-title">📦 제품별 판매 현황</span>
             <span style="font-size:11px;color:var(--tx2);" id="revDlyTblSub"></span>
+            <input type="text" id="dlyProdSearch" placeholder="🔍 모델명 검색..." oninput="setDlyProdSearch(this.value)" style="font-size:11px;padding:5px 10px;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);width:200px;margin-left:12px;">
             <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="dlyCumChk" style="cursor:pointer;">월별 누적 포함</label>
             <button class="btn btn-sm" onclick="downloadDailyExcel()" style="background:#059669;color:#fff;border:none;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;margin-left:8px;">📥 엑셀 다운로드</button>
           </div>
@@ -14743,6 +14744,12 @@ function toggleRevMask(){
 // ── 일일 보고 ──
 let _dlyFilter={year:null,month:null,day:null,ch:'ALL'};
 let _dlyTypeFilter='ALL';   // 제품별 판매현황 '구분' 헤더 필터
+let _dlySearchTerm='';      // 제품별 판매현황 모델명 검색어
+function setDlyProdSearch(val){
+  _dlySearchTerm=(val||'').trim().toLowerCase();
+  _dlyProdPage=0;
+  renderDailyReport();
+}
 let _dlyProdPage=0;         // 제품별 판매현황 페이지(0-based)
 let _dlySort={key:null,dir:-1};   // 제품별 판매현황 헤더 정렬: dir -1=내림차순, 1=오름차순
 
@@ -14971,6 +14978,7 @@ function renderDailyReport(){
     typeSel.value=_dlyTypeFilter;
   }
   let viewList=_dlyTypeFilter==='ALL'?prodList:prodList.filter(([,v])=>v.type===_dlyTypeFilter);
+  if(_dlySearchTerm) viewList=viewList.filter(([name])=>name.toLowerCase().includes(_dlySearchTerm));
   if(_dlySort.key==='rate'){
     const rateOf=v=>v.settle>0?(v.margin/v.settle):-Infinity;
     viewList=[...viewList].sort((a,b)=>(rateOf(a[1])-rateOf(b[1]))*_dlySort.dir);
@@ -14987,8 +14995,8 @@ function renderDailyReport(){
     const i=dlyStart+idxInPage;
     const rate=v.settle>0?(v.margin/v.settle*100):0;
     const rCls=rate<0?'rev-margin-neg':rate>0?'rev-margin-pos':'';
-    return `<tr ondblclick="openDlyProdChart(${i})" title="더블클릭: 일별 판매수량 그래프" style="cursor:pointer;">
-      <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</td>
+    return `<tr style="cursor:pointer;">
+      <td onclick="openDlyProdChart(${i})" style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" title="클릭: 일별 판매수량 그래프 (기간 설정 가능)">${name}</td>
       <td>${v.type}</td>
       <td style="text-align:right;">${v.qty.toLocaleString()}</td>
       <td style="text-align:right;">${v.cnt.toLocaleString()}</td>
