@@ -17621,6 +17621,7 @@ let _uniPage = 0; // 현재 페이지 (0-based)
 let _uniRowsCache = []; // renderUnifiedTable()이 마지막으로 필터·정렬한 전체 목록(페이지네이션 전) — 특정 행으로 바로가기 시 재사용
 let _uniSel = new Set(); // 통합 탭 선택된 행 id
 let _uniBatchDelIds = null; // 업로드분 삭제(판매처·날짜 선택) 대기 중인 id 목록(비번 확인 모달 공용)
+let _delPwCallback = null; // delPwModal 공용 — 비번 확인 후 실행할 콜백(설정 시 우선 실행, 미설정 시 매출관리 통합삭제 기본 동작)
 
 function toggleUniSel(id, checked){
   if(checked) _uniSel.add(id); else _uniSel.delete(id);
@@ -17720,6 +17721,7 @@ function confirmBatchDelPick(){
 }
 function cancelDelPw(){
   _uniBatchDelIds=null;
+  _delPwCallback=null;
   closeModal('delPwModal');
 }
 function confirmDelPw(){
@@ -17727,6 +17729,7 @@ function confirmDelPw(){
   const savedPw=localStorage.getItem('rev_admin_pw')||'tlstjd12!';
   if(pw!==savedPw){ const m=document.getElementById('delPwMsg'); if(m) m.textContent='비밀번호가 올바르지 않습니다.'; return; }
   closeModal('delPwModal');
+  if(_delPwCallback){ const cb=_delPwCallback; _delPwCallback=null; cb(); return; }
   if(_uniBatchDelIds) _doDeleteBatchUni();
   else _doDeleteSelectedUni();
 }
@@ -23221,10 +23224,17 @@ function foSaveProduct(){
 }
 
 function foDeleteProduct(id){
-  if(!confirm('상품을 삭제하시겠습니까?')) return;
-  _foProducts = _foProducts.filter(p=>p.id!==id);
-  _foFlushProducts();
-  foRenderProductList();
+  const p=_foProducts.find(x=>x.id===id);
+  const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=`"${_esc(p?p.name:'상품')}" 삭제`;
+  const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
+  const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
+  _delPwCallback=()=>{
+    _foProducts = _foProducts.filter(x=>x.id!==id);
+    _foFlushProducts();
+    foRenderProductList();
+  };
+  openModal('delPwModal');
+  setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
 }
 
 // ── 우측 주문서 ──
