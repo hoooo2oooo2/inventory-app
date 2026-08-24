@@ -17736,9 +17736,15 @@ async function _doDeleteSelectedUni(){
   const btn=document.getElementById('revUniDelBtn');
   if(btn){ btn.disabled=true; btn.textContent='삭제 중...'; }
   try{
+    let deletedTotal=0;
     for(let i=0;i<ids.length;i+=200){
-      const {error}=await sb.from('revenue').delete().in('id',ids.slice(i,i+200));
+      const chunk=ids.slice(i,i+200);
+      const {data,error}=await sb.from('revenue').delete().in('id',chunk).select('id');
       if(error) throw error;
+      deletedTotal += (data||[]).length;
+    }
+    if(deletedTotal<ids.length){
+      throw new Error(`${ids.length}건 중 ${deletedTotal}건만 삭제됐습니다. 계정 권한(DB 정책)이 부족해 나머지는 삭제되지 않았을 수 있습니다 — 관리자에게 문의하세요.`);
     }
     _uniSel.clear();
     await reloadRevLoadedYears();
@@ -17755,9 +17761,15 @@ async function _doDeleteBatchUni(){
   const btn=document.getElementById('revUniFilterDelBtn');
   if(btn){ btn.disabled=true; btn.textContent='삭제 중...'; }
   try{
+    let deletedTotal=0;
     for(let i=0;i<ids.length;i+=200){
-      const {error}=await sb.from('revenue').delete().in('id',ids.slice(i,i+200));
+      const chunk=ids.slice(i,i+200);
+      const {data,error}=await sb.from('revenue').delete().in('id',chunk).select('id');
       if(error) throw error;
+      deletedTotal += (data||[]).length;
+    }
+    if(deletedTotal<ids.length){
+      throw new Error(`${ids.length}건 중 ${deletedTotal}건만 삭제됐습니다. 계정 권한(DB 정책)이 부족해 나머지는 삭제되지 않았을 수 있습니다 — 관리자에게 문의하세요.`);
     }
     await reloadRevLoadedYears();
     addHistory({menu:'매출관리',type:'edit',code:'MULTI',name:`통합 필터삭제 ${ids.length}건`,desc:'날짜·판매처 필터 결과 일괄 삭제',before:`${ids.length}건`,after:'삭제',user:'수동'});
