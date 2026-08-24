@@ -17024,7 +17024,7 @@ let _adChartCh='ALL';
 
 function renderAdCenter(){
   const chSel=document.getElementById('adCh');
-  if(chSel && !chSel.options.length) chSel.innerHTML=AD_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  if(chSel && !chSel.options.length) chSel.innerHTML='<option value="">판매처 선택</option>'+AD_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
   const listChSel=document.getElementById('adListCh');
   if(listChSel && listChSel.options.length<=1)
     listChSel.innerHTML='<option value="ALL">전체 판매처</option>'+AD_CHANNELS.map(c=>`<option value="${c}">${c}</option>`).join('');
@@ -17069,6 +17069,9 @@ function adSave(){
       renderAdList(); renderAdChart();
     });
     return;
+  }
+  if(_adSpend[adKey(ch,date)]!==undefined){
+    if(!confirm(`정말 ${date}에 ${ch}로 저장하시겠습니까?`)) return;
   }
   _adSpend[adKey(ch,date)]=amt;
   saveAdSpend();
