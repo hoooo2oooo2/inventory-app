@@ -8952,19 +8952,20 @@ function dsMgSelect(date){
   restoreBtn.title = hasBackup ? '' : '이 날짜의 삭제 백업이 없어 되돌릴 데이터가 없습니다.';
   document.getElementById('dsMgActionPanel').style.display='';
 }
-async function dsMgConfirmDelete(){
+function dsMgConfirmDelete(){
   if(!_dsMgSelected) return;
   const {date, isRg} = _dsMgSelected;
-  if(!confirm(`${date} ${isRg?'로켓그로스':'판매분석'} 데이터를 삭제할까요?\n(삭제 전 자동 백업되어 되돌릴 수 있습니다)`)) return;
-  const backup = await backupDailySalesBeforeDelete(date, isRg);
-  const {error} = await sb.from('daily_sales').delete().eq('sale_date', date).eq('is_rg', isRg);
-  if(error){ alert('삭제 실패: '+error.message); return; }
-  await addHistory({menu: isRg?'로켓그로스':'판매분석', type:'upload', code:'-', name:'삭제',
-    desc:`${date} ${isRg?'로켓그로스':'판매분석'} 데이터 삭제`, before:`${backup?backup.rows.length:0}건`, after:'0건', user:'수동'});
-  if(isRg) await loadRgDailyCache(); else await loadDailyCache();
-  renderDsBackups(); renderHist();
-  alert(`완료! ${date} 데이터가 삭제됐습니다.${backup&&backup.rows.length?' 필요하면 이 창에서 같은 날짜를 다시 선택해 되돌릴 수 있습니다.':''}`);
-  dsManageLoadList();
+  _openDelPw(`${date} ${isRg?'로켓그로스':'판매분석'} 데이터 삭제`, async()=>{
+    const backup = await backupDailySalesBeforeDelete(date, isRg);
+    const {error} = await sb.from('daily_sales').delete().eq('sale_date', date).eq('is_rg', isRg);
+    if(error){ alert('삭제 실패: '+error.message); return; }
+    await addHistory({menu: isRg?'로켓그로스':'판매분석', type:'upload', code:'-', name:'삭제',
+      desc:`${date} ${isRg?'로켓그로스':'판매분석'} 데이터 삭제`, before:`${backup?backup.rows.length:0}건`, after:'0건', user:'수동'});
+    if(isRg) await loadRgDailyCache(); else await loadDailyCache();
+    renderDsBackups(); renderHist();
+    alert(`완료! ${date} 데이터가 삭제됐습니다.${backup&&backup.rows.length?' 필요하면 이 창에서 같은 날짜를 다시 선택해 되돌릴 수 있습니다.':''}`);
+    dsManageLoadList();
+  });
 }
 async function dsMgConfirmRestore(){
   if(!_dsMgSelected) return;
@@ -10812,13 +10813,14 @@ function pcViewEstimate(id){
 }
 
 function pcDeleteEstimate(id){
-  if(!confirm('이 견적을 삭제하시겠습니까?'))return;
   const _est=_pcEstimates.find(x=>x.id===id);
-  _pcEstimates=_pcEstimates.filter(x=>x.id!==id);
-  try{localStorage.setItem('pc_estimates',JSON.stringify(_pcEstimates));}catch(e){}
-  cloudKvSave('pc_estimates', _pcEstimates);   // 클라우드 공유 갱신
-  addHistory({menu:'단가계산기',type:'edit',code:'-',name:_est?_est.name:'-',desc:'견적 삭제',before:'존재',after:'삭제',user:'수동'});
-  pcRenderEstimates();
+  _openDelPw(`"${_est?_est.name:'견적'}" 삭제`, ()=>{
+    _pcEstimates=_pcEstimates.filter(x=>x.id!==id);
+    try{localStorage.setItem('pc_estimates',JSON.stringify(_pcEstimates));}catch(e){}
+    cloudKvSave('pc_estimates', _pcEstimates);   // 클라우드 공유 갱신
+    addHistory({menu:'단가계산기',type:'edit',code:'-',name:_est?_est.name:'-',desc:'견적 삭제',before:'존재',after:'삭제',user:'수동'});
+    pcRenderEstimates();
+  });
 }
 
 // 클라우드에서 단가계산기 견적 최신본 로드(다른 컴퓨터 저장분 포함)
@@ -11101,14 +11103,15 @@ function qtLoadSaved(id){
 }
 
 function qtDeleteSaved(id){
-  if(!confirm('이 견적서를 삭제할까요?')) return;
   const _q=_qtSaved.find(x=>x.id===id);
-  _qtSaved=_qtSaved.filter(x=>x.id!==id);
-  if(_qtEditId===id) _qtEditId=null;
-  try{ localStorage.setItem('qt_saved',JSON.stringify(_qtSaved)); }catch(e){}
-  cloudKvSave('qt_saved', _qtSaved);   // 클라우드 공유 갱신
-  addHistory({menu:'견적서',type:'edit',code:'-',name:_q?_q.name:'-',desc:'견적서 삭제',before:'존재',after:'삭제',user:'수동'});
-  qtRenderSaved();
+  _openDelPw(`"${_q?_q.name:'견적서'}" 삭제`, ()=>{
+    _qtSaved=_qtSaved.filter(x=>x.id!==id);
+    if(_qtEditId===id) _qtEditId=null;
+    try{ localStorage.setItem('qt_saved',JSON.stringify(_qtSaved)); }catch(e){}
+    cloudKvSave('qt_saved', _qtSaved);   // 클라우드 공유 갱신
+    addHistory({menu:'견적서',type:'edit',code:'-',name:_q?_q.name:'-',desc:'견적서 삭제',before:'존재',after:'삭제',user:'수동'});
+    qtRenderSaved();
+  });
 }
 
 // 클라우드에서 저장된 견적서 최신본 로드(다른 컴퓨터 저장분 포함)
@@ -12330,16 +12333,17 @@ async function saveShipModal(){
   }catch(e){ alert('저장 실패: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='저장'; } }
 }
-async function deleteShip(id){
+function deleteShip(id){
   const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
-  if(!confirm(`[${r.channel}] ${r.item_no} 택배비를 삭제할까요?\n(통합 데이터 배송비는 기본 규칙으로 재계산됩니다)`)) return;
-  _shipData=_shipData.filter(x=>String(x.id)!==String(id));
-  await _shipPersist();
-  renderShipTable();
-  // 기본 규칙(공식)으로 재계산
-  const n=await recalcShippingForKey(r.channel,r.item_no,null);
-  addHistory({menu:'매출관리',type:'edit',code:r.item_no,name:r.item_name||r.channel,desc:`배송비 삭제 (${r.channel})`,before:`${r.fee}원`,after:'삭제',user:'수동'});
-  alert(`삭제 완료. 통합 데이터 ${n}건을 기본 배송비 규칙으로 재계산했습니다.`);
+  _openDelPw(`[${r.channel}] ${r.item_no} 택배비 삭제`, async()=>{
+    _shipData=_shipData.filter(x=>String(x.id)!==String(id));
+    await _shipPersist();
+    renderShipTable();
+    // 기본 규칙(공식)으로 재계산
+    const n=await recalcShippingForKey(r.channel,r.item_no,null);
+    addHistory({menu:'매출관리',type:'edit',code:r.item_no,name:r.item_name||r.channel,desc:`배송비 삭제 (${r.channel})`,before:`${r.fee}원`,after:'삭제',user:'수동'});
+    alert(`삭제 완료. 통합 데이터 ${n}건을 기본 배송비 규칙으로 재계산했습니다.`);
+  });
 }
 
 // 입력된 모든 택배비를 통합 데이터 전체(과거 포함)에 재적용
@@ -17057,24 +17061,30 @@ function adSave(){
   const amt=parseInt(document.getElementById('adAmount').value)||0;
   if(!ch||!date){ alert('판매처와 날짜를 입력하세요.'); return; }
   if(amt<=0){
-    if(!confirm('광고비가 0원입니다. 해당 날짜·판매처 광고비를 삭제할까요?')) return;
-    delete _adSpend[adKey(ch,date)];
-  } else {
-    _adSpend[adKey(ch,date)]=amt;
+    _openDelPw(`${ch} · ${date} 광고비 삭제`, ()=>{
+      delete _adSpend[adKey(ch,date)];
+      saveAdSpend();
+      addHistory({menu:'매출관리',type:'edit',code:ch,name:`광고비 ${date}`,desc:'광고비 삭제',before:'-',after:'삭제',user:'수동'});
+      document.getElementById('adAmount').value='';
+      renderAdList(); renderAdChart();
+    });
+    return;
   }
+  _adSpend[adKey(ch,date)]=amt;
   saveAdSpend();
-  addHistory({menu:'매출관리',type:'edit',code:ch,name:`광고비 ${date}`,desc:amt>0?'광고비 저장':'광고비 삭제',before:'-',after:amt>0?`${amt.toLocaleString()}원`:'삭제',user:'수동'});
+  addHistory({menu:'매출관리',type:'edit',code:ch,name:`광고비 ${date}`,desc:'광고비 저장',before:'-',after:`${amt.toLocaleString()}원`,user:'수동'});
   document.getElementById('adAmount').value='';
   renderAdList(); renderAdChart();
   alert(`${ch} · ${date} 광고비 ${amt.toLocaleString()}원 저장되었습니다.`);
 }
 
 function adDelete(ch,date){
-  if(!confirm(`${ch} · ${date} 광고비를 삭제할까요?`)) return;
-  delete _adSpend[adKey(ch,date)];
-  saveAdSpend();
-  addHistory({menu:'매출관리',type:'edit',code:ch,name:`광고비 ${date}`,desc:'광고비 삭제',before:'-',after:'삭제',user:'수동'});
-  renderAdList(); renderAdChart();
+  _openDelPw(`${ch} · ${date} 광고비 삭제`, ()=>{
+    delete _adSpend[adKey(ch,date)];
+    saveAdSpend();
+    addHistory({menu:'매출관리',type:'edit',code:ch,name:`광고비 ${date}`,desc:'광고비 삭제',before:'-',after:'삭제',user:'수동'});
+    renderAdList(); renderAdChart();
+  });
 }
 
 function renderAdList(){
@@ -17716,6 +17726,15 @@ function confirmBatchDelPick(){
   const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
   const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
   const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=`${y}년 ${m}월 ${d}일 · ${ch} 업로드분 ${matches.length.toLocaleString()}건을 영구 삭제합니다. 되돌릴 수 없습니다.`;
+  openModal('delPwModal');
+  setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
+}
+// 공용 삭제 비밀번호 게이트 — label을 delPwCount에 표시하고, 비번 통과 시 cb 실행
+function _openDelPw(label, cb){
+  const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=label;
+  const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
+  const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
+  _delPwCallback=cb;
   openModal('delPwModal');
   setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
 }
@@ -19127,7 +19146,7 @@ async function saveProd(){
   else{await sb.from('products').insert({...d,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)});await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code,name,desc:'신규등록',before:'-',after:'등록',user:'수동'});await loadProducts(true);if(products.length===1)salesSel=new Set([products[0].id]);}
   closeModal('prodModal');renderInv();updateFloat();
 }
-async function deleteProd(id){const p=products.find(x=>x.id===id);if(!p||!confirm(`"${p.name}" 을 삭제하시겠습니까?`))return;await sb.from('products').delete().eq('id',id);await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:'삭제',before:'존재',after:'삭제',user:'수동'});await loadProducts(true);renderInv();updateFloat();}
+function deleteProd(id){const p=products.find(x=>x.id===id);if(!p)return;_openDelPw(`"${p.name}" 삭제`, async()=>{await sb.from('products').delete().eq('id',id);await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:'삭제',before:'존재',after:'삭제',user:'수동'});await loadProducts(true);renderInv();updateFloat();});}
 async function discProd(id){
   const p=products.find(x=>x.id===id);if(!p)return;
   const d=!p.disc;
@@ -19974,52 +19993,52 @@ async function deleteHistUpload(histId){
     // 날짜 입력 받기
     const dateInput = prompt(`삭제할 날짜를 입력하세요 (예: 2026-04-28)\n\n업로드 시간: ${h.time}`, '');
     if(!dateInput) return;
-    const confirmDel = confirm(`${dateInput} 날짜의 일별 판매 데이터를 삭제합니다.\n(삭제 전 자동 백업되어 변동이력 화면에서 되돌릴 수 있습니다)\n계속하시겠습니까?`);
-    if(!confirmDel) return;
-    const backup = await backupDailySalesBeforeDelete(dateInput, false);
-    const {error, count} = await sb.from('daily_sales').delete({count:'exact'}).eq('sale_date', dateInput).eq('is_rg', false);
-    if(error){ alert('삭제 실패: '+error.message); return; }
-    // 변동이력도 삭제
-    await sb.from('history_log').delete().eq('id', histId);
-    historyLog = historyLog.filter(x=>x.id!==histId);
-    await addHistory({menu:'변동이력',type:'upload',code:'-',name:'삭제',desc:`${dateInput} 판매데이터 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
-    alert(`완료! ${dateInput} 판매 데이터 삭제됨${backup&&backup.rows.length?` (백업 ${backup.rows.length}행 — 아래 목록에서 되돌리기 가능)`:''}`);
-    await loadDailyCache();
-    renderDsBackups();
-    renderHist();
+    _openDelPw(`${dateInput} 판매 데이터 삭제`, async()=>{
+      const backup = await backupDailySalesBeforeDelete(dateInput, false);
+      const {error, count} = await sb.from('daily_sales').delete({count:'exact'}).eq('sale_date', dateInput).eq('is_rg', false);
+      if(error){ alert('삭제 실패: '+error.message); return; }
+      // 변동이력도 삭제
+      await sb.from('history_log').delete().eq('id', histId);
+      historyLog = historyLog.filter(x=>x.id!==histId);
+      await addHistory({menu:'변동이력',type:'upload',code:'-',name:'삭제',desc:`${dateInput} 판매데이터 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
+      alert(`완료! ${dateInput} 판매 데이터 삭제됨${backup&&backup.rows.length?` (백업 ${backup.rows.length}행 — 아래 목록에서 되돌리기 가능)`:''}`);
+      await loadDailyCache();
+      renderDsBackups();
+      renderHist();
+    });
 
   } else if(menu==='로켓그로스'){
     const dateInput = prompt(`삭제할 날짜를 입력하세요 (예: 2026-04-28)\n\n업로드 시간: ${h.time}`, '');
     if(!dateInput) return;
-    const confirmDel = confirm(`${dateInput} 날짜의 로켓그로스 데이터를 삭제합니다.\n(삭제 전 자동 백업되어 변동이력 화면에서 되돌릴 수 있습니다)\n계속하시겠습니까?`);
-    if(!confirmDel) return;
-    const backup = await backupDailySalesBeforeDelete(dateInput, true);
-    const {error} = await sb.from('daily_sales').delete().eq('sale_date', dateInput).eq('is_rg', true);
-    if(error){ alert('삭제 실패: '+error.message); return; }
-    await sb.from('history_log').delete().eq('id', histId);
-    historyLog = historyLog.filter(x=>x.id!==histId);
-    await addHistory({menu:'변동이력',type:'upload',code:'-',name:'삭제',desc:`${dateInput} 로켓그로스 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
-    alert(`완료! ${dateInput} 로켓그로스 데이터 삭제됨${backup&&backup.rows.length?` (백업 ${backup.rows.length}행 — 아래 목록에서 되돌리기 가능)`:''}`);
-    await loadRgDailyCache();
-    renderDsBackups();
-    renderHist();
+    _openDelPw(`${dateInput} 로켓그로스 데이터 삭제`, async()=>{
+      const backup = await backupDailySalesBeforeDelete(dateInput, true);
+      const {error} = await sb.from('daily_sales').delete().eq('sale_date', dateInput).eq('is_rg', true);
+      if(error){ alert('삭제 실패: '+error.message); return; }
+      await sb.from('history_log').delete().eq('id', histId);
+      historyLog = historyLog.filter(x=>x.id!==histId);
+      await addHistory({menu:'변동이력',type:'upload',code:'-',name:'삭제',desc:`${dateInput} 로켓그로스 삭제`,before:`${h.after}`,after:'0건',user:'수동'});
+      alert(`완료! ${dateInput} 로켓그로스 데이터 삭제됨${backup&&backup.rows.length?` (백업 ${backup.rows.length}행 — 아래 목록에서 되돌리기 가능)`:''}`);
+      await loadRgDailyCache();
+      renderDsBackups();
+      renderHist();
+    });
 
   } else if(menu==='재고관리'){
     // 재고 업로드는 products 테이블 stock 변경 → 롤백 복잡하므로 이력만 삭제
-    const confirmDel = confirm(`재고관리 업로드 이력을 삭제합니다.\n(stock 수량은 직접 수정 필요)\n계속하시겠습니까?`);
-    if(!confirmDel) return;
-    await sb.from('history_log').delete().eq('id', histId);
-    historyLog = historyLog.filter(x=>x.id!==histId);
-    alert('이력이 삭제됐습니다. 재고 수량은 재고관리 탭에서 직접 수정해주세요.');
-    renderHist();
+    _openDelPw('재고관리 업로드 이력 삭제', async()=>{
+      await sb.from('history_log').delete().eq('id', histId);
+      historyLog = historyLog.filter(x=>x.id!==histId);
+      alert('이력이 삭제됐습니다. 재고 수량은 재고관리 탭에서 직접 수정해주세요.');
+      renderHist();
+    });
 
   } else {
     // 기타 이력 삭제
-    const confirmDel = confirm(`이 이력을 삭제하시겠습니까?`);
-    if(!confirmDel) return;
-    await sb.from('history_log').delete().eq('id', histId);
-    historyLog = historyLog.filter(x=>x.id!==histId);
-    renderHist();
+    _openDelPw('이력 삭제', async()=>{
+      await sb.from('history_log').delete().eq('id', histId);
+      historyLog = historyLog.filter(x=>x.id!==histId);
+      renderHist();
+    });
   }
 }
 function histPageChange(dir){const max=Math.ceil(historyLog.length/HIST_PER)-1;histPage=Math.max(0,Math.min(max,histPage+dir));renderHist();}
@@ -23225,16 +23244,11 @@ function foSaveProduct(){
 
 function foDeleteProduct(id){
   const p=_foProducts.find(x=>x.id===id);
-  const cnt=document.getElementById('delPwCount'); if(cnt) cnt.textContent=`"${_esc(p?p.name:'상품')}" 삭제`;
-  const inp=document.getElementById('delPwInput'); if(inp) inp.value='';
-  const msg=document.getElementById('delPwMsg'); if(msg) msg.textContent='';
-  _delPwCallback=()=>{
+  _openDelPw(`"${_esc(p?p.name:'상품')}" 삭제`, ()=>{
     _foProducts = _foProducts.filter(x=>x.id!==id);
     _foFlushProducts();
     foRenderProductList();
-  };
-  openModal('delPwModal');
-  setTimeout(()=>{ const i=document.getElementById('delPwInput'); if(i) i.focus(); },120);
+  });
 }
 
 // ── 우측 주문서 ──
@@ -23386,12 +23400,13 @@ function foLoadOrder(id){
   if(card) card.classList.add('active');
 }
 
-async function foDeleteOrder(id){
-  if(!confirm('주문서를 삭제하시겠습니까?')) return;
-  _foOrders=_foOrders.filter(o=>o.id!==id);
-  await _foFlushOrders();
-  if(_foCurOrderId===id){ _foCurOrderId=null; _foCurRows=[]; foRenderOrderTable(); }
-  foRenderOrderList();
+function foDeleteOrder(id){
+  _openDelPw('주문서 삭제', async()=>{
+    _foOrders=_foOrders.filter(o=>o.id!==id);
+    await _foFlushOrders();
+    if(_foCurOrderId===id){ _foCurOrderId=null; _foCurRows=[]; foRenderOrderTable(); }
+    foRenderOrderList();
+  });
 }
 
 function foRenderOrderList(){
@@ -23754,12 +23769,13 @@ function foSaveEditedReceipts(orderId,maxCols){
 function foDeleteCompletedOrder(orderId){
   const order=_foOrders.find(o=>o.id===orderId);
   if(!order) return;
-  if(!confirm(`"${order.date||''} ${order.vendor||''} 오더건"을 삭제하시겠습니까?\n입고 이력도 함께 삭제됩니다.`)) return;
-  (order.rows||[]).forEach((_,idx)=>{ delete _foImports[`${orderId}_${idx}`]; });
-  _foOrders=_foOrders.filter(o=>o.id!==orderId);
-  Promise.all([_foFlushOrders(),_foFlushImports()]).then(()=>{
-    foRenderOrderList();
-    foRenderImportTab();
+  _openDelPw(`"${order.date||''} ${order.vendor||''} 오더건" 삭제`, ()=>{
+    (order.rows||[]).forEach((_,idx)=>{ delete _foImports[`${orderId}_${idx}`]; });
+    _foOrders=_foOrders.filter(o=>o.id!==orderId);
+    Promise.all([_foFlushOrders(),_foFlushImports()]).then(()=>{
+      foRenderOrderList();
+      foRenderImportTab();
+    });
   });
 }
 
@@ -24465,14 +24481,15 @@ async function cmbKpiAddCard(){
   await cmbSaveKpiCards();
   toast(`'${name}' KPI 카드를 추가했습니다.`);
 }
-async function cmbKpiDeleteCard(id){
+function cmbKpiDeleteCard(id){
   const card = _cmbKpiCards.find(x=>x.id===id); if(!card) return;
-  if(!confirm(`'${card.name}' KPI 카드를 삭제할까요?`)) return;
-  _cmbKpiCards = _cmbKpiCards.filter(x=>x.id!==id);
-  cmbRenderKpiGroupBar();
-  cmbRenderKpiBar();
-  await cmbSaveKpiCards();
-  toast('KPI 카드를 삭제했습니다.');
+  _openDelPw(`'${card.name}' KPI 카드 삭제`, async()=>{
+    _cmbKpiCards = _cmbKpiCards.filter(x=>x.id!==id);
+    cmbRenderKpiGroupBar();
+    cmbRenderKpiBar();
+    await cmbSaveKpiCards();
+    toast('KPI 카드를 삭제했습니다.');
+  });
 }
 // 대분류 생성 직후 — 기존(다른 대분류/미분류) 카드를 체크해서 이 대분류로 한 번에 이동
 let _cmbKpiAssignGroupId = null;
@@ -24592,15 +24609,16 @@ function cmbEditFromDetail(){
   cmbRenderSel();
   toast(`"${set.name}" 세트를 불러왔습니다. 수정 후 저장하세요.`);
 }
-async function cmbDeleteFromDetail(){
+function cmbDeleteFromDetail(){
   const set = _cmbSets.find(x=>x.id===_cmbDetailId); if(!set) return;
-  if(!confirm(`"${set.name}" 세트를 삭제할까요?`)) return;
-  _cmbSets = _cmbSets.filter(x=>x.id!==_cmbDetailId);
-  if(_cmbEditId===_cmbDetailId){ _cmbEditId=null; cmbRenderSel(); }
-  document.getElementById('cmbDetailModal').style.display='none';
-  cmbRenderSaved();
-  await cloudKvSave('combo_sets', _cmbSets);
-  toast('세트를 삭제했습니다.');
+  _openDelPw(`"${set.name}" 세트 삭제`, async()=>{
+    _cmbSets = _cmbSets.filter(x=>x.id!==_cmbDetailId);
+    if(_cmbEditId===_cmbDetailId){ _cmbEditId=null; cmbRenderSel(); }
+    document.getElementById('cmbDetailModal').style.display='none';
+    cmbRenderSaved();
+    await cloudKvSave('combo_sets', _cmbSets);
+    toast('세트를 삭제했습니다.');
+  });
 }
 
 // ══════════════════════════════════════════════
@@ -24764,19 +24782,20 @@ async function csConfirmVendor(){
   await cloudKvSave('consign_vendors', _csVendors);
   toast('배송처를 저장했습니다.');
 }
-async function csDeleteVendor(){
+function csDeleteVendor(){
   const v = _csVendors.find(x=>x.id===_csEditVendorId); if(!v) return;
   const np = _csProducts.filter(p=>p.vendorId===v.id).length;
   const no = _csOrders.filter(o=>o.vendorId===v.id).length;
   if(np||no){ toast(`제품 ${np}개·주문 ${no}건이 남아 있어 삭제할 수 없습니다. 먼저 비워주세요.`); return; }
-  if(!confirm(`'${v.name}' 배송처를 삭제할까요?`)) return;
-  _csVendors = _csVendors.filter(x=>x.id!==v.id);
-  if(_csSelVendor===v.id) _csSelVendor = _csVendors.length ? _csVendors[0].id : 'ALL';
-  document.getElementById('csVendorModal').style.display='none';
-  _csEditVendorId = null;
-  csRenderVendorChips(); csRenderVHead(); csRenderProducts(); csRenderOrders();
-  await cloudKvSave('consign_vendors', _csVendors);
-  toast('배송처를 삭제했습니다.');
+  _openDelPw(`'${v.name}' 배송처 삭제`, async()=>{
+    _csVendors = _csVendors.filter(x=>x.id!==v.id);
+    if(_csSelVendor===v.id) _csSelVendor = _csVendors.length ? _csVendors[0].id : 'ALL';
+    document.getElementById('csVendorModal').style.display='none';
+    _csEditVendorId = null;
+    csRenderVendorChips(); csRenderVHead(); csRenderProducts(); csRenderOrders();
+    await cloudKvSave('consign_vendors', _csVendors);
+    toast('배송처를 삭제했습니다.');
+  });
 }
 function _csVendorOptions(selId){
   return _csVendors.map(v=>`<option value="${v.id}" ${v.id===selId?'selected':''}>${_csEsc(v.name)}</option>`).join('');
@@ -24873,13 +24892,14 @@ async function csConfirmProd(){
   await cloudKvSave('consign_products', _csProducts);
   toast('제품을 저장했습니다.');
 }
-async function csDeleteProd(id){
+function csDeleteProd(id){
   const p = _csProducts.find(x=>x.id===id); if(!p) return;
-  if(!confirm(`'${p.name}' 제품을 삭제할까요?`)) return;
-  _csProducts = _csProducts.filter(x=>x.id!==id);
-  csRenderVendorChips(); csRenderProducts();
-  await cloudKvSave('consign_products', _csProducts);
-  toast('제품을 삭제했습니다.');
+  _openDelPw(`'${p.name}' 제품 삭제`, async()=>{
+    _csProducts = _csProducts.filter(x=>x.id!==id);
+    csRenderVendorChips(); csRenderProducts();
+    await cloudKvSave('consign_products', _csProducts);
+    toast('제품을 삭제했습니다.');
+  });
 }
 
 // ── 주문·거래 리스트 (한 주문에 여러 제품) ──
@@ -24966,13 +24986,14 @@ async function csConfirmOrder(){
   await cloudKvSave('consign_orders', _csOrders);
   toast('주문을 저장했습니다.');
 }
-async function csDeleteOrder(id){
+function csDeleteOrder(id){
   const o = _csOrders.find(x=>x.id===id); if(!o) return;
-  if(!confirm(`${o.date} ${o.customer||''} 주문을 삭제할까요?`)) return;
-  _csOrders = _csOrders.filter(x=>x.id!==id);
-  csRenderVHead(); csRenderOrders();
-  await cloudKvSave('consign_orders', _csOrders);
-  toast('주문을 삭제했습니다.');
+  _openDelPw(`${o.date} ${o.customer||''} 주문 삭제`, async()=>{
+    _csOrders = _csOrders.filter(x=>x.id!==id);
+    csRenderVHead(); csRenderOrders();
+    await cloudKvSave('consign_orders', _csOrders);
+    toast('주문을 삭제했습니다.');
+  });
 }
 function _csOrderFilter(){
   const month = document.getElementById('csOrderMonth').value;
@@ -25210,10 +25231,11 @@ async function arqSaveAdd(row){
   await cloudKvSave('accessory_requests', latest);
 }
 function arqDeleteRow(id){
-  if(!confirm('이 요청을 삭제할까요?')) return;
-  _arqRows = _arqRows.filter(r=>r.id!==id);
-  arqRender();
-  arqSaveDelete(id);
+  _openDelPw('요청 삭제', ()=>{
+    _arqRows = _arqRows.filter(r=>r.id!==id);
+    arqRender();
+    arqSaveDelete(id);
+  });
 }
 async function arqSaveDelete(id){
   let latest = await cloudKvLoad('accessory_requests');
@@ -25451,10 +25473,11 @@ async function tcbImport(json, fileName){
 }
 
 function tcbDeleteRow(id){
-  if(!confirm('이 보상 건을 삭제할까요?')) return;
-  _tcbRows = _tcbRows.filter(r=>r.id!==id);
-  tcbRender();
-  tcbSaveDelete(id);
+  _openDelPw('보상 건 삭제', ()=>{
+    _tcbRows = _tcbRows.filter(r=>r.id!==id);
+    tcbRender();
+    tcbSaveDelete(id);
+  });
 }
 async function tcbSaveDelete(id){
   let latest = await cloudKvLoad('courier_comp_list');
