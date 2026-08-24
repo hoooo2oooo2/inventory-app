@@ -20426,8 +20426,8 @@ function _buildPreview(rows){
     rows.forEach(r=>{
       const di=_parseDate(r[0]),code=String(r[1]||'').trim(),name=String(r[2]||'').trim();
       const bq=parseInt(r[3])||1,boxes=parseInt(r[4])||0,totalQty=parseInt(r[5])||boxes*bq;
-      if(!code||!totalQty){err++;return;}
-      const dateStr=di?di.str:String(r[0]).trim();
+      if(!code||!totalQty||!di){err++;return;} // 날짜 형식이 아니면 양식이 다른 파일로 판단해 거절
+      const dateStr=di.str;
       if(isDup({code,name,orderDate:dateStr,orderQty:totalQty})){dup++;html+=`<tr style="background:#FEF2F2;">${td(dateStr,'color:var(--tx2);')+td(code,'font-family:monospace;')+td(name)+td(totalQty.toLocaleString()+'개','text-align:right;')+td('<span style="color:#DC2626;font-size:10px;font-weight:500;">중복차단</span>')}</tr>`;return;}
       _pendingRows.push({code,name,orderDate:dateStr,orderQty:totalQty});ok++;
       html+=`<tr>${td(dateStr,'color:var(--tx2);')+td(code,'font-family:monospace;')+td(name)+td(totalQty.toLocaleString()+'개','text-align:right;font-weight:500;')+td('<span style="background:#ECFDF5;color:#059669;padding:2px 6px;border-radius:4px;font-size:10px;">등록</span>')}</tr>`;
