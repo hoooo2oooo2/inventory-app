@@ -1420,7 +1420,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-order-info{flex:1;min-width:0;font-size:13px;color:var(--tx);}
 .lbx-order-info small{color:var(--tx2);font-size:11px;}
 .lbx-order-qty{width:78px;padding:5px 7px;border:1px solid var(--bd);border-radius:7px;font-size:13px;text-align:right;}
-.lbx-order-qty:disabled{background:#f1f2f4;color:#bbb;}
+.lbx-order-qty:disabled{background:var(--bg2);color:var(--tx2);}
 .lbx-order-sum{margin-top:10px;font-size:13px;color:var(--tx);font-weight:700;text-align:right;min-height:18px;}
 /* 같은 규격 중 최저가 표시 (초록) */
 .lbx-cheap{color:#05C072;font-size:11px;font-weight:800;margin-top:2px;white-space:nowrap;}
@@ -23565,21 +23565,21 @@ function foRenderImportTab(){
       // 주문건별 날짜 설정 행
       let dateCells='';
       for(let i=0;i<maxCols;i++){
-        dateCells+=`<td style="padding:3px 5px;background:#F0F6FF;border-bottom:2px solid ${vc}30;">
+        dateCells+=`<td style="padding:3px 5px;background:var(--prl);border-bottom:2px solid ${vc}30;">
           <input type="date" value="${orderDates[i]||''}"
-            style="width:100%;border:1px solid #BFDBFE;border-radius:4px;font-size:10.5px;padding:2px 4px;box-sizing:border-box;font-family:inherit;background:#fff;color:#1A1A1A;color-scheme:light;"
+            style="width:100%;border:1px solid ${vc}40;border-radius:4px;font-size:10.5px;padding:2px 4px;box-sizing:border-box;font-family:inherit;background:var(--bg);color:var(--tx);"
             onchange="foUpdateOrderDate('${order.id}',${i},this.value)">
         </td>`;
       }
-      rows+=`<tr style="background:#F0F6FF;">
-        <td colspan="2" style="padding:5px 10px;background:#F0F6FF;border-bottom:2px solid ${vc}30;">
+      rows+=`<tr style="background:var(--prl);">
+        <td colspan="2" style="padding:5px 10px;background:var(--prl);border-bottom:2px solid ${vc}30;">
           <span style="font-size:11px;font-weight:700;color:${vc};">${order.date||''}</span>
           <span style="font-size:10px;font-weight:700;color:${vc};background:${vc}20;border-radius:3px;padding:1px 6px;margin-left:6px;">${order.vendor||''}</span>
-          <span style="font-size:10px;color:#6B7280;margin-left:6px;">차수별 입고 날짜</span>
+          <span style="font-size:10px;color:var(--tx2);margin-left:6px;">차수별 입고 날짜</span>
         </td>
-        <td colspan="5" style="background:#F0F6FF;border-bottom:2px solid ${vc}30;"></td>
+        <td colspan="5" style="background:var(--prl);border-bottom:2px solid ${vc}30;"></td>
         ${dateCells}
-        <td colspan="2" style="background:#F0F6FF;border-bottom:2px solid ${vc}30;"></td>
+        <td colspan="2" style="background:var(--prl);border-bottom:2px solid ${vc}30;"></td>
       </tr>`;
       // 품목 행
       (order.rows||[]).forEach((row,idx)=>{
@@ -23593,7 +23593,7 @@ function foRenderImportTab(){
         for(let i=0;i<maxCols;i++){
           const rQty=receipts[i]||'';
           tdInputs+=`<td style="padding:2px 4px;vertical-align:middle;">
-            <input type="number" min="0" value="${rQty}" placeholder="0" style="width:100%;border:1px solid #ddd;border-radius:4px;font-size:12px;padding:3px 5px;box-sizing:border-box;text-align:right;font-family:inherit;" oninput="foUpdateImportQty('${rawKey}',${i},this.value,${totalQty})">
+            <input type="number" min="0" value="${rQty}" placeholder="0" style="width:100%;border:1px solid var(--bd);border-radius:4px;font-size:12px;padding:3px 5px;box-sizing:border-box;text-align:right;font-family:inherit;background:var(--bg);color:var(--tx);" oninput="foUpdateImportQty('${rawKey}',${i},this.value,${totalQty})">
           </td>`;
         }
         rows+=`<tr>
@@ -23663,9 +23663,9 @@ function foEditCompletedOrder(orderId){
   const orderDatesEdit=_foOrderImportDates[orderId]||{};
   let thCols='';
   for(let i=0;i<maxCols;i++){
-    thCols+=`<th style="padding:6px 8px;border:1px solid #e0e0e0;white-space:nowrap;min-width:110px;">
+    thCols+=`<th style="padding:6px 8px;border:1px solid var(--bd);white-space:nowrap;min-width:110px;">
       ${i+1}차 입고<br>
-      <input type="date" id="foEditDate_${orderId}_${i}" value="${orderDatesEdit[i]||''}" style="width:100%;border:1px solid #ccc;border-radius:3px;font-size:10px;padding:1px 2px;margin-top:2px;font-family:inherit;">
+      <input type="date" id="foEditDate_${orderId}_${i}" value="${orderDatesEdit[i]||''}" style="width:100%;border:1px solid var(--bd);border-radius:3px;font-size:10px;padding:1px 2px;margin-top:2px;font-family:inherit;background:var(--bg);color:var(--tx);">
     </th>`;
   }
   let tbody='';
@@ -23675,15 +23675,15 @@ function foEditCompletedOrder(orderId){
     const totalQty=(row.qtyBox||0)*(row.boxes||0);
     let tdInputs='';
     for(let i=0;i<maxCols;i++){
-      tdInputs+=`<td style="padding:3px 4px;border:1px solid #e0e0e0;">
+      tdInputs+=`<td style="padding:3px 4px;border:1px solid var(--bd);">
         <input type="number" min="0" id="foEditQty_${orderId}_${idx}_${i}" value="${receipts[i]||''}" placeholder="0"
-          style="width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 5px;text-align:right;font-size:12px;font-family:inherit;box-sizing:border-box;">
+          style="width:100%;border:1px solid var(--bd);border-radius:4px;padding:4px 5px;text-align:right;font-size:12px;font-family:inherit;box-sizing:border-box;background:var(--bg);color:var(--tx);">
       </td>`;
     }
     tbody+=`<tr>
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.name||''}">${row.name||''}</td>
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:center;font-size:11px;color:#888;">${row.code||''}</td>
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;font-weight:700;">${totalQty.toLocaleString()}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx);" title="${row.name||''}">${row.name||''}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);text-align:center;font-size:11px;color:var(--tx2);">${row.code||''}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);text-align:right;font-weight:700;color:var(--tx);">${totalQty.toLocaleString()}</td>
       ${tdInputs}
     </tr>`;
   });
@@ -23703,10 +23703,10 @@ function foEditCompletedOrder(orderId){
     </div>
     <div style="padding:16px;overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:#f5f7fa;color:#1A1A1A;">
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;text-align:left;">품명</th>
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;">코드</th>
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;">총수량</th>
+        <thead><tr style="background:var(--bg2);color:var(--tx);">
+          <th style="padding:6px 8px;border:1px solid var(--bd);text-align:left;">품명</th>
+          <th style="padding:6px 8px;border:1px solid var(--bd);">코드</th>
+          <th style="padding:6px 8px;border:1px solid var(--bd);">총수량</th>
           ${thCols}
         </tr></thead>
         <tbody>${tbody}</tbody>
@@ -23769,7 +23769,7 @@ function foShowCompletedDetail(orderId){
   const maxCols=Math.max(_foImportCols,...Object.values(_foImports).map(v=>Array.isArray(v)?v.length:0),1);
   let thCols='';
   const orderDatesDetail=_foOrderImportDates[orderId]||{};
-  for(let i=0;i<maxCols;i++) thCols+=`<th style="padding:6px 8px;border:1px solid #e0e0e0;white-space:nowrap;">${i+1}차<br><span style="font-size:10px;font-weight:400;color:#888;">${orderDatesDetail[i]||'날짜없음'}</span></th>`;
+  for(let i=0;i<maxCols;i++) thCols+=`<th style="padding:6px 8px;border:1px solid var(--bd);white-space:nowrap;">${i+1}차<br><span style="font-size:10px;font-weight:400;color:var(--tx2);">${orderDatesDetail[i]||'날짜없음'}</span></th>`;
   let tbody='';
   let grandTotal=0, grandRecv=0;
   (order.rows||[]).forEach((row,idx)=>{
@@ -23780,14 +23780,14 @@ function foShowCompletedDetail(orderId){
     const rem=totalQty-totalRecv;
     grandTotal+=totalQty; grandRecv+=totalRecv;
     let tdQtys='';
-    for(let i=0;i<maxCols;i++) tdQtys+=`<td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;color:#059669;">${receipts[i]?((parseFloat(receipts[i])||0).toLocaleString()):'—'}</td>`;
+    for(let i=0;i<maxCols;i++) tdQtys+=`<td style="padding:5px 8px;border:1px solid var(--bd);text-align:right;color:#059669;">${receipts[i]?((parseFloat(receipts[i])||0).toLocaleString()):'—'}</td>`;
     tbody+=`<tr>
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;font-size:12px;">${row.name||''}</td>
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:center;font-size:11px;color:#888;">${row.code||''}</td>
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;font-weight:700;">${totalQty.toLocaleString()}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);font-size:12px;color:var(--tx);">${row.name||''}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);text-align:center;font-size:11px;color:var(--tx2);">${row.code||''}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);text-align:right;font-weight:700;color:var(--tx);">${totalQty.toLocaleString()}</td>
       ${tdQtys}
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;font-weight:700;color:#059669;">${totalRecv.toLocaleString()}</td>
-      <td style="padding:5px 8px;border:1px solid #e0e0e0;text-align:right;color:${rem<=0?'#059669':'#DC2626'};">${rem.toLocaleString()}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);text-align:right;font-weight:700;color:#059669;">${totalRecv.toLocaleString()}</td>
+      <td style="padding:5px 8px;border:1px solid var(--bd);text-align:right;color:${rem<=0?'#059669':'#DC2626'};">${rem.toLocaleString()}</td>
     </tr>`;
   });
   modal.innerHTML=`<div style="background:var(--bg);border-radius:14px;width:92%;max-width:820px;max-height:82vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.3);">
@@ -23801,13 +23801,13 @@ function foShowCompletedDetail(orderId){
     </div>
     <div style="padding:16px;overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="background:#f5f7fa;color:#1A1A1A;">
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;text-align:left;">품명</th>
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;">코드</th>
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;">총수량</th>
+        <thead><tr style="background:var(--bg2);color:var(--tx);">
+          <th style="padding:6px 8px;border:1px solid var(--bd);text-align:left;">품명</th>
+          <th style="padding:6px 8px;border:1px solid var(--bd);">코드</th>
+          <th style="padding:6px 8px;border:1px solid var(--bd);">총수량</th>
           ${thCols}
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;">총입고</th>
-          <th style="padding:6px 8px;border:1px solid #e0e0e0;">잔여</th>
+          <th style="padding:6px 8px;border:1px solid var(--bd);">총입고</th>
+          <th style="padding:6px 8px;border:1px solid var(--bd);">잔여</th>
         </tr></thead>
         <tbody>${tbody}</tbody>
       </table>
