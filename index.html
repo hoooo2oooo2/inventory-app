@@ -17918,7 +17918,17 @@ function renderUnifiedTable(){
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
           onblur="this.style.borderColor='transparent';this.style.background='transparent';">
       </td>
-      <td style="text-align:right;">${r.orderQty!=null?r.orderQty:''}</td>
+      <td style="text-align:right;padding:0;">
+        <input type="text" inputmode="numeric" value="${r.orderQty!=null?r.orderQty:''}"
+          onfocus="this.select()" onclick="event.stopPropagation()"
+          onkeydown="if(event.key==='Enter'){this.blur();}"
+          onchange="updateRowQty(${r.id}, this.value)"
+          title="클릭하여 수량 수정 (매입·마진 자동 반영)"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px 4px;border-radius:4px;cursor:text;"
+          onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
+          onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+      </td>
       <td style="text-align:right;">${r.shipQty!=null?r.shipQty:''}</td>
       <td style="text-align:right;padding:0;">
         <input type="text" inputmode="numeric" value="${r.shipping!=null?r.shipping:''}"
@@ -18144,6 +18154,34 @@ async function updateRowModel(id, val){
   if(!name){ alert('모델명은 비울 수 없습니다.'); renderUnifiedTable(); return; }
   try{ await applyRowCodeName(id, r.itemCode||'', name); renderUnifiedTable(); }
   catch(e){ alert('모델명 저장 실패: '+e.message); renderUnifiedTable(); }
+}
+
+// 통합 테이블 수량(주문수량) 인라인 수정 → 매입액·마진 자동 재계산
+async function updateRowQty(id, val){
+  if(!_uniEditMode){ toast('먼저 ✏️ 수정모드를 켜주세요 (마스킹 버튼 아래).'); renderUnifiedTable(); return; }
+  const r=_revData.find(x=>x.id===id);
+  if(!r) return;
+  let qty=parseFloat(String(val).replace(/[^0-9.\-]/g,''));
+  if(isNaN(qty)) qty=0;
+  qty=Math.round(qty);
+  if(qty===(r.orderQty||0)){ renderUnifiedTable(); return; } // 변경 없음
+  const unitCost=r.unitCost||0;
+  const settle=r.settlement||0;
+  const shipping=r.shipping||0;
+  const costPrice=Math.round(unitCost*qty);
+  const margin=Math.round(settle-costPrice-shipping);
+  const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
+  try{
+    const {error}=await sb.from('revenue')
+      .update({order_qty:qty, cost_price:costPrice, margin, margin_rate:marginRate}).eq('id',id);
+    if(error) throw error;
+    _bumpRev(r.year);
+    r.orderQty=qty; r.costPrice=costPrice; r.margin=margin; r.marginRate=marginRate;
+    renderUnifiedTable();
+  }catch(e){
+    alert('수량 저장 실패: '+e.message);
+    renderUnifiedTable();
+  }
 }
 
 // 통합 테이블 배송비 인라인 수정 → 마진 자동 재계산
