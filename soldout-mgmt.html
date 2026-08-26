@@ -211,6 +211,8 @@
   .field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;}
   .field input{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13.5px;font-family:inherit;}
   .field input:focus{outline:none;border-color:var(--blue);}
+  .field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13.5px;font-family:inherit;resize:vertical;min-height:38px;}
+  .field textarea:focus{outline:none;border-color:var(--blue);}
   .site-block{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
   .mode-tabs{display:flex;gap:6px;margin:10px 0 14px;}
   .mode-tab{
@@ -226,12 +228,6 @@
   .exist-item:hover{background:var(--blue-light);color:var(--blue);}
   .exist-item .ei-alias{font-size:11px;color:var(--ink-soft);font-weight:500;margin-left:6px;}
   .exist-none{padding:12px;font-size:12.5px;color:var(--ink-soft);text-align:center;}
-  .exist-selected{
-    background:var(--blue-light);border:1px solid #D7E3FC;border-radius:10px;
-    padding:10px 13px;font-size:13px;font-weight:700;margin-bottom:12px;
-    display:flex;align-items:center;justify-content:space-between;gap:8px;
-  }
-  .exist-selected .es-change{font-size:11.5px;font-weight:700;color:var(--blue);cursor:pointer;white-space:nowrap;}
   .site-block-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
   .site-block-head .name{font-size:12.5px;font-weight:700;}
   .site-block textarea{width:100%;border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-size:12.5px;font-family:inherit;resize:vertical;min-height:38px;}
@@ -365,12 +361,11 @@
     <!-- 기존 모드 -->
     <div id="modeExist" style="display:none;">
       <p class="sub">기존 상품을 선택하면 각 사이트의 상품번호가 표시됩니다. 번호를 추가·수정 후 저장하세요.</p>
-      <div class="field">
-        <label>기존 상품 검색 (ERP 상품명)</label>
-        <input type="text" id="existSearch" placeholder="상품명 입력" autocomplete="off">
-      </div>
       <div class="exist-list" id="existList"></div>
-      <div class="exist-selected" id="existSelected" style="display:none;"></div>
+      <div class="field" id="existSelected" style="display:none;">
+        <label>상품명 (ERP 상품명)</label>
+        <textarea id="existNameInput" rows="1"></textarea>
+      </div>
     </div>
 
     <div id="newProdSites"></div>
@@ -1348,7 +1343,6 @@ function setAddMode(mode){
   document.getElementById('modeNew').style.display = mode==='new' ? '' : 'none';
   document.getElementById('modeExist').style.display = mode==='exist' ? '' : 'none';
   document.getElementById('confirmAdd').textContent = mode==='new' ? '등록하기' : '저장하기';
-  document.getElementById('existSearch').value = '';
   document.getElementById('existList').classList.remove('show');
   document.getElementById('existSelected').style.display = 'none';
   if(mode==='new'){
@@ -1393,14 +1387,7 @@ function selectExisting(pid){
   document.getElementById('existList').classList.remove('show');
   const sel = document.getElementById('existSelected');
   sel.style.display = '';
-  sel.innerHTML = `<span>✓ ${escapeHtml(firstLine(p.erpName))}${extraLineCount(p.erpName)>0?` 외 ${extraLineCount(p.erpName)}종`:''}</span><span class="es-change" id="esChange">다른 상품 선택</span>`;
-  document.getElementById('esChange').addEventListener('click', ()=>{
-    existPid = null;
-    sel.style.display = 'none';
-    document.getElementById('newProdSites').style.display = 'none';
-    document.getElementById('newProdSites').innerHTML = '';
-    renderExistList(document.getElementById('existSearch').value);
-  });
+  document.getElementById('existNameInput').value = p.erpName;
   document.getElementById('newProdSites').style.display = '';
   renderAddSiteBlocks(p);
 }
@@ -1411,7 +1398,6 @@ function openEditModal(pid){
   document.getElementById('newProdName').value = '';
   document.getElementById('newProdSearch').value = '';
   setAddMode('exist');
-  document.getElementById('existSearch').value = firstLine(p.erpName);
   selectExisting(pid);
   document.getElementById('addOverlay').classList.add('show');
 }
@@ -1445,6 +1431,13 @@ async function confirmAddProduct(){
     if(!existPid){ showToast('먼저 기존 상품을 선택해주세요.'); return; }
     const p = state.products.find(x=>x.id===existPid);
     if(!p){ showToast('상품을 찾을 수 없습니다.'); return; }
+    const newName = document.getElementById('existNameInput').value.trim();
+    if(!newName){ showToast('상품명을 입력해주세요.'); return; }
+    if(newName !== p.erpName && state.products.some(x=>x.id!==p.id && x.erpName===newName)){
+      showToast('동일한 ERP 상품명이 이미 있습니다.');
+      return;
+    }
+    p.erpName = newName;
     p.siteData = collectSiteBlocks(p);
     await saveState();
     closeAddModal();
@@ -1609,16 +1602,6 @@ async function init(){
   document.getElementById('addOverlay').addEventListener('click', (e)=>{ if(e.target.id==='addOverlay') closeAddModal(); });
   document.querySelectorAll('.mode-tab').forEach(btn=>{
     btn.addEventListener('click', ()=> setAddMode(btn.dataset.mode));
-  });
-  document.getElementById('existSearch').addEventListener('input', (e)=>{
-    if(!existPid) renderExistList(e.target.value);
-    else {
-      // 이미 선택된 상태에서 다시 검색하면 선택 해제 후 리스트 표시
-      existPid = null;
-      document.getElementById('existSelected').style.display = 'none';
-      document.getElementById('newProdSites').style.display = 'none';
-      renderExistList(e.target.value);
-    }
   });
 
   document.getElementById('btnSites').addEventListener('click', openSiteModal);
