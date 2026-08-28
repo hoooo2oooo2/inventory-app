@@ -17204,6 +17204,14 @@ function _catRowColor(cat){
   return CAT_ROW_PALETTE[h%CAT_ROW_PALETTE.length];
 }
 
+// 원본 데이터(상품명 등)에 XML 1.0에서 금지된 제어문자(탭·개행 제외 0x00~0x1F)가 섞여 있으면
+// xlsx-js-style이 이스케이프 없이 그대로 써버려 xlsx 내부 XML이 깨진다 — Excel이 "복구"하면서
+// 문제가 생긴 시트 전체가 통째로 비워지므로, 시트에 넣기 전에 미리 제거한다.
+const _XML_ILLEGAL_CHARS=/[\x00-\x08\x0B\x0C\x0E-\x1F]/g;
+function _xmlSafeAoa(rows){
+  return rows.map(row=>row.map(v=>typeof v==='string'?v.replace(_XML_ILLEGAL_CHARS,''):v));
+}
+
 async function downloadDailyExcel(){
   if(!_dlyFilter.year||!_dlyFilter.month){ alert('년도와 월을 선택하세요.'); return; }
   if(!window.XLSXStyle||!window.JSZip){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
@@ -17283,7 +17291,7 @@ async function downloadDailyExcel(){
     s.push(['■ 핵심 지표']);
     s.push(['날짜','판매가','정산예정금액','마진','마진율','택배건수','광고비','최종마진']);
     agg.forEach(d=>s.push([d.serial,d.sale,d.settle,d.margin,d.rate,d.pkgs,d.ad,d.finalMargin]));
-    const ws=U.aoa_to_sheet(s);
+    const ws=U.aoa_to_sheet(_xmlSafeAoa(s));
     ws['!cols']=[{wch:13},{wch:14},{wch:14},{wch:13},{wch:9},{wch:10},{wch:12},{wch:13}];
     ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];
     sc(ws,0,0,SECT); sc(ws,16,0,SECT);
@@ -17306,7 +17314,7 @@ async function downloadDailyExcel(){
   stp.push([`■ 제품구분별 비중 - ${selY}-${selMonStr}-${pad(endDay)} [${chLabel}]`]);
   stp.push(['구분','정산금액','비중']);
   typeList.forEach(([t,v])=>stp.push([t,v,typeTot>0?v/typeTot:0]));
-  const wsT=U.aoa_to_sheet(stp);
+  const wsT=U.aoa_to_sheet(_xmlSafeAoa(stp));
   wsT['!cols']=[{wch:16},{wch:14},{wch:10}];
   sc(wsT,0,0,SECT); for(let c=0;c<3;c++) sc(wsT,1,c,HEAD);
   for(let i=0;i<typeList.length;i++){ fmt(wsT,2+i,1,WON); fmt(wsT,2+i,2,PCT); }
@@ -17429,7 +17437,9 @@ async function downloadDailyExcel(){
   const weekTrend=name=>{
     const cur=weekSum(name,0,6), prev=weekSum(name,7,13);
     if(cur===0&&prev===0) return {text:'', dir:0, kind:'none'};
-    if(isTriggerDay(name,refDate)) return {text:'🆕신규', dir:1, kind:'new'};
+    // 🆕(U+1F195, 서로게이트 페어 필요한 문자)를 xlsx-js-style로 쓰면 드물게 잘못된 UTF-8(CESU-8 형태)로
+    // 인코딩되어 xlsx 내부 XML이 깨지는 사례가 확인됨(2026-08-27 발생) — BMP 내 안전한 기호로 대체.
+    if(isTriggerDay(name,refDate)) return {text:'★신규', dir:1, kind:'new'};
     if(cur===0) return {text:'▼판매중단', dir:-1, kind:'down'};
     const diff=cur-prev;
     const dir=diff>0?1:diff<0?-1:0;
@@ -17455,7 +17465,7 @@ async function downloadDailyExcel(){
         tM=prodList.reduce((s,[,v])=>s+v.margin,0);
   const totalDaily=dateCols.map(d=>prodList.reduce((s,[name])=>s+qtyOn(name,d),0));
   s2.push(['합계','',tQ,tC,tS,tM,tSt>0?tM/tSt:0,'','', ...totalDaily]);
-  const ws2=U.aoa_to_sheet(s2);
+  const ws2=U.aoa_to_sheet(_xmlSafeAoa(s2));
   ws2['!cols']=[{wch:40},{wch:11},{wch:9},{wch:9},{wch:13},{wch:12},{wch:9},{wch:14},{wch:11}, ...Array(DAILY_COLS_DAYS).fill({wch:9})];
   sc(ws2,0,0,SECT);
   for(let c=0;c<totalCols;c++) sc(ws2,1,c,HEAD);
@@ -17510,7 +17520,7 @@ async function downloadDailyExcel(){
   s3.push([]);
   s3.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2','우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수','배송비','판매가','매입액','마진','마진율','개당단가']);
   detail.forEach(r=>s3.push([r.year,r.date,r.ch,r.orderNo,r.buyer,r.receiver,r.phone1,r.phone2,r.zip,r.addr,r.itemType,r.itemCode,r.modelName,r.orderQty,r.shipQty,r.shipping,r.salePrice,r.costPrice,r.margin,r.marginRate,r.unitCost]));
-  const ws3=U.aoa_to_sheet(s3);
+  const ws3=U.aoa_to_sheet(_xmlSafeAoa(s3));
   ws3['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},{wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},{wch:8},{wch:10},{wch:10},{wch:12},{wch:8},{wch:10}];
   sc(ws3,0,0,SECT); for(let c=0;c<21;c++) sc(ws3,2,c,HEAD);
   for(let i=3;i<s3.length;i++){ [15,16,17,20].forEach(c=>fmt(ws3,i,c,WON)); fmt(ws3,i,18,MARGIN_FMT); fmt(ws3,i,19,PCT); }
@@ -17528,7 +17538,7 @@ async function downloadDailyExcel(){
   }
   adRows.sort((a,b)=>a.date.localeCompare(b.date)||a.ch.localeCompare(b.ch));
   adRows.forEach(a=>s4.push([a.date,a.ch,a.amt]));
-  const ws4=U.aoa_to_sheet(s4);
+  const ws4=U.aoa_to_sheet(_xmlSafeAoa(s4));
   ws4['!cols']=[{wch:14},{wch:14},{wch:12}];
   for(let c=0;c<3;c++) sc(ws4,0,c,HEAD);
   for(let i=1;i<s4.length;i++) fmt(ws4,i,2,WON);
