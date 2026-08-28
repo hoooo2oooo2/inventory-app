@@ -4357,30 +4357,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 <!-- ═══ 발주 인사이트 — 제품별 출고 추이 모달 ═══ -->
 <style>
-#insightTrendModal .modal{max-width:760px;}
-#insightTrendModal .ptab{font-size:13px;padding:6px 14px;}
-#insightTrendModal .ins-trend-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+#insightTrendModal .modal{max-width:820px;}
+#insightTrendModal .ins-trend-head{margin-bottom:14px;}
 #insightTrendModal h3{font-size:17px;margin:0;}
 #insightTrendModal .ins-trend-code{font-size:12px;color:var(--tx2);font-weight:500;margin-top:2px;}
-#insightTrendModal .ins-trend-summary{font-size:13px;color:var(--tx2);margin-top:10px;font-weight:600;}
-#insightTrendModal .ins-trend-canvaswrap{height:320px;position:relative;}
+#insightTrendModal .ins-trend-section{margin-bottom:18px;}
+#insightTrendModal .ins-trend-section:last-of-type{margin-bottom:10px;}
+#insightTrendModal .ins-trend-section-title{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:6px;}
+#insightTrendModal .ins-trend-section-sum{font-size:12px;font-weight:600;color:var(--tx2);}
+#insightTrendModal .ins-trend-canvaswrap{height:190px;position:relative;}
 </style>
 <div class="modal-overlay" id="insightTrendModal">
   <div class="modal">
     <div class="ins-trend-head">
-      <div>
-        <h3 id="insightTrendTitle">상품 출고 추이</h3>
-        <div class="ins-trend-code" id="insightTrendSub"></div>
-      </div>
-      <div class="period-row">
-        <button class="ptab ins-trend-ptab active" data-period="daily" onclick="insightSetTrendPeriod('daily')">일별</button>
-        <button class="ptab ins-trend-ptab" data-period="weekly" onclick="insightSetTrendPeriod('weekly')">주별</button>
-        <button class="ptab ins-trend-ptab" data-period="monthly" onclick="insightSetTrendPeriod('monthly')">월별</button>
-      </div>
+      <h3 id="insightTrendTitle">상품 출고 추이</h3>
+      <div class="ins-trend-code" id="insightTrendSub"></div>
     </div>
-    <div class="ins-trend-canvaswrap" id="insightTrendCanvasWrap"><canvas id="insightTrendCanvas"></canvas></div>
+    <div class="ins-trend-section">
+      <div class="ins-trend-section-title">📅 일별 <span class="ins-trend-section-sum" id="insightTrendSumDaily"></span></div>
+      <div class="ins-trend-canvaswrap"><canvas id="insightTrendCanvasDaily"></canvas></div>
+    </div>
+    <div class="ins-trend-section">
+      <div class="ins-trend-section-title">🗓 주별 <span class="ins-trend-section-sum" id="insightTrendSumWeekly"></span></div>
+      <div class="ins-trend-canvaswrap"><canvas id="insightTrendCanvasWeekly"></canvas></div>
+    </div>
+    <div class="ins-trend-section">
+      <div class="ins-trend-section-title">📆 월별 <span class="ins-trend-section-sum" id="insightTrendSumMonthly"></span></div>
+      <div class="ins-trend-canvaswrap"><canvas id="insightTrendCanvasMonthly"></canvas></div>
+    </div>
     <div class="ins-empty" id="insightTrendEmpty" style="display:none;padding:40px 10px;">판매 데이터가 없습니다.</div>
-    <div class="ins-trend-summary" id="insightTrendSummary"></div>
     <div class="ma"><button class="btn" onclick="closeModal('insightTrendModal')">닫기</button></div>
   </div>
 </div>
@@ -11818,9 +11823,9 @@ function renderInsight(){
   tbody.innerHTML=rows.map(insightRowHtml).join('');
 }
 
-// ── 상품별 출고 추이 모달 (일별/주별/월별) ──
+// ── 상품별 출고 추이 모달 — 일별·주별·월별을 탭 전환 없이 한 화면에 동시 표시 ──
 //  · 일반 채널(_dCache) + 로켓그로스(_rgDailyCache) 합산 — getTotalM과 동일한 "전체 채널" 기준
-let _insightTrendChart=null, _insightTrendCode=null, _insightTrendPeriod='daily';
+let _insightTrendCharts={daily:null,weekly:null,monthly:null}, _insightTrendCode=null;
 function insightMergedSeries(code){
   const out={};
   Object.entries(_dCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
@@ -11829,41 +11834,18 @@ function insightMergedSeries(code){
 }
 function insightOpenTrend(code,name){
   _insightTrendCode=code;
-  _insightTrendPeriod='daily';
   const t=document.getElementById('insightTrendTitle'); if(t) t.textContent=name;
   const s=document.getElementById('insightTrendSub'); if(s) s.textContent=code;
-  document.querySelectorAll('#insightTrendModal .ins-trend-ptab').forEach(b=>b.classList.toggle('active', b.dataset.period==='daily'));
   openModal('insightTrendModal');
   insightRenderTrend();
 }
-function insightSetTrendPeriod(p){
-  _insightTrendPeriod=p;
-  document.querySelectorAll('#insightTrendModal .ins-trend-ptab').forEach(b=>b.classList.toggle('active', b.dataset.period===p));
-  insightRenderTrend();
-}
-function insightRenderTrend(){
-  const code=_insightTrendCode; if(!code) return;
-  const series=insightMergedSeries(code);
-  const dates=Object.keys(series).sort();
-  const wrap=document.getElementById('insightTrendCanvasWrap');
-  const empty=document.getElementById('insightTrendEmpty');
-  const summary=document.getElementById('insightTrendSummary');
-  if(!dates.length){
-    if(_insightTrendChart){ _insightTrendChart.destroy(); _insightTrendChart=null; }
-    if(wrap) wrap.style.display='none';
-    if(empty) empty.style.display='';
-    if(summary) summary.textContent='';
-    return;
-  }
-  if(wrap) wrap.style.display='';
-  if(empty) empty.style.display='none';
-
+function insightBuildPeriodData(dates, series, period){
   let labels=[], values=[];
-  if(_insightTrendPeriod==='daily'){
+  if(period==='daily'){
     const last=dates.slice(-60);
     labels=last.map(d=>{ const s2=d.split('-'); return s2[1]+'/'+s2[2]; });
     values=last.map(d=>series[d]||0);
-  } else if(_insightTrendPeriod==='weekly'){
+  } else if(period==='weekly'){
     const wk={};
     dates.forEach(d=>{
       const dt=new Date(d+'T00:00:00');
@@ -11882,11 +11864,14 @@ function insightRenderTrend(){
     labels=keys.map(k=>{ const s2=k.split('-'); return s2[0].slice(2)+'/'+s2[1]; });
     values=keys.map(k=>mo[k]);
   }
-
+  return {labels,values};
+}
+function insightDrawPeriodChart(period, canvasId, sumElId, dates, series){
+  const {labels,values}=insightBuildPeriodData(dates, series, period);
   const dark=_currentTheme()==='dark';
-  const ctx=document.getElementById('insightTrendCanvas').getContext('2d');
-  if(_insightTrendChart) _insightTrendChart.destroy();
-  _insightTrendChart=new Chart(ctx,{
+  const ctx=document.getElementById(canvasId).getContext('2d');
+  if(_insightTrendCharts[period]){ _insightTrendCharts[period].destroy(); }
+  _insightTrendCharts[period]=new Chart(ctx,{
     type:'bar',
     data:{ labels, datasets:[{ label:'출고수량', data:values, backgroundColor:dark?'#5B9BFF':'#3182F6', borderRadius:3, maxBarThickness:26 }] },
     options:{
@@ -11900,7 +11885,26 @@ function insightRenderTrend(){
   });
   const total=values.reduce((a,b)=>a+b,0);
   const avg=values.length?Math.round(total/values.length*10)/10:0;
-  if(summary) summary.textContent=`합계 ${total.toLocaleString()}개 · 구간평균 ${avg.toLocaleString()}개 (전체 채널 합산)`;
+  const sumEl=document.getElementById(sumElId);
+  if(sumEl) sumEl.textContent=`합계 ${total.toLocaleString()}개 · 구간평균 ${avg.toLocaleString()}개`;
+}
+function insightRenderTrend(){
+  const code=_insightTrendCode; if(!code) return;
+  const series=insightMergedSeries(code);
+  const dates=Object.keys(series).sort();
+  const sections=document.querySelectorAll('#insightTrendModal .ins-trend-section');
+  const empty=document.getElementById('insightTrendEmpty');
+  if(!dates.length){
+    Object.keys(_insightTrendCharts).forEach(k=>{ if(_insightTrendCharts[k]){ _insightTrendCharts[k].destroy(); _insightTrendCharts[k]=null; } });
+    sections.forEach(s=>s.style.display='none');
+    if(empty) empty.style.display='';
+    return;
+  }
+  sections.forEach(s=>s.style.display='');
+  if(empty) empty.style.display='none';
+  insightDrawPeriodChart('daily','insightTrendCanvasDaily','insightTrendSumDaily', dates, series);
+  insightDrawPeriodChart('weekly','insightTrendCanvasWeekly','insightTrendSumWeekly', dates, series);
+  insightDrawPeriodChart('monthly','insightTrendCanvasMonthly','insightTrendSumMonthly', dates, series);
 }
 
 // 재고 상태별 KPI 카드 — 클릭 시 상태 필터
