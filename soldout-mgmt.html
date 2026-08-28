@@ -854,6 +854,7 @@ function renderQuick(){
         <div class="pcard-actions">
           <button class="btn btn-sm" data-hist="${p.id}">🕐 이력</button>
           <button class="btn btn-sm btn-edit" data-edit="${p.id}">✎ 수정</button>
+          <button class="btn btn-sm" data-clone="${p.id}" title="이 상품을 복사해 새 상품(사이트 번호 포함)을 만듭니다">⧉ 복사</button>
           <button class="btn btn-sm btn-red" data-allsoldout="${p.id}" ${p.discontinued?'disabled style="opacity:.4;cursor:default;"':''}>전체 품절</button>
           <button class="btn btn-sm btn-green" data-allrestore="${p.id}" ${p.discontinued?'disabled style="opacity:.4;cursor:default;"':''}>전체 해제</button>
           <button class="btn btn-sm btn-yellow ${p.discontinued?'on':''}" data-disc="${p.id}">${p.discontinued?'단종 해제':'단종'}</button>
@@ -935,6 +936,24 @@ function renderQuick(){
   });
   container.querySelectorAll('[data-edit]').forEach(btn=>{
     btn.addEventListener('click', ()=> openEditModal(btn.dataset.edit));
+  });
+  container.querySelectorAll('[data-clone]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const p = state.products.find(x=>x.id===btn.dataset.clone);
+      if(!p) return;
+      const clonedSiteData = {};
+      Object.keys(p.siteData||{}).forEach(sid=>{
+        const c = p.siteData[sid] || {};
+        clonedSiteData[sid] = { x: !!c.x, soldout:false, numbers:(c.numbers||[]).map(n=>({...n})), history:[] };
+      });
+      const newP = { id:uid('p'), erpName: p.erpName+' (복사)', searchName:p.searchName||'', category:p.category||'', addedDate: todayISO(), siteData: clonedSiteData };
+      state.products.unshift(newP);
+      await saveState();
+      state.openCards[newP.id] = true;
+      render();
+      showToast(`"${firstLine(p.erpName)}" 복사본이 생성되었습니다 — 상품명을 수정해주세요`);
+      openEditModal(newP.id);
+    });
   });
   container.querySelectorAll('[data-disc]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
