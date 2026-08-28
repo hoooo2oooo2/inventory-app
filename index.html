@@ -1989,6 +1989,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="ni active" id="nav-inv" onclick="goMenu('inv')">재고관리</div>
   <div class="ni" id="nav-sales" onclick="goMenu('sales')">판매분석</div>
   <div class="ni" id="nav-order" onclick="goMenu('order')">발주관리 <span class="nbadge" id="orderBadge">0</span><span class="pulse-wrap" id="navPulse" style="display:none;"><span class="pdot"></span><span class="pring"></span><span class="pring pring2"></span></span></div>
+  <div class="ni" id="nav-insight" onclick="goMenu('insight')">📊 발주 인사이트</div>
   <div class="ni" id="nav-rg" onclick="goMenu('rg')">그로스 출고</div>
   <div class="ni" id="nav-hist" onclick="goMenu('hist')">변동이력</div>
   <div class="ni" id="nav-report" onclick="goPage('report')" style="display:none;">📋 보고</div>
@@ -4279,6 +4280,111 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 </div>
 </div>
 
+<!-- ═══ 발주 인사이트 (CX팀) ═══ -->
+<style>
+#page-insight .main{gap:14px;}
+#page-insight .ins-kpi{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+#page-insight .ins-kpi-card{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;cursor:pointer;position:relative;overflow:hidden;transition:box-shadow .15s,transform .15s;}
+#page-insight .ins-kpi-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bd);}
+#page-insight .ins-kpi-card:hover{box-shadow:0 3px 14px rgba(16,24,40,.10);transform:translateY(-1px);}
+#page-insight .ins-kpi-card.active{border-color:var(--pr);box-shadow:0 0 0 2px var(--prl);}
+#page-insight .ins-kpi-card[data-st="부족"]::before{background:#DC2626;}
+#page-insight .ins-kpi-card[data-st="긴급"]::before{background:#EA580C;}
+#page-insight .ins-kpi-card[data-st="임박"]::before{background:#D97706;}
+#page-insight .ins-kpi-card[data-st="정상"]::before{background:#059669;}
+#page-insight .ins-kpi-card[data-st="season"]::before{background:#534AB7;}
+#page-insight .ins-kpi-lbl{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:6px;}
+#page-insight .ins-kpi-val{font-size:30px;font-weight:800;letter-spacing:-.5px;}
+#page-insight .ins-kpi-sub{font-size:12px;color:var(--tx2);margin-top:3px;}
+#page-insight .ins-filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 16px;}
+#page-insight .ins-filter-bar .search-box input{width:220px;font-size:14px;}
+#page-insight .ins-filter-bar select{font-size:13px;padding:7px 10px;}
+#page-insight .tw table{font-size:14.5px;border-collapse:separate;border-spacing:0;}
+#page-insight .tw thead th{position:sticky;top:0;background:var(--bg);z-index:1;font-size:13px;font-weight:700;color:var(--tx2);padding:12px 14px;white-space:nowrap;border-bottom:1.5px solid var(--bd);text-align:left;}
+#page-insight .tw tbody td{padding:13px 14px;white-space:nowrap;vertical-align:middle;border-bottom:0.5px solid var(--bd);}
+#page-insight .tw tbody tr:nth-child(even){background:rgba(16,24,40,.015);}
+#page-insight .tw tbody tr:hover{background:var(--prl);}
+#page-insight .ins-name{font-size:15px;font-weight:700;}
+#page-insight .ins-code{font-size:12px;color:var(--tx2);margin-top:2px;}
+#page-insight .ins-badge{display:inline-flex;align-items:center;padding:5px 13px;border-radius:99px;font-size:13px;font-weight:700;}
+#page-insight .ins-tag{display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;}
+#page-insight .ins-spark{display:flex;align-items:flex-end;gap:2px;height:32px;}
+#page-insight .ins-spark div{width:7px;border-radius:1.5px 1.5px 0 0;}
+#page-insight .ins-num{font-size:15px;font-weight:700;}
+#page-insight .ins-sub{font-size:12px;color:var(--tx2);margin-top:2px;font-weight:500;}
+#page-insight .ins-empty{padding:60px 20px;text-align:center;color:var(--tx2);font-size:14px;}
+@media(max-width:1200px){#page-insight .ins-kpi{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:700px){#page-insight .ins-kpi{grid-template-columns:repeat(2,1fr);}}
+</style>
+<div class="page" id="page-insight">
+<div class="main">
+  <div class="card" style="padding:16px 18px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div class="ct" style="font-size:17px;">📊 발주 인사이트</div>
+        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리 데이터를 통합 분석해 제품별 발주 시점·수량·성수기를 자동 계산합니다 — 긴급도·권장 발주·발주 마감일은 발주관리에 걸려있는 진행중 발주(미입고 수량)를 차감한 값입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
+      </div>
+      <div style="font-size:12px;color:var(--tx2);" id="insightUpdLbl"></div>
+    </div>
+  </div>
+  <div class="ins-kpi" id="insightKpi"></div>
+  <div class="card">
+    <div class="ins-filter-bar">
+      <div class="search-box"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="insightSrch" placeholder="코드, 상품명 검색..." oninput="insightSetSearch(this.value)"></div>
+      <select class="sel" id="insightTypeSel" onchange="insightSetType(this.value)"><option value="">전체 구분</option><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select>
+      <select class="sel" id="insightGradeSel" onchange="insightSetGrade(this.value)"><option value="">전체 등급</option><option value="A">A등급</option><option value="B">B등급</option><option value="C">C등급</option></select>
+      <select class="sortsel" id="insightSortSel" onchange="insightSetSort(this.value)">
+        <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="name">상품명순</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="insightDiscChk" onchange="insightToggleDisc(this.checked)"> 단종 포함</label>
+      <span style="font-size:13px;color:var(--tx2);" id="insightCount"></span>
+    </div>
+    <div class="tw" style="max-height:calc(100vh - 340px);overflow-y:auto;">
+      <table>
+        <thead><tr>
+          <th>긴급도</th><th>상품</th><th>구분</th><th>등급</th>
+          <th style="text-align:right;">현재고</th><th style="text-align:right;">일평균판매</th>
+          <th>예상 소진일</th><th>발주 마감일</th><th style="text-align:right;">권장 발주</th>
+          <th>진행중 발주</th><th>성수기·비수기</th><th>전년 월별추이</th>
+        </tr></thead>
+        <tbody id="insightTbody"></tbody>
+      </table>
+    </div>
+    <div class="ins-empty" id="insightEmpty" style="display:none;">조건에 맞는 상품이 없습니다.</div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ 발주 인사이트 — 제품별 출고 추이 모달 ═══ -->
+<style>
+#insightTrendModal .modal{max-width:760px;}
+#insightTrendModal .ptab{font-size:13px;padding:6px 14px;}
+#insightTrendModal .ins-trend-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+#insightTrendModal h3{font-size:17px;margin:0;}
+#insightTrendModal .ins-trend-code{font-size:12px;color:var(--tx2);font-weight:500;margin-top:2px;}
+#insightTrendModal .ins-trend-summary{font-size:13px;color:var(--tx2);margin-top:10px;font-weight:600;}
+#insightTrendModal .ins-trend-canvaswrap{height:320px;position:relative;}
+</style>
+<div class="modal-overlay" id="insightTrendModal">
+  <div class="modal">
+    <div class="ins-trend-head">
+      <div>
+        <h3 id="insightTrendTitle">상품 출고 추이</h3>
+        <div class="ins-trend-code" id="insightTrendSub"></div>
+      </div>
+      <div class="period-row">
+        <button class="ptab ins-trend-ptab active" data-period="daily" onclick="insightSetTrendPeriod('daily')">일별</button>
+        <button class="ptab ins-trend-ptab" data-period="weekly" onclick="insightSetTrendPeriod('weekly')">주별</button>
+        <button class="ptab ins-trend-ptab" data-period="monthly" onclick="insightSetTrendPeriod('monthly')">월별</button>
+      </div>
+    </div>
+    <div class="ins-trend-canvaswrap" id="insightTrendCanvasWrap"><canvas id="insightTrendCanvas"></canvas></div>
+    <div class="ins-empty" id="insightTrendEmpty" style="display:none;padding:40px 10px;">판매 데이터가 없습니다.</div>
+    <div class="ins-trend-summary" id="insightTrendSummary"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('insightTrendModal')">닫기</button></div>
+  </div>
+</div>
+
 <!-- ═══ 로켓그로스 ═══ -->
 <div class="page" id="page-rg">
 <div class="main">
@@ -6048,7 +6154,7 @@ let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인
 //   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
-  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', accreq:'edit', tcb:'edit', review:'edit', rgmgmt:'edit' } },
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', insight:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', accreq:'edit', tcb:'edit', review:'edit', rgmgmt:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit', moeum:'edit', soldout:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', coupangad:'edit' } },
@@ -6193,7 +6299,7 @@ function _axColor(){ return _currentTheme()==='dark' ? '#C7C7CC' : '#888'; }
 // 메뉴별 권한 (열람 / 수정)  + 직원 계정 관리 (마스터 전용)
 // ══════════════════════════════════════════════
 const MENUS = [
-  {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'},
+  {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'}, {id:'insight',label:'📊 발주 인사이트'},
   {id:'rg',label:'그로스 출고'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
   {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'tcb',label:'💸 택배사 보상목록'}, {id:'phoneorder',label:'📞 전화구매건'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'}, {id:'rgrevenue',label:'🚀 로켓그로스 매출'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
@@ -6214,7 +6320,7 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','price','quote','family','consign','accreq','tcb','phoneorder','cost3day','review'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','insight','price','quote','family','consign','accreq','tcb','phoneorder','cost3day','review'] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','coupangad'] },
@@ -9465,7 +9571,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','coupangad'].forEach(x=>{
+  ['inv','sales','order','insight','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','rgmgmt','cost3day','review','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -9482,6 +9588,7 @@ function goPage(p){
   document.getElementById('addTopBtn').onclick=()=>openAddProd();
   document.getElementById('uploadTopBtn').onclick=()=>openUpload(p);
   if(p==='order') loadDailyCache().then(()=>{ recalcOrders(); checkRestockPriorityAlerts(); });
+  if(p==='insight') Promise.all([loadDailyCache(), loadRgDailyCache()]).then(()=>{ insightInit(); });
   if(p==='sales'){
     buildYearSelects();
     const ys=document.getElementById('salesYrSel');
@@ -11548,6 +11655,252 @@ function _hasEnoughDailyData(p){
   const dc=_dCache[p.code]||{};
   const entries=Object.entries(dc);
   return entries.length>=3 && entries.some(([,q])=>q>0);
+}
+
+// ══════════════════════════════════════════════
+// 📊 발주 인사이트 (CX팀) — 재고관리·판매분석·발주관리 통합 자동분석
+//  · 발주 시점/수량 계산은 기존 calcNeeded()·getStatus()·getEffectiveReorder() 그대로 재사용 (새 계산식 아님)
+//  · 성수기/비수기만 신규: 전년 월별 실적(monthly_YYYY) 기준 최고/최저월 계산, 전년 데이터 없으면 판정 보류
+// ══════════════════════════════════════════════
+let insightSearch='', insightTypeF='', insightGradeF='', insightStatusF='', insightSort='urgency', insightShowDisc=false;
+
+function insightSeasonInfo(p){
+  const prev=getTotalM(p, CUR_YEAR-1), prevTotal=prev.reduce((a,b)=>a+b,0);
+  let m=prev, total=prevTotal, basis=(CUR_YEAR-1)+'년';
+  if(total<=0){
+    const cur=getTotalM(p, CUR_YEAR), curTotal=cur.reduce((a,b)=>a+b,0);
+    if(curTotal<=0) return {status:'nodata'};
+    m=cur; total=curTotal; basis=CUR_YEAR+'년(누적)';
+  }
+  const avg=total/12;
+  let peakI=0, troughI=0;
+  m.forEach((v,i)=>{ if(v>m[peakI]) peakI=i; if(v<m[troughI]) troughI=i; });
+  const peakRatio=avg>0?m[peakI]/avg:1, troughRatio=avg>0?m[troughI]/avg:1;
+  const flat=peakRatio<1.15;
+  let upcoming=null;
+  if(!flat){
+    for(let k=1;k<=3;k++){ if((MONTH+k)%12===peakI){ upcoming={monthsAway:k}; break; } }
+  }
+  return {status:'ok', flat, m, avg, basis,
+    peakMonth:MNAMES[peakI], peakPct:Math.round((peakRatio-1)*100),
+    troughMonth:MNAMES[troughI], troughPct:Math.round((troughRatio-1)*100), upcoming};
+}
+
+// 긴급도 판정: 재고관리 화면과 동일한 임계값(0.3/0.6/1)을 쓰되, 기준을 "실물 재고"가 아니라
+// "실물 재고 + 진행중 발주(미입고 수량)"로 잡는다 — 이미 충분히 발주해둔 상품을 즉시발주로 잘못 띄우지 않기 위함.
+function insightStatusForRatio(p, ratio){
+  if(p.disc) return '단종';
+  if(ratio<=0.3) return '부족';
+  if(ratio<=0.6) return '긴급';
+  if(ratio<=1) return '임박';
+  return '정상';
+}
+function insightBuildRows(){
+  return products.filter(p=>!p.hidden && (insightShowDisc || !p.disc)).map(p=>{
+    const c=calcNeeded(p);
+    const grade=getAbcGrade(p);
+    const er=getEffectiveReorder(p);
+    // 진행중 발주(발주관리 receive_list의 미완료 건) — 주문수량 중 아직 입고 안 된 부분만 합산
+    const pending=receiveList.filter(r=>r.code===p.code).reduce((s,r)=>s+Math.max(0,r.orderQty-r.in1-r.in2),0);
+    const effStock=p.stock+pending;
+    const status = p.disc?'단종':(er<=0?'정상':insightStatusForRatio(p, effStock/er));
+    const avgDay=c.noData?0:c.avgDay;
+    // 예상 소진일: 지금 추가 입고가 없다고 가정했을 때 실물 재고가 바닥나는 시점(=현장 체감 기준)
+    const daysLeft=avgDay>0?Math.floor(p.stock/avgDay):null;
+    // 발주 마감일: 진행중 발주까지 반영한 순수 부족분이 발주시점에 닿는 시점(=추가로 더 주문해야 하는 시점)
+    const daysToReorder=avgDay>0?Math.max(0,Math.floor((effStock-er)/avgDay)):null;
+    const exhaustDate=daysLeft!=null?new Date(Date.now()+daysLeft*86400000):null;
+    const reorderByDate=daysToReorder!=null?new Date(Date.now()+daysToReorder*86400000):null;
+    const netNeeded=c.noData?null:Math.max(0,c.needed-pending);
+    const netBoxes=netNeeded!=null?Math.ceil(netNeeded/(p.boxQty||1)):null;
+    const covered=!c.noData && pending>0 && netNeeded<=0;
+    const season=insightSeasonInfo(p);
+    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season};
+  });
+}
+
+function insightSetSearch(v){ insightSearch=v; renderInsight(); }
+function insightSetType(v){ insightTypeF=v; renderInsight(); }
+function insightSetGrade(v){ insightGradeF=v; renderInsight(); }
+function insightSetSort(v){ insightSort=v; renderInsight(); }
+function insightToggleDisc(v){ insightShowDisc=v; renderInsight(); }
+function insightSetStatus(st){ insightStatusF=(insightStatusF===st)?'':st; renderInsight(); }
+
+function insightInit(){
+  const el=document.getElementById('insightUpdLbl');
+  if(el) el.textContent='업데이트 '+fmtFull(new Date());
+  renderInsight();
+}
+
+function insightSparkHtml(season){
+  if(season.status==='nodata') return '<span class="ins-sub">데이터 부족</span>';
+  const max=Math.max(...season.m,1);
+  // var(--bd)는 얇은 경계선용이라 다크모드에서 거의 안 보임 — 막대 채움에는 var(--tx2) 사용
+  const bars=season.m.map((v,i)=>`<div title="${MNAMES[i]}: ${v.toLocaleString()}" style="height:${Math.max(2,Math.round(v/max*30))}px;background:${i===MONTH?'var(--pr)':'var(--tx2)'};opacity:${i===MONTH?'1':'.55'};"></div>`).join('');
+  return `<div class="ins-spark">${bars}</div><div class="ins-sub">${season.basis} 기준</div>`;
+}
+
+function insightSeasonCellHtml(season){
+  if(season.status==='nodata') return '<span class="ins-tag" style="background:var(--bg2);color:var(--tx2);">데이터 부족</span>';
+  if(season.flat) return '<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">사계절 균등</span>';
+  let html=`<span class="ins-tag" style="background:#FFF7ED;color:#EA580C;">성수기 ${season.peakMonth} (+${season.peakPct}%)</span><div class="ins-sub">비수기 ${season.troughMonth} (${season.troughPct}%)</div>`;
+  if(season.upcoming) html+=`<div style="font-size:12px;font-weight:700;color:#EA580C;margin-top:3px;">▲ ${season.upcoming.monthsAway}개월 후 성수기 진입</div>`;
+  return html;
+}
+
+function insightRowHtml(r){
+  const st=r.status;
+  const stColor={부족:'#DC2626',긴급:'#EA580C',임박:'#D97706',정상:'#059669',단종:'#9CA3AF'}[st]||'#9CA3AF';
+  const stBg={부족:'#FEF2F2',긴급:'#FFF7ED',임박:'#FFFBEB',정상:'#ECFDF5',단종:'var(--bg2)'}[st]||'var(--bg2)';
+  const gradeColor={A:'#DC2626',B:'#D97706',C:'#6B7280'}[r.grade]||'#6B7280';
+  const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  let orderCell;
+  if(r.c.noData) orderCell='<span class="ins-sub">산출불가</span>';
+  else if(r.covered) orderCell=`<span class="ins-tag" style="background:#ECFDF5;color:#059669;">✓ 발주 진행중(충분)</span>`;
+  else orderCell=`<div class="ins-num">${r.netBoxes.toLocaleString()}박스</div>${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}`;
+  return `<tr>
+    <td><span class="ins-badge" style="background:${stBg};color:${stColor};">${st}</span></td>
+    <td><div class="ins-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px;" onclick="insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이 그래프를 볼 수 있어요">${r.p.name}</div><div class="ins-code">${r.p.code}</div></td>
+    <td>${r.p.type||'기타'}</td>
+    <td><span class="ins-tag" style="background:var(--bg2);color:${gradeColor};font-weight:800;">${r.grade}</span></td>
+    <td style="text-align:right;" class="ins-num">${r.p.stock.toLocaleString()}</td>
+    <td style="text-align:right;" class="ins-num">${r.avgDay>0?r.avgDay.toFixed(1):'-'}</td>
+    <td>${r.exhaustDate?`<div class="ins-num">${fmtDate(r.exhaustDate)}</div><div class="ins-sub">D-${r.daysLeft}</div>`:'<span class="ins-sub">산출불가</span>'}</td>
+    <td>${r.reorderByDate==null?'<span class="ins-sub">산출불가</span>':(r.daysToReorder<=0?'<span class="ins-num" style="color:#DC2626;">지금 발주</span>':`<div class="ins-num">${fmtDate(r.reorderByDate)}</div><div class="ins-sub">D-${r.daysToReorder}</div>`)}</td>
+    <td style="text-align:right;">${orderCell}</td>
+    <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>`:'<span class="ins-sub">-</span>'}</td>
+    <td>${insightSeasonCellHtml(r.season)}</td>
+    <td>${insightSparkHtml(r.season)}</td>
+  </tr>`;
+}
+
+function renderInsightKpi(rows){
+  const el=document.getElementById('insightKpi'); if(!el) return;
+  const cnt={부족:0,긴급:0,임박:0,정상:0};
+  let seasonCnt=0;
+  rows.forEach(r=>{ if(cnt[r.status]!=null) cnt[r.status]++; if(r.season.status==='ok'&&r.season.upcoming) seasonCnt++; });
+  const card=(key,label,val,sub)=>`<div class="ins-kpi-card ${insightStatusF===key?'active':''}" data-st="${key}" onclick="insightSetStatus('${key}')">
+    <div class="ins-kpi-lbl">${label}</div><div class="ins-kpi-val">${val.toLocaleString()}</div><div class="ins-kpi-sub">${sub}</div></div>`;
+  el.innerHTML =
+    card('부족','🔴 즉시발주',cnt.부족,'재고 30% 이하')+
+    card('긴급','🟠 긴급',cnt.긴급,'재고 60% 이하')+
+    card('임박','🟡 임박',cnt.임박,'발주 검토 필요')+
+    card('정상','🟢 정상',cnt.정상,'재고 충분')+
+    card('season','🟣 성수기 임박',seasonCnt,'3개월 내 성수기 진입');
+}
+
+function renderInsight(){
+  const base=insightBuildRows().filter(r=>{
+    if(insightSearch && !(r.p.name.includes(insightSearch)||r.p.code.toLowerCase().includes(insightSearch.toLowerCase()))) return false;
+    if(insightTypeF && (r.p.type||'기타')!==insightTypeF) return false;
+    if(insightGradeF && r.grade!==insightGradeF) return false;
+    return true;
+  });
+  renderInsightKpi(base);
+  let rows=base;
+  if(insightStatusF==='season') rows=rows.filter(r=>r.season.status==='ok'&&r.season.upcoming);
+  else if(insightStatusF) rows=rows.filter(r=>r.status===insightStatusF);
+  const rank={부족:0,긴급:1,임박:2,정상:3,단종:4};
+  rows=[...rows].sort((a,b)=>{
+    if(insightSort==='days_asc') return (a.daysLeft==null?Infinity:a.daysLeft)-(b.daysLeft==null?Infinity:b.daysLeft);
+    if(insightSort==='boxes_desc') return (b.netBoxes||0)-(a.netBoxes||0);
+    if(insightSort==='stock_asc') return a.p.stock-b.p.stock;
+    if(insightSort==='name') return a.p.name.localeCompare(b.p.name);
+    return (rank[a.status]-rank[b.status])||((a.daysLeft==null?9999:a.daysLeft)-(b.daysLeft==null?9999:b.daysLeft));
+  });
+  const tbody=document.getElementById('insightTbody');
+  const empty=document.getElementById('insightEmpty');
+  const cntEl=document.getElementById('insightCount');
+  if(cntEl) cntEl.textContent=rows.length.toLocaleString()+'개';
+  if(!tbody) return;
+  if(!rows.length){ tbody.innerHTML=''; if(empty) empty.style.display=''; return; }
+  if(empty) empty.style.display='none';
+  tbody.innerHTML=rows.map(insightRowHtml).join('');
+}
+
+// ── 상품별 출고 추이 모달 (일별/주별/월별) ──
+//  · 일반 채널(_dCache) + 로켓그로스(_rgDailyCache) 합산 — getTotalM과 동일한 "전체 채널" 기준
+let _insightTrendChart=null, _insightTrendCode=null, _insightTrendPeriod='daily';
+function insightMergedSeries(code){
+  const out={};
+  Object.entries(_dCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+  Object.entries(_rgDailyCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+  return out;
+}
+function insightOpenTrend(code,name){
+  _insightTrendCode=code;
+  _insightTrendPeriod='daily';
+  const t=document.getElementById('insightTrendTitle'); if(t) t.textContent=name;
+  const s=document.getElementById('insightTrendSub'); if(s) s.textContent=code;
+  document.querySelectorAll('#insightTrendModal .ins-trend-ptab').forEach(b=>b.classList.toggle('active', b.dataset.period==='daily'));
+  openModal('insightTrendModal');
+  insightRenderTrend();
+}
+function insightSetTrendPeriod(p){
+  _insightTrendPeriod=p;
+  document.querySelectorAll('#insightTrendModal .ins-trend-ptab').forEach(b=>b.classList.toggle('active', b.dataset.period===p));
+  insightRenderTrend();
+}
+function insightRenderTrend(){
+  const code=_insightTrendCode; if(!code) return;
+  const series=insightMergedSeries(code);
+  const dates=Object.keys(series).sort();
+  const wrap=document.getElementById('insightTrendCanvasWrap');
+  const empty=document.getElementById('insightTrendEmpty');
+  const summary=document.getElementById('insightTrendSummary');
+  if(!dates.length){
+    if(_insightTrendChart){ _insightTrendChart.destroy(); _insightTrendChart=null; }
+    if(wrap) wrap.style.display='none';
+    if(empty) empty.style.display='';
+    if(summary) summary.textContent='';
+    return;
+  }
+  if(wrap) wrap.style.display='';
+  if(empty) empty.style.display='none';
+
+  let labels=[], values=[];
+  if(_insightTrendPeriod==='daily'){
+    const last=dates.slice(-60);
+    labels=last.map(d=>{ const s2=d.split('-'); return s2[1]+'/'+s2[2]; });
+    values=last.map(d=>series[d]||0);
+  } else if(_insightTrendPeriod==='weekly'){
+    const wk={};
+    dates.forEach(d=>{
+      const dt=new Date(d+'T00:00:00');
+      const dow=(dt.getDay()+6)%7; // 0=월요일
+      const monday=new Date(dt); monday.setDate(dt.getDate()-dow);
+      const key=fmtDate(monday);
+      wk[key]=(wk[key]||0)+series[d];
+    });
+    const keys=Object.keys(wk).sort().slice(-20);
+    labels=keys.map(k=>{ const s2=k.split('-'); return s2[1]+'/'+s2[2]+'~'; });
+    values=keys.map(k=>wk[k]);
+  } else {
+    const mo={};
+    dates.forEach(d=>{ const ym=d.slice(0,7); mo[ym]=(mo[ym]||0)+series[d]; });
+    const keys=Object.keys(mo).sort().slice(-24);
+    labels=keys.map(k=>{ const s2=k.split('-'); return s2[0].slice(2)+'/'+s2[1]; });
+    values=keys.map(k=>mo[k]);
+  }
+
+  const dark=_currentTheme()==='dark';
+  const ctx=document.getElementById('insightTrendCanvas').getContext('2d');
+  if(_insightTrendChart) _insightTrendChart.destroy();
+  _insightTrendChart=new Chart(ctx,{
+    type:'bar',
+    data:{ labels, datasets:[{ label:'출고수량', data:values, backgroundColor:dark?'#5B9BFF':'#3182F6', borderRadius:3, maxBarThickness:26 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.parsed.y.toLocaleString()}개`}} },
+      scales:{
+        x:{ ticks:{ color:_axColor(), maxRotation:0, autoSkip:true, font:{size:11} }, grid:{ display:false } },
+        y:{ ticks:{ color:_axColor() }, grid:{ color:dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)' }, beginAtZero:true }
+      }
+    }
+  });
+  const total=values.reduce((a,b)=>a+b,0);
+  const avg=values.length?Math.round(total/values.length*10)/10:0;
+  if(summary) summary.textContent=`합계 ${total.toLocaleString()}개 · 구간평균 ${avg.toLocaleString()}개 (전체 채널 합산)`;
 }
 
 // 재고 상태별 KPI 카드 — 클릭 시 상태 필터
