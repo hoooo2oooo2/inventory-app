@@ -4322,7 +4322,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
       <div>
         <div class="ct" style="font-size:17px;">📊 발주 인사이트</div>
-        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석해 제품별 발주 시점·수량·성수기를 자동 계산합니다 — 긴급도·권장 발주·발주 마감일은 발주관리에 걸려있는 진행중 발주(미입고 수량)를 차감한 값입니다. 로켓그로스 매출은 최근 2개월 · 단가계산기 백데이터 매칭 기준(로켓그로스 매출 화면과 동일 매칭)이라 매칭 안 된 상품은 공란입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
+        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석합니다 — 일평균판매·예상 소진일·권장 발주는 정규채널 판매량에 로켓그로스 매출 화면(쿠팡 셀러인사이트)의 일별 판매량을 합산한 값입니다(그로스 출고 메뉴는 미사용이라 반영하지 않음). 긴급도·발주 마감일은 여기에 발주관리 진행중 발주(미입고 수량)까지 추가로 차감한 값입니다. 로켓그로스 매출액(원)은 최근 2개월·백데이터 매칭 기준이라 매칭 안 된 상품은 공란입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
       </div>
       <div style="font-size:12px;color:var(--tx2);" id="insightUpdLbl"></div>
     </div>
@@ -9594,10 +9594,13 @@ function goPage(p){
   document.getElementById('uploadTopBtn').onclick=()=>openUpload(p);
   if(p==='order') loadDailyCache().then(()=>{ recalcOrders(); checkRestockPriorityAlerts(); });
   if(p==='insight'){
-    const _insMonths=insightRgRecentYms();
+    // 그로스 출고(daily_sales is_rg=true) 메뉴는 실사용 안 함 — 로켓그로스 매출 화면(쿠팡 셀러인사이트 업로드)의
+    // 일별 판매량을 재고 판매속도 계산에 직접 반영한다. loadRgDailyCache()는 더 이상 필요 없어 생략.
+    const _insMonths=insightRgYms();
     Promise.all([
-      loadDailyCache(), loadRgDailyCache(), pcEnsureBackdata(),
+      loadDailyCache(), pcEnsureBackdata(),
       (_rgOptionMapLoaded?Promise.resolve():loadRgOptionMap()),
+      (_rgPackMultiplierLoaded?Promise.resolve():loadRgPackMultiplier()),
       rgEnsureProdMonths(_insMonths[_insMonths.length-1], _insMonths[0])
     ]).then(()=>{ insightInit(); });
   }
@@ -11707,20 +11710,38 @@ function insightStatusForRatio(p, ratio){
   if(ratio<=1) return '임박';
   return '정상';
 }
-// ── 로켓그로스 매출(정산 전 매출액) — 최근 2개월, 단가계산기 백데이터 이름 매칭 기준 ──
-//  · 매칭은 로켓그로스 매출 화면과 동일하게 optionId→백데이터 id→이름으로 한다.
-//    백데이터의 code는 여러 상품이 공유하는 경우가 있어(예: "ss소장 직접소싱") code 매칭은 쓰지 않는다.
-function insightRgRecentYms(){
+// ── 로켓그로스 매출 화면의 일별 판매량 — 재고 판매속도 계산에 직접 반영 ──
+//  · 그로스 출고(daily_sales is_rg=true) 메뉴는 실사용 안 해서 데이터가 비어있음 — 대신 로켓그로스 매출
+//    화면(쿠팡 셀러인사이트 업로드, rg_products_YYYY-MM)의 옵션별 일별 판매량을 가져와 정규채널(_dCache)과
+//    합산한다. 매칭은 로켓그로스 매출 화면과 동일하게 optionId→백데이터 id→상품명으로 한다(백데이터의 code는
+//    여러 상품이 공유하는 경우가 있어(예: "ss소장 직접소싱") code 매칭은 쓰지 않는다).
+const INSIGHT_RG_LOOKBACK_MONTHS=4;   // 판매속도·추이 계산에 반영할 로켓그로스 매출 데이터 기간(이번달 포함 최근 N개월)
+function insightRgYms(){
   const out=[];
-  for(let k=0;k<2;k++){
+  for(let k=0;k<INSIGHT_RG_LOOKBACK_MONTHS;k++){
     const mi=MONTH-k, y=mi<0?CUR_YEAR-1:CUR_YEAR, m=((mi%12)+12)%12;
     out.push(y+'-'+String(m+1).padStart(2,'0'));
   }
-  return out; // [이번달, 저번달]
+  return out; // [이번달, 저번달, ...] 내림차순
 }
+// 상품명별 {날짜: 판매량} — 세트상품 개입수(rgQtyMultiplier) 반영, 로켓그로스 매출 화면의 '판매량' 컬럼과 동일 기준
+function insightRgQtyByName(){
+  const byName={};
+  insightRgYms().forEach(ym=>{
+    (_rgProdCache[ym]||[]).forEach(r=>{
+      const name=rgResolveName(r.optionId);
+      if(!name || !r.date) return;
+      const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
+      if(!byName[name]) byName[name]={};
+      byName[name][r.date]=(byName[name][r.date]||0)+qty;
+    });
+  });
+  return byName;
+}
+// 상품별 매출액(정산 전) — 최근 2개월, 표시용(위 판매량 계산과는 별개로 화면에 참고용으로만 노출)
 function insightRgRevenueByName(){
   const byName={};
-  insightRgRecentYms().forEach(ym=>{
+  insightRgYms().slice(0,2).forEach(ym=>{
     (_rgProdCache[ym]||[]).forEach(r=>{
       const name=rgResolveName(r.optionId);
       if(!name) return;
@@ -11729,12 +11750,67 @@ function insightRgRevenueByName(){
   });
   return byName;
 }
+// 정규채널(_dCache) + 로켓그로스 매출 화면 판매량을 합친 일별 시리즈
+let _insightRgQtyByNameCache={};
+function insightMergedSeriesFor(p, rgQtyByName){
+  const out={};
+  Object.entries(_dCache[p.code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+  Object.entries(rgQtyByName[p.name]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+  return out;
+}
+// 최근 판매속도(일평균) — calcNeeded의 정교한 트렌드/이상치 로직 대신 단순 7일/30일 평균을 쓴다.
+// (calcNeeded는 전역 _dCache만 읽어서 합산 시리즈를 넣을 수 없어 재고관리 등 다른 화면에 영향 없이 별도로 계산)
+function insightDemandFromSeries(series){
+  const dates=Object.keys(series).sort();
+  if(!dates.length) return {avgDay:0, noData:true, dataPoints:0};
+  const latestDate=new Date(dates[dates.length-1]+'T00:00:00');
+  const cut30=fmtDate(new Date(latestDate.getTime()-29*86400000));
+  const cut7=fmtDate(new Date(latestDate.getTime()-6*86400000));
+  let sum30=0,sum7=0,n30=0;
+  dates.forEach(d=>{ if(d>=cut30){ sum30+=series[d]||0; n30++; if(d>=cut7) sum7+=series[d]||0; } });
+  if(sum30<=0) return {avgDay:0, noData:true, dataPoints:n30};
+  const avg30=sum30/30, avg7=sum7/7;
+  let avgDay=avg30;
+  if(avg7>avg30*1.2) avgDay=(avg7+avg30)/2;   // 최근 7일 판매속도가 뚜렷이 빨라지면 절반만 반영해 완만하게 반응
+  return { avgDay:Math.round(avgDay*10)/10, noData:false, dataPoints:n30 };
+}
+// calcNeeded()와 동일한 목표재고 공식(주문주기+안전재고-도착시점잔여재고)을 쓰되, 일평균판매만
+// 합산 시리즈(정규채널+로켓그로스 매출 판매량) 기준으로 바꿔 계산 — 다른 화면의 calcNeeded는 그대로 둔다.
+function insightCalcNeeded(p, mergedSeries){
+  const dem=insightDemandFromSeries(mergedSeries);
+  if(dem.noData) return {needed:0, boxes:0, expM:0, avgDay:0, noData:true, corrLabel:'', dataPoints30:dem.dataPoints};
+  let expM=Math.max(Math.round(dem.avgDay*30),1);
+  let corrLabel='';
+  const prevYr=getTotalM(p, CUR_YEAR-1), prevTotal=prevYr.reduce((a,b)=>a+b,0);
+  if(prevTotal>0){
+    const prevAvg=prevTotal/12;
+    const arrM=Math.round(MONTH+p.leadTime)%12;
+    const rawSr=(prevYr[arrM]||0)/prevAvg;
+    const sr=Math.min(1.4,Math.max(0.8,1+(rawSr-1)*0.3));
+    if(sr>1.05) expM=Math.round(expM*sr);
+    const cp=Math.round((sr-1)*100);
+    corrLabel=cp>5?`성수기 +${cp}%`:cp<-5?`비수기 ${cp}%`:'보정없음';
+  }
+  const orderCycle=getOrderCycle();
+  const stockAtDelivery=Math.max(0, p.stock-expM*p.leadTime);
+  const safetyM=safetyMonthsFor(p);
+  const needed=Math.max(0, Math.round(expM*(orderCycle+safetyM)-stockAtDelivery));
+  const boxes=Math.ceil(needed/(p.boxQty||1));
+  return {needed, boxes, expM, avgDay:dem.avgDay, noData:false, corrLabel, dataPoints30:dem.dataPoints, safetyM};
+}
+function insightEffectiveReorder(p, ic){
+  if(p.reorderPoint>0) return p.reorderPoint;
+  return ic.noData?0:Math.round(ic.expM*p.leadTime);
+}
 function insightBuildRows(){
   const rgRevMap=insightRgRevenueByName();
+  const rgQtyByName=insightRgQtyByName();
+  _insightRgQtyByNameCache=rgQtyByName;   // 출고 추이 모달에서도 동일 데이터 재사용
   return products.filter(p=>!p.hidden && (insightShowDisc || !p.disc)).map(p=>{
-    const c=calcNeeded(p);
+    const mergedSeries=insightMergedSeriesFor(p, rgQtyByName);
+    const c=insightCalcNeeded(p, mergedSeries);
     const grade=getAbcGrade(p);
-    const er=getEffectiveReorder(p);
+    const er=insightEffectiveReorder(p, c);
     // 진행중 발주(발주관리 receive_list의 미완료 건) — 주문수량 중 아직 입고 안 된 부분만 합산
     const pending=receiveList.filter(r=>r.code===p.code).reduce((s,r)=>s+Math.max(0,r.orderQty-r.in1-r.in2),0);
     const effStock=p.stock+pending;
@@ -11857,16 +11933,17 @@ function renderInsight(){
 }
 
 // ── 상품별 출고 추이 모달 — 일별·주별·월별을 탭 전환 없이 한 화면에 동시 표시 ──
-//  · 일반 채널(_dCache) + 로켓그로스(_rgDailyCache) 합산 — getTotalM과 동일한 "전체 채널" 기준
-let _insightTrendCharts={daily:null,weekly:null,monthly:null}, _insightTrendCode=null;
-function insightMergedSeries(code){
+//  · 정규채널(_dCache) + 로켓그로스 매출 화면 판매량(_insightRgQtyByNameCache, insightBuildRows에서 채워짐) 합산
+let _insightTrendCharts={daily:null,weekly:null,monthly:null}, _insightTrendCode=null, _insightTrendName=null;
+function insightMergedSeries(code,name){
   const out={};
   Object.entries(_dCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
-  Object.entries(_rgDailyCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+  Object.entries(_insightRgQtyByNameCache[name]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
   return out;
 }
 function insightOpenTrend(code,name){
   _insightTrendCode=code;
+  _insightTrendName=name;
   const t=document.getElementById('insightTrendTitle'); if(t) t.textContent=name;
   const s=document.getElementById('insightTrendSub'); if(s) s.textContent=code;
   openModal('insightTrendModal');
@@ -11923,7 +12000,7 @@ function insightDrawPeriodChart(period, canvasId, sumElId, dates, series){
 }
 function insightRenderTrend(){
   const code=_insightTrendCode; if(!code) return;
-  const series=insightMergedSeries(code);
+  const series=insightMergedSeries(code, _insightTrendName);
   const dates=Object.keys(series).sort();
   const sections=document.querySelectorAll('#insightTrendModal .ins-trend-section');
   const empty=document.getElementById('insightTrendEmpty');
