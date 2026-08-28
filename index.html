@@ -4322,7 +4322,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
       <div>
         <div class="ct" style="font-size:17px;">📊 발주 인사이트</div>
-        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리 데이터를 통합 분석해 제품별 발주 시점·수량·성수기를 자동 계산합니다 — 긴급도·권장 발주·발주 마감일은 발주관리에 걸려있는 진행중 발주(미입고 수량)를 차감한 값입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
+        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석해 제품별 발주 시점·수량·성수기를 자동 계산합니다 — 긴급도·권장 발주·발주 마감일은 발주관리에 걸려있는 진행중 발주(미입고 수량)를 차감한 값입니다. 로켓그로스 매출은 최근 2개월 · 단가계산기 백데이터 매칭 기준(로켓그로스 매출 화면과 동일 매칭)이라 매칭 안 된 상품은 공란입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
       </div>
       <div style="font-size:12px;color:var(--tx2);" id="insightUpdLbl"></div>
     </div>
@@ -4334,7 +4334,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <select class="sel" id="insightTypeSel" onchange="insightSetType(this.value)"><option value="">전체 구분</option><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select>
       <select class="sel" id="insightGradeSel" onchange="insightSetGrade(this.value)"><option value="">전체 등급</option><option value="A">A등급</option><option value="B">B등급</option><option value="C">C등급</option></select>
       <select class="sortsel" id="insightSortSel" onchange="insightSetSort(this.value)">
-        <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="name">상품명순</option>
+        <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="rg_desc">로켓그로스매출순</option><option value="name">상품명순</option>
       </select>
       <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="insightDiscChk" onchange="insightToggleDisc(this.checked)"> 단종 포함</label>
       <span style="font-size:13px;color:var(--tx2);" id="insightCount"></span>
@@ -4345,7 +4345,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <th>긴급도</th><th>상품</th><th>구분</th><th>등급</th>
           <th style="text-align:right;">현재고</th><th style="text-align:right;">일평균판매</th>
           <th>예상 소진일</th><th>발주 마감일</th><th style="text-align:right;">권장 발주</th>
-          <th>진행중 발주</th><th>성수기·비수기</th><th>전년 월별추이</th>
+          <th>진행중 발주</th><th style="text-align:right;">🚀 로켓그로스 매출</th><th>성수기·비수기</th><th>전년 월별추이</th>
         </tr></thead>
         <tbody id="insightTbody"></tbody>
       </table>
@@ -9593,7 +9593,14 @@ function goPage(p){
   document.getElementById('addTopBtn').onclick=()=>openAddProd();
   document.getElementById('uploadTopBtn').onclick=()=>openUpload(p);
   if(p==='order') loadDailyCache().then(()=>{ recalcOrders(); checkRestockPriorityAlerts(); });
-  if(p==='insight') Promise.all([loadDailyCache(), loadRgDailyCache()]).then(()=>{ insightInit(); });
+  if(p==='insight'){
+    const _insMonths=insightRgRecentYms();
+    Promise.all([
+      loadDailyCache(), loadRgDailyCache(), pcEnsureBackdata(),
+      (_rgOptionMapLoaded?Promise.resolve():loadRgOptionMap()),
+      rgEnsureProdMonths(_insMonths[_insMonths.length-1], _insMonths[0])
+    ]).then(()=>{ insightInit(); });
+  }
   if(p==='sales'){
     buildYearSelects();
     const ys=document.getElementById('salesYrSel');
@@ -11700,7 +11707,30 @@ function insightStatusForRatio(p, ratio){
   if(ratio<=1) return '임박';
   return '정상';
 }
+// ── 로켓그로스 매출(정산 전 매출액) — 최근 2개월, 단가계산기 백데이터 이름 매칭 기준 ──
+//  · 매칭은 로켓그로스 매출 화면과 동일하게 optionId→백데이터 id→이름으로 한다.
+//    백데이터의 code는 여러 상품이 공유하는 경우가 있어(예: "ss소장 직접소싱") code 매칭은 쓰지 않는다.
+function insightRgRecentYms(){
+  const out=[];
+  for(let k=0;k<2;k++){
+    const mi=MONTH-k, y=mi<0?CUR_YEAR-1:CUR_YEAR, m=((mi%12)+12)%12;
+    out.push(y+'-'+String(m+1).padStart(2,'0'));
+  }
+  return out; // [이번달, 저번달]
+}
+function insightRgRevenueByName(){
+  const byName={};
+  insightRgRecentYms().forEach(ym=>{
+    (_rgProdCache[ym]||[]).forEach(r=>{
+      const name=rgResolveName(r.optionId);
+      if(!name) return;
+      byName[name]=(byName[name]||0)+(r.revenue||0);
+    });
+  });
+  return byName;
+}
 function insightBuildRows(){
+  const rgRevMap=insightRgRevenueByName();
   return products.filter(p=>!p.hidden && (insightShowDisc || !p.disc)).map(p=>{
     const c=calcNeeded(p);
     const grade=getAbcGrade(p);
@@ -11720,7 +11750,8 @@ function insightBuildRows(){
     const netBoxes=netNeeded!=null?Math.ceil(netNeeded/(p.boxQty||1)):null;
     const covered=!c.noData && pending>0 && netNeeded<=0;
     const season=insightSeasonInfo(p);
-    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season};
+    const rgRevenue=rgRevMap[p.name]||0;
+    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgRevenue};
   });
 }
 
@@ -11774,6 +11805,7 @@ function insightRowHtml(r){
     <td>${r.reorderByDate==null?'<span class="ins-sub">산출불가</span>':(r.daysToReorder<=0?'<span class="ins-num" style="color:#DC2626;">지금 발주</span>':`<div class="ins-num">${fmtDate(r.reorderByDate)}</div><div class="ins-sub">D-${r.daysToReorder}</div>`)}</td>
     <td style="text-align:right;">${orderCell}</td>
     <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>`:'<span class="ins-sub">-</span>'}</td>
+    <td style="text-align:right;">${r.rgRevenue>0?`<div class="ins-num">${Math.round(r.rgRevenue).toLocaleString()}원</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
     <td>${insightSeasonCellHtml(r.season)}</td>
     <td>${insightSparkHtml(r.season)}</td>
   </tr>`;
@@ -11810,6 +11842,7 @@ function renderInsight(){
     if(insightSort==='days_asc') return (a.daysLeft==null?Infinity:a.daysLeft)-(b.daysLeft==null?Infinity:b.daysLeft);
     if(insightSort==='boxes_desc') return (b.netBoxes||0)-(a.netBoxes||0);
     if(insightSort==='stock_asc') return a.p.stock-b.p.stock;
+    if(insightSort==='rg_desc') return (b.rgRevenue||0)-(a.rgRevenue||0);
     if(insightSort==='name') return a.p.name.localeCompare(b.p.name);
     return (rank[a.status]-rank[b.status])||((a.daysLeft==null?9999:a.daysLeft)-(b.daysLeft==null?9999:b.daysLeft));
   });
