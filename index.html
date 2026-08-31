@@ -11971,8 +11971,11 @@ function insightStatusForRatio(p, ratio){
 // ── 로켓그로스 매출 화면의 일별 판매량 — 재고 판매속도 계산에 직접 반영 ──
 //  · 그로스 출고(daily_sales is_rg=true) 메뉴는 실사용 안 해서 데이터가 비어있음 — 대신 로켓그로스 매출
 //    화면(쿠팡 셀러인사이트 업로드, rg_products_YYYY-MM)의 옵션별 일별 판매량을 가져와 정규채널(_dCache)과
-//    합산한다. 매칭은 로켓그로스 매출 화면과 동일하게 optionId→백데이터 id→상품명으로 한다(백데이터의 code는
-//    여러 상품이 공유하는 경우가 있어(예: "ss소장 직접소싱") code 매칭은 쓰지 않는다).
+//    합산한다. optionId→백데이터 id는 이미 정확히 매칭돼 있으므로, 재고관리 상품(products)도 상품명이 아니라
+//    이 백데이터 id로 연결한다 — products.name과 backdata.name은 서로 독립적으로 관리되는 별개 문자열이라
+//    이름으로 비교하면 옵션ID 매칭이 되어 있어도 표기가 조금만 달라도 조용히 매칭 실패로 빠진다(2026-08-31
+//    "판매중인데 매칭없음으로 뜬다" 버그 원인). 대신 물류팀 발주건 정리(_lodMatchType)와 동일하게
+//    코드 우선, 코드가 없거나 여러 상품이 공유하는 'ss소장'류일 때만 상품명으로 보조 매칭한다.
 const INSIGHT_RG_LOOKBACK_MONTHS=4;   // 판매속도·추이 계산에 반영할 로켓그로스 매출 데이터 기간(이번달 포함 최근 N개월)
 function insightRgYms(){
   const out=[];
@@ -11982,38 +11985,49 @@ function insightRgYms(){
   }
   return out; // [이번달, 저번달, ...] 내림차순
 }
-// 상품명별 {날짜: 판매량} — 세트상품 개입수(rgQtyMultiplier) 반영, 로켓그로스 매출 화면의 '판매량' 컬럼과 동일 기준
-function insightRgQtyByName(){
-  const byName={};
+// 재고관리 상품(code/name) → 백데이터(_bdData) 고유 id. 코드가 있으면 코드로, 'ss소장'처럼 코드가
+// 여러 상품에 공유되거나 코드로 못 찾으면 상품명으로 보조 매칭(_lodMatchType과 동일한 규칙).
+function insightBdIdFor(p){
+  const code=String(p.code||'').trim();
+  if(code && code.toLowerCase()!=='ss소장'){
+    const m=_bdData.find(b=>String(b.code||'').trim().toLowerCase()===code.toLowerCase());
+    if(m) return m.id;
+  }
+  const mn=_bdData.find(b=>String(b.name||'').trim()===String(p.name||'').trim());
+  return mn ? mn.id : null;
+}
+// 백데이터 id별 {날짜: 판매량} — 세트상품 개입수(rgQtyMultiplier) 반영, 로켓그로스 매출 화면의 '판매량' 컬럼과 동일 기준
+function insightRgQtyById(){
+  const byId={};
   insightRgYms().forEach(ym=>{
     (_rgProdCache[ym]||[]).forEach(r=>{
-      const name=rgResolveName(r.optionId);
-      if(!name || !r.date) return;
+      const id=_rgOptionMap[r.optionId];
+      if(id==null || !r.date) return;
       const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
-      if(!byName[name]) byName[name]={};
-      byName[name][r.date]=(byName[name][r.date]||0)+qty;
+      if(!byId[id]) byId[id]={};
+      byId[id][r.date]=(byId[id][r.date]||0)+qty;
     });
   });
-  return byName;
+  return byId;
 }
-// 상품별 매출액(정산 전) — 최근 2개월, 표시용(위 판매량 계산과는 별개로 화면에 참고용으로만 노출)
-function insightRgRevenueByName(){
-  const byName={};
+// 백데이터 id별 매출액(정산 전) — 최근 2개월, 표시용(위 판매량 계산과는 별개로 화면에 참고용으로만 노출)
+function insightRgRevenueById(){
+  const byId={};
   insightRgYms().slice(0,2).forEach(ym=>{
     (_rgProdCache[ym]||[]).forEach(r=>{
-      const name=rgResolveName(r.optionId);
-      if(!name) return;
-      byName[name]=(byName[name]||0)+(r.revenue||0);
+      const id=_rgOptionMap[r.optionId];
+      if(id==null) return;
+      byId[id]=(byId[id]||0)+(r.revenue||0);
     });
   });
-  return byName;
+  return byId;
 }
 // 정규채널(_dCache) + 로켓그로스 매출 화면 판매량을 합친 일별 시리즈
-let _insightRgQtyByNameCache={};
-function insightMergedSeriesFor(p, rgQtyByName){
+let _insightRgQtyByIdCache={};
+function insightMergedSeriesFor(p, rgQtyById, bdId){
   const out={};
   Object.entries(_dCache[p.code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
-  Object.entries(rgQtyByName[p.name]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+  if(bdId!=null) Object.entries(rgQtyById[bdId]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
   return out;
 }
 // 최근 판매속도(일평균) — calcNeeded의 정교한 트렌드/이상치 로직 대신 단순 7일/30일 평균을 쓴다.
@@ -12061,11 +12075,12 @@ function insightEffectiveReorder(p, ic){
   return ic.noData?0:Math.round(ic.expM*p.leadTime);
 }
 function insightBuildRows(){
-  const rgRevMap=insightRgRevenueByName();
-  const rgQtyByName=insightRgQtyByName();
-  _insightRgQtyByNameCache=rgQtyByName;   // 출고 추이 모달에서도 동일 데이터 재사용
+  const rgRevMap=insightRgRevenueById();
+  const rgQtyById=insightRgQtyById();
+  _insightRgQtyByIdCache=rgQtyById;   // 출고 추이 모달에서도 동일 데이터 재사용
   return products.filter(p=>!p.hidden && (insightShowDisc || !p.disc)).map(p=>{
-    const mergedSeries=insightMergedSeriesFor(p, rgQtyByName);
+    const bdId=insightBdIdFor(p);
+    const mergedSeries=insightMergedSeriesFor(p, rgQtyById, bdId);
     const c=insightCalcNeeded(p, mergedSeries);
     const grade=getAbcGrade(p);
     const er=insightEffectiveReorder(p, c);
@@ -12084,7 +12099,7 @@ function insightBuildRows(){
     const netBoxes=netNeeded!=null?Math.ceil(netNeeded/(p.boxQty||1)):null;
     const covered=!c.noData && pending>0 && netNeeded<=0;
     const season=insightSeasonInfo(p);
-    const rgRevenue=rgRevMap[p.name]||0;
+    const rgRevenue=(bdId!=null?rgRevMap[bdId]:0)||0;
     return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgRevenue};
   });
 }
@@ -12191,12 +12206,13 @@ function renderInsight(){
 }
 
 // ── 상품별 출고 추이 모달 — 일별·주별·월별을 탭 전환 없이 한 화면에 동시 표시 ──
-//  · 정규채널(_dCache) + 로켓그로스 매출 화면 판매량(_insightRgQtyByNameCache, insightBuildRows에서 채워짐) 합산
+//  · 정규채널(_dCache) + 로켓그로스 매출 화면 판매량(_insightRgQtyByIdCache, insightBuildRows에서 채워짐) 합산
 let _insightTrendCharts={daily:null,weekly:null,monthly:null}, _insightTrendCode=null, _insightTrendName=null;
 function insightMergedSeries(code,name){
   const out={};
   Object.entries(_dCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
-  Object.entries(_insightRgQtyByNameCache[name]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+  const bdId=insightBdIdFor({code,name});
+  if(bdId!=null) Object.entries(_insightRgQtyByIdCache[bdId]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
   return out;
 }
 function insightOpenTrend(code,name){
