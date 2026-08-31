@@ -703,15 +703,36 @@ function longSoldoutList(){
   return out.sort((a,b)=> b.days - a.days);
 }
 
+const LONG_SOLDOUT_COLLAPSE_KEY = 'soldout_longwarn_collapsed';
+function isLongSoldWarnCollapsed(){ try{ return localStorage.getItem(LONG_SOLDOUT_COLLAPSE_KEY)==='1'; }catch{ return false; } }
+function setLongSoldWarnCollapsed(v){ try{ localStorage.setItem(LONG_SOLDOUT_COLLAPSE_KEY, v?'1':'0'); }catch{} }
+
 function renderLongSoldWarn(){
   const el = document.getElementById('longSoldWarn');
   const items = longSoldoutList();
   if(!items.length){ el.style.display='none'; el.innerHTML=''; return; }
   el.style.display = '';
+
+  if(isLongSoldWarnCollapsed()){
+    el.innerHTML = `
+      <div style="background:var(--red-light);border:1px solid #F6C9CA;border-radius:12px;padding:8px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <b style="color:var(--red);">🚨 ${LONG_SOLDOUT_DAYS}일 이상 장기 품절 ${items.length}건</b>
+        <button class="btn btn-sm" id="btnLongSoldExpand">펼치기</button>
+      </div>`;
+    document.getElementById('btnLongSoldExpand').addEventListener('click', ()=>{
+      setLongSoldWarnCollapsed(false);
+      renderLongSoldWarn();
+    });
+    return;
+  }
+
   el.innerHTML = `
-    <div style="background:var(--red-light);border:1px solid #F6C9CA;border-radius:12px;padding:14px 18px;margin-bottom:14px;font-size:13.5px;line-height:1.7;">
-      <b style="color:var(--red);">🚨 ${LONG_SOLDOUT_DAYS}일 이상 장기 품절 ${items.length}건</b>
-      <span style="color:var(--ink-soft);font-size:12px;">— 판매 재개 또는 상품 정리 검토가 필요합니다. 클릭하면 해당 상품이 검색됩니다.</span>
+    <div style="background:var(--red-light);border:1px solid #F6C9CA;border-radius:12px;padding:14px 18px;margin-bottom:14px;font-size:13.5px;line-height:1.7;position:relative;">
+      <button class="btn btn-sm" id="btnLongSoldHide" style="position:absolute;top:10px;right:12px;">숨기기</button>
+      <div style="padding-right:70px;">
+        <b style="color:var(--red);">🚨 ${LONG_SOLDOUT_DAYS}일 이상 장기 품절 ${items.length}건</b>
+        <span style="color:var(--ink-soft);font-size:12px;">— 판매 재개 또는 상품 정리 검토가 필요합니다. 클릭하면 해당 상품이 검색됩니다.</span>
+      </div>
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">
         ${items.slice(0,20).map(it=>`
           <span class="chip-mini warn" style="cursor:pointer;" data-lsname="${escapeHtml(it.p.erpName)}">
@@ -720,6 +741,10 @@ function renderLongSoldWarn(){
         ${items.length>20?`<span class="chip-mini">외 ${items.length-20}건</span>`:''}
       </div>
     </div>`;
+  document.getElementById('btnLongSoldHide').addEventListener('click', ()=>{
+    setLongSoldWarnCollapsed(true);
+    renderLongSoldWarn();
+  });
   el.querySelectorAll('[data-lsname]').forEach(chip=>{
     chip.addEventListener('click', ()=>{
       document.getElementById('searchField').value = 'erp';
