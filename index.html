@@ -28418,18 +28418,21 @@ function kbBestCardHtml(e){
     ${relatedHtml}
   </div>`;
 }
-// 지식들끼리 '관련도' 자동 계산 — 같은 구분(카테고리)·겹치는 검색 키워드·제목 단어 겹침을 반영
+// 지식들끼리 '관련도' 자동 계산 — 겹치는 검색 키워드·제목 단어 겹침이 실제 연관의 근거이고,
+// 같은 구분(카테고리)은 그 위에 얹는 가산점일 뿐이다. 카테고리만 같고 키워드·제목이 전혀 안 겹치면
+// (예: "태양광 정원등" ↔ "엠코니 전동베드" — 둘 다 '제품정보'일 뿐 내용은 무관) 연결하지 않는다.
 // 별도 그래프 데이터를 저장하지 않고 매번 계산 — 항목 수가 적어 부담 없고, 항상 최신 상태와 일치함
 function _kbRelatedness(a, b){
   if(a.id===b.id) return -1;
-  let score=0;
-  if(a.category && a.category===b.category) score+=3;
+  let score=0, overlap=false;
   const akw=new Set((a.keywords||[]).map(k=>k.toLowerCase()));
   const bkw=new Set((b.keywords||[]).map(k=>k.toLowerCase()));
-  akw.forEach(k=>{ if(bkw.has(k)) score+=4; });
+  akw.forEach(k=>{ if(bkw.has(k)){ score+=4; overlap=true; } });
   const at=new Set(_kbTokens(a.title).filter(t=>t.length>=2));
   const bt=new Set(_kbTokens(b.title).filter(t=>t.length>=2));
-  at.forEach(t=>{ if(bt.has(t)) score+=2; });
+  at.forEach(t=>{ if(bt.has(t)){ score+=2; overlap=true; } });
+  if(!overlap) return 0;   // 실제 내용 겹침이 없으면 카테고리가 같아도 무관한 지식으로 취급
+  if(a.category && a.category===b.category) score+=3;
   return score;
 }
 function kbRelatedEntries(entry, limit){
