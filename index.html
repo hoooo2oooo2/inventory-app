@@ -1202,6 +1202,26 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .fo-tabcontent{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 
 /* ── 📚 지식베이스 (CX팀) ── */
+.kb-layout{display:flex;gap:24px;align-items:flex-start;}
+.kb-main{flex:1;min-width:0;}
+.kb-side{width:300px;flex-shrink:0;position:sticky;top:16px;}
+@media(max-width:1100px){.kb-layout{flex-direction:column;}.kb-side{width:100%;position:static;}}
+.kb-graph-card{border:1px solid var(--bd);border-radius:16px;background:var(--bg);padding:16px;}
+.kb-graph-title{font-size:14px;font-weight:800;color:var(--tx);margin-bottom:2px;}
+.kb-graph-hint{font-size:10.5px;color:var(--tx2);line-height:1.5;margin-bottom:12px;}
+.kb-graph-canvas-wrap{width:100%;height:340px;border-radius:12px;overflow:hidden;background:var(--bg2);position:relative;cursor:grab;}
+.kb-graph-canvas-wrap:active{cursor:grabbing;}
+#kbGraphCanvas{width:100%;height:100%;display:block;}
+.kb-graph-tooltip{position:absolute;transform:translate(-50%,-100%);background:#191919;color:#fff;font-size:11px;padding:4px 9px;border-radius:6px;white-space:nowrap;pointer-events:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;z-index:5;}
+.kb-graph-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:var(--tx2);line-height:1.6;padding:20px;}
+
+.kb-best-related{margin-top:12px;padding-top:12px;border-top:1px solid var(--bd);}
+.kb-best-related-label{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:7px;}
+.kb-best-related-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.kb-related-chip{border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:11.5px;font-weight:600;padding:5px 12px;border-radius:99px;cursor:pointer;font-family:inherit;transition:.12s;}
+.kb-related-chip:hover{border-color:var(--pr);color:var(--pr);}
+.kb-view-related-label{font-size:12px;font-weight:700;color:var(--tx2);margin:14px 0 8px;}
+
 .kb-wrap{max-width:1200px;}
 .kb-hero{background:linear-gradient(135deg,var(--prl),var(--bg));border:1px solid var(--bd);border-radius:16px;padding:28px 26px;margin-bottom:18px;}
 .kb-hero-title{font-size:19px;font-weight:800;color:var(--tx);margin-bottom:4px;}
@@ -3199,7 +3219,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 <!-- ═══ 📚 지식베이스 (CX팀) ═══ -->
 <div class="page" id="page-knowledge">
- <div class="kb-wrap">
+ <div class="kb-layout">
+ <div class="kb-wrap kb-main">
   <div class="fo-subtabs" style="margin:0 0 18px;">
     <button class="fo-stab active" id="kbTab-ask" onclick="kbSwitchMode('ask')">🔍 질문으로 찾기</button>
     <button class="fo-stab" id="kbTab-browse" onclick="kbSwitchMode('browse')">📂 카테고리로 보기</button>
@@ -3253,6 +3274,19 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="kb-grid" id="kbBrowseGrid"></div>
     </div>
   </div>
+ </div>
+
+ <div class="kb-side">
+   <div class="kb-graph-card">
+     <div class="kb-graph-title">🧠 지식 연결망</div>
+     <div class="kb-graph-hint">비슷한 지식끼리 자동으로 이어집니다 · 드래그로 회전, 점 클릭 시 이동</div>
+     <div class="kb-graph-canvas-wrap" id="kbGraphWrap">
+       <canvas id="kbGraphCanvas"></canvas>
+       <div class="kb-graph-tooltip" id="kbGraphTooltip" style="display:none;"></div>
+       <div class="kb-graph-empty" id="kbGraphEmpty" style="display:none;">지식을 2개 이상 등록하면<br>연결망이 나타납니다</div>
+     </div>
+   </div>
+ </div>
  </div>
 </div>
 
@@ -9751,6 +9785,7 @@ function goPage(p){
   // 리뷰관리 화면을 벗어나면 실시간 폴링 중단(다른 화면에서 불필요한 egress 방지) — 'review'로
   // 다시 들어오면 reviewInit()이 _rvwStartPoll()로 재시작함
   if(p!=='review') _rvwStopPoll();
+  if(p!=='knowledge') kbGraphStopLoop();
   currentPage=p;
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
@@ -27954,6 +27989,7 @@ async function kbInit(){
   kbRenderCats();
   kbRenderResults();
   if(_kbMode==='browse'){ _kbBrowseCat ? kbRenderBrowseList() : kbRenderBrowseCats(); }
+  kbGraphInit();
 }
 function kbSwitchMode(mode){
   _kbMode = mode;
@@ -27989,6 +28025,7 @@ function kbRefreshAll(){
   kbRenderCats();
   kbRenderResults();
   if(_kbMode==='browse'){ _kbBrowseCat ? kbRenderBrowseList() : kbRenderBrowseCats(); }
+  kbGraphRefreshData();
 }
 function kbRenderBrowseList(){
   if(!_kbBrowseCat) return;
@@ -28113,6 +28150,11 @@ function kbCardHtml(e){
 }
 function kbBestCardHtml(e){
   const tags=(e.keywords||[]).map(k=>`<span class="kb-tag">${_esc(k)}</span>`).join('');
+  const related=kbRelatedEntries(e,4);
+  const relatedHtml = related.length ? `<div class="kb-best-related">
+      <div class="kb-best-related-label">🔗 이 지식과 연결된 다른 지식</div>
+      <div class="kb-best-related-chips">${related.map(r=>`<button class="kb-related-chip" onclick="event.stopPropagation();kbOpenView('${r.id}')">${_esc(r.title)}</button>`).join('')}</div>
+    </div>` : '';
   return `<div class="kb-best" onclick="kbOpenView('${e.id}')">
     <div class="kb-best-badge">🎯 가장 일치하는 답변</div>
     <div><span class="kb-view-cat" style="background:rgba(255,255,255,.55);">${_esc(e.category||'기타')}</span></div>
@@ -28120,7 +28162,224 @@ function kbBestCardHtml(e){
     <div class="kb-best-content">${_esc(e.content||'')}</div>
     <div class="kb-best-imgs" id="kbBestImgs"></div>
     <div class="kb-best-tags">${tags}</div>
+    ${relatedHtml}
   </div>`;
+}
+// 지식들끼리 '관련도' 자동 계산 — 같은 구분(카테고리)·겹치는 검색 키워드·제목 단어 겹침을 반영
+// 별도 그래프 데이터를 저장하지 않고 매번 계산 — 항목 수가 적어 부담 없고, 항상 최신 상태와 일치함
+function _kbRelatedness(a, b){
+  if(a.id===b.id) return -1;
+  let score=0;
+  if(a.category && a.category===b.category) score+=3;
+  const akw=new Set((a.keywords||[]).map(k=>k.toLowerCase()));
+  const bkw=new Set((b.keywords||[]).map(k=>k.toLowerCase()));
+  akw.forEach(k=>{ if(bkw.has(k)) score+=4; });
+  const at=new Set(_kbTokens(a.title).filter(t=>t.length>=2));
+  const bt=new Set(_kbTokens(b.title).filter(t=>t.length>=2));
+  at.forEach(t=>{ if(bt.has(t)) score+=2; });
+  return score;
+}
+function kbRelatedEntries(entry, limit){
+  return (_kbIdx||[])
+    .map(e=>({ e, s:_kbRelatedness(entry,e) }))
+    .filter(x=>x.s>0)
+    .sort((a,b)=>b.s-a.s)
+    .slice(0, limit||4)
+    .map(x=>x.e);
+}
+
+// ── 🧠 지식 연결망 (우측 3D 노드맵) ──
+//   외부 라이브러리 없이 canvas로 직접 그리는 pseudo-3D 힘-기반 그래프.
+//   레이아웃(_kbGraphNodes 좌표)은 데이터가 바뀔 때만 다시 계산하고, 회전/투영은 매 프레임 가볍게만 갱신한다.
+let _kbGraphNodes=null, _kbGraphEdges=null, _kbGraphBuiltFor=null;
+let _kbGraphRotY=0.5, _kbGraphRotX=-0.28, _kbGraphAutoRotate=true;
+let _kbGraphAnimHandle=null, _kbGraphHover=-1, _kbGraphProjected=[];
+let _kbGraphEventsWired=false;
+const KB_GRAPH_PALETTE=['#3182F6','#05C072','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#84CC16'];
+function kbGraphColor(cat){
+  let h=0; for(let i=0;i<cat.length;i++) h=(h*31+cat.charCodeAt(i))>>>0;
+  return KB_GRAPH_PALETTE[h%KB_GRAPH_PALETTE.length];
+}
+function kbGraphFingerprint(){
+  return (_kbIdx||[]).map(e=>e.id+':'+(e.category||'')+':'+(e.keywords||[]).join(',')+':'+(e.title||'')).join('|');
+}
+function kbGraphEnsureBuilt(){
+  const fp=kbGraphFingerprint();
+  if(_kbGraphBuiltFor===fp && _kbGraphNodes) return;
+  _kbGraphBuiltFor=fp;
+  const entries=_kbIdx||[];
+  const nodes=entries.map(e=>({ id:e.id, title:e.title, category:e.category||'기타', deg:0,
+    x:(Math.random()-0.5)*2, y:(Math.random()-0.5)*2, z:(Math.random()-0.5)*2 }));
+  const idxOf={}; entries.forEach((e,i)=>{ idxOf[e.id]=i; });
+  const edgeSet=new Set(); const edges=[];
+  entries.forEach((e,i)=>{
+    kbRelatedEntries(e,3).forEach(r=>{
+      const j=idxOf[r.id]; if(j===undefined||j===i) return;
+      const key=i<j? i+'_'+j : j+'_'+i;
+      if(edgeSet.has(key)) return;
+      edgeSet.add(key); edges.push([i,j]);
+    });
+  });
+  edges.forEach(([i,j])=>{ nodes[i].deg++; nodes[j].deg++; });
+  const N=nodes.length;
+  if(N>1 && N<=180){
+    for(let iter=0; iter<100; iter++){
+      for(let i=0;i<N;i++){
+        let fx=0,fy=0,fz=0;
+        for(let j=0;j<N;j++){
+          if(i===j) continue;
+          const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y, dz=nodes[i].z-nodes[j].z;
+          const d2=dx*dx+dy*dy+dz*dz+0.01;
+          const f=0.02/d2;
+          fx+=dx*f; fy+=dy*f; fz+=dz*f;
+        }
+        nodes[i]._fx=fx; nodes[i]._fy=fy; nodes[i]._fz=fz;
+      }
+      edges.forEach(([a,b])=>{
+        const dx=nodes[b].x-nodes[a].x, dy=nodes[b].y-nodes[a].y, dz=nodes[b].z-nodes[a].z;
+        const d=Math.sqrt(dx*dx+dy*dy+dz*dz)+0.001;
+        const f=(d-0.9)*0.02;
+        nodes[a]._fx+=dx*f/d; nodes[a]._fy+=dy*f/d; nodes[a]._fz+=dz*f/d;
+        nodes[b]._fx-=dx*f/d; nodes[b]._fy-=dy*f/d; nodes[b]._fz-=dz*f/d;
+      });
+      for(let i=0;i<N;i++){
+        nodes[i].x=(nodes[i].x+nodes[i]._fx)*0.985;
+        nodes[i].y=(nodes[i].y+nodes[i]._fy)*0.985;
+        nodes[i].z=(nodes[i].z+nodes[i]._fz)*0.985;
+      }
+    }
+  }
+  _kbGraphNodes=nodes; _kbGraphEdges=edges;
+}
+function _kbGraphLineRgb(){
+  return document.documentElement.getAttribute('data-theme')==='dark' ? '255,255,255' : '25,25,25';
+}
+function kbGraphResize(){
+  const canvas=document.getElementById('kbGraphCanvas'); const wrap=document.getElementById('kbGraphWrap');
+  if(!canvas||!wrap) return;
+  const rect=wrap.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=Math.max(1,Math.round(rect.width*dpr));
+  canvas.height=Math.max(1,Math.round(rect.height*dpr));
+}
+function kbGraphHitTest(clientX, clientY){
+  const canvas=document.getElementById('kbGraphCanvas'); if(!canvas) return -1;
+  const rect=canvas.getBoundingClientRect();
+  const mx=clientX-rect.left, my=clientY-rect.top;
+  let best=-1, bestD=999;
+  _kbGraphProjected.forEach(p=>{
+    const d=Math.hypot(p.x-mx, p.y-my);
+    if(d<p.r+4 && d<bestD){ bestD=d; best=p.idx; }
+  });
+  return best;
+}
+function kbGraphWireEvents(){
+  if(_kbGraphEventsWired) return; _kbGraphEventsWired=true;
+  const canvas=document.getElementById('kbGraphCanvas'); if(!canvas) return;
+  let dragging=false, lastX=0, lastY=0, moved=false;
+  canvas.addEventListener('mousedown', e=>{ dragging=true; moved=false; _kbGraphAutoRotate=false; lastX=e.clientX; lastY=e.clientY; });
+  window.addEventListener('mouseup', ()=>{ dragging=false; });
+  window.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    moved=true;
+    const dx=e.clientX-lastX, dy=e.clientY-lastY;
+    lastX=e.clientX; lastY=e.clientY;
+    _kbGraphRotY += dx*0.008;
+    _kbGraphRotX = Math.max(-1.4, Math.min(1.4, _kbGraphRotX + dy*0.008));
+  });
+  canvas.addEventListener('mousemove', e=>{
+    _kbGraphHover = kbGraphHitTest(e.clientX, e.clientY);
+    canvas.style.cursor = _kbGraphHover>=0 ? 'pointer' : (dragging?'grabbing':'grab');
+  });
+  canvas.addEventListener('mouseleave', ()=>{ _kbGraphHover=-1; });
+  canvas.addEventListener('click', e=>{
+    if(moved) return;   // 드래그 끝의 클릭은 무시(회전 조작과 항목 열기 구분)
+    const idx=kbGraphHitTest(e.clientX, e.clientY);
+    if(idx>=0 && _kbGraphNodes[idx]) kbOpenView(_kbGraphNodes[idx].id);
+  });
+  window.addEventListener('resize', ()=>{ kbGraphResize(); });
+}
+function kbGraphStartLoop(){
+  if(_kbGraphAnimHandle) return;
+  const step=()=>{
+    if(_kbGraphAutoRotate) _kbGraphRotY += 0.0035;
+    kbGraphRender();
+    _kbGraphAnimHandle=requestAnimationFrame(step);
+  };
+  _kbGraphAnimHandle=requestAnimationFrame(step);
+}
+function kbGraphStopLoop(){
+  if(_kbGraphAnimHandle){ cancelAnimationFrame(_kbGraphAnimHandle); _kbGraphAnimHandle=null; }
+}
+function kbGraphRender(){
+  const canvas=document.getElementById('kbGraphCanvas');
+  if(!canvas || !_kbGraphNodes || !_kbGraphNodes.length) return;
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.width, H=canvas.height;
+  if(!W||!H) return;
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=H/2, scale=Math.min(W,H)*0.34;
+  const cosY=Math.cos(_kbGraphRotY), sinY=Math.sin(_kbGraphRotY);
+  const cosX=Math.cos(_kbGraphRotX), sinX=Math.sin(_kbGraphRotX);
+  const projected=_kbGraphNodes.map((n,i)=>{
+    const x1=n.x*cosY - n.z*sinY, z1=n.x*sinY + n.z*cosY;
+    const y1=n.y*cosX - z1*sinX, z2=n.y*sinX + z1*cosX;
+    const persp=1/(1.8 - z2*0.5);
+    return { i, sx:cx+x1*scale*persp, sy:cy+y1*scale*persp, z:z2, persp };
+  });
+  const order=[...projected].sort((a,b)=>a.z-b.z);
+  ctx.lineWidth=1*dpr;
+  (_kbGraphEdges||[]).forEach(([a,b])=>{
+    const pa=projected[a], pb=projected[b];
+    const depth=(pa.z+pb.z)/2;
+    ctx.strokeStyle=`rgba(${_kbGraphLineRgb()},${Math.max(0.08,Math.min(0.5,0.32+depth*0.15))})`;
+    ctx.beginPath(); ctx.moveTo(pa.sx,pa.sy); ctx.lineTo(pb.sx,pb.sy); ctx.stroke();
+  });
+  const hitList=[];
+  order.forEach(p=>{
+    const n=_kbGraphNodes[p.i];
+    const baseR=(5+Math.min(n.deg,6)*1.1)*dpr;
+    const r=baseR*(0.7+p.persp*0.5);
+    const hovered=p.i===_kbGraphHover;
+    ctx.beginPath();
+    ctx.arc(p.sx, p.sy, hovered? r*1.25 : r, 0, Math.PI*2);
+    ctx.globalAlpha=Math.max(0.35, Math.min(1, 0.55+p.z*0.35));
+    ctx.fillStyle=kbGraphColor(n.category);
+    ctx.fill();
+    ctx.globalAlpha=1;
+    if(hovered){ ctx.lineWidth=2*dpr; ctx.strokeStyle='#fff'; ctx.stroke(); }
+    hitList.push({ x:p.sx/dpr, y:p.sy/dpr, r:r/dpr, idx:p.i });
+  });
+  _kbGraphProjected=hitList;
+  const tip=document.getElementById('kbGraphTooltip');
+  if(tip){
+    if(_kbGraphHover>=0 && _kbGraphNodes[_kbGraphHover]){
+      const n=_kbGraphNodes[_kbGraphHover];
+      const p=projected[_kbGraphHover];
+      tip.textContent=n.title;
+      tip.style.left=(p.sx/dpr)+'px';
+      tip.style.top=(p.sy/dpr-14)+'px';
+      tip.style.display='';
+    } else {
+      tip.style.display='none';
+    }
+  }
+}
+function kbGraphRefreshData(){
+  const canvas=document.getElementById('kbGraphCanvas'); if(!canvas) return;
+  kbGraphEnsureBuilt();
+  const empty=document.getElementById('kbGraphEmpty');
+  const hasData=_kbGraphNodes && _kbGraphNodes.length>=2;
+  if(empty) empty.style.display=hasData? 'none' : '';
+  canvas.style.display=hasData? '' : 'none';
+  if(hasData) kbGraphStartLoop(); else kbGraphStopLoop();
+}
+function kbGraphInit(){
+  if(!document.getElementById('kbGraphCanvas')) return;
+  kbGraphResize();
+  kbGraphWireEvents();
+  kbGraphRefreshData();
 }
 async function kbLoadBestImages(e){
   if(!e.imgCount) return;
@@ -28141,6 +28400,11 @@ async function kbOpenView(id){
   const e=(_kbIdx||[]).find(x=>x.id===id); if(!e) return;
   const body=document.getElementById('kbViewBody'); if(!body) return;
   const canEdit=_menuPerm('knowledge')==='edit';
+  const related=kbRelatedEntries(e,6);
+  const relatedHtml = related.length ? `<div>
+      <div class="kb-view-related-label">🔗 연결된 다른 지식</div>
+      <div class="kb-best-related-chips">${related.map(r=>`<button class="kb-related-chip" onclick="kbOpenView('${r.id}')">${_esc(r.title)}</button>`).join('')}</div>
+    </div>` : '';
   body.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
       <div>
@@ -28152,7 +28416,8 @@ async function kbOpenView(id){
     <div class="kb-view-content">${_esc(e.content||'')}</div>
     <div class="kb-view-imgs" id="kbViewImgs">${e.imgCount? '<span style="font-size:12px;color:var(--tx2);">이미지 불러오는 중…</span>' : ''}</div>
     <div class="kb-view-tags">${(e.keywords||[]).map(k=>`<span class="kb-tag">${_esc(k)}</span>`).join('')}</div>
-    <div class="kb-view-meta">${e.updatedAt? String(e.updatedAt).slice(0,16).replace('T',' ') : ''}${e.updatedBy? ' · '+_esc(e.updatedBy)+' 업데이트' : ''}</div>
+    ${relatedHtml}
+    <div class="kb-view-meta" style="margin-top:14px;">${e.updatedAt? String(e.updatedAt).slice(0,16).replace('T',' ') : ''}${e.updatedBy? ' · '+_esc(e.updatedBy)+' 업데이트' : ''}</div>
     ${canEdit? `<div class="ma" style="margin-top:16px;">
         <button class="btn" style="color:#DC2626;" onclick="kbDeleteEntry('${e.id}')">🗑 삭제</button>
         <button class="btn btn-pr" onclick="kbOpenEditor('${e.id}')">✏️ 수정</button>
