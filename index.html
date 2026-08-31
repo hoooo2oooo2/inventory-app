@@ -999,6 +999,18 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cs-pickrow-qty{width:62px;border:1px solid var(--bd);border-radius:7px;padding:6px 8px;font-size:13px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;flex-shrink:0;}
 .cs-pickrow-qty:focus{border-color:#3182F6;background:var(--bg);}
 .cs-pickrow-qty.cs-has{border-color:#3182F6;background:#EEF4FF;font-weight:700;}
+/* 위탁: 발주서 업로드 미리보기 */
+.cs-rino-grp{padding:10px 14px;border-bottom:0.5px solid var(--bd);}
+.cs-rino-grp:last-child{border-bottom:none;}
+.cs-rino-grp-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+.cs-rino-grp-name{font-size:13px;font-weight:700;color:var(--tx);}
+.cs-rino-grp-addr{font-size:11px;color:var(--tx2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cs-rino-grp-settle{font-size:12px;font-weight:700;color:#3182F6;white-space:nowrap;}
+.cs-rino-item{display:flex;align-items:center;gap:6px;padding:3px 0;}
+.cs-rino-item select{flex:1;min-width:0;border:1px solid var(--bd);border-radius:7px;padding:5px 7px;font-size:11.5px;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
+.cs-rino-item.cs-rino-unmatched select{border-color:#DC2626;background:#FEF2F2;color:#DC2626;}
+.cs-rino-item input{width:56px;border:1px solid var(--bd);border-radius:7px;padding:5px 6px;font-size:11.5px;text-align:right;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;flex-shrink:0;}
+.cs-rino-item-raw{font-size:10px;color:var(--tx2);flex-shrink:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* 부속요청 게시판 */
 .arq-wrap{max-width:1320px;margin:0 auto;padding:16px 18px;height:calc(100vh - 140px);display:flex;flex-direction:column;box-sizing:border-box;}
 .arq-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
@@ -3197,6 +3209,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div style="display:flex;gap:8px;align-items:center;">
         <input type="month" class="cs-search" id="csOrderMonth" style="width:150px;" onchange="csRenderOrders()" title="월별 보기 (비우면 전체)"/>
         <input class="cs-search" id="csOrderSearch" placeholder="고객명·제품 검색" autocomplete="off" oninput="csRenderOrders()"/>
+        <button class="cs-add-btn" id="csRinoUploadBtn" style="display:none;background:#059669;" onclick="document.getElementById('csRinoFileInput').click()">📤 발주서 업로드</button>
+        <input type="file" id="csRinoFileInput" accept=".xlsx,.xls" style="display:none;" onchange="csRinoPickFile(event)">
         <button class="cs-add-btn" onclick="csOpenOrderModal()">＋ 주문 추가</button>
       </div>
     </div>
@@ -3729,6 +3743,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="csVendorModalTitle" style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:18px;">＋ 위탁 배송처 추가</div>
     <div style="display:grid;gap:10px;">
       <div><div class="pc-lbl">배송처명</div><input type="text" id="csVName" class="pc-inp" placeholder="예: 비츠온" autocomplete="off"/></div>
+      <div><div class="pc-lbl">기본 택배비 (원) <span style="font-weight:400;color:var(--tx2);">— 발주서 자동반영 시 건당 부과</span></div><input type="number" id="csVShipFee" class="pc-inp" placeholder="3000" min="0"/></div>
       <div><div class="pc-lbl">메모 (선택)</div><input type="text" id="csVMemo" class="pc-inp" placeholder="연락처·정산방식 등" autocomplete="off"/></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:18px;align-items:center;">
@@ -3753,6 +3768,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <span style="font-size:12px;color:var(--tx2);">부가세 포함단가 (단가 × 1.1, 자동)</span>
         <span id="csPVatPreview" style="font-size:15px;font-weight:700;color:#3182F6;">0원</span>
       </div>
+      <div style="grid-column:1/-1;"><div class="pc-lbl">판매가 · 정산단가 (원) <span style="font-weight:400;color:var(--tx2);">— 거래명세서·발주서 자동반영 시 사용</span></div><input type="number" id="csPSale" class="pc-inp" placeholder="0" min="0"/></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:18px;">
       <button onclick="document.getElementById('csProdModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
@@ -3783,6 +3799,33 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button onclick="document.getElementById('csOrderModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
       <button onclick="csConfirmOrder()" style="flex:2;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 위탁: 리노우 발주서 업로드 → 주문·거래명세서 자동반영 모달 -->
+<div id="csRinoModal" class="pc-modal-bg">
+  <div style="background:var(--bg);border-radius:14px;padding:22px;width:min(94vw,760px);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div style="font-size:15px;font-weight:700;color:var(--tx);">📤 발주서 반영 <span id="csRinoFileName" style="font-weight:400;color:var(--tx2);font-size:12px;"></span></div>
+      <button onclick="csRinoCloseModal()" style="border:none;background:none;font-size:16px;cursor:pointer;color:var(--tx2);">✕</button>
+    </div>
+    <div id="csRinoSummaryLine" style="font-size:12px;color:var(--tx2);margin-bottom:12px;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><div class="pc-lbl">주문 날짜</div><input type="date" id="csRinoDate" class="pc-inp" onchange="csRinoRecalcAndRender()"/></div>
+      <div><div class="pc-lbl">택배비 (건당, 원)</div><input type="number" id="csRinoShipFee" class="pc-inp" min="0" oninput="csRinoRecalcAndRender()"/></div>
+    </div>
+    <div id="csRinoUnmatchedWarn" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#DC2626;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;">⚠️ 매칭 안 된 상품이 있습니다. 각 항목의 드롭다운에서 일치하는 제품을 선택하세요.</div>
+    <div id="csRinoGroupList" style="flex:1;overflow-y:auto;border:1px solid var(--bd);border-radius:10px;"></div>
+    <div style="margin-top:12px;background:var(--bg2);border-radius:8px;padding:10px 13px;display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;color:var(--tx2);">택배건수 · <b id="csRinoSumCnt" style="color:var(--tx);">0건</b></span>
+      <span style="font-size:12px;color:var(--tx2);">발생금액(원가) · <b id="csRinoSumCost" style="color:var(--tx);">0원</b></span>
+      <span style="font-size:12px;color:var(--tx2);">배송비 합계 · <b id="csRinoSumShip" style="color:#D97706;">0원</b></span>
+      <span style="font-size:12px;color:var(--tx2);">정산금액(매출) · <b id="csRinoSumSettle" style="color:#3182F6;">0원</b></span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button onclick="csRinoCloseModal()" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
+      <button onclick="csRinoConfirmImport()" style="flex:2;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">✓ 주문 등록 + 거래명세서 생성</button>
     </div>
   </div>
 </div>
@@ -25459,7 +25502,12 @@ function csSelectVendor(id){
   _csCalYM = null;   // 배송처가 바뀌면 미니 달력도 그 배송처의 최근 주문월로 다시 잡는다
   csRenderVendorChips(); csRenderVHead(); csRenderProducts(); csRenderOrders();
 }
+function _csUpdateRinoBtn(){
+  const btn = document.getElementById('csRinoUploadBtn');
+  if(btn) btn.style.display = (_csSelVendor!=='ALL' && _csVendorName(_csSelVendor)==='리노우') ? '' : 'none';
+}
 function csRenderVHead(){
+  _csUpdateRinoBtn();
   const el = document.getElementById('csVHead');
   if(_csSelVendor==='ALL'){
     el.innerHTML = `<div class="cs-vhead-name">📦 전체 배송처</div>
@@ -25487,6 +25535,7 @@ function csOpenVendorModal(id){
   const v = id ? _csVendors.find(x=>x.id===id) : null;
   document.getElementById('csVendorModalTitle').textContent = v ? '✏️ 배송처 수정' : '＋ 위탁 배송처 추가';
   document.getElementById('csVName').value = v?v.name||'':'';
+  document.getElementById('csVShipFee').value = v?(v.shipFee??''):'';
   document.getElementById('csVMemo').value = v?v.memo||'':'';
   document.getElementById('csVDelBtn').style.display = v ? '' : 'none';
   document.getElementById('csVendorModal').style.display='flex';
@@ -25496,15 +25545,16 @@ async function csConfirmVendor(){
   const name = (document.getElementById('csVName').value||'').trim();
   if(!name){ toast('배송처명을 입력하세요.'); return; }
   const memo = (document.getElementById('csVMemo').value||'').trim();
+  const shipFee = Math.max(0, Math.round(Number(document.getElementById('csVShipFee').value)||0));
   if(_csVendors.some(v=>v.name===name && v.id!==_csEditVendorId)){ toast('이미 있는 배송처명입니다.'); return; }
   if(_csEditVendorId){
     const v = _csVendors.find(x=>x.id===_csEditVendorId);
-    if(v){ const old=v.name; v.name=name; v.memo=memo;
+    if(v){ const old=v.name; v.name=name; v.memo=memo; v.shipFee=shipFee;
       _csProducts.forEach(p=>{ if(p.vendorId===v.id) p.vendor=name; });   // 표시용 동기화
       await cloudKvSave('consign_products', _csProducts);
     }
   } else {
-    const vd = { id:_csId(), name, memo };
+    const vd = { id:_csId(), name, memo, shipFee };
     _csVendors.push(vd);
     _csSelVendor = vd.id;
   }
@@ -25592,6 +25642,7 @@ function csOpenProdModal(id){
   document.getElementById('csPName').value = p?p.name||'':'';
   document.getElementById('csPCode').value = p?p.code||'':'';
   document.getElementById('csPPrice').value = p?(p.price??''):'';
+  document.getElementById('csPSale').value = p?(p.salePrice??''):'';
   csUpdateVatPreview();
   document.getElementById('csProdModal').style.display='flex';
   setTimeout(()=>document.getElementById('csPName').focus(),50);
@@ -25606,11 +25657,12 @@ async function csConfirmProd(){
   const vendorId = document.getElementById('csPVendor').value;
   if(!vendorId){ toast('배송처를 선택하세요.'); return; }
   const price = Math.round(Number(document.getElementById('csPPrice').value)||0);
+  const salePrice = Math.round(Number(document.getElementById('csPSale').value)||0);
   const data = {
     vendorId, vendor:_csVendorName(vendorId),
     cat:(document.getElementById('csPCat').value||'').trim(),
     name, code:(document.getElementById('csPCode').value||'').trim(),
-    price, vat:_csVat(price)
+    price, vat:_csVat(price), salePrice
   };
   if(_csEditProdId){
     const p = _csProducts.find(x=>x.id===_csEditProdId);
@@ -25889,6 +25941,192 @@ function csRenderOrderCal(){
       ${cells}
     </div>
     <div class="cs-order-cal-total"><span>주문일 ${orderDays}일 합계</span><b>${_csWon(monthTotal)}</b></div>`;
+}
+
+// ── 리노우 발주서 업로드 → 주문·거래명세서 자동반영 (리노우 배송처 전용) ──
+//   엑셀 열: C=수취인 D=연락처 G=주소 H=상품명 I=수량 (헤더 1행, 2행부터 데이터)
+//   동일 수취인+연락처+주소 = 택배 1건(배송비 1회) · 상품명은 제품세팅과 자동 매칭 후 필요시 수동 보정
+//   확정 시: consign_orders에 주문 등록 + 견적서 화면에 "거래명세서"로 자동 채워 이동
+let _csRinoImport = null;   // {vendor, fileName, groups:[{customer,phone,addr,items:[{raw,qty,productId}]}], aliasMap}
+function _csRinoNorm(s){ return String(s==null?'':s).replace(/\s+/g,'').replace(/[()（）\-–_,./·]/g,'').toLowerCase(); }
+function _csRinoMatch(vendorId, rawName, aliasMap){
+  const norm = _csRinoNorm(rawName);
+  if(!norm) return null;
+  const prods = _csProducts.filter(p=>p.vendorId===vendorId);
+  let hit = prods.find(p=>_csRinoNorm(p.name)===norm);
+  if(hit) return hit.id;
+  if(aliasMap && aliasMap[norm] && prods.some(p=>p.id===aliasMap[norm])) return aliasMap[norm];
+  hit = prods.find(p=>{ const pn=_csRinoNorm(p.name); return pn && (pn.includes(norm) || norm.includes(pn)); });
+  return hit ? hit.id : null;
+}
+function csRinoPickFile(evt){
+  const f = evt.target.files && evt.target.files[0];
+  evt.target.value = '';
+  if(!f) return;
+  if(_csSelVendor==='ALL' || _csVendorName(_csSelVendor)!=='리노우'){ toast('리노우 배송처를 선택한 상태에서 업로드하세요.'); return; }
+  const vendor = _csVendors.find(x=>x.id===_csSelVendor);
+  const reader = new FileReader();
+  reader.onload = async(e)=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      await csRinoParseAndOpen(aoa, vendor, f.name);
+    }catch(err){
+      toast('엑셀 파일을 읽는 중 오류가 발생했습니다: '+(err.message||err));
+    }
+  };
+  reader.readAsArrayBuffer(f);
+}
+async function csRinoParseAndOpen(aoa, vendor, fileName){
+  if(!aoa || aoa.length<2){ toast('엑셀에서 데이터를 찾지 못했습니다.'); return; }
+  const rows = aoa.slice(1);   // 1행은 헤더
+  const groupsMap = new Map();
+  rows.forEach(row=>{
+    const customer = String(row[2]??'').trim();
+    const phone    = String(row[3]??'').trim();
+    const addr     = String(row[6]??'').trim();
+    const prodName = String(row[7]??'').trim();
+    const qty      = Math.floor(Number(row[8]))||0;
+    if(!customer || !prodName || qty<=0) return;
+    const key = `${customer}|${phone}|${addr}`;
+    if(!groupsMap.has(key)) groupsMap.set(key, { customer, phone, addr, items:[] });
+    const g = groupsMap.get(key);
+    const ex = g.items.find(it=>it.raw===prodName);
+    if(ex) ex.qty += qty; else g.items.push({ raw:prodName, qty });
+  });
+  const groups = [...groupsMap.values()];
+  if(!groups.length){ toast('인식 가능한 주문 행이 없습니다. C(수취인)·D(연락처)·G(주소)·H(상품명)·I(수량) 열을 확인하세요.'); return; }
+  const aliasMap = (await cloudKvLoad('consign_rino_alias')) || {};
+  groups.forEach(g=>{ g.items.forEach(it=>{ it.productId = _csRinoMatch(vendor.id, it.raw, aliasMap); }); });
+  _csRinoImport = { vendor, fileName, groups, aliasMap };
+  document.getElementById('csRinoFileName').textContent = '· '+fileName;
+  document.getElementById('csRinoDate').value = _csToday();
+  document.getElementById('csRinoShipFee').value = vendor.shipFee || 3000;
+  csRinoRecalcAndRender();
+  document.getElementById('csRinoModal').style.display='flex';
+}
+function csRinoCloseModal(){
+  document.getElementById('csRinoModal').style.display='none';
+  _csRinoImport = null;
+}
+function csRinoSetMatch(gi, ii, pid){
+  if(!_csRinoImport) return;
+  const g=_csRinoImport.groups[gi]; if(!g) return;
+  const it=g.items[ii]; if(!it) return;
+  it.productId = pid || null;
+  if(pid) _csRinoImport.aliasMap[_csRinoNorm(it.raw)] = pid;   // 확정 시 저장 → 다음부터 자동 매칭
+  csRinoRecalcAndRender();
+}
+function csRinoSetQty(gi, ii, val){
+  if(!_csRinoImport) return;
+  const g=_csRinoImport.groups[gi]; if(!g) return;
+  const it=g.items[ii]; if(!it) return;
+  it.qty = Math.max(0, Math.floor(Number(val))||0);
+  csRinoRecalcAndRender();
+}
+function csRinoRecalcAndRender(){
+  if(!_csRinoImport) return;
+  const { vendor, groups } = _csRinoImport;
+  const shipFee = Math.max(0, Math.round(Number(document.getElementById('csRinoShipFee').value)||0));
+  let anyUnmatched=false, costSum=0, settleSum=0;
+  const vendorProds = _csProducts.filter(x=>x.vendorId===vendor.id);
+  const rowsHtml = groups.map((g,gi)=>{
+    let gSettle=0;
+    const itemsHtml = g.items.map((it,ii)=>{
+      const p = it.productId ? _csProducts.find(x=>x.id===it.productId) : null;
+      if(!p) anyUnmatched=true;
+      if(p){ costSum += (p.vat||0)*it.qty; gSettle += (p.salePrice||0)*it.qty; }
+      const opts = `<option value="">❓ 매칭할 제품 선택</option>` + vendorProds.map(x=>`<option value="${x.id}" ${x.id===it.productId?'selected':''}>${_csEsc(x.name)}${x.salePrice?'':' (판매가 미등록)'}</option>`).join('');
+      return `<div class="cs-rino-item ${p?'':'cs-rino-unmatched'}">
+        <select onchange="csRinoSetMatch(${gi},${ii},this.value)">${opts}</select>
+        <input type="number" min="0" value="${it.qty}" oninput="csRinoSetQty(${gi},${ii},this.value)">
+        <span class="cs-rino-item-raw" title="엑셀 원본 상품명: ${_csEsc(it.raw)}">엑셀: ${_csEsc(it.raw)}</span>
+      </div>`;
+    }).join('');
+    settleSum += gSettle;
+    return `<div class="cs-rino-grp">
+      <div class="cs-rino-grp-head">
+        <span class="cs-rino-grp-name">${_csEsc(g.customer)}</span>
+        <span class="cs-rino-grp-addr">${_csEsc(g.phone)}${g.phone&&g.addr?' · ':''}${_csEsc(g.addr)}</span>
+        <span class="cs-rino-grp-settle">${_csWon(gSettle)}</span>
+      </div>
+      ${itemsHtml}
+    </div>`;
+  }).join('');
+  document.getElementById('csRinoGroupList').innerHTML = rowsHtml;
+  document.getElementById('csRinoSummaryLine').textContent = `택배건수 ${groups.length}건 · 상품 ${groups.reduce((s,g)=>s+g.items.length,0)}품목 인식됨`;
+  document.getElementById('csRinoUnmatchedWarn').style.display = anyUnmatched ? '' : 'none';
+  document.getElementById('csRinoSumCnt').textContent = groups.length+'건';
+  document.getElementById('csRinoSumCost').textContent = _csWon(costSum);
+  document.getElementById('csRinoSumShip').textContent = _csWon(shipFee*groups.length);
+  document.getElementById('csRinoSumSettle').textContent = _csWon(settleSum);
+}
+async function csRinoConfirmImport(){
+  if(!_csRinoImport) return;
+  const { vendor, groups, aliasMap } = _csRinoImport;
+  const date = document.getElementById('csRinoDate').value || _csToday();
+  const shipFee = Math.max(0, Math.round(Number(document.getElementById('csRinoShipFee').value)||0));
+  const usable = groups.filter(g=>g.items.some(it=>it.productId));
+  if(!usable.length){ toast('매칭된 제품이 없어 등록할 주문이 없습니다.'); return; }
+  if(groups.some(g=>g.items.some(it=>!it.productId))){
+    if(!confirm('매칭되지 않은 상품이 있습니다. 매칭 안 된 항목은 제외하고 진행할까요?')) return;
+  }
+
+  const newOrders = usable.map(g=>{
+    const items = g.items.filter(it=>it.productId).map(it=>{
+      const p = _csProducts.find(x=>x.id===it.productId);
+      return { productId:p.id, productName:p.name, productCode:p.code||'', vatUnit:p.vat, qty:it.qty, vatTotal:p.vat*it.qty };
+    });
+    const vatTotal = items.reduce((s,it)=>s+it.vatTotal,0);
+    const settlement = items.reduce((s,it)=>{ const p=_csProducts.find(x=>x.id===it.productId); return s+(p.salePrice||0)*it.qty; },0);
+    return { id:_csId(), vendorId:vendor.id, date, customer:g.customer, phone:g.phone, addr:g.addr,
+      items, vatTotal, shipping:shipFee, settlement, author:(window.__CURRENT_USER&&window.__CURRENT_USER.name)||'', source:'rino_import' };
+  });
+
+  // 상품별 합계(거래명세서용) — 매칭된 항목만
+  const prodAgg = new Map();
+  usable.forEach(g=>g.items.forEach(it=>{
+    if(!it.productId) return;
+    const p = _csProducts.find(x=>x.id===it.productId); if(!p) return;
+    const cur = prodAgg.get(p.id) || { p, qty:0 };
+    cur.qty += it.qty;
+    prodAgg.set(p.id, cur);
+  }));
+
+  // 다른 PC와의 동시저장 레이스를 피하기 위해 최신본을 다시 받아 병합 후 저장
+  const freshOrders = await cloudKvLoad('consign_orders');
+  _csOrders = Array.isArray(freshOrders) ? freshOrders : _csOrders;
+  _csOrders = [...newOrders, ..._csOrders];
+  await cloudKvSave('consign_orders', _csOrders);
+
+  if(Object.keys(aliasMap).length){
+    const freshAlias = await cloudKvLoad('consign_rino_alias');
+    const mergedAlias = Object.assign({}, (freshAlias && !Array.isArray(freshAlias))?freshAlias:{}, aliasMap);
+    await cloudKvSave('consign_rino_alias', mergedAlias);
+  }
+
+  csRenderVHead(); csRenderOrders();
+  csRinoFillQuoteFromImport(vendor, date, shipFee, usable.length, [...prodAgg.values()]);
+  csRinoCloseModal();
+  toast(`주문 ${newOrders.length}건을 등록하고 거래명세서를 생성했습니다.`);
+}
+// 견적서 화면을 "거래명세서"로 채워 이동 (견적서 메뉴 양식 그대로 재사용)
+function csRinoFillQuoteFromImport(vendor, date, shipFee, orderCount, prodList){
+  _qtRows = prodList.map(({p,qty})=>({ id:_qtRowNextId++, name:(p.cat||'위탁상품'), model:p.name, qty:String(qty), unit:String(p.salePrice||0), note:'' }));
+  if(orderCount>0) _qtRows.push({ id:_qtRowNextId++, name:'배송비', model:'배송비', qty:String(orderCount), unit:String(shipFee||0), note:'-' });
+  if(!_qtRows.length) _qtRows.push({id:_qtRowNextId++,name:'',model:'',qty:'',unit:'',note:''});
+  _qtEditId = null;
+  const titleEl=document.getElementById('qt-title'); if(titleEl) titleEl.innerText='거래명세서';
+  const phraseEl=document.getElementById('qt-phrase'); if(phraseEl) phraseEl.innerText='아래와 같이 거래합니다.';
+  const nameEl=document.getElementById('qt-name'); if(nameEl) nameEl.value = `${vendor.name} 정산 (${date})`;
+  const compEl=document.getElementById('qt-company'); if(compEl) compEl.value = vendor.name;
+  _qtDate = date;
+  const di=document.getElementById('qt-date-input'); if(di) di.value=date;
+  const dd=document.getElementById('qt-date-disp'); if(dd) dd.textContent=qtFmtDate(date);
+  const vat=document.getElementById('qt-vat'); if(vat) vat.value='포함';
+  qtRenderRows();
+  goMenu('quote');
 }
 
 // ══════════════════════════════════════════════
