@@ -4578,7 +4578,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
       <div>
         <div class="ct" style="font-size:17px;">📊 발주 인사이트</div>
-        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석합니다 — 일평균판매·예상 소진일·권장 발주는 정규채널 판매량에 로켓그로스 매출 화면(쿠팡 셀러인사이트)의 일별 판매량을 합산한 값입니다(그로스 출고 메뉴는 미사용이라 반영하지 않음). 긴급도·발주 마감일은 여기에 발주관리 진행중 발주(미입고 수량)까지 추가로 차감한 값입니다. 로켓그로스 매출액(원)은 최근 2개월·백데이터 매칭 기준이라 매칭 안 된 상품은 공란입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
+        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석합니다 — 일평균판매·예상 소진일·권장 발주는 정규채널 판매량에 로켓그로스 매출 화면(쿠팡 셀러인사이트)의 일별 판매량을 합산한 값입니다(그로스 출고 메뉴는 미사용이라 반영하지 않음). 긴급도·발주 마감일은 여기에 발주관리 진행중 발주(미입고 수량)까지 추가로 차감한 값입니다. 로켓그로스 판매량(개)은 최근 2개월·백데이터 매칭 기준이라 매칭 안 된 상품은 공란입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
       </div>
       <div style="font-size:12px;color:var(--tx2);" id="insightUpdLbl"></div>
     </div>
@@ -4590,7 +4590,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <select class="sel" id="insightTypeSel" onchange="insightSetType(this.value)"><option value="">전체 구분</option><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select>
       <select class="sel" id="insightGradeSel" onchange="insightSetGrade(this.value)"><option value="">전체 등급</option><option value="A">A등급</option><option value="B">B등급</option><option value="C">C등급</option></select>
       <select class="sortsel" id="insightSortSel" onchange="insightSetSort(this.value)">
-        <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="rg_desc">로켓그로스매출순</option><option value="name">상품명순</option>
+        <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="rg_desc">로켓그로스판매량순</option><option value="name">상품명순</option>
       </select>
       <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="insightDiscChk" onchange="insightToggleDisc(this.checked)"> 단종 포함</label>
       <span style="font-size:13px;color:var(--tx2);" id="insightCount"></span>
@@ -4601,7 +4601,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <th>긴급도</th><th>상품</th><th>구분</th><th>등급</th>
           <th style="text-align:right;">현재고</th><th style="text-align:right;">일평균판매</th>
           <th>예상 소진일</th><th>발주 마감일</th><th style="text-align:right;">권장 발주</th>
-          <th>진행중 발주</th><th style="text-align:right;">🚀 로켓그로스 매출</th><th>성수기·비수기</th><th>전년 월별추이</th>
+          <th>진행중 발주</th><th style="text-align:right;">🚀 로켓그로스 판매량</th><th>성수기·비수기</th><th>전년 월별추이</th>
         </tr></thead>
         <tbody id="insightTbody"></tbody>
       </table>
@@ -4622,12 +4622,33 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #insightTrendModal .ins-trend-section-title{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:6px;}
 #insightTrendModal .ins-trend-section-sum{font-size:12px;font-weight:600;color:var(--tx2);}
 #insightTrendModal .ins-trend-canvaswrap{height:190px;position:relative;}
+#insightTrendModal .ins-trend-range{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:16px;}
+#insightTrendModal .ins-trend-range-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+#insightTrendModal .ins-trend-range-row input[type=date]{padding:3px 6px;font-size:11px;}
+#insightTrendModal .ins-trend-range-sep{color:var(--tx2);font-size:11px;}
+#insightTrendModal .ins-trend-range-summary{margin-top:8px;font-size:13.5px;font-weight:700;color:var(--tx);}
+#insightTrendModal .ins-trend-range-summary small{font-size:11.5px;font-weight:500;color:var(--tx2);margin-left:6px;}
+#insightTrendModal .ins-trend-range-summary .ins-avg{color:var(--pr);}
 </style>
 <div class="modal-overlay" id="insightTrendModal">
   <div class="modal">
     <div class="ins-trend-head">
       <h3 id="insightTrendTitle">상품 출고 추이</h3>
       <div class="ins-trend-code" id="insightTrendSub"></div>
+    </div>
+    <div class="ins-trend-range">
+      <div class="ins-trend-range-row" id="insightRangePtabs">
+        <button class="ptab" data-days="7" onclick="insightSetTrendRange(7)">최근 7일</button>
+        <button class="ptab" data-days="14" onclick="insightSetTrendRange(14)">최근 14일</button>
+        <button class="ptab active" data-days="30" onclick="insightSetTrendRange(30)">최근 30일</button>
+        <button class="ptab" data-days="60" onclick="insightSetTrendRange(60)">최근 60일</button>
+        <button class="ptab" data-days="90" onclick="insightSetTrendRange(90)">최근 90일</button>
+        <div class="divider-v"></div>
+        <input type="date" class="sel" id="insightRangeFrom" onchange="insightSetTrendCustomRange()">
+        <span class="ins-trend-range-sep">~</span>
+        <input type="date" class="sel" id="insightRangeTo" onchange="insightSetTrendCustomRange()">
+      </div>
+      <div class="ins-trend-range-summary" id="insightRangeSummary"></div>
     </div>
     <div class="ins-trend-section">
       <div class="ins-trend-section-title">📅 일별 <span class="ins-trend-section-sum" id="insightTrendSumDaily"></span></div>
@@ -12010,14 +12031,14 @@ function insightRgQtyById(){
   });
   return byId;
 }
-// 백데이터 id별 매출액(정산 전) — 최근 2개월, 표시용(위 판매량 계산과는 별개로 화면에 참고용으로만 노출)
-function insightRgRevenueById(){
+// 백데이터 id별 판매수량 — 최근 2개월, 표시용(위 4개월치 판매속도 계산과는 별개로 화면에 참고용으로만 노출)
+function insightRgQtyRecentById(){
   const byId={};
   insightRgYms().slice(0,2).forEach(ym=>{
     (_rgProdCache[ym]||[]).forEach(r=>{
       const id=_rgOptionMap[r.optionId];
       if(id==null) return;
-      byId[id]=(byId[id]||0)+(r.revenue||0);
+      byId[id]=(byId[id]||0)+(r.qty||0)*rgQtyMultiplier(r.optionId);
     });
   });
   return byId;
@@ -12075,7 +12096,7 @@ function insightEffectiveReorder(p, ic){
   return ic.noData?0:Math.round(ic.expM*p.leadTime);
 }
 function insightBuildRows(){
-  const rgRevMap=insightRgRevenueById();
+  const rgQtyMap=insightRgQtyRecentById();
   const rgQtyById=insightRgQtyById();
   _insightRgQtyByIdCache=rgQtyById;   // 출고 추이 모달에서도 동일 데이터 재사용
   return products.filter(p=>!p.hidden && (insightShowDisc || !p.disc)).map(p=>{
@@ -12099,8 +12120,8 @@ function insightBuildRows(){
     const netBoxes=netNeeded!=null?Math.ceil(netNeeded/(p.boxQty||1)):null;
     const covered=!c.noData && pending>0 && netNeeded<=0;
     const season=insightSeasonInfo(p);
-    const rgRevenue=(bdId!=null?rgRevMap[bdId]:0)||0;
-    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgRevenue};
+    const rgQty=(bdId!=null?rgQtyMap[bdId]:0)||0;
+    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty};
   });
 }
 
@@ -12154,7 +12175,7 @@ function insightRowHtml(r){
     <td>${r.reorderByDate==null?'<span class="ins-sub">산출불가</span>':(r.daysToReorder<=0?'<span class="ins-num" style="color:#DC2626;">지금 발주</span>':`<div class="ins-num">${fmtDate(r.reorderByDate)}</div><div class="ins-sub">D-${r.daysToReorder}</div>`)}</td>
     <td style="text-align:right;">${orderCell}</td>
     <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>`:'<span class="ins-sub">-</span>'}</td>
-    <td style="text-align:right;">${r.rgRevenue>0?`<div class="ins-num">${Math.round(r.rgRevenue).toLocaleString()}원</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
+    <td style="text-align:right;">${r.rgQty>0?`<div class="ins-num">${Math.round(r.rgQty).toLocaleString()}개</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
     <td>${insightSeasonCellHtml(r.season)}</td>
     <td>${insightSparkHtml(r.season)}</td>
   </tr>`;
@@ -12191,7 +12212,7 @@ function renderInsight(){
     if(insightSort==='days_asc') return (a.daysLeft==null?Infinity:a.daysLeft)-(b.daysLeft==null?Infinity:b.daysLeft);
     if(insightSort==='boxes_desc') return (b.netBoxes||0)-(a.netBoxes||0);
     if(insightSort==='stock_asc') return a.p.stock-b.p.stock;
-    if(insightSort==='rg_desc') return (b.rgRevenue||0)-(a.rgRevenue||0);
+    if(insightSort==='rg_desc') return (b.rgQty||0)-(a.rgQty||0);
     if(insightSort==='name') return a.p.name.localeCompare(b.p.name);
     return (rank[a.status]-rank[b.status])||((a.daysLeft==null?9999:a.daysLeft)-(b.daysLeft==null?9999:b.daysLeft));
   });
@@ -12208,6 +12229,8 @@ function renderInsight(){
 // ── 상품별 출고 추이 모달 — 일별·주별·월별을 탭 전환 없이 한 화면에 동시 표시 ──
 //  · 정규채널(_dCache) + 로켓그로스 매출 화면 판매량(_insightRgQtyByIdCache, insightBuildRows에서 채워짐) 합산
 let _insightTrendCharts={daily:null,weekly:null,monthly:null}, _insightTrendCode=null, _insightTrendName=null;
+// 발주 참고용 구간 합계 — 기본 최근 30일, 프리셋 버튼 또는 직접 날짜 지정 시 자동으로 합계·일평균 계산 (열려있는 동안 선택 유지)
+let _insightTrendRangeDays=30, _insightTrendRangeFrom=null, _insightTrendRangeTo=null, _insightTrendDailyDates=[];
 function insightMergedSeries(code,name){
   const out={};
   Object.entries(_dCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
@@ -12224,9 +12247,10 @@ function insightOpenTrend(code,name){
   insightRenderTrend();
 }
 function insightBuildPeriodData(dates, series, period){
-  let labels=[], values=[];
+  let labels=[], values=[], dateKeys=[];
   if(period==='daily'){
     const last=dates.slice(-60);
+    dateKeys=last;
     labels=last.map(d=>{ const s2=d.split('-'); return s2[1]+'/'+s2[2]; });
     values=last.map(d=>series[d]||0);
   } else if(period==='weekly'){
@@ -12248,10 +12272,11 @@ function insightBuildPeriodData(dates, series, period){
     labels=keys.map(k=>{ const s2=k.split('-'); return s2[0].slice(2)+'/'+s2[1]; });
     values=keys.map(k=>mo[k]);
   }
-  return {labels,values};
+  return {labels,values,dateKeys};
 }
 function insightDrawPeriodChart(period, canvasId, sumElId, dates, series){
-  const {labels,values}=insightBuildPeriodData(dates, series, period);
+  const {labels,values,dateKeys}=insightBuildPeriodData(dates, series, period);
+  if(period==='daily') _insightTrendDailyDates=dateKeys;
   const dark=_currentTheme()==='dark';
   const ctx=document.getElementById(canvasId).getContext('2d');
   if(_insightTrendCharts[period]){ _insightTrendCharts[period].destroy(); }
@@ -12277,18 +12302,67 @@ function insightRenderTrend(){
   const series=insightMergedSeries(code, _insightTrendName);
   const dates=Object.keys(series).sort();
   const sections=document.querySelectorAll('#insightTrendModal .ins-trend-section');
+  const rangeBox=document.querySelector('#insightTrendModal .ins-trend-range');
   const empty=document.getElementById('insightTrendEmpty');
   if(!dates.length){
     Object.keys(_insightTrendCharts).forEach(k=>{ if(_insightTrendCharts[k]){ _insightTrendCharts[k].destroy(); _insightTrendCharts[k]=null; } });
     sections.forEach(s=>s.style.display='none');
+    if(rangeBox) rangeBox.style.display='none';
     if(empty) empty.style.display='';
     return;
   }
   sections.forEach(s=>s.style.display='');
+  if(rangeBox) rangeBox.style.display='';
   if(empty) empty.style.display='none';
   insightDrawPeriodChart('daily','insightTrendCanvasDaily','insightTrendSumDaily', dates, series);
   insightDrawPeriodChart('weekly','insightTrendCanvasWeekly','insightTrendSumWeekly', dates, series);
   insightDrawPeriodChart('monthly','insightTrendCanvasMonthly','insightTrendSumMonthly', dates, series);
+  insightRenderRangeSummary();
+}
+// 프리셋 버튼(7/14/30/60/90일) 선택 — 직접입력 날짜는 초기화하고 즉시 합계 재계산
+function insightSetTrendRange(days){
+  _insightTrendRangeDays=days; _insightTrendRangeFrom=null; _insightTrendRangeTo=null;
+  const fromEl=document.getElementById('insightRangeFrom'), toEl=document.getElementById('insightRangeTo');
+  if(fromEl) fromEl.value=''; if(toEl) toEl.value='';
+  document.querySelectorAll('#insightRangePtabs .ptab').forEach(b=>b.classList.toggle('active', b.dataset.days===String(days)));
+  insightRenderRangeSummary();
+}
+// 시작~종료 날짜 직접 지정 — 둘 다 입력되면 프리셋 해제하고 즉시 합계 재계산
+function insightSetTrendCustomRange(){
+  const fromEl=document.getElementById('insightRangeFrom'), toEl=document.getElementById('insightRangeTo');
+  let from=fromEl?.value, to=toEl?.value;
+  if(!from || !to) return;
+  if(from>to){ [from,to]=[to,from]; fromEl.value=from; toEl.value=to; }
+  _insightTrendRangeFrom=from; _insightTrendRangeTo=to; _insightTrendRangeDays=null;
+  document.querySelectorAll('#insightRangePtabs .ptab').forEach(b=>b.classList.remove('active'));
+  insightRenderRangeSummary();
+}
+// 선택된 구간의 합계·일평균을 자동 계산해 표시 + 일별 차트에서 해당 구간 막대를 강조
+function insightRenderRangeSummary(){
+  const code=_insightTrendCode; if(!code) return;
+  const series=insightMergedSeries(code, _insightTrendName);
+  let from, to;
+  if(_insightTrendRangeFrom && _insightTrendRangeTo){ from=_insightTrendRangeFrom; to=_insightTrendRangeTo; }
+  else {
+    const today=new Date();
+    to=fmtDate(today);
+    from=fmtDate(new Date(today.getTime()-(_insightTrendRangeDays-1)*86400000));
+  }
+  let sum=0, dayCount=0;
+  for(let d=new Date(from+'T00:00:00'); fmtDate(d)<=to; d.setDate(d.getDate()+1)){
+    sum+=series[fmtDate(d)]||0; dayCount++;
+  }
+  const avg=dayCount?Math.round(sum/dayCount*10)/10:0;
+  const label=(from===to)?from:`${from} ~ ${to}`;
+  const el=document.getElementById('insightRangeSummary');
+  if(el) el.innerHTML=`📌 ${label} 합계 <b>${sum.toLocaleString()}개</b><small>일평균</small> <span class="ins-avg">${avg.toLocaleString()}개</span><small>· 발주 참고용 자동 합산 (아래 일별 그래프에서 파란색으로 표시)</small>`;
+  const chart=_insightTrendCharts.daily;
+  if(chart && _insightTrendDailyDates.length){
+    const dark=_currentTheme()==='dark';
+    const inColor=dark?'#5B9BFF':'#3182F6', outColor=dark?'rgba(91,155,255,0.25)':'rgba(49,130,246,0.22)';
+    chart.data.datasets[0].backgroundColor=_insightTrendDailyDates.map(d=>(d>=from&&d<=to)?inColor:outColor);
+    chart.update();
+  }
 }
 
 // 재고 상태별 KPI 카드 — 클릭 시 상태 필터
