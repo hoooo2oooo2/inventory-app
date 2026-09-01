@@ -12193,9 +12193,24 @@ function insightDemandFromSeries(series){
 // calcNeeded()와 동일한 목표재고 공식(주문주기+안전재고-도착시점잔여재고)을 쓰되, 일평균판매만
 // 합산 시리즈(정규채널+로켓그로스 매출 판매량) 기준으로 바꿔 계산 — 다른 화면의 calcNeeded는 그대로 둔다.
 function insightCalcNeeded(p, mergedSeries){
+  // 재고관리에서 수동으로 "월소진 고정값"을 설정해둔 상품은 그 값을 그대로 따른다. 이미 자동계산
+  // 오류를 재고관리 화면에서 직접 바로잡아둔 상품인데 발주 인사이트가 이를 무시하고 독자적으로
+  // 재계산하면, 같은 상품인데 두 화면이 서로 다른 권장 수량을 보여주는 모순이 생긴다.
+  const _fixedExpM=getFixedExpM(p.code);
+  if(_fixedExpM>0){
+    const orderCycle=getOrderCycle();
+    const stockAtDelivery=Math.max(0, p.stock-_fixedExpM*p.leadTime);
+    const safetyM=safetyMonthsFor(p);
+    const needed=Math.max(0, Math.round(_fixedExpM*(orderCycle+safetyM)-stockAtDelivery));
+    const boxes=Math.ceil(needed/(p.boxQty||1));
+    const avgDay=Math.round(_fixedExpM/30*10)/10;
+    return {needed, boxes, expM:_fixedExpM, avgDay, noData:false, corrLabel:'📌고정값', dataPoints30:0, safetyM, fixedExpM:true};
+  }
   const dem=insightDemandFromSeries(mergedSeries);
   if(dem.noData) return {needed:0, boxes:0, expM:0, avgDay:0, noData:true, corrLabel:'', dataPoints30:dem.dataPoints};
-  let expM=Math.max(Math.round(dem.avgDay*30),1);
+  // avgDay가 반올림으로 0.0이 되는 극소량 판매 상품까지 "최소 월 1개는 판다"고 우겨서 발주를
+  // 만들어내지 않도록, 여기서는 더 이상 최소 1을 강제하지 않는다(실제로 거의 안 팔리면 0으로 수렴).
+  let expM=Math.round(dem.avgDay*30);
   let corrLabel='';
   const prevYr=getTotalM(p, CUR_YEAR-1), prevTotal=prevYr.reduce((a,b)=>a+b,0);
   if(prevTotal>0){
@@ -12203,9 +12218,14 @@ function insightCalcNeeded(p, mergedSeries){
     const arrM=Math.round(MONTH+p.leadTime)%12;
     const rawSr=(prevYr[arrM]||0)/prevAvg;
     const sr=Math.min(1.4,Math.max(0.8,1+(rawSr-1)*0.3));
+    // 성수기 쪽(수요를 늘리는 방향)만 실제로 반영하고 비수기 쪽은 보수적으로 그대로 둔다 — 재고관리
+    // calcNeeded()와 동일한 정책. 다만 반영 안 된 비수기 보정을 마치 적용된 것처럼 라벨링하지 않도록
+    // "미반영"임을 명시한다(실제 수치는 안 바뀌었는데 "비수기 -15%"라고만 뜨면 오해의 소지가 있었음).
     if(sr>1.05) expM=Math.round(expM*sr);
     const cp=Math.round((sr-1)*100);
-    corrLabel=cp>5?`성수기 +${cp}%`:cp<-5?`비수기 ${cp}%`:'보정없음';
+    corrLabel=cp>5?`성수기 +${cp}%`:cp<-5?`비수기(미반영)`:'보정없음';
+  } else {
+    corrLabel='작년 데이터 없음';
   }
   const orderCycle=getOrderCycle();
   const stockAtDelivery=Math.max(0, p.stock-expM*p.leadTime);
@@ -12281,7 +12301,7 @@ function insightSparkHtml(season){
 function insightFamCellHtml(r){
   if(!r.famProd) return '<span class="ins-sub">-</span>';
   const fp=r.famProd;
-  const needLine = r.c.noData ? '<div class="ins-sub">판매데이터 부족</div>' : `<div class="ins-num">발주 ${(r.famBoxes||0).toLocaleString()}박스</div><div class="ins-sub">(${(r.netNeeded||0).toLocaleString()}개) · ${(fp.qtyBox||0).toLocaleString()}개/박스</div>`;
+  const needLine = r.p.disc ? '<div class="ins-sub">단종 — 발주 불필요</div>' : r.c.noData ? '<div class="ins-sub">판매데이터 부족</div>' : `<div class="ins-num">발주 ${(r.famBoxes||0).toLocaleString()}박스</div><div class="ins-sub">(${(r.netNeeded||0).toLocaleString()}개) · ${(fp.qtyBox||0).toLocaleString()}개/박스</div>`;
   const orderLine = r.famLatest ? `<div class="ins-sub">최근주문 ${r.famLatest.qty.toLocaleString()}개 · ${r.famLatest.date}</div>` : '<div class="ins-sub">주문 이력 없음</div>';
   return `<div style="cursor:pointer;" onclick="insightOpenFamPick(${r.p.id})" title="클릭해서 연결 변경">
     <div style="font-size:10.5px;font-weight:700;color:var(--pr);">🔗 ${_esc(fp.vendor)}·${_esc(fp.code)}</div>
@@ -12303,9 +12323,11 @@ function insightRowHtml(r){
   const gradeColor={A:'#DC2626',B:'#D97706',C:'#6B7280'}[r.grade]||'#6B7280';
   const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
   let orderCell;
-  if(r.c.noData) orderCell='<span class="ins-sub">산출불가</span>';
-  else if(r.covered) orderCell=`<span class="ins-tag" style="background:#ECFDF5;color:#059669;">✓ 발주 진행중(충분)</span>`;
-  else orderCell=`<div class="ins-num">${r.netBoxes.toLocaleString()}박스</div><div class="ins-sub">(${(r.netNeeded||0).toLocaleString()}개)</div>${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}`;
+  const corrBadge=r.c.corrLabel&&r.c.corrLabel!=='보정없음'&&r.c.corrLabel!=='작년 데이터 없음'?`<div class="ins-sub" style="color:${r.c.corrLabel.startsWith('성수기')?'#EA580C':'var(--tx2)'};">${r.c.corrLabel}</div>`:'';
+  if(r.p.disc) orderCell='<span class="ins-sub">단종 — 발주 불필요</span>';
+  else if(r.c.noData) orderCell='<span class="ins-sub">산출불가</span>';
+  else if(r.covered) orderCell=`<span class="ins-tag" style="background:#ECFDF5;color:#059669;">✓ 발주 진행중(충분)</span>${corrBadge}`;
+  else orderCell=`<div class="ins-num">${r.netBoxes.toLocaleString()}박스</div><div class="ins-sub">(${(r.netNeeded||0).toLocaleString()}개)</div>${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}${corrBadge}`;
   return `<tr>
     <td><span class="ins-badge" style="background:${stBg};color:${stColor};">${st}</span></td>
     <td><div class="ins-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px;" onclick="insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이 그래프를 볼 수 있어요">${r.p.name}</div><div class="ins-code">${r.p.code}</div></td>
