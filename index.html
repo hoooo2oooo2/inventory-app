@@ -4596,6 +4596,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </select>
       <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="insightDiscChk" onchange="insightToggleDisc(this.checked)"> 단종 포함</label>
       <span style="font-size:13px;color:var(--tx2);" id="insightCount"></span>
+      <button class="btn btn-sm btn-pr" onclick="openErpUpload()" title="외부 ERP 엑셀을 그대로 업로드하면 재고관리·판매분석에 자동 반영됩니다">📤 ERP 엑셀 업로드</button>
       <button class="btn btn-sm" onclick="insightExportXlsx()" title="현재 화면에 보이는(검색·필터·정렬 적용된) 목록을 엑셀로 저장">📥 엑셀 다운로드</button>
     </div>
     <div class="tw" style="max-height:calc(100vh - 340px);overflow-y:auto;">
@@ -4706,6 +4707,43 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <input type="text" class="sel fam-pick-search" id="insightFamPickSearch" placeholder="패밀리오더 상품 검색 (업체·코드·상품명)" oninput="insightRenderFamPickList(this.value)">
     <div class="fam-pick-list" id="insightFamPickList"></div>
     <div class="ma"><button class="btn" onclick="closeModal('insightFamPickModal')">닫기</button></div>
+  </div>
+</div>
+
+<!-- ═══ 발주 인사이트 — 외부 ERP 엑셀 업로드(재고관리+판매분석 자동 반영) ═══ -->
+<style>
+#erpUploadModal .modal{max-width:920px;}
+#erpUploadModal h3{font-size:16px;margin:0 0 4px;}
+#erpUploadModal .erp-sub{font-size:12px;color:var(--tx2);margin-bottom:12px;line-height:1.5;}
+#erpUploadModal .erp-dz{border:1.5px dashed var(--bd);border-radius:10px;padding:22px;text-align:center;cursor:pointer;background:var(--bg2);margin-bottom:10px;}
+#erpUploadModal .erp-dz:hover{background:var(--prl);}
+#erpUploadModal #erpSummary{font-size:12.5px;font-weight:600;color:var(--tx);margin-bottom:10px;}
+#erpUploadModal .erp-warn-title{font-size:12px;font-weight:700;margin-bottom:6px;}
+#erpUploadModal .erp-warn-box{background:#FEF2F2;border:0.5px solid #FECACA;border-radius:8px;padding:10px 12px;margin-bottom:10px;}
+#erpUploadModal .erp-warn-box .erp-warn-title{color:#DC2626;}
+#erpUploadModal .erp-new-box{background:#ECFDF5;border:0.5px solid #A7F3D0;border-radius:8px;padding:10px 12px;margin-bottom:10px;}
+#erpUploadModal .erp-new-box .erp-warn-title{color:#059669;}
+#erpUploadModal .erp-all-box{background:var(--bg2);border:0.5px solid var(--bd);border-radius:8px;padding:10px 12px;}
+#erpUploadModal .erp-all-box .erp-warn-title{color:var(--tx);}
+#erpUploadModal .erp-tbl{width:100%;border-collapse:collapse;font-size:11.5px;max-height:280px;}
+#erpUploadModal .erp-tbl-wrap{max-height:260px;overflow-y:auto;}
+#erpUploadModal .erp-tbl th{padding:5px 8px;text-align:left;background:var(--bg);border-bottom:0.5px solid var(--bd);position:sticky;top:0;}
+#erpUploadModal .erp-tbl td{padding:4px 8px;border-bottom:0.5px solid var(--bd);color:var(--tx);}
+</style>
+<div class="modal-overlay" id="erpUploadModal">
+  <div class="modal">
+    <h3>📤 ERP 엑셀 업로드</h3>
+    <div class="erp-sub">외부 ERP에서 받은 엑셀을 그대로 올리면 재고관리(현재고·박스당수량)와 판매분석(요일별 출고수량)에 자동 반영되고, 발주 인사이트에도 바로 연동됩니다. 별도 양식 변환 없이 원본 파일을 그대로 업로드하세요.</div>
+    <label class="erp-dz" for="erpFile" id="erpDzBox">
+      <div id="erpDzText">📄 파일을 클릭하여 선택 (A=코드, D=상품명, F=박스당수량, L~R=요일별 출고수량, Y=현재고)</div>
+      <input type="file" id="erpFile" accept=".xlsx,.xls,.csv" style="display:none;" onchange="erpHandleFile(event)">
+    </label>
+    <div id="erpSummary"></div>
+    <div id="erpPreview"></div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('erpUploadModal')">닫기</button>
+      <button class="btn btn-pr" id="erpApplyBtn" style="display:none;" onclick="erpApplyImport()">📥 적용하기</button>
+    </div>
   </div>
 </div>
 
@@ -12585,6 +12623,198 @@ function insightExportXlsx(){
   XLSX.utils.book_append_sheet(wb,ws,'발주인사이트');
   const d=new Date();
   XLSX.writeFile(wb,`발주인사이트_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+}
+
+// ══════════════════════════════════════════════
+// 발주 인사이트 — 외부 ERP 엑셀 업로드 (재고관리+판매분석 자동 반영)
+// ══════════════════════════════════════════════
+//  · 외부 ERP에서 매주 받는 원본 엑셀(A=전체상품코드, D=상품명, F=BOX당 수량, L~R=요일별 출고수량
+//    [헤더에 "월 (08-31)"처럼 날짜가 박혀있고 주가 바뀔 때마다 갱신됨], Y=현재고)을 그대로 올리면
+//    재고관리(products.stock/box_qty)와 판매분석(daily_sales+products.monthly_YYYY)에 자동 반영한다.
+//  · 상품명은 ERP 파일 이름으로 덮어쓰되(외부에서 이름이 바뀌는 경우가 있음), 기존 등록된 이름과
+//    다르면 적용 전 목록으로 보여주고 한 번 더 확인받는다. 재고관리에 없는 새 코드는 업로드 화면에서
+//    구분을 직접 지정해야 적용할 수 있다(자동으로 '기타' 등을 넣지 않음).
+let _erpPendingRows=[];  // {code,name,boxQty,stock,exists,nameChanged,oldName,daily:[{date,qty}]}
+let _erpNewTypes={};     // code → 사용자가 지정한 구분(신규상품만)
+
+function openErpUpload(){
+  const f=document.getElementById('erpFile'); if(f) f.value='';
+  const pv=document.getElementById('erpPreview'); if(pv) pv.innerHTML='';
+  const sm=document.getElementById('erpSummary'); if(sm) sm.innerHTML='';
+  const dt=document.getElementById('erpDzText'); if(dt) dt.textContent='📄 파일을 클릭하여 선택 (A=코드, D=상품명, F=박스당수량, L~R=요일별 출고수량, Y=현재고)';
+  const btn=document.getElementById('erpApplyBtn'); if(btn){ btn.style.display='none'; btn.disabled=false; btn.textContent='📥 적용하기'; }
+  _erpPendingRows=[]; _erpNewTypes={};
+  openModal('erpUploadModal');
+}
+function erpHandleFile(e){ const f=e.target.files[0]; if(f) erpParseFile(f); }
+// L~R 헤더("월 (08-31)")에서 날짜를 뽑되, 연도 표기가 없어서 오늘 날짜 기준으로 가장 가까운 연도로
+// 추정한다 — 연말·연초를 걸치는 주만 앞뒤 연도가 갈릴 수 있어 180일 넘게 차이나면 반대쪽 연도로 보정.
+function _erpInferDate(mm, dd){
+  const today=new Date(); today.setHours(0,0,0,0);
+  let year=today.getFullYear();
+  let cand=new Date(year, mm-1, dd);
+  const diffDays=(cand-today)/86400000;
+  if(diffDays>180) year-=1; else if(diffDays<-180) year+=1;
+  return fmtDate(new Date(year, mm-1, dd));
+}
+function erpParseFile(file){
+  const dt=document.getElementById('erpDzText'); if(dt) dt.textContent=`📄 ${file.name} 읽는 중...`;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){ alert('데이터가 없습니다.'); return; }
+      const header=rows[0];
+      const dateCols=[];
+      for(let ci=11; ci<=17; ci++){ // L~R
+        const m=String(header[ci]||'').match(/\((\d{1,2})-(\d{1,2})\)/);
+        if(m) dateCols.push({idx:ci, date:_erpInferDate(parseInt(m[1]), parseInt(m[2]))});
+      }
+      if(!dateCols.length){ alert('일별 출고수량 열(L~R)의 날짜 헤더("월 (08-31)" 형식)를 인식하지 못했습니다. ERP 원본 파일이 맞는지 확인해주세요.'); return; }
+      const dataRows=rows.slice(1).filter(r=>String(r[0]||'').trim()!=='');
+      erpBuildPreview(dataRows, dateCols);
+      if(dt) dt.textContent=`✅ ${file.name} (${dataRows.length}행, 출고데이터 ${dateCols.map(d=>d.date.slice(5)).join('/')})`;
+    }catch(err){ alert('파일 읽기 오류: '+err.message); }
+  };
+  reader.readAsBinaryString(file);
+}
+function erpBuildPreview(rows, dateCols){
+  _erpPendingRows=[]; _erpNewTypes={};
+  rows.forEach(r=>{
+    const code=String(r[0]||'').trim();
+    const name=String(r[3]||'').trim();
+    if(!code||!name) return;
+    const boxQty=parseInt(r[5])||1;
+    const stock=parseInt(r[24])||0;
+    const existing=products.find(p=>p.code===code);
+    const daily=dateCols.map(dc=>({date:dc.date, qty:parseInt(r[dc.idx])||0})).filter(d=>d.qty>0);
+    _erpPendingRows.push({code, name, boxQty, stock, daily,
+      exists:!!existing, nameChanged:!!existing && existing.name!==name, oldName:existing?existing.name:null});
+  });
+  erpRenderPreview();
+}
+function erpSetNewType(el){ _erpNewTypes[el.dataset.code]=el.value.trim(); }
+function erpRenderPreview(){
+  const rows=_erpPendingRows;
+  const newRows=rows.filter(r=>!r.exists);
+  const changedRows=rows.filter(r=>r.exists && r.nameChanged);
+  const normalRows=rows.filter(r=>r.exists && !r.nameChanged);
+  const totalDaily=rows.reduce((s,r)=>s+r.daily.length,0);
+  const attrEsc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const sumEl=document.getElementById('erpSummary');
+  if(sumEl) sumEl.innerHTML=rows.length?`총 ${rows.length}개 상품 · 🆕 신규 ${newRows.length}개 · ✏ 이름변경 ${changedRows.length}개 · 🔄 갱신 ${normalRows.length}개 · 출고데이터 ${totalDaily}건`:'인식된 데이터가 없습니다.';
+
+  let html='';
+  if(changedRows.length){
+    html+=`<div class="erp-warn-box">
+      <div class="erp-warn-title">⚠ 재고관리에 등록된 이름과 ERP 파일 상품명이 다른 상품 ${changedRows.length}개 — 적용하면 아래 이름으로 바뀝니다</div>
+      <div class="erp-tbl-wrap"><table class="erp-tbl"><thead><tr><th>코드</th><th>기존 이름</th><th>ERP 이름</th></tr></thead><tbody>
+      ${changedRows.map(r=>`<tr><td>${_esc(r.code)}</td><td style="color:var(--tx2);">${_esc(r.oldName)}</td><td style="color:#DC2626;font-weight:600;">${_esc(r.name)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+  if(newRows.length){
+    const existingTypes=[...new Set(products.map(p=>p.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+    html+=`<div class="erp-new-box">
+      <div class="erp-warn-title">🆕 재고관리에 없는 새 상품 ${newRows.length}개 — 구분을 지정해야 적용할 수 있습니다</div>
+      <datalist id="erpTypeList">${existingTypes.map(t=>`<option value="${attrEsc(t)}">`).join('')}</datalist>
+      <div class="erp-tbl-wrap"><table class="erp-tbl"><thead><tr><th>코드</th><th>상품명</th><th>박스당수량</th><th>현재고</th><th>구분</th></tr></thead><tbody>
+      ${newRows.map(r=>`<tr><td>${_esc(r.code)}</td><td>${_esc(r.name)}</td><td style="text-align:right;">${r.boxQty}</td><td style="text-align:right;">${r.stock.toLocaleString()}</td>
+        <td><input list="erpTypeList" class="sel" data-code="${attrEsc(r.code)}" placeholder="구분 입력" oninput="erpSetNewType(this)" style="width:110px;"></td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+  html+=`<div class="erp-all-box">
+    <div class="erp-warn-title">전체 목록 (${rows.length}개)</div>
+    <div class="erp-tbl-wrap"><table class="erp-tbl"><thead><tr><th>코드</th><th>상품명</th><th>박스당수량</th><th>현재고</th><th>출고데이터</th><th>상태</th></tr></thead><tbody>
+    ${rows.map(r=>{
+      const tag=!r.exists?'<span class="ins-tag" style="background:#ECFDF5;color:#059669;">신규</span>'
+        : r.nameChanged?'<span class="ins-tag" style="background:#FEF2F2;color:#DC2626;">이름변경</span>'
+        : '<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">갱신</span>';
+      return `<tr><td>${_esc(r.code)}</td><td>${_esc(r.name)}</td><td style="text-align:right;">${r.boxQty}</td><td style="text-align:right;">${r.stock.toLocaleString()}</td><td style="text-align:right;">${r.daily.length}일</td><td>${tag}</td></tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+
+  const el=document.getElementById('erpPreview'); if(el) el.innerHTML=html;
+  const btn=document.getElementById('erpApplyBtn'); if(btn) btn.style.display=rows.length?'':'none';
+}
+async function erpApplyImport(){
+  const rows=_erpPendingRows;
+  if(!rows.length) return;
+  const newRows=rows.filter(r=>!r.exists);
+  const missingType=newRows.filter(r=>!(_erpNewTypes[r.code]||'').trim());
+  if(missingType.length){
+    alert(`구분을 입력하지 않은 신규 상품이 ${missingType.length}개 있습니다:\n`+missingType.slice(0,20).map(r=>`${r.code} (${r.name})`).join('\n')+(missingType.length>20?`\n...외 ${missingType.length-20}건`:''));
+    return;
+  }
+  const changedRows=rows.filter(r=>r.exists && r.nameChanged);
+  if(changedRows.length){
+    const list=changedRows.slice(0,15).map(r=>`${r.code}: "${r.oldName}" → "${r.name}"`).join('\n');
+    const more=changedRows.length>15?`\n...외 ${changedRows.length-15}건`:'';
+    if(!confirm(`상품명이 다른 상품 ${changedRows.length}개가 있습니다. ERP 파일 이름으로 변경하고 계속 진행할까요?\n\n${list}${more}`)) return;
+  }
+
+  const btn=document.getElementById('erpApplyBtn');
+  if(btn){ btn.disabled=true; btn.textContent='적용 중...'; }
+  try{
+    // 1) 신규 상품 등록
+    const toInsert=newRows.map(r=>({code:r.code, name:r.name, type:_erpNewTypes[r.code].trim(), stock:r.stock, box_qty:r.boxQty, monthly:Array(12).fill(0), last_yr:Array(12).fill(0)}));
+    for(let b=0;b<toInsert.length;b+=100){
+      const {error}=await sb.from('products').insert(toInsert.slice(b,b+100));
+      if(error) console.error('ERP 신규등록 오류', error.message);
+    }
+    // 2) 기존 상품 재고·박스당수량·이름 갱신 (구분·발주시점·리드타임 등은 건드리지 않음)
+    const toUpdate=rows.filter(r=>r.exists);
+    for(const r of toUpdate){
+      const {error}=await sb.from('products').update({stock:r.stock, box_qty:r.boxQty, name:r.name}).eq('code', r.code);
+      if(error) console.error('ERP 갱신 오류', r.code, error.message);
+    }
+    await _bumpProducts();
+    await loadProducts(true); // 신규 상품 id 포함해서 최신 목록 확보
+
+    // 3) 판매분석: daily_sales + products.monthly_YYYY 누적 반영
+    const dailyRows=[];
+    rows.forEach(r=>{ r.daily.forEach(d=>{ dailyRows.push({code:r.code, name:r.name, sale_date:d.date, qty:d.qty, is_rg:false}); }); });
+    for(let b=0;b<dailyRows.length;b+=100){
+      const {error}=await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100), {onConflict:'code,sale_date,is_rg', ignoreDuplicates:false});
+      if(error) console.error('ERP daily_sales 오류', error.message);
+    }
+    if(dailyRows.length) await _bumpDaily();
+
+    const monthlyUpd={};
+    dailyRows.forEach(dr=>{
+      const p=products.find(x=>x.code===dr.code); if(!p) return;
+      const yr=parseInt(dr.sale_date.slice(0,4)), mIdx=parseInt(dr.sale_date.slice(5,7))-1;
+      const col='monthly_'+yr;
+      if(!monthlyUpd[p.id]) monthlyUpd[p.id]={};
+      if(!monthlyUpd[p.id][yr]) monthlyUpd[p.id][yr]=[...(p[col]||Array(12).fill(0))];
+      monthlyUpd[p.id][yr][mIdx]=(monthlyUpd[p.id][yr][mIdx]||0)+dr.qty;
+      if(!YEARS.includes(yr)){ YEARS.push(yr); YEARS.sort((a,b)=>a-b); buildYearSelects(); }
+    });
+    for(const [id, yrs] of Object.entries(monthlyUpd)){
+      const updateData={};
+      for(const [yr, monthly] of Object.entries(yrs)) updateData['monthly_'+yr]=monthly;
+      await sb.from('products').update(updateData).eq('id', parseInt(id));
+    }
+    if(Object.keys(monthlyUpd).length) await _bumpProducts();
+
+    await addHistory({menu:'발주 인사이트', type:'upload', code:'MULTI', name:`${rows.length}개`, desc:'ERP 엑셀 자동연동 업로드',
+      before:'-', after:`신규 ${newRows.length}·갱신 ${toUpdate.length}·출고데이터 ${dailyRows.length}건`, user:'업로드'});
+
+    // 4) 최종 재동기화 + 화면 갱신
+    await loadProducts(true);
+    await loadDailyCache(true);
+    closeModal('erpUploadModal');
+    toast(`ERP 업로드 완료 — 신규 ${newRows.length}개, 갱신 ${toUpdate.length}개, 출고데이터 ${dailyRows.length}건 반영됐습니다.`);
+    renderInsight();
+    if(currentPage==='inv'){ renderInv(); updateFloat(); }
+    if(currentPage==='sales'){ renderSalesPeriod(); renderSalesTbody(); }
+  }catch(err){
+    alert('업로드 처리 중 오류: '+err.message);
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='📥 적용하기'; }
+  }
 }
 
 // ── 상품별 출고 추이 모달 — 일별·주별·월별을 탭 전환 없이 한 화면에 동시 표시 ──
