@@ -4578,7 +4578,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
       <div>
         <div class="ct" style="font-size:17px;">📊 발주 인사이트</div>
-        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석합니다 — 일평균판매·예상 소진일·권장 발주는 정규채널 판매량에 로켓그로스 매출 화면(쿠팡 셀러인사이트)의 일별 판매량을 합산한 값입니다(그로스 출고 메뉴는 미사용이라 반영하지 않음). 긴급도·발주 마감일은 여기에 발주관리 진행중 발주(미입고 수량)까지 추가로 차감한 값입니다. 로켓그로스 판매량(개)은 최근 2개월·백데이터 매칭 기준이라 매칭 안 된 상품은 공란입니다. 다른 업체에서 사입해 발주관리 대신 패밀리 오더로 주문하는 상품은 코드가 서로 달라 자동 매칭이 안 되니, 🔗 패밀리오더 칸에서 연결해두면 박스 단위 발주 수량과 최근 주문 이력을 바로 볼 수 있어요. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
+        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석합니다 — 일평균판매·예상 소진일·권장 발주는 정규채널 판매량에 로켓그로스 매출 화면(쿠팡 셀러인사이트)의 일별 판매량을 합산한 값입니다(그로스 출고 메뉴는 미사용이라 반영하지 않음). 긴급도·발주 마감일은 여기에 발주관리 진행중 발주(미입고 수량)까지 추가로 차감한 값입니다. 로켓그로스 판매량(개)은 최근 2개월·백데이터 매칭 기준이라 매칭 안 된 상품은 공란입니다. 다른 업체에서 사입해 발주관리 대신 패밀리 오더로 주문하는 상품은 코드가 서로 달라 자동 매칭이 안 되니, 관리 칸의 🔗 버튼으로 연결해두면 패밀리오더 수입 입고 관리의 미입고(남은수량)까지 진행중 발주에 반영되고, 박스 단위 발주 수량과 최근 주문 이력도 함께 볼 수 있어요. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
       </div>
       <div style="font-size:12px;color:var(--tx2);" id="insightUpdLbl"></div>
     </div>
@@ -11995,7 +11995,7 @@ let _insightFoLoaded = false;
 async function _insightEnsureFamData(){
   const tasks=[];
   if(!_insightFamMapLoaded) tasks.push(cloudKvLoad(INSIGHT_FAM_MAP_KIND).then(m=>{ _insightFamMap=(m&&typeof m==='object')?m:{}; _insightFamMapLoaded=true; }));
-  if(!_insightFoLoaded) tasks.push(_foLoadData().then(()=>{ _insightFoLoaded=true; }));
+  if(!_insightFoLoaded) tasks.push(Promise.all([_foLoadData(), _foLoadImports()]).then(()=>{ _insightFoLoaded=true; }));
   if(tasks.length) await Promise.all(tasks);
 }
 function insightFamProductFor(p){
@@ -12016,6 +12016,23 @@ function insightFamLatestOrder(famCode){
     });
   });
   return latest;
+}
+// famCode로 저장된 모든 주문서 행 중 아직 입고 안 된(남은수량) 합계 — 패밀리 오더 "수입 입고 관리" 탭의
+// 차수별 입고수량(_foImports) 기준으로 총주문수량-총입고수량을 더한다. 발주관리 receive_list의 미입고
+// 수량과 동일한 성격이라 진행중 발주에 그대로 합산해 쓴다.
+function insightFamPendingFor(famCode){
+  if(!famCode) return 0;
+  let sum=0;
+  _foOrders.forEach(o=>{
+    (o.rows||[]).forEach((r,idx)=>{
+      if(r.code!==famCode) return;
+      const totalQty=(r.qtyBox||0)*(r.boxes||0);
+      if(totalQty<=0) return;
+      const totalRecv=(_foImports[`${o.id}_${idx}`]||[]).reduce((s,v)=>s+(parseFloat(v)||0),0);
+      sum+=Math.max(0,totalQty-totalRecv);
+    });
+  });
+  return sum;
 }
 // 매칭 저장 — 다른 PC의 동시수정을 덮어쓰지 않도록 저장 직전 최신본을 재로드해 병합
 async function insightSetFamMap(productId, famId){
@@ -12207,8 +12224,11 @@ function insightBuildRows(){
     const c=insightCalcNeeded(p, mergedSeries);
     const grade=getAbcGrade(p);
     const er=insightEffectiveReorder(p, c);
-    // 진행중 발주(발주관리 receive_list의 미완료 건) — 주문수량 중 아직 입고 안 된 부분만 합산
-    const pending=receiveList.filter(r=>r.code===p.code).reduce((s,r)=>s+Math.max(0,r.orderQty-r.in1-r.in2),0);
+    // 패밀리 오더(타업체 사입) 매칭 — pending 계산에 먼저 반영해야 발주마감일·권장발주 등이 전부 정확해진다
+    const famProd=insightFamProductFor(p);
+    // 진행중 발주 = 발주관리 receive_list의 미입고분 + (매칭된 경우) 패밀리오더 수입 입고 관리의 미입고(남은수량)
+    const pending=receiveList.filter(r=>r.code===p.code).reduce((s,r)=>s+Math.max(0,r.orderQty-r.in1-r.in2),0)
+      + (famProd?insightFamPendingFor(famProd.code):0);
     const effStock=p.stock+pending;
     const status = p.disc?'단종':(er<=0?'정상':insightStatusForRatio(p, effStock/er));
     const avgDay=c.noData?0:c.avgDay;
@@ -12223,8 +12243,7 @@ function insightBuildRows(){
     const covered=!c.noData && pending>0 && netNeeded<=0;
     const season=insightSeasonInfo(p);
     const rgQty=(bdId!=null?rgQtyMap[bdId]:0)||0;
-    // 패밀리 오더(타업체 사입) 매칭 — 연결돼 있으면 패밀리오더 박스 단위 권장 발주량과 최근 주문 이력을 참고용으로 함께 계산
-    const famProd=insightFamProductFor(p);
+    // 연결된 경우 패밀리오더 박스 단위(qtyBox)로 다시 계산한 권장 발주 박스수 + 최근 주문 이력(참고용)
     const famBoxes=(famProd && netNeeded!=null)?Math.ceil(netNeeded/(famProd.qtyBox||1)):null;
     const famLatest=famProd?insightFamLatestOrder(famProd.code):null;
     return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest};
@@ -12253,12 +12272,12 @@ function insightSparkHtml(season){
   return `<div class="ins-spark">${bars}</div><div class="ins-sub">${season.basis} 기준</div>`;
 }
 
-// 패밀리 오더(타업체 사입) 매칭 셀 — 미연결이면 연결 버튼만, 연결돼 있으면 패밀리오더 박스단위 발주수량
-// (발주 수량) + 최근 주문 이력(주문수량·발주시점)을 보여준다. 클릭하면 연결 변경 팝업이 열린다.
+// 패밀리 오더(타업체 사입) 매칭 셀 — 매칭 상품이 많지 않아 연결 안 된 상품은 빈칸으로 두고(연결 버튼은
+// 관리 컬럼의 🔗 아이콘으로 이동), 연결된 상품만 패밀리오더 박스단위 권장 발주량 + 최근 주문 이력을 보여준다.
 function insightFamCellHtml(r){
-  if(!r.famProd) return `<button class="btn btn-sm btn-gy" onclick="insightOpenFamPick(${r.p.id})" title="다른 업체에서 사입해 패밀리 오더로 주문하는 상품이면 연결해보세요">🔗 연결</button>`;
+  if(!r.famProd) return '<span class="ins-sub">-</span>';
   const fp=r.famProd;
-  const needLine = r.c.noData ? '<div class="ins-sub">판매데이터 부족</div>' : `<div class="ins-num">발주 ${(r.famBoxes||0).toLocaleString()}박스</div><div class="ins-sub">${(fp.qtyBox||0).toLocaleString()}개/박스</div>`;
+  const needLine = r.c.noData ? '<div class="ins-sub">판매데이터 부족</div>' : `<div class="ins-num">발주 ${(r.famBoxes||0).toLocaleString()}박스</div><div class="ins-sub">(${(r.netNeeded||0).toLocaleString()}개) · ${(fp.qtyBox||0).toLocaleString()}개/박스</div>`;
   const orderLine = r.famLatest ? `<div class="ins-sub">최근주문 ${r.famLatest.qty.toLocaleString()}개 · ${r.famLatest.date}</div>` : '<div class="ins-sub">주문 이력 없음</div>';
   return `<div style="cursor:pointer;" onclick="insightOpenFamPick(${r.p.id})" title="클릭해서 연결 변경">
     <div style="font-size:10.5px;font-weight:700;color:var(--pr);">🔗 ${_esc(fp.vendor)}·${_esc(fp.code)}</div>
@@ -12282,7 +12301,7 @@ function insightRowHtml(r){
   let orderCell;
   if(r.c.noData) orderCell='<span class="ins-sub">산출불가</span>';
   else if(r.covered) orderCell=`<span class="ins-tag" style="background:#ECFDF5;color:#059669;">✓ 발주 진행중(충분)</span>`;
-  else orderCell=`<div class="ins-num">${r.netBoxes.toLocaleString()}박스</div>${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}`;
+  else orderCell=`<div class="ins-num">${r.netBoxes.toLocaleString()}박스</div><div class="ins-sub">(${(r.netNeeded||0).toLocaleString()}개)</div>${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}`;
   return `<tr>
     <td><span class="ins-badge" style="background:${stBg};color:${stColor};">${st}</span></td>
     <td><div class="ins-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px;" onclick="insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이 그래프를 볼 수 있어요">${r.p.name}</div><div class="ins-code">${r.p.code}</div></td>
@@ -12298,7 +12317,10 @@ function insightRowHtml(r){
     <td>${insightFamCellHtml(r)}</td>
     <td>${insightSeasonCellHtml(r.season)}</td>
     <td>${insightSparkHtml(r.season)}</td>
-    <td style="text-align:center;"><button class="btn btn-sm ${r.p.disc?'btn-or':'btn-gy'}" onclick="insightDiscProd(${r.p.id})" title="${r.p.disc?'단종 해제':'단종 처리 — 발주 알림 및 발주 목록에서 제외됩니다'}">${r.p.disc?'↩단종':'단종처리'}</button></td>
+    <td style="text-align:center;white-space:nowrap;">
+      <button class="btn btn-sm ${r.p.disc?'btn-or':'btn-gy'}" onclick="insightDiscProd(${r.p.id})" title="${r.p.disc?'단종 해제':'단종 처리 — 발주 알림 및 발주 목록에서 제외됩니다'}">${r.p.disc?'↩단종':'단종처리'}</button>
+      <button class="btn btn-sm ${r.famProd?'btn-pr':'btn-gy'}" onclick="insightOpenFamPick(${r.p.id})" title="${r.famProd?'패밀리오더 연결 변경/해제':'다른 업체에서 사입해 패밀리 오더로 주문하는 상품이면 연결해보세요'}" style="margin-left:4px;">🔗</button>
+    </td>
   </tr>`;
 }
 // 발주 인사이트 목록에서 바로 단종 처리/해제 — 재고관리와 동일한 discProd()를 호출한 뒤 이 화면도 즉시 갱신
