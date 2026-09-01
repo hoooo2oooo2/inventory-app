@@ -4776,6 +4776,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="card">
         <div class="ch">
           <div><div class="ct">로켓그로스 출고 제품</div><div class="cs" id="rgUpdLbl"></div></div>
+          <div class="search-box"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="rgTblSrch" placeholder="코드, 상품명 검색..." oninput="renderRgTbody()"></div>
         </div>
         <div class="tw"><table>
           <thead><tr><th>코드</th><th>상품명</th><th>구분</th><th style="text-align:right;">현재고</th><th style="text-align:right;">이번달</th><th style="text-align:right;">저번달</th><th style="text-align:right;">증감</th><th class="ns" style="text-align:center;">그래프</th><th class="ns">비고</th></tr></thead>
@@ -4799,6 +4800,28 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     </div>
   </div>
 </div>
+</div>
+
+<!-- ═══ 로켓그로스 출고 — 제품별 날짜/수량 히스토리 ═══ -->
+<style>
+#rgHistModal .modal{max-width:420px;}
+#rgHistModal h3{font-size:16px;margin:0 0 4px;}
+#rgHistModal .rg-hist-code{font-size:12px;color:var(--tx2);font-weight:500;margin-bottom:10px;}
+#rgHistModal .rg-hist-sum{font-size:12.5px;font-weight:600;color:var(--tx);margin-bottom:10px;}
+#rgHistModal .rg-hist-list{max-height:400px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;}
+#rgHistModal .rg-hist-row{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:0.5px solid var(--bd);font-size:12.5px;}
+#rgHistModal .rg-hist-row:last-child{border-bottom:none;}
+#rgHistModal .rg-hist-date{color:var(--tx2);}
+#rgHistModal .rg-hist-qty{font-weight:700;color:var(--tx);}
+</style>
+<div class="modal-overlay" id="rgHistModal">
+  <div class="modal">
+    <h3 id="rgHistTitle">상품명</h3>
+    <div class="rg-hist-code" id="rgHistCode"></div>
+    <div class="rg-hist-sum" id="rgHistSum"></div>
+    <div class="rg-hist-list" id="rgHistList"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('rgHistModal')">닫기</button></div>
+  </div>
 </div>
 
 <!-- ═══ 변동이력 ═══ -->
@@ -21371,6 +21394,37 @@ function setRgPeriod(p){
   renderRgPeriod();
 }
 
+// 로켓그로스 출고 기간별 라벨+값 — 일별/주별/저번주는 실제 날짜 단위로 직접 합산한다. 예전엔
+// 월별로만 집계해둔 값(getRgMonthly)을 라벨 문자열 안의 "N월" 텍스트로 억지로 매칭했는데(labelToMIdx),
+// 일별 라벨엔 그 문자열 자체가 없어 계산이 늘 0으로 나오고, 주별은 그 달 전체 합계가 같은 달에
+// 속한 모든 주에 똑같이(틀리게) 반복 표시되는 버그였다(2026-09 사용자 리포트). 월별/분기는 원래도
+// 라벨이 "N월"을 포함해 우연히 맞았으므로 기존 월별 집계 방식을 그대로 쓴다.
+function getRgPeriodSeries(code, yr, per){
+  const day=_rgDailyCache[code]||{};
+  if(per==='daily' || per==='lastweek'){
+    const rng=getDateRange(yr, per);
+    const labels=per==='daily'?getThisWeekDays():getLastWeekDays();
+    const values=rng.days.map(d=>day[d]||0);
+    return {labels, values};
+  }
+  if(per==='weekly'){
+    const labels=[], values=[];
+    for(let w=7; w>=0; w--){
+      const d=new Date(now); d.setDate(now.getDate()-w*7);
+      const dow=(d.getDay()+6)%7; const mon=new Date(d); mon.setDate(d.getDate()-dow);
+      const mo=d.getMonth()+1, fd=new Date(d.getFullYear(),d.getMonth(),1), wom=Math.ceil((d.getDate()+fd.getDay())/7);
+      labels.push(`${mo}월 ${wom}주차`);
+      let sum=0;
+      for(let i=0;i<7;i++){ const dd=new Date(mon); dd.setDate(mon.getDate()+i); sum+=day[fmtDate(dd)]||0; }
+      values.push(sum);
+    }
+    return {labels, values};
+  }
+  const def=getPeriodDef(yr,per);
+  const m=getRgMonthly(code,yr);
+  const values=def.labels.map(lbl=>{const mi=labelToMIdx(lbl);return mi>=0?(m[mi]||0):0;}).slice(0,def.len);
+  return {labels:def.labels, values};
+}
 function renderRgPeriod(){
   const rgProds = getRgProducts();
   if(!rgProds.length){
@@ -21382,15 +21436,15 @@ function renderRgPeriod(){
   }
   const sel = [...rgSel].map(id=>rgProds.find(x=>x.id===id)).filter(Boolean);
   if(!sel.length){ if(rgChart){rgChart.destroy();rgChart=null;} document.getElementById('rgSum').innerHTML=''; document.getElementById('rgCurLbl').textContent=''; document.getElementById('rgLegend').innerHTML=''; return; }
-  const def=getPeriodDef(rgYear,rgPeriod);
+  let labels=null;
   const ds=[];let i=0;
   sel.forEach(p=>{
-    const m=getRgMonthly(p.code,rgYear);
-    const data=def.labels.map(lbl=>{const mi=labelToMIdx(lbl);return mi>=0?(m[mi]||0):0;}).slice(0,def.len);
+    const {labels:lbl,values:data}=getRgPeriodSeries(p.code,rgYear,rgPeriod);
+    if(!labels) labels=lbl;
     ds.push({label:p.name,data,borderColor:COLORS[i%8],backgroundColor:COLORS[i%8]+'18',borderWidth:2,pointRadius:4,pointHoverRadius:6,tension:.35,fill:false,borderDash:DASHES[i%8]||[]});i++;
   });
   if(rgChart)rgChart.destroy();
-  rgChart=makeChart('rgChart',def.labels,ds);
+  rgChart=makeChart('rgChart',labels,ds);
   const all=ds.flatMap(d=>d.data);
   const tot=all.reduce((a,b)=>a+b,0),avg=all.length?Math.round(tot/all.length):0;
   document.getElementById('rgSum').innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${sel.length}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
@@ -21399,9 +21453,11 @@ function renderRgPeriod(){
 }
 
 function renderRgTbody(){
-  const rgProds = getRgProducts();
+  const srch=(document.getElementById('rgTblSrch')?.value||'').toLowerCase().trim();
+  let rgProds = getRgProducts();
+  if(srch) rgProds=rgProds.filter(p=>p.name.toLowerCase().includes(srch)||p.code.toLowerCase().includes(srch));
   if(!rgProds.length){
-    document.getElementById('rgTbody').innerHTML=`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--tx2);">로켓그로스 출고 데이터를 업로드하세요</td></tr>`;
+    document.getElementById('rgTbody').innerHTML=`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--tx2);">${srch?'검색 결과가 없습니다.':'로켓그로스 출고 데이터를 업로드하세요'}</td></tr>`;
     return;
   }
   document.getElementById('rgTbody').innerHTML=rgProds.map(p=>{
@@ -21416,7 +21472,7 @@ function renderRgTbody(){
     const g=prevRate>0?Math.round(((curRate-prevRate)/prevRate)*100):(cur>0?100:0);
     return `<tr>
       <td><span class="code-chip">${p.code}</span></td>
-      <td style="font-weight:500;">${p.name}</td>
+      <td style="font-weight:500;cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px;" onclick="openRgHistModal(${p.id})" title="클릭하면 출고 날짜·수량 히스토리를 볼 수 있어요">${p.name}</td>
       <td><span class="badge b-gy">${p.type}</span></td>
       <td style="text-align:right;font-weight:500;">${p.stock.toLocaleString()}개</td>
       <td style="text-align:right;">${cur.toLocaleString()}개 <span style="font-size:9px;color:var(--tx2);">(${daysElapsed}일)</span></td>
@@ -21426,6 +21482,23 @@ function renderRgTbody(){
       <td style="text-align:center;"><span style="font-size:10px;color:var(--tx2);">재고관리 연동</span></td>
     </tr>`;
   }).join('');
+}
+// 로켓그로스 출고 — 제품 클릭 시 날짜별 출고 히스토리 팝업
+function openRgHistModal(id){
+  const p=products.find(x=>x.id===id); if(!p) return;
+  const t=document.getElementById('rgHistTitle'); if(t) t.textContent=p.name;
+  const c=document.getElementById('rgHistCode'); if(c) c.textContent=p.code;
+  const dayData=_rgDailyCache[p.code]||{};
+  const dates=Object.keys(dayData).sort((a,b)=>b.localeCompare(a)); // 최신 날짜 먼저
+  const sum=document.getElementById('rgHistSum');
+  const total=dates.reduce((s,d)=>s+(dayData[d]||0),0);
+  if(sum) sum.textContent=dates.length?`합계 ${total.toLocaleString()}개 · 기록 ${dates.length}일`:'출고 기록이 없습니다.';
+  const list=document.getElementById('rgHistList');
+  if(list) list.innerHTML=dates.map(d=>{
+    const dow=DNAMES[new Date(d+'T00:00:00').getDay()];
+    return `<div class="rg-hist-row"><span class="rg-hist-date">${d} (${dow})</span><span class="rg-hist-qty">${(dayData[d]||0).toLocaleString()}개</span></div>`;
+  }).join('');
+  openModal('rgHistModal');
 }
 
 function renderRgProdPanel(){
