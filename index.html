@@ -12175,11 +12175,15 @@ function insightMergedSeriesFor(p, rgQtyById, bdId){
 function insightDemandFromSeries(series){
   const dates=Object.keys(series).sort();
   if(!dates.length) return {avgDay:0, noData:true, dataPoints:0};
-  const latestDate=new Date(dates[dates.length-1]+'T00:00:00');
-  const cut30=fmtDate(new Date(latestDate.getTime()-29*86400000));
-  const cut7=fmtDate(new Date(latestDate.getTime()-6*86400000));
+  // "가장 최근 판매가 찍힌 날"이 아니라 "오늘"을 기준으로 최근 30일/7일을 잡는다. 예전 방식은
+  // 한동안 안 팔린 상품이면 마지막으로 반짝 팔렸던 시점에 창이 고정돼, 그 이후의 판매 없는 기간이
+  // 통째로 평균 계산에서 빠지면서 실제보다 훨씬 빨리 팔리는 것처럼 과대추정되는 문제가 있었다
+  // (2026-09 사용자 리포트: 최근 거의 안 팔리는데도 일평균판매·권장발주가 크게 잡히던 원인).
+  const todayStr=fmtDate(new Date());
+  const cut30=fmtDate(new Date(Date.now()-29*86400000));
+  const cut7=fmtDate(new Date(Date.now()-6*86400000));
   let sum30=0,sum7=0,n30=0;
-  dates.forEach(d=>{ if(d>=cut30){ sum30+=series[d]||0; n30++; if(d>=cut7) sum7+=series[d]||0; } });
+  dates.forEach(d=>{ if(d>=cut30 && d<=todayStr){ sum30+=series[d]||0; n30++; if(d>=cut7) sum7+=series[d]||0; } });
   if(sum30<=0) return {avgDay:0, noData:true, dataPoints:n30};
   const avg30=sum30/30, avg7=sum7/7;
   let avgDay=avg30;
