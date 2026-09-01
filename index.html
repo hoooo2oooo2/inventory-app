@@ -12657,6 +12657,16 @@ function _erpInferDate(mm, dd){
   if(diffDays>180) year-=1; else if(diffDays<-180) year+=1;
   return fmtDate(new Date(year, mm-1, dd));
 }
+// 헤더(1행) 텍스트로 열을 찾는다 — 열 위치(A/D/F/Y)가 아니라 "전체상품코드"·"상품명" 같은 실제 헤더
+// 문구로 찾기 때문에, ERP가 컬럼 순서를 바꿔서 내보내도 엉뚱한 열의 값을 잘못 읽어들이는 일이 없다.
+// (참고: 행 순서/순번은애초에 무관 — 각 행은 그 행의 코드로 재고관리 상품과 매칭되지, 몇 번째 줄인지는 안 봄)
+function _erpFindCol(header, patterns){
+  for(let i=0;i<header.length;i++){
+    const h=String(header[i]||'');
+    if(patterns.some(p=>h.includes(p))) return i;
+  }
+  return -1;
+}
 function erpParseFile(file){
   const dt=document.getElementById('erpDzText'); if(dt) dt.textContent=`📄 ${file.name} 읽는 중...`;
   const reader=new FileReader();
@@ -12667,27 +12677,38 @@ function erpParseFile(file){
       const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       if(rows.length<2){ alert('데이터가 없습니다.'); return; }
       const header=rows[0];
+      const colCode=_erpFindCol(header,['전체상품코드','상품코드']);
+      const colName=_erpFindCol(header,['상품명']);
+      const colBox=_erpFindCol(header,['BOX당','박스당']);
+      const colStock=_erpFindCol(header,['현재고']);
+      const missing=[];
+      if(colCode<0) missing.push('코드(전체상품코드)');
+      if(colName<0) missing.push('상품명');
+      if(colBox<0) missing.push('박스당수량(BOX당 수량)');
+      if(colStock<0) missing.push('현재고');
+      if(missing.length){ alert(`엑셀 헤더에서 다음 열을 찾지 못했습니다: ${missing.join(', ')}\nERP 원본 파일 양식이 바뀌었을 수 있으니 확인해주세요.`); return; }
+      // 요일별 출고수량 열은 위치가 아니라 헤더 전체에서 "(MM-DD)" 날짜 패턴으로 찾는다(양식이 밀려도 안전)
       const dateCols=[];
-      for(let ci=11; ci<=17; ci++){ // L~R
-        const m=String(header[ci]||'').match(/\((\d{1,2})-(\d{1,2})\)/);
+      header.forEach((h,ci)=>{
+        const m=String(h||'').match(/\((\d{1,2})-(\d{1,2})\)/);
         if(m) dateCols.push({idx:ci, date:_erpInferDate(parseInt(m[1]), parseInt(m[2]))});
-      }
-      if(!dateCols.length){ alert('일별 출고수량 열(L~R)의 날짜 헤더("월 (08-31)" 형식)를 인식하지 못했습니다. ERP 원본 파일이 맞는지 확인해주세요.'); return; }
-      const dataRows=rows.slice(1).filter(r=>String(r[0]||'').trim()!=='');
-      erpBuildPreview(dataRows, dateCols);
+      });
+      if(!dateCols.length){ alert('일별 출고수량 열의 날짜 헤더("월 (08-31)" 형식)를 인식하지 못했습니다. ERP 원본 파일이 맞는지 확인해주세요.'); return; }
+      const dataRows=rows.slice(1).filter(r=>String(r[colCode]||'').trim()!=='');
+      erpBuildPreview(dataRows, dateCols, {colCode, colName, colBox, colStock});
       if(dt) dt.textContent=`✅ ${file.name} (${dataRows.length}행, 출고데이터 ${dateCols.map(d=>d.date.slice(5)).join('/')})`;
     }catch(err){ alert('파일 읽기 오류: '+err.message); }
   };
   reader.readAsBinaryString(file);
 }
-function erpBuildPreview(rows, dateCols){
+function erpBuildPreview(rows, dateCols, cols){
   _erpPendingRows=[]; _erpNewTypes={};
   rows.forEach(r=>{
-    const code=String(r[0]||'').trim();
-    const name=String(r[3]||'').trim();
+    const code=String(r[cols.colCode]||'').trim();
+    const name=String(r[cols.colName]||'').trim();
     if(!code||!name) return;
-    const boxQty=parseInt(r[5])||1;
-    const stock=parseInt(r[24])||0;
+    const boxQty=parseInt(r[cols.colBox])||1;
+    const stock=parseInt(r[cols.colStock])||0;
     const existing=products.find(p=>p.code===code);
     const daily=dateCols.map(dc=>({date:dc.date, qty:parseInt(r[dc.idx])||0})).filter(d=>d.qty>0);
     _erpPendingRows.push({code, name, boxQty, stock, daily,
