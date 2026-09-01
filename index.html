@@ -4578,7 +4578,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
       <div>
         <div class="ct" style="font-size:17px;">📊 발주 인사이트</div>
-        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석합니다 — 일평균판매·예상 소진일·권장 발주는 정규채널 판매량에 로켓그로스 매출 화면(쿠팡 셀러인사이트)의 일별 판매량을 합산한 값입니다(그로스 출고 메뉴는 미사용이라 반영하지 않음). 긴급도·발주 마감일은 여기에 발주관리 진행중 발주(미입고 수량)까지 추가로 차감한 값입니다. 로켓그로스 판매량(개)은 최근 2개월·백데이터 매칭 기준이라 매칭 안 된 상품은 공란입니다. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
+        <div class="cs" style="font-size:12.5px;margin-top:3px;">재고관리·판매분석·발주관리·로켓그로스 매출 데이터를 통합 분석합니다 — 일평균판매·예상 소진일·권장 발주는 정규채널 판매량에 로켓그로스 매출 화면(쿠팡 셀러인사이트)의 일별 판매량을 합산한 값입니다(그로스 출고 메뉴는 미사용이라 반영하지 않음). 긴급도·발주 마감일은 여기에 발주관리 진행중 발주(미입고 수량)까지 추가로 차감한 값입니다. 로켓그로스 판매량(개)은 최근 2개월·백데이터 매칭 기준이라 매칭 안 된 상품은 공란입니다. 다른 업체에서 사입해 발주관리 대신 패밀리 오더로 주문하는 상품은 코드가 서로 달라 자동 매칭이 안 되니, 🔗 패밀리오더 칸에서 연결해두면 박스 단위 발주 수량과 최근 주문 이력을 바로 볼 수 있어요. 상품명을 클릭하면 출고 추이 그래프를 볼 수 있어요.</div>
       </div>
       <div style="font-size:12px;color:var(--tx2);" id="insightUpdLbl"></div>
     </div>
@@ -4601,7 +4601,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <th>긴급도</th><th>상품</th><th>구분</th><th>등급</th>
           <th style="text-align:right;">현재고</th><th style="text-align:right;">일평균판매</th>
           <th>예상 소진일</th><th>발주 마감일</th><th style="text-align:right;">권장 발주</th>
-          <th>진행중 발주</th><th style="text-align:right;">🚀 로켓그로스 판매량</th><th>성수기·비수기</th><th>전년 월별추이</th><th style="text-align:center;">관리</th>
+          <th>진행중 발주</th><th style="text-align:right;">🚀 로켓그로스 판매량</th><th>🔗 패밀리오더</th><th>성수기·비수기</th><th>전년 월별추이</th><th style="text-align:center;">관리</th>
         </tr></thead>
         <tbody id="insightTbody"></tbody>
       </table>
@@ -4664,6 +4664,31 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     </div>
     <div class="ins-empty" id="insightTrendEmpty" style="display:none;padding:40px 10px;">판매 데이터가 없습니다.</div>
     <div class="ma"><button class="btn" onclick="closeModal('insightTrendModal')">닫기</button></div>
+  </div>
+</div>
+
+<!-- ═══ 발주 인사이트 — 패밀리오더(타업체 사입) 상품 매칭 팝업 ═══ -->
+<style>
+#insightFamPickModal .modal{max-width:480px;}
+#insightFamPickModal h3{font-size:16px;margin:0 0 4px;}
+#insightFamPickModal .fam-pick-cur{font-size:12.5px;color:var(--tx);background:var(--bg2);border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+#insightFamPickModal .fam-pick-search{width:100%;box-sizing:border-box;margin-bottom:8px;}
+#insightFamPickModal .fam-pick-list{max-height:320px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;}
+#insightFamPickModal .fam-pick-row{padding:8px 12px;border-bottom:0.5px solid var(--bd);cursor:pointer;transition:background .1s;}
+#insightFamPickModal .fam-pick-row:last-child{border-bottom:none;}
+#insightFamPickModal .fam-pick-row:hover{background:var(--bg2);}
+#insightFamPickModal .fam-pick-row.active{background:var(--pr);}
+#insightFamPickModal .fam-pick-row.active .fam-pick-name,#insightFamPickModal .fam-pick-row.active .fam-pick-meta{color:#fff;}
+#insightFamPickModal .fam-pick-name{font-size:13px;font-weight:600;color:var(--tx);}
+#insightFamPickModal .fam-pick-meta{font-size:11.5px;color:var(--tx2);margin-top:2px;}
+</style>
+<div class="modal-overlay" id="insightFamPickModal">
+  <div class="modal">
+    <h3 id="insightFamPickTitle">상품명</h3>
+    <div class="fam-pick-cur" id="insightFamPickCur"></div>
+    <input type="text" class="sel fam-pick-search" id="insightFamPickSearch" placeholder="패밀리오더 상품 검색 (업체·코드·상품명)" oninput="insightRenderFamPickList(this.value)">
+    <div class="fam-pick-list" id="insightFamPickList"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('insightFamPickModal')">닫기</button></div>
   </div>
 </div>
 
@@ -11958,6 +11983,83 @@ function _hasEnoughDailyData(p){
 // ══════════════════════════════════════════════
 let insightSearch='', insightTypeF='', insightGradeF='', insightStatusF='', insightSort='urgency', insightShowDisc=false;
 
+// ── 패밀리 오더(타업체 사입) 상품 매칭 ──────────────────────────────────
+// 발주 인사이트는 재고관리 상품(products.code) 기준이지만, 다른 업체에서 사입해 발주관리 대신
+// 패밀리 오더로 주문하는 상품은 코드/상품명이 서로 달라 자동 매칭이 안 된다. 수동으로 한 번 연결해
+// 두면(productId → 패밀리오더 상품id) 발주 인사이트에서 그 상품의 패밀리오더 박스 단위 권장 발주량과
+// 최근 주문 이력(수량·날짜)을 바로 참고할 수 있다.
+const INSIGHT_FAM_MAP_KIND = 'insight_fam_map_v1'; // { [products.id]: 패밀리오더 상품id }
+let _insightFamMap = {};
+let _insightFamMapLoaded = false;
+let _insightFoLoaded = false;
+async function _insightEnsureFamData(){
+  const tasks=[];
+  if(!_insightFamMapLoaded) tasks.push(cloudKvLoad(INSIGHT_FAM_MAP_KIND).then(m=>{ _insightFamMap=(m&&typeof m==='object')?m:{}; _insightFamMapLoaded=true; }));
+  if(!_insightFoLoaded) tasks.push(_foLoadData().then(()=>{ _insightFoLoaded=true; }));
+  if(tasks.length) await Promise.all(tasks);
+}
+function insightFamProductFor(p){
+  const fid=_insightFamMap[p.id];
+  if(!fid) return null;
+  return _foProducts.find(fp=>fp.id===fid)||null;
+}
+// famCode(패밀리오더 상품 코드)로 저장된 주문서들 중 가장 최근 주문 행 — {qty, date}
+function insightFamLatestOrder(famCode){
+  if(!famCode) return null;
+  let latest=null;
+  _foOrders.forEach(o=>{
+    (o.rows||[]).forEach(r=>{
+      if(r.code!==famCode) return;
+      const qty=(r.qtyBox||0)*(r.boxes||0);
+      if(!qty) return;
+      if(!latest || (o.date||'')>(latest.date||'')) latest={qty, date:o.date||''};
+    });
+  });
+  return latest;
+}
+// 매칭 저장 — 다른 PC의 동시수정을 덮어쓰지 않도록 저장 직전 최신본을 재로드해 병합
+async function insightSetFamMap(productId, famId){
+  const latest = await cloudKvLoad(INSIGHT_FAM_MAP_KIND);
+  _insightFamMap = (latest && typeof latest==='object') ? latest : {};
+  if(famId) _insightFamMap[productId]=famId; else delete _insightFamMap[productId];
+  await cloudKvSave(INSIGHT_FAM_MAP_KIND, _insightFamMap);
+}
+let _insightFamPickProductId=null;
+async function insightOpenFamPick(productId){
+  _insightFamPickProductId=productId;
+  await _insightEnsureFamData();
+  const p=products.find(x=>x.id===productId);
+  const t=document.getElementById('insightFamPickTitle'); if(t) t.textContent=p?p.name:'';
+  const cur=document.getElementById('insightFamPickCur');
+  const curFp=p?insightFamProductFor(p):null;
+  if(cur) cur.innerHTML=curFp?`현재 연결: <b>${_esc(curFp.vendor)} · ${_esc(curFp.code)} · ${_esc(curFp.name)}</b> <button class="btn btn-sm btn-da" style="margin-left:6px;" onclick="insightUnlinkFam(${productId})">연결 해제</button>`:'<span style="color:var(--tx2);">아직 연결된 패밀리오더 상품이 없습니다.</span>';
+  const s=document.getElementById('insightFamPickSearch'); if(s) s.value='';
+  openModal('insightFamPickModal');
+  insightRenderFamPickList('');
+}
+function insightRenderFamPickList(q){
+  const el=document.getElementById('insightFamPickList'); if(!el) return;
+  const qq=(q||'').trim().toLowerCase();
+  const list=_foProducts.filter(fp=>!qq || (fp.name||'').toLowerCase().includes(qq) || (fp.code||'').toLowerCase().includes(qq) || (fp.vendor||'').toLowerCase().includes(qq));
+  if(!list.length){ el.innerHTML='<div class="ins-empty" style="padding:20px 10px;">검색 결과가 없습니다.</div>'; return; }
+  const curFid=_insightFamMap[_insightFamPickProductId];
+  el.innerHTML=list.map(fp=>`<div class="fam-pick-row${fp.id===curFid?' active':''}" onclick="insightPickFam('${fp.id}')">
+    <div class="fam-pick-name">${_esc(fp.name)}</div>
+    <div class="fam-pick-meta">${_esc(fp.vendor)} · ${_esc(fp.code)} · ${(fp.qtyBox||0).toLocaleString()}개/박스</div>
+  </div>`).join('');
+}
+async function insightPickFam(famId){
+  if(!_insightFamPickProductId) return;
+  await insightSetFamMap(_insightFamPickProductId, famId);
+  closeModal('insightFamPickModal');
+  renderInsight();
+}
+async function insightUnlinkFam(productId){
+  await insightSetFamMap(productId, null);
+  closeModal('insightFamPickModal');
+  renderInsight();
+}
+
 function insightSeasonInfo(p){
   const prev=getTotalM(p, CUR_YEAR-1), prevTotal=prev.reduce((a,b)=>a+b,0);
   let m=prev, total=prevTotal, basis=(CUR_YEAR-1)+'년';
@@ -12121,7 +12223,11 @@ function insightBuildRows(){
     const covered=!c.noData && pending>0 && netNeeded<=0;
     const season=insightSeasonInfo(p);
     const rgQty=(bdId!=null?rgQtyMap[bdId]:0)||0;
-    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty};
+    // 패밀리 오더(타업체 사입) 매칭 — 연결돼 있으면 패밀리오더 박스 단위 권장 발주량과 최근 주문 이력을 참고용으로 함께 계산
+    const famProd=insightFamProductFor(p);
+    const famBoxes=(famProd && netNeeded!=null)?Math.ceil(netNeeded/(famProd.qtyBox||1)):null;
+    const famLatest=famProd?insightFamLatestOrder(famProd.code):null;
+    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest};
   });
 }
 
@@ -12136,6 +12242,7 @@ function insightInit(){
   const el=document.getElementById('insightUpdLbl');
   if(el) el.textContent='업데이트 '+fmtFull(new Date());
   renderInsight();
+  _insightEnsureFamData().then(renderInsight); // 패밀리오더 매칭 데이터는 별도로 로드되는 대로 다시 반영
 }
 
 function insightSparkHtml(season){
@@ -12146,6 +12253,18 @@ function insightSparkHtml(season){
   return `<div class="ins-spark">${bars}</div><div class="ins-sub">${season.basis} 기준</div>`;
 }
 
+// 패밀리 오더(타업체 사입) 매칭 셀 — 미연결이면 연결 버튼만, 연결돼 있으면 패밀리오더 박스단위 발주수량
+// (발주 수량) + 최근 주문 이력(주문수량·발주시점)을 보여준다. 클릭하면 연결 변경 팝업이 열린다.
+function insightFamCellHtml(r){
+  if(!r.famProd) return `<button class="btn btn-sm btn-gy" onclick="insightOpenFamPick(${r.p.id})" title="다른 업체에서 사입해 패밀리 오더로 주문하는 상품이면 연결해보세요">🔗 연결</button>`;
+  const fp=r.famProd;
+  const needLine = r.c.noData ? '<div class="ins-sub">판매데이터 부족</div>' : `<div class="ins-num">발주 ${(r.famBoxes||0).toLocaleString()}박스</div><div class="ins-sub">${(fp.qtyBox||0).toLocaleString()}개/박스</div>`;
+  const orderLine = r.famLatest ? `<div class="ins-sub">최근주문 ${r.famLatest.qty.toLocaleString()}개 · ${r.famLatest.date}</div>` : '<div class="ins-sub">주문 이력 없음</div>';
+  return `<div style="cursor:pointer;" onclick="insightOpenFamPick(${r.p.id})" title="클릭해서 연결 변경">
+    <div style="font-size:10.5px;font-weight:700;color:var(--pr);">🔗 ${_esc(fp.vendor)}·${_esc(fp.code)}</div>
+    ${needLine}${orderLine}
+  </div>`;
+}
 function insightSeasonCellHtml(season){
   if(season.status==='nodata') return '<span class="ins-tag" style="background:var(--bg2);color:var(--tx2);">데이터 부족</span>';
   if(season.flat) return '<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">사계절 균등</span>';
@@ -12176,6 +12295,7 @@ function insightRowHtml(r){
     <td style="text-align:right;">${orderCell}</td>
     <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>`:'<span class="ins-sub">-</span>'}</td>
     <td style="text-align:right;">${r.rgQty>0?`<div class="ins-num">${Math.round(r.rgQty).toLocaleString()}개</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
+    <td>${insightFamCellHtml(r)}</td>
     <td>${insightSeasonCellHtml(r.season)}</td>
     <td>${insightSparkHtml(r.season)}</td>
     <td style="text-align:center;"><button class="btn btn-sm ${r.p.disc?'btn-or':'btn-gy'}" onclick="insightDiscProd(${r.p.id})" title="${r.p.disc?'단종 해제':'단종 처리 — 발주 알림 및 발주 목록에서 제외됩니다'}">${r.p.disc?'↩단종':'단종처리'}</button></td>
