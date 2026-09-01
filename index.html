@@ -4589,7 +4589,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="card">
     <div class="ins-filter-bar">
       <div class="search-box"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="insightSrch" placeholder="코드, 상품명 검색..." oninput="insightSetSearch(this.value)"></div>
-      <select class="sel" id="insightTypeSel" onchange="insightSetType(this.value)"><option value="">전체 구분</option><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select>
+      <select class="sel" id="insightTypeSel" onchange="insightSetType(this.value)"><option value="">전체 구분</option></select>
       <select class="sel" id="insightGradeSel" onchange="insightSetGrade(this.value)"><option value="">전체 등급</option><option value="A">A등급</option><option value="B">B등급</option><option value="C">C등급</option></select>
       <select class="sortsel" id="insightSortSel" onchange="insightSetSort(this.value)">
         <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="rg_desc">로켓그로스판매량순</option><option value="name">상품명순</option>
@@ -12542,6 +12542,7 @@ function insightVisibleRows(){
   return {base, rows};
 }
 function renderInsight(){
+  _fillInsightTypeFilter(); // 실제 등록된 구분값으로 필터 옵션을 항상 최신화
   const {base, rows}=insightVisibleRows();
   renderInsightKpi(base);
   const tbody=document.getElementById('insightTbody');
@@ -12808,6 +12809,14 @@ function _fillInvTypeFilter(){
   const cur=sel.value;
   const cats=[...new Set(products.map(p=>p.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
   sel.innerHTML='<option value="">전체구분</option>'+cats.map(t=>`<option>${t}</option>`).join('');
+  if(cats.includes(cur)) sel.value=cur;
+}
+// 발주 인사이트 구분 필터도 동일하게 — 하드코딩된 의류/잡화/식품/전자/기타 대신 실제 등록된 구분값으로
+function _fillInsightTypeFilter(){
+  const sel=document.getElementById('insightTypeSel'); if(!sel) return;
+  const cur=sel.value;
+  const cats=[...new Set(products.map(p=>p.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  sel.innerHTML='<option value="">전체 구분</option>'+cats.map(t=>`<option>${t}</option>`).join('');
   if(cats.includes(cur)) sel.value=cur;
 }
 // 재고관리 구분별 드릴다운 카드 — 구분별 개수·발주검토 필요 수 요약
