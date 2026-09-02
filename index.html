@@ -9021,17 +9021,29 @@ async function logiLoadChk(){
   await _logiChkRefresh();
   logiRenderChk();
 }
+// 같은 상품명이 재고관리 코드/판매자 관리코드처럼 코드만 다르게 여러 건 등록된 경우가 있어,
+// 상품명으로 매칭되는 모든 코드를 모아둔다 — 발주서에 상품명이 비고 코드만 있는 행도 매칭하기 위함.
+function _lhcCodesForName(name){
+  const n = String(name||'').trim();
+  if(!n) return [];
+  const list = (typeof products!=='undefined' ? products : [])
+    .filter(p=>String(p.name||'').trim()===n && p.code)
+    .map(p=>String(p.code).trim().toLowerCase());
+  return [...new Set(list)];
+}
 // 여러 PC가 같은 리스트를 공유하므로, 수정 직전 항상 클라우드 최신본을 다시 받아온 뒤
 // 그 위에 변경을 적용한다. (안 그러면 다른 PC가 먼저 저장한 변경을 이 PC의 오래된
 // 메모리 복사본으로 덮어써 수량차감·등록정보가 통째로 사라지는 문제가 있었음)
 async function _logiChkRefresh(){
   const cloud = (await cloudKvLoad('logi_checklist')) || [];
   let changed = false;
+  const hasProducts = typeof products!=='undefined' && products.length>0;
   cloud.forEach(c=>{
     if(c.createdBy==null){ c.createdBy='미상'; changed=true; }
     if(c.createdAt==null){ c.createdAt='-'; changed=true; }
     if(c.initQty==null){ c.initQty=c.qty; changed=true; }
     if(!Array.isArray(c.logs)){ c.logs=[]; changed=true; }
+    if(!Array.isArray(c.codes) && hasProducts){ c.codes=_lhcCodesForName(c.name); changed=true; }
   });
   _logiChk = cloud;
   if(changed) await cloudKvSave('logi_checklist', _logiChk);
@@ -9078,7 +9090,7 @@ async function logiChkAdd(){
   if(!name){ toast('제품명을 입력하세요.'); nameEl.focus(); return; }
   const qty = _lbxNum(qtyEl.value);
   await _logiChkRefresh();
-  _logiChk.push({ id: Date.now(), name, qty, checked: false,
+  _logiChk.push({ id: Date.now(), name, qty, checked: false, codes: _lhcCodesForName(name),
     createdBy: _logiChkActor(), createdAt: _logiChkNow(), initQty: qty, logs: [] });
   nameEl.value=''; qtyEl.value=''; nameEl.focus();
   logiRenderChk();
@@ -9246,15 +9258,31 @@ function _lsoParseSheet(aoa){
   const head = aoa[0].map(h=>String(h).trim());
   const ix = n => head.indexOf(n);
   let iRecv=ix('수취인'), iName=ix('상품명'), iQty=ix('수량');
-  if(iRecv<0 && iName<0){ iRecv=2; iName=7; iQty=8; }
+  let iCode=ix('패밀리상품코드'); if(iCode<0) iCode=ix('상품코드');
+  if(iRecv<0 && iName<0){ iRecv=2; iName=7; iQty=8; iCode=13; }
   const rows=[];
   aoa.forEach((r,i)=>{
     if(i===0) return;
     const name = String(r[iName]!=null?r[iName]:'').trim();
-    if(!name) return;
-    rows.push({ rowNum:i+1, recv:String(r[iRecv]!=null?r[iRecv]:'').trim(), name, qty:Number(r[iQty])||0 });
+    const code = iCode>=0 ? String(r[iCode]!=null?r[iCode]:'').trim() : '';
+    if(!name && !code) return;
+    rows.push({ rowNum:i+1, recv:String(r[iRecv]!=null?r[iRecv]:'').trim(), name, code, qty:Number(r[iQty])||0 });
   });
   return rows;
+}
+// 발주서 행 하나를 소장재고 체크리스트 항목과 매칭. 상품명이 비어 있고 판매자 관리코드만
+// 찍혀 있는 경우가 있어, 코드 매칭을 우선 시도하고(등록 시 모아둔 codes 배열과 대조) 안 되면 상품명으로 매칭한다.
+function _lsoMatch(active, r){
+  const codeNorm = String(r.code||'').trim().toLowerCase();
+  if(codeNorm){
+    const m = active.find(c=>Array.isArray(c.codes) && c.codes.includes(codeNorm));
+    if(m) return { m, by:'code' };
+  }
+  if(r.name){
+    const m = active.find(c=>String(c.name||'').trim()===r.name);
+    if(m) return { m, by:'name' };
+  }
+  return { m:null, by:null };
 }
 async function lsoHandleFile(files){
   const file = files && files[0]; if(!file) return;
@@ -9268,8 +9296,8 @@ async function lsoHandleFile(files){
     await _logiChkRefresh();
     const active = (_logiChk||[]).filter(c=>!c.checked);
     _lsoRows = rows.map(r=>{
-      const m = active.find(c=>String(c.name||'').trim()===r.name);
-      return { ...r, matchId: m?m.id:null, matchQty: m?m.qty:null, use: !!m };
+      const { m, by } = _lsoMatch(active, r);
+      return { ...r, matchId: m?m.id:null, matchQty: m?m.qty:null, matchName: m?m.name:null, matchBy: by, use: !!m };
     });
     const showAll = document.getElementById('lsoShowAll'); if(showAll) showAll.checked=false;
     lsoRenderModal();
@@ -9290,11 +9318,15 @@ function lsoRenderModal(){
   if(summ) summ.textContent = `전체 ${_lsoRows.length}건 · 소장재고 매칭 ${matchedCount}건 · 적용 예정 ${selCount}건`;
   const list = onlyMatched ? _lsoRows.filter(r=>r.matchId) : _lsoRows;
   body.innerHTML = list.length ? list.map(r=>{
-    const stockNote = r.matchId ? `<span class="lso-tag lso-yes">소장재고 있음 (${_lbxNum(r.matchQty)})</span>` : `<span class="lso-tag lso-no">—</span>`;
+    const stockNote = r.matchId
+      ? `<span class="lso-tag lso-yes">소장재고 있음 · ${r.matchBy==='code'?'코드매칭':'이름매칭'} (${_lbxNum(r.matchQty)})</span>`
+      : `<span class="lso-tag lso-no">—</span>`;
+    const nameDisp = r.name ? _logiEsc(r.name)
+      : (r.matchId ? `<span style="color:var(--tx2);">(코드로 매칭됨) ${_logiEsc(r.matchName)}</span>` : `<span style="color:var(--tx2);">상품명 없음${r.code?' · 코드 '+_logiEsc(r.code):''}</span>`);
     return `<tr>
       <td>${r.rowNum}</td>
       <td class="lso-l">${_logiEsc(r.recv)}</td>
-      <td class="lso-l">${_logiEsc(r.name)}</td>
+      <td class="lso-l">${nameDisp}</td>
       <td>${_lbxNum(r.qty)}</td>
       <td>${stockNote}</td>
       <td>${r.matchId?`<input type="checkbox" ${r.use?'checked':''} onchange="lsoToggleUse(${r.rowNum})">`:''}</td>
@@ -9315,7 +9347,7 @@ async function lsoApply(){
     if(dec<=0) return;
     const to = from-dec;
     c.logs = c.logs || [];
-    c.logs.unshift({ ts:_logiChkNow(), by:_logiChkActor(), from, to, delta:-dec, note:`발주서 대조 차감 · ${r.rowNum}행 · 수취인 ${r.recv||'-'}` });
+    c.logs.unshift({ ts:_logiChkNow(), by:_logiChkActor(), from, to, delta:-dec, note:`발주서 대조 차감 · ${r.rowNum}행 · 수취인 ${r.recv||'-'} · ${r.matchBy==='code'?'코드매칭':'이름매칭'}` });
     c.qty = to;
     applied++;
     if(dec < r.qty) insufficient.push(c.name);
