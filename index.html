@@ -22736,6 +22736,21 @@ async function confirmUpload(){
       renderInv();updateFloat();
       if(products.length>0&&salesSel.size===0)salesSel=new Set([products[0].id]);
     } else if(type==='sales'){
+      // 재고관리·발주 인사이트가 함께 쓰는 monthly_YYYY 누적합이 이중 집계되지 않도록,
+      // 같은 코드·날짜가 daily_sales에 이미 있으면(같은 날 재업로드) 증가분(delta)만 반영한다.
+      // ([[erpApplyImport]]의 ERP 엑셀 업로드와 동일한 원칙)
+      const dailyRows=_pendingRows.filter(r=>r.mIdx>=0&&r.qty>0&&r.dateStr).map(r=>({code:r.code,name:r.name,sale_date:r.dateStr,qty:r.qty,is_rg:false}));
+      const oldQtyMap={};   // "code|date" → 업로드 전 daily_sales.qty
+      if(dailyRows.length){
+        const codes=[...new Set(dailyRows.map(d=>d.code))];
+        const dates=[...new Set(dailyRows.map(d=>d.sale_date))];
+        for(let b=0;b<codes.length;b+=200){
+          const {data:oldRows, error:oldErr}=await sb.from('daily_sales').select('code,sale_date,qty')
+            .eq('is_rg', false).in('code', codes.slice(b,b+200)).in('sale_date', dates);
+          if(oldErr){ console.error('판매분석 기존 daily_sales 조회 오류', oldErr.message); continue; }
+          (oldRows||[]).forEach(r=>{ oldQtyMap[r.code+'|'+r.sale_date]=r.qty||0; });
+        }
+      }
       const upd={};
       for(const row of _pendingRows){
         if(row.mIdx<0)continue;
@@ -22744,7 +22759,9 @@ async function confirmUpload(){
         const col='monthly_'+yr;
         if(!upd[p.id])upd[p.id]={};
         if(!upd[p.id][yr])upd[p.id][yr]=[...(p[col]||Array(12).fill(0))];
-        upd[p.id][yr][row.mIdx]=(upd[p.id][yr][row.mIdx]||0)+row.qty;
+        const oldQty=row.dateStr ? (oldQtyMap[row.code+'|'+row.dateStr]||0) : 0;
+        const delta=row.qty-oldQty;   // 재업로드분은 증가분만 반영 → 이중 누적 방지
+        upd[p.id][yr][row.mIdx]=Math.max(0, (upd[p.id][yr][row.mIdx]||0)+delta);
         if(!YEARS.includes(yr)){YEARS.push(yr);YEARS.sort((a,b)=>a-b);buildYearSelects();}
       }
       for(const[id,yrs] of Object.entries(upd)){
@@ -22755,7 +22772,6 @@ async function confirmUpload(){
         if(p){for(const[yr,monthly] of Object.entries(yrs)) p['monthly_'+yr]=monthly;}
       }
       if(Object.keys(upd).length) await _bumpProducts();
-      const dailyRows=_pendingRows.filter(r=>r.mIdx>=0&&r.qty>0&&r.dateStr).map(r=>({code:r.code,name:r.name,sale_date:r.dateStr,qty:r.qty,is_rg:false}));
       for(let b=0;b<dailyRows.length;b+=100){
         const {error}=await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100),{onConflict:'code,sale_date,is_rg',ignoreDuplicates:false});
         if(error) console.error('daily_sales upsert error:',error.message);
