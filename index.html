@@ -1504,6 +1504,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-table tbody td{padding:8px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;}
 .lcr-table tbody tr:hover{background:var(--bg2);}
 .lcr-table tbody tr:last-child td{border-bottom:none;}
+/* ERP 재고 차감 확인된 주문건 — 반투명 초록 틴트라 라이트/다크 모드 배경 위에서 둘 다 자연스럽게
+   보이고, 별도 글씨색 보정 없이도 기본 글씨색(var(--tx))이 그대로 잘 읽힘 */
+.lcr-table tbody tr.lcr-erp-done{background:rgba(5,192,114,.14);}
+.lcr-table tbody tr.lcr-erp-done:hover{background:rgba(5,192,114,.22);}
 .lcr-table td.lcr-l{text-align:left;}
 .lcr-table td.lcr-r{text-align:right;font-family:ui-monospace,monospace;}
 .lcr-meta{font-size:10.5px;color:var(--tx2);margin-top:2px;}
@@ -9533,7 +9537,7 @@ function lcrRender(){
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
   const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
-  return `<tr data-row="${o.id}">
+  return `<tr data-row="${o.id}" class="${o.erpChecked?'lcr-erp-done':''}">
     <td>${_lcrEsc(o.createdAt)}</td>
     <td class="lcr-l">${_lcrEsc(o.customerName)}</td>
     <td>${_lcrEsc(o.phone)}</td>
