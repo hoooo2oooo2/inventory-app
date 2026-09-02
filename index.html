@@ -9022,13 +9022,17 @@ async function logiLoadChk(){
   logiRenderChk();
 }
 // 같은 상품명이 재고관리 코드/판매자 관리코드처럼 코드만 다르게 여러 건 등록된 경우가 있어,
-// 상품명으로 매칭되는 모든 코드를 모아둔다 — 발주서에 상품명이 비고 코드만 있는 행도 매칭하기 위함.
+// 매출관리 백데이터(_bdData)에서 상품명으로 매칭되는 모든 코드를 모아둔다
+// — 발주서에 상품명이 비고 코드만 있는 행도 매칭하기 위함.
+// 'ss소장'은 여러 서로 다른 상품이 공유하는 특수 placeholder 코드(물류팀 발주건 정리와 동일 규칙)라
+// 여기 포함시키면 엉뚱한 상품끼리 코드로 오매칭될 수 있어 제외한다.
 function _lhcCodesForName(name){
   const n = String(name||'').trim();
   if(!n) return [];
-  const list = (typeof products!=='undefined' ? products : [])
+  const list = (typeof _bdData!=='undefined' ? _bdData : [])
     .filter(p=>String(p.name||'').trim()===n && p.code)
-    .map(p=>String(p.code).trim().toLowerCase());
+    .map(p=>String(p.code).trim().toLowerCase())
+    .filter(c=>c && c!=='ss소장');
   return [...new Set(list)];
 }
 // 여러 PC가 같은 리스트를 공유하므로, 수정 직전 항상 클라우드 최신본을 다시 받아온 뒤
@@ -9037,13 +9041,13 @@ function _lhcCodesForName(name){
 async function _logiChkRefresh(){
   const cloud = (await cloudKvLoad('logi_checklist')) || [];
   let changed = false;
-  const hasProducts = typeof products!=='undefined' && products.length>0;
+  const hasBd = typeof _bdData!=='undefined' && _bdData.length>0;
   cloud.forEach(c=>{
     if(c.createdBy==null){ c.createdBy='미상'; changed=true; }
     if(c.createdAt==null){ c.createdAt='-'; changed=true; }
     if(c.initQty==null){ c.initQty=c.qty; changed=true; }
     if(!Array.isArray(c.logs)){ c.logs=[]; changed=true; }
-    if(!Array.isArray(c.codes) && hasProducts){ c.codes=_lhcCodesForName(c.name); changed=true; }
+    if(!Array.isArray(c.codes) && hasBd){ c.codes=_lhcCodesForName(c.name); changed=true; }
   });
   _logiChk = cloud;
   if(changed) await cloudKvSave('logi_checklist', _logiChk);
@@ -9090,7 +9094,7 @@ async function logiChkAdd(){
   if(!name){ toast('제품명을 입력하세요.'); nameEl.focus(); return; }
   const qty = _lbxNum(qtyEl.value);
   await _logiChkRefresh();
-  _logiChk.push({ id: Date.now(), name, qty, checked: false, codes: _lhcCodesForName(name),
+  _logiChk.push({ id: Date.now(), name, qty, checked: false, codes: _bdLoaded ? _lhcCodesForName(name) : undefined,
     createdBy: _logiChkActor(), createdAt: _logiChkNow(), initQty: qty, logs: [] });
   nameEl.value=''; qtyEl.value=''; nameEl.focus();
   logiRenderChk();
@@ -9202,7 +9206,9 @@ async function logiChkDelConfirm(){
   await cloudKvSave('logi_checklist', _logiChk);
 }
 
-// ── 제품명: 운영관리 백데이터(products) 검색 드롭다운 (소장재고 체크리스트 추가) ──
+// ── 제품명: 매출관리 백데이터(_bdData) 검색 드롭다운 (소장재고 체크리스트 추가) ──
+//   ※ 재고관리 상품마스터(products)가 아니라 매출관리 백데이터(_bdData, 'backdata' 테이블)를 쓴다.
+//     소장재고에서 다루는 판매용 상품명·코드(재고관리 코드/판매자 관리코드)는 백데이터 쪽에 등록돼 있음.
 let _lhcProdPicking = false;
 function logiChkProdInput(inputEl){
   const q = (inputEl.value||'').trim().toLowerCase();
@@ -9210,9 +9216,9 @@ function logiChkProdInput(inputEl){
   // 재고관리 코드/판매자 관리코드처럼 같은 상품명이 코드만 다르게 여러 건 등록된 경우가 있어,
   // 체크리스트는 상품명만 쓰므로(코드 무관) 이름 기준으로 중복 제거해 드롭다운에 한 번만 보여준다.
   const seen = new Set();
-  const list = (typeof products!=='undefined' ? products : []).filter(p=>!p.hidden &&
-    (p.name.toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)))
-    .filter(p=>{ const k=p.name.trim(); if(seen.has(k)) return false; seen.add(k); return true; })
+  const list = (typeof _bdData!=='undefined' ? _bdData : []).filter(p=>
+    (String(p.name||'').toLowerCase().includes(q) || String(p.code||'').toLowerCase().includes(q)))
+    .filter(p=>{ const k=String(p.name||'').trim(); if(!k || seen.has(k)) return false; seen.add(k); return true; })
     .slice(0,30);
   logiChkShowProdDrop(inputEl, list);
 }
@@ -9230,7 +9236,7 @@ function logiChkShowProdDrop(inputEl, list){
 }
 function logiChkHideProdDrop(){ const d=document.getElementById('logiChkProdDrop'); if(d) d.style.display='none'; }
 function logiChkPickProd(prodId){
-  const p = (typeof products!=='undefined' ? products : []).find(x=>String(x.id)===String(prodId)); if(!p) return;
+  const p = (typeof _bdData!=='undefined' ? _bdData : []).find(x=>String(x.id)===String(prodId)); if(!p) return;
   _lhcProdPicking = true;
   const nameEl = document.getElementById('lhChkName');
   if(nameEl) nameEl.value = p.name;
@@ -9293,6 +9299,7 @@ async function lsoHandleFile(files){
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
     const rows = _lsoParseSheet(aoa);
     if(!rows.length){ toast('발주서 형식을 인식하지 못했습니다.'); return; }
+    if(!_bdLoaded){ try{ await loadBackdata(); }catch{} }   // 코드매칭용 백데이터 코드 백필에 필요
     await _logiChkRefresh();
     const active = (_logiChk||[]).filter(c=>!c.checked);
     _lsoRows = rows.map(r=>{
@@ -9381,6 +9388,7 @@ async function logiLoadMemo(){
 }
 
 function loadLogiHome(){
+  if(!_bdLoaded){ loadBackdata().catch(()=>{}); }   // 소장재고 제품명 검색·발주서 코드매칭에 필요
   logiLoadNotices();
   logiLoadHandovers();
   logiLoadChk();
