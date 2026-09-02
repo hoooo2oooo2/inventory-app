@@ -915,6 +915,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cs-table tbody tr:hover{background:var(--bg2);}
 .cs-table td.cs-l{text-align:left;}
 .cs-table td.cs-name{text-align:left;font-weight:600;}
+/* 주문·거래 리스트: 관리(수정·삭제) 열이 좁은 화면에서 가로 스크롤에 묻히지 않도록 오른쪽에 고정 */
+.cs-order-table th:last-child,.cs-order-table td:last-child{position:sticky;right:0;background:var(--bg);box-shadow:-6px 0 6px -6px rgba(0,0,0,.12);}
+.cs-order-table thead th:last-child{background:var(--bg2);}
+.cs-order-table tbody tr:hover td:last-child{background:var(--bg2);}
 .cs-tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:600;background:var(--bg2);color:var(--tx2);}
 .cs-vendor-tag{background:#EEF4FF;color:#3182F6;}
 .cs-cat-tag2{background:#F0FDF4;color:#059669;}
@@ -27118,9 +27122,15 @@ function csDeleteProd(id){
 
 // ── 주문·거래 리스트 (한 주문에 여러 제품) ──
 let _csOrderQty = {};   // 모달 작업용 {productId: qty}
-function csOpenOrderModal(id){
+async function csOpenOrderModal(id){
   if(!_csVendors.length){ toast('먼저 [＋ 배송처]로 위탁 배송처를 추가하세요.'); return; }
   if(!_csProducts.length){ toast('먼저 [제품 세팅]에서 제품을 등록하세요.'); return; }
+  // 다른 PC에서 방금 단가를 바꿨을 수 있으므로, 주문을 시작하기 전 제품 단가를 최신으로 다시 받아온다
+  // (기존 주문의 저장된 단가는 그대로 두고, 이 화면에서 "새로 담는" 수량만 최신가로 계산됨)
+  try{
+    const latestProducts = await cloudKvLoad('consign_products');
+    if(Array.isArray(latestProducts)) _csProducts = latestProducts;
+  }catch(e){ console.warn('제품 단가 최신화 실패', e); }
   _csEditOrderId = id||null;
   const o = id ? _csOrders.find(x=>x.id===id) : null;
   document.getElementById('csOrderModalTitle').textContent = o ? '✏️ 주문 수정' : '＋ 주문 추가';
@@ -27232,7 +27242,7 @@ function csRenderOrders(){
   csRenderOrderCal();
   if(!_csVendors.length){ card.innerHTML = `<div class="cs-empty">먼저 위쪽 <b>[＋ 배송처]</b>로 위탁 배송처를 추가하세요.</div>`; return; }
   if(!list.length){ card.innerHTML = `<div class="cs-empty">${_csOrders.length?'조건에 맞는 주문이 없습니다.':'저장된 주문이 없습니다. <b>[＋ 주문 추가]</b>로 등록하세요.'}</div>`; return; }
-  card.innerHTML = `<table class="cs-table" style="min-width:980px;"><thead><tr>
+  card.innerHTML = `<table class="cs-table cs-order-table" style="min-width:980px;"><thead><tr>
       <th style="width:96px;">날짜</th>
       ${showV?'<th style="width:96px;">배송처</th>':''}
       <th style="width:90px;">고객명</th>
