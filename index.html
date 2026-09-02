@@ -13414,9 +13414,26 @@ async function erpApplyImport(){
     await _bumpProducts();
     await loadProducts(true); // 신규 상품 id 포함해서 최신 목록 확보
 
-    // 3) 판매분석: daily_sales + products.monthly_YYYY 누적 반영
+    // 3) 판매분석: daily_sales + products.monthly_YYYY 반영
     const dailyRows=[];
     rows.forEach(r=>{ r.daily.forEach(d=>{ dailyRows.push({code:r.code, name:r.name, sale_date:d.date, qty:d.qty, is_rg:false}); }); });
+
+    // 같은 날짜를 하루에 여러 번 업로드하는 경우(예: 점심에 1차, 마감 때 2차)가 있어, daily_sales는
+    // (code,sale_date,is_rg) upsert로 덮어써지지만 monthly_YYYY 누적합에는 새 값을 그냥 더하면 이중
+    // 집계(출고량 뻥튀기)가 된다. 업로드 전 기존 daily_sales 값을 조회해, monthly에는 "증가분(delta)"만
+    // 반영한다 — 재업로드해도 그날 최종 수량으로 정확히 맞춰지고 누적되지 않는다.
+    const oldQtyMap={};   // "code|date" → 업로드 전 daily_sales.qty
+    if(dailyRows.length){
+      const codes=[...new Set(dailyRows.map(d=>d.code))];
+      const dates=[...new Set(dailyRows.map(d=>d.sale_date))];
+      for(let b=0;b<codes.length;b+=200){
+        const {data:oldRows, error:oldErr}=await sb.from('daily_sales').select('code,sale_date,qty')
+          .eq('is_rg', false).in('code', codes.slice(b,b+200)).in('sale_date', dates);
+        if(oldErr){ console.error('ERP 기존 daily_sales 조회 오류', oldErr.message); continue; }
+        (oldRows||[]).forEach(r=>{ oldQtyMap[r.code+'|'+r.sale_date]=r.qty||0; });
+      }
+    }
+
     for(let b=0;b<dailyRows.length;b+=100){
       const {error}=await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100), {onConflict:'code,sale_date,is_rg', ignoreDuplicates:false});
       if(error) console.error('ERP daily_sales 오류', error.message);
@@ -13430,7 +13447,9 @@ async function erpApplyImport(){
       const col='monthly_'+yr;
       if(!monthlyUpd[p.id]) monthlyUpd[p.id]={};
       if(!monthlyUpd[p.id][yr]) monthlyUpd[p.id][yr]=[...(p[col]||Array(12).fill(0))];
-      monthlyUpd[p.id][yr][mIdx]=(monthlyUpd[p.id][yr][mIdx]||0)+dr.qty;
+      const oldQty=oldQtyMap[dr.code+'|'+dr.sale_date]||0;
+      const delta=dr.qty-oldQty;   // 재업로드분은 증가분만 반영 → 이중 누적 방지
+      monthlyUpd[p.id][yr][mIdx]=Math.max(0, (monthlyUpd[p.id][yr][mIdx]||0)+delta);
       if(!YEARS.includes(yr)){ YEARS.push(yr); YEARS.sort((a,b)=>a-b); buildYearSelects(); }
     });
     for(const [id, yrs] of Object.entries(monthlyUpd)){
