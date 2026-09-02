@@ -9325,9 +9325,13 @@ function lsoRenderModal(){
   if(summ) summ.textContent = `전체 ${_lsoRows.length}건 · 소장재고 매칭 ${matchedCount}건 · 적용 예정 ${selCount}건`;
   const list = onlyMatched ? _lsoRows.filter(r=>r.matchId) : _lsoRows;
   body.innerHTML = list.length ? list.map(r=>{
+    // 'ss소장'은 여러 상품이 공유하는 코드라 코드만으로는 특정 상품을 못 정하고, 반드시
+    // 상품명으로 한 번 더 대조해야 한다 — 이 케이스는 라벨에 별도로 명시해서 확실히 보이게 한다.
+    const isSsCode = String(r.code||'').trim().toLowerCase()==='ss소장';
+    const matchLabel = r.matchBy==='code' ? '코드매칭' : (isSsCode ? 'ss소장 → 상품명 재확인' : '이름매칭');
     const stockNote = r.matchId
-      ? `<span class="lso-tag lso-yes">소장재고 있음 · ${r.matchBy==='code'?'코드매칭':'이름매칭'} (${_lbxNum(r.matchQty)})</span>`
-      : `<span class="lso-tag lso-no">—</span>`;
+      ? `<span class="lso-tag lso-yes">소장재고 있음 · ${matchLabel} (${_lbxNum(r.matchQty)})</span>`
+      : (isSsCode ? `<span class="lso-tag lso-no">ss소장 · 상품명 불일치</span>` : `<span class="lso-tag lso-no">—</span>`);
     const nameDisp = r.name ? _logiEsc(r.name)
       : (r.matchId ? `<span style="color:var(--tx2);">(코드로 매칭됨) ${_logiEsc(r.matchName)}</span>` : `<span style="color:var(--tx2);">상품명 없음${r.code?' · 코드 '+_logiEsc(r.code):''}</span>`);
     return `<tr>
@@ -9354,7 +9358,9 @@ async function lsoApply(){
     if(dec<=0) return;
     const to = from-dec;
     c.logs = c.logs || [];
-    c.logs.unshift({ ts:_logiChkNow(), by:_logiChkActor(), from, to, delta:-dec, note:`발주서 대조 차감 · ${r.rowNum}행 · 수취인 ${r.recv||'-'} · ${r.matchBy==='code'?'코드매칭':'이름매칭'}` });
+    const isSsCode = String(r.code||'').trim().toLowerCase()==='ss소장';
+    const matchLabel = r.matchBy==='code' ? '코드매칭' : (isSsCode ? 'ss소장→상품명매칭' : '이름매칭');
+    c.logs.unshift({ ts:_logiChkNow(), by:_logiChkActor(), from, to, delta:-dec, note:`발주서 대조 차감 · ${r.rowNum}행 · 수취인 ${r.recv||'-'} · ${matchLabel}` });
     c.qty = to;
     applied++;
     if(dec < r.qty) insufficient.push(c.name);
