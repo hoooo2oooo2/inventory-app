@@ -1504,6 +1504,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-erp-cell input[type=checkbox]{width:19px;height:19px;cursor:pointer;}
 .lcr-del-btn{border:none;background:none;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1;color:var(--tx2);}
 .lcr-del-btn:hover{color:#DC2626;}
+.lcr-visit-tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:#DCFCE7;color:#15803D;white-space:nowrap;}
 /* 메모장 (글씨 크게) */
 .lh2-memo-status{font-size:11px;color:var(--tx2);font-weight:600;}
 .lh2-memo{flex:1;min-height:140px;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:18px;line-height:1.7;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;word-break:keep-all;overflow-wrap:break-word;}
@@ -2014,7 +2015,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <input id="lcrPhone" placeholder="010-0000-0000" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
       <div>
-        <div class="cl-lbl">주소</div>
+        <div class="cl-lbl" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>주소</span>
+          <label style="display:flex;align-items:center;gap:5px;font-weight:600;font-size:12px;color:var(--tx2);cursor:pointer;">
+            <input type="checkbox" id="lcrVisit" onchange="lcrToggleVisit(this)" style="width:15px;height:15px;cursor:pointer;">방문판매
+          </label>
+        </div>
         <input id="lcrAddr" placeholder="배송지 주소" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
       <div style="position:relative;">
@@ -9519,11 +9525,12 @@ function lcrRender(){
 }
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
+  const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
   return `<tr data-row="${o.id}">
     <td>${_lcrEsc(o.createdAt)}</td>
     <td class="lcr-l">${_lcrEsc(o.customerName)}</td>
     <td>${_lcrEsc(o.phone)}</td>
-    <td class="lcr-l">${_lcrEsc(o.address)}</td>
+    <td class="lcr-l">${addrDisp}</td>
     <td class="lcr-l">${_lcrEsc(o.productName)}</td>
     <td>${_lbxNum(o.qty)}</td>
     <td class="lcr-r">${_lcrWon(o.price)}</td>
@@ -9531,10 +9538,18 @@ function lcrRowHtml(o){
     <td><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
   </tr>`;
 }
+function lcrToggleVisit(cb){
+  const addrEl = document.getElementById('lcrAddr');
+  if(cb.checked){ addrEl.value=''; addrEl.disabled=true; addrEl.placeholder='방문판매 (주소 불필요)'; }
+  else { addrEl.disabled=false; addrEl.placeholder='배송지 주소'; }
+}
 function lcrOpenAdd(){
   document.getElementById('lcrName').value = '';
   document.getElementById('lcrPhone').value = '';
   document.getElementById('lcrAddr').value = '';
+  document.getElementById('lcrAddr').disabled = false;
+  document.getElementById('lcrAddr').placeholder = '배송지 주소';
+  document.getElementById('lcrVisit').checked = false;
   document.getElementById('lcrProdName').value = '';
   document.getElementById('lcrQty').value = '';
   document.getElementById('lcrPrice').value = '';
@@ -9544,13 +9559,14 @@ function lcrOpenAdd(){
 async function lcrSave(){
   const name = (document.getElementById('lcrName').value||'').trim();
   const phone = (document.getElementById('lcrPhone').value||'').trim();
-  const addr = (document.getElementById('lcrAddr').value||'').trim();
+  const visitSale = document.getElementById('lcrVisit').checked;
+  const addr = visitSale ? '' : (document.getElementById('lcrAddr').value||'').trim();
   const productName = (document.getElementById('lcrProdName').value||'').trim();
   const qty = _lbxNum(document.getElementById('lcrQty').value);
   const price = _lbxNum(document.getElementById('lcrPrice').value);
   if(!productName){ toast('제품명을 입력하세요.'); document.getElementById('lcrProdName').focus(); return; }
   const row = { id:_lcrId(), createdAt:_lcrToday(), createdBy:_lcrActor(),
-    customerName:name, phone, address:addr, productName, qty, price,
+    customerName:name, phone, address:addr, visitSale, productName, qty, price,
     erpChecked:false, erpCheckedAt:'', erpCheckedBy:'' };
   let latest = await cloudKvLoad('logi_carrot_orders');
   latest = Array.isArray(latest) ? latest : [];
