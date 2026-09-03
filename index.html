@@ -20564,7 +20564,7 @@ function renderBdTable(){
       <td>${r.supplier||'—'}</td>
       <td>
         <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px;">${(r.comboItems&&r.comboItems.length)?'🧩 ':''}${r.code||''}</code>
-        ${(r.aliasCodes&&r.aliasCodes.length)?`<div class="bd-alias-tag">별칭: ${r.aliasCodes.map(_bdEscHtml).join(', ')}</div>`:''}
+        ${(r.aliasCodes&&r.aliasCodes.length)?`<div class="bd-alias-tag">별칭: ${r.aliasCodes.map(a=>`${_bdEscHtml(a)}<button type="button" onclick="bdUnmergeAlias('${String(r.id).replace(/'/g,"\\'")}','${String(a).replace(/'/g,"\\'")}')" title="분리(되돌리기)" style="border:none;background:transparent;color:var(--tx2);cursor:pointer;font-size:10px;padding:0 2px;">×</button>`).join(', ')}</div>`:''}
       </td>
       <td>${r.type||'—'}</td>
       <td style="font-weight:500;">${r.name||'—'}</td>
@@ -20609,7 +20609,7 @@ function openBdAdd(){
   document.getElementById('bdPrice').value='';
   document.getElementById('bdEditKey').value='';
   document.getElementById('bdEffDateField').style.display='none';
-  _bdAliasChips=[]; bdRenderAliasChips();
+  _bdAliasChips=[]; _bdAliasChipsOriginal=[]; bdRenderAliasChips();
   openModal('bdModal');
 }
 
@@ -20629,7 +20629,7 @@ function openBdEdit(id){
   const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
   document.getElementById('bdEffDate').value=defEffDate;
   document.getElementById('bdEffDateField').style.display='';
-  _bdAliasChips=(r.aliasCodes||[]).slice(); bdRenderAliasChips();
+  _bdAliasChips=(r.aliasCodes||[]).slice(); _bdAliasChipsOriginal=(r.aliasCodes||[]).slice(); bdRenderAliasChips();
   openModal('bdModal');
 }
 
@@ -20895,6 +20895,7 @@ async function resyncRevenueTypes(){
 
 // 별칭코드 chip 편집 상태 (bdModal 열려있는 동안만 유지)
 let _bdAliasChips = [];
+let _bdAliasChipsOriginal = []; // 모달 연 시점의 별칭코드 스냅샷 — 저장 시 이 중 빠진 게 있으면 별도 행으로 되살림
 function bdRenderAliasChips(){
   const box=document.getElementById('bdAliasChips'); if(!box) return;
   box.innerHTML = _bdAliasChips.map((c,i)=>
@@ -20933,6 +20934,13 @@ async function saveBdModal(){
         row = {..._bdData[idx],supplier,type,name,price,aliasCodes};
         await saveBdToSupabase(row, true);
         _bdData[idx] = row;
+        // 이미 저장돼있던 별칭코드를 이번에 빼버렸으면(되돌리기) 그 코드는 별도 행으로 되살림
+        const removedAliases=_bdAliasChipsOriginal.filter(a=>!aliasCodes.includes(a));
+        for(const ac of removedAliases){
+          const spun={code:ac, supplier:row.supplier, type:row.type, name:row.name, price:row.price, aliasCodes:[], comboItems:null};
+          try{ await saveBdToSupabase(spun,false); _bdData.push(spun); }
+          catch(se){ console.warn('별칭 분리 실패:',ac,se); }
+        }
         // 공급가 변경 시 매칭된 revenue 단가·마진 일괄 재계산
         if(price !== oldPrice){
           if(saveBtn) saveBtn.textContent='단가 반영 중...';
@@ -20980,7 +20988,7 @@ function bdRenderMergeHeader(){
   const box=document.getElementById('bdMergeAliasSummary'); if(!box) return;
   const aliases=src.aliasCodes||[];
   box.innerHTML = `<b>${_bdEscHtml(src.code)}</b>` + (aliases.length
-    ? ` = ${aliases.map(a=>`<span class="bd-alias-chip" style="margin-left:4px;">${_bdEscHtml(a)}</span>`).join('')} 합쳐짐`
+    ? ` = ${aliases.map(a=>`<span class="bd-alias-chip" style="margin-left:4px;">${_bdEscHtml(a)}<button type="button" onclick="bdUnmergeAlias('${String(src.id).replace(/'/g,"\\'")}','${String(a).replace(/'/g,"\\'")}')" title="이 코드를 다시 별도 행으로 분리(되돌리기)">×</button></span>`).join('')} 합쳐짐`
     : ` — 아직 합쳐진 별칭 코드 없음`);
 }
 function bdRenderMergeList(){
@@ -21004,7 +21012,14 @@ async function bdMergeConfirm(targetId){
   const src=_bdData.find(x=>String(x.id)===String(_bdMergeSourceId));
   const tgt=_bdData.find(x=>String(x.id)===String(targetId));
   if(!src||!tgt) return;
-  if(!confirm(`"${tgt.name}" (코드: ${tgt.code})를\n"${src.name}" (코드: ${src.code})의 별칭코드로 합칠까요?\n\n합친 뒤 "${tgt.code}" 행은 삭제되고, 앞으로 이 코드로 들어오는 판매·재고 데이터는 전부 "${src.code}" 단가로 매칭됩니다.`)) return;
+  // 병합은 대표행(src)의 단가를 그대로 쓰고, 흡수되는 행(tgt)의 단가는 버려짐 — 서로 다르면 명확히 경고
+  const srcPriceTxt = src.price!=null?Number(src.price).toLocaleString()+'원':'단가없음';
+  const tgtPriceTxt = tgt.price!=null?Number(tgt.price).toLocaleString()+'원':'단가없음';
+  const priceDiffers = (src.price||0)!==(tgt.price||0);
+  const priceWarn = priceDiffers
+    ? `\n\n⚠ 두 단가가 다릅니다 — "${src.code}"(${srcPriceTxt})가 대표 단가로 남고, "${tgt.code}"(${tgtPriceTxt})의 단가는 사라집니다.`
+    : '';
+  if(!confirm(`"${tgt.name}" (코드: ${tgt.code}, ${tgtPriceTxt})를\n"${src.name}" (코드: ${src.code}, ${srcPriceTxt})의 별칭코드로 합칠까요?\n\n합친 뒤 "${tgt.code}" 행은 삭제되고, 앞으로 이 코드로 들어오는 판매·재고 데이터는 전부 "${src.code}" 단가로 매칭됩니다.${priceWarn}`)) return;
   const mergedAliases=[...new Set([...(src.aliasCodes||[]), tgt.code, ...(tgt.aliasCodes||[])].filter(Boolean))];
   const updated={...src, aliasCodes:mergedAliases};
   try{
@@ -21017,8 +21032,30 @@ async function bdMergeConfirm(targetId){
     bdRenderMergeHeader();
     bdRenderMergeList();
     renderBdTable();
-    if(typeof toast==='function') toast(`"${tgt.code}" 코드를 "${updated.code}"의 별칭으로 합쳤습니다. 계속 다른 코드를 더 합칠 수 있습니다.`);
+    if(typeof toast==='function') toast(`"${tgt.code}" 코드를 "${updated.code}"의 별칭으로 합쳤습니다. 계속 다른 코드를 더 합치거나, 상단 별칭 옆 ×로 되돌릴 수 있습니다.`);
   }catch(e){ alert('병합 실패: '+e.message); }
+}
+// 병합/별칭 취소 — 별칭코드를 대표행에서 분리해서 다시 독립된 행으로 되살림
+// (분리된 행은 현재 대표행과 같은 이름·단가·구분으로 새로 생성됨 — 이후 그 코드로 들어오는 데이터는 이 새 행에 매칭됨)
+async function bdUnmergeAlias(primaryId, aliasCode){
+  const src=_bdData.find(x=>String(x.id)===String(primaryId)); if(!src) return;
+  const priceTxt = src.price!=null?Number(src.price).toLocaleString()+'원':'단가없음';
+  if(!confirm(`"${aliasCode}" 코드를 "${src.code}"에서 분리해서 다시 별도 행으로 만들까요?\n\n분리된 행은 "${src.name}"과 같은 값(${priceTxt})으로 새로 생성됩니다.`)) return;
+  const newAliases=(src.aliasCodes||[]).filter(a=>a!==aliasCode);
+  const updatedSrc={...src, aliasCodes:newAliases};
+  const newRow={code:aliasCode, supplier:src.supplier, type:src.type, name:src.name, price:src.price, aliasCodes:[], comboItems:null};
+  try{
+    await saveBdToSupabase(updatedSrc,true);
+    await saveBdToSupabase(newRow,false);
+    const si=_bdData.findIndex(x=>String(x.id)===String(src.id));
+    if(si>=0) _bdData[si]=updatedSrc;
+    _bdData.push(newRow);
+    addHistory({menu:'매출관리',type:'edit',code:updatedSrc.code,name:updatedSrc.name,desc:`코드 병합 취소 (${aliasCode} 분리)`,before:'별칭',after:'분리',user:'수동'});
+    bdRenderMergeHeader();
+    bdRenderMergeList();
+    renderBdTable();
+    if(typeof toast==='function') toast(`"${aliasCode}" 코드를 별도 행으로 분리했습니다.`);
+  }catch(e){ alert('분리 실패: '+e.message); }
 }
 
 // ── 세트(조합)상품 등록/수정 ──
