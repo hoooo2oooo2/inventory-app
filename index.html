@@ -5288,6 +5288,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <span style="font-size:11px;color:var(--tx2);">클릭 시 반영 시작일 입력 — 그 이전 통합·일일보고 데이터는 기존 단가로 유지</span>
         <button class="btn btn-sm" onclick="resyncRevenueTypes()" style="background:#7C3AED;color:#fff;border:none;" title="현재 백데이터 '구분'을 통합 데이터 전체(날짜 제한 없음)에 일괄 반영합니다. 단가·마진은 변경하지 않습니다">🏷️ 구분 수정</button>
         <span style="font-size:11px;color:var(--tx2);">구분만 전체 기간에 적용 (날짜 제한 없음)</span>
+        <button class="btn btn-sm" onclick="openBdDedupe()" style="background:#DC2626;color:#fff;border:none;" title="코드·구분·상품명·공급가 4개가 전부 동일한 행을 찾아 1개만 남기고 정리합니다">🧹 중복 정리</button>
       </div>
       <div class="rev-tbl-card">
         <div class="tw">
@@ -6440,6 +6441,19 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ma">
       <button class="btn" onclick="closeModal('bdComboModal')">취소</button>
       <button class="btn btn-pr" onclick="saveBdCombo()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 백데이터 중복 정리 모달 -->
+<div class="modal-overlay" id="bdDedupeModal">
+  <div class="modal" style="max-width:600px;max-height:80vh;overflow-y:auto;">
+    <h3>🧹 중복 정리</h3>
+    <div style="font-size:11.5px;color:var(--tx2);margin-bottom:10px;">코드·구분·상품명·공급가 4개가 전부 동일한 행만 중복으로 판단합니다. 이 중 하나라도 다르면 중복으로 처리하지 않습니다.</div>
+    <div id="bdDedupeList" style="max-height:50vh;overflow-y:auto;"></div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('bdDedupeModal')">취소</button>
+      <button class="btn btn-pr" id="bdDedupeConfirmBtn" onclick="bdConfirmDedupe()" style="background:#DC2626;">중복 삭제 실행</button>
     </div>
   </div>
 </div>
@@ -21056,6 +21070,83 @@ async function bdUnmergeAlias(primaryId, aliasCode){
     renderBdTable();
     if(typeof toast==='function') toast(`"${aliasCode}" 코드를 별도 행으로 분리했습니다.`);
   }catch(e){ alert('분리 실패: '+e.message); }
+}
+
+// ── 완전 중복행 정리 (코드·구분·상품명·공급가 4개가 전부 동일한 경우만) ──
+// 별칭코드 병합(다른 코드·같은 상품)과는 다른 케이스 — 여긴 코드까지 완전히 똑같은 진짜 중복행.
+let _bdDedupeGroups=[];
+function _bdDedupeKey(r){
+  return [(r.code||'').trim().toLowerCase(), (r.type||'').trim(), (r.name||'').trim(), r.price!=null?String(r.price):''].join('');
+}
+function bdFindDuplicateGroups(){
+  const groups={};
+  _bdData.forEach(r=>{
+    if(r.comboItems && r.comboItems.length) return; // 세트상품은 대상에서 제외
+    const k=_bdDedupeKey(r);
+    (groups[k]=groups[k]||[]).push(r);
+  });
+  return Object.values(groups).filter(g=>g.length>1);
+}
+function openBdDedupe(){
+  _bdDedupeGroups=bdFindDuplicateGroups();
+  const box=document.getElementById('bdDedupeList');
+  if(!_bdDedupeGroups.length){
+    box.innerHTML=`<div style="padding:20px;text-align:center;color:var(--tx2);font-size:12.5px;">코드·구분·상품명·공급가가 전부 동일한 중복 행이 없습니다.</div>`;
+    document.getElementById('bdDedupeConfirmBtn').style.display='none';
+  } else {
+    document.getElementById('bdDedupeConfirmBtn').style.display='';
+    const dupRowCount=_bdDedupeGroups.reduce((a,g)=>a+g.length-1,0);
+    box.innerHTML = `<div style="font-size:12px;font-weight:600;margin-bottom:8px;">${_bdDedupeGroups.length}개 그룹, 총 ${dupRowCount}개 행이 삭제 대상입니다.</div>`
+      + _bdDedupeGroups.map(g=>{
+        const keeper=_bdDedupeKeeper(g);
+        return `<div style="border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+          <div style="font-size:12px;font-weight:600;">${_bdEscHtml(keeper.name)} <code style="font-weight:400;color:var(--tx2);">${_bdEscHtml(keeper.code)}</code> · ${_bdEscHtml(keeper.type||'—')} · ${keeper.price!=null?Number(keeper.price).toLocaleString()+'원':'—'}</div>
+          <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">✅ 유지: 1개 (id:${_bdEscHtml(String(keeper.id))}) &nbsp;·&nbsp; 🗑 삭제: ${g.length-1}개</div>
+        </div>`;
+      }).join('');
+  }
+  openModal('bdDedupeModal');
+}
+// 그룹 내에서 남길 1개 선택 — supplier가 채워진 쪽, 별칭코드가 더 많은 쪽 우선, 그 외엔 첫 번째
+function _bdDedupeKeeper(group){
+  return group.slice().sort((a,b)=>{
+    const sa=(a.supplier||'').trim()?1:0, sb=(b.supplier||'').trim()?1:0;
+    if(sa!==sb) return sb-sa;
+    const aa=(a.aliasCodes||[]).length, ab=(b.aliasCodes||[]).length;
+    if(aa!==ab) return ab-aa;
+    return 0;
+  })[0];
+}
+async function bdConfirmDedupe(){
+  if(!_bdDedupeGroups.length) return;
+  const dupRowCount=_bdDedupeGroups.reduce((a,g)=>a+g.length-1,0);
+  if(!confirm(`${_bdDedupeGroups.length}개 그룹, 총 ${dupRowCount}개 행을 삭제합니다.\n각 그룹당 1개만 남기고, 나머지 행의 별칭코드는 남는 행으로 옮겨진 뒤 삭제됩니다.\n\n계속할까요?`)) return;
+  const btn=document.getElementById('bdDedupeConfirmBtn');
+  btn.disabled=true; btn.textContent='정리 중...';
+  let deleted=0;
+  try{
+    for(const g of _bdDedupeGroups){
+      const keeper=_bdDedupeKeeper(g);
+      const others=g.filter(r=>r.id!==keeper.id);
+      const mergedAliases=[...new Set([...(keeper.aliasCodes||[]), ...others.flatMap(o=>[o.code, ...(o.aliasCodes||[])])].filter(Boolean).filter(c=>c.toLowerCase()!==keeper.code.toLowerCase()))];
+      const updatedKeeper={...keeper, aliasCodes:mergedAliases};
+      await saveBdToSupabase(updatedKeeper, true);
+      for(const o of others){ await deleteBdFromSupabase(o.id); deleted++; }
+      const ki=_bdData.findIndex(x=>x.id===keeper.id);
+      if(ki>=0) _bdData[ki]=updatedKeeper;
+      const otherIds=new Set(others.map(o=>o.id));
+      _bdData=_bdData.filter(x=>!otherIds.has(x.id));
+      addHistory({menu:'매출관리',type:'edit',code:updatedKeeper.code,name:updatedKeeper.name,desc:`중복 정리 (${others.length}건 삭제)`,before:`${g.length}건`,after:'1건',user:'수동'});
+    }
+    closeModal('bdDedupeModal');
+    renderBdTable();
+    alert(`완료: ${deleted}건의 중복 행을 정리했습니다.`);
+  }catch(e){
+    alert('중복 정리 중 오류: '+e.message+'\n일부만 처리됐을 수 있으니 목록을 다시 확인해주세요.');
+    renderBdTable();
+  }finally{
+    btn.disabled=false; btn.textContent='중복 삭제 실행';
+  }
 }
 
 // ── 세트(조합)상품 등록/수정 ──
