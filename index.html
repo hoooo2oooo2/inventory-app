@@ -9633,8 +9633,10 @@ function lcrUnitCost(productName){
   const bd=(typeof _bdData!=='undefined'?_bdData:[]).find(r=>(r.name||'').trim()===nm);
   return (bd && bd.price!=null) ? Number(bd.price) : null;
 }
+// 공급가는 주문 등록/수정 시점에 백데이터에서 스냅샷으로 떠서 o.unitCost에 저장해둔 값을 그대로 씀
+// (백데이터 단가가 나중에 바뀌어도 이미 등록된 주문건의 공급가는 그대로 유지되어야 마진이 안 틀어짐)
 function lcrCostCell(o){
-  const unit=lcrUnitCost(o.productName);
+  const unit=o.unitCost;
   if(unit==null) return '<span style="color:var(--tx2);">—</span>';
   const qty=Number(o.qty)||0;
   if(qty>1){
@@ -9709,10 +9711,14 @@ async function lcrSave(){
   if(editId){
     const idx = latest.findIndex(o=>o.id===editId);
     if(idx<0){ toast('수정할 주문건을 찾을 수 없습니다.'); return; }
-    latest[idx] = {...latest[idx], customerName:name, phone, address:addr, visitSale, productName, qty, price};
+    // 제품명을 바꾼 경우에만 공급가를 새로 스냅샷 — 그 외 필드(고객명 등)만 고친 거면
+    // 기존에 저장해둔 공급가를 그대로 유지해야 백데이터 단가가 나중에 바뀌어도 이 주문건은 안 흔들림
+    const unitCost = (productName !== latest[idx].productName) ? lcrUnitCost(productName) : latest[idx].unitCost;
+    latest[idx] = {...latest[idx], customerName:name, phone, address:addr, visitSale, productName, qty, price, unitCost};
   } else {
+    const unitCost = lcrUnitCost(productName);
     const row = { id:_lcrId(), createdAt:_lcrToday(), createdBy:_lcrActor(),
-      customerName:name, phone, address:addr, visitSale, productName, qty, price,
+      customerName:name, phone, address:addr, visitSale, productName, qty, price, unitCost,
       erpChecked:false, erpCheckedAt:'', erpCheckedBy:'' };
     latest.push(row);
   }
