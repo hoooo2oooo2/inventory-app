@@ -21295,13 +21295,13 @@ function bdComboItemSearch(){
   const list=_bdData.filter(r=>!(r.comboItems&&r.comboItems.length) &&
     ((r.code||'').toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q))
   ).slice(0,30);
-  if(!list.length){ box.innerHTML=`<div class="bd-combo-drop-empty">"${_bdEscHtml(q)}" 검색 결과가 없습니다.</div>`; box.style.display=''; return; }
+  if(!list.length){ box.innerHTML=`<div class="bd-combo-drop-empty">"${_bdEscHtml(q)}" 검색 결과가 없습니다.</div>`; box.style.display='block'; return; }
   box.innerHTML=list.map(r=>`
     <div class="bd-combo-drop-row" onmousedown="event.preventDefault();bdComboItemPick('${String(r.code||'').replace(/'/g,"\\'")}')">
       <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_bdEscHtml(r.name||'')} <code style="color:var(--tx2);">${_bdEscHtml(r.code||'')}</code></div>
       <div style="flex-shrink:0;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</div>
     </div>`).join('');
-  box.style.display='';
+  box.style.display='block';
 }
 function bdComboItemPick(code){
   document.getElementById('bdComboItemCode').value=code;
