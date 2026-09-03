@@ -881,6 +881,18 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .cmb-cat-add{padding:4px 10px;border:1px dashed var(--bd);border-radius:14px;background:transparent;color:var(--tx2);font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .cmb-cat-add:hover{border-color:#059669;color:#059669;}
 .cmb-cat-tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#FEF3C7;color:#B45309;margin-right:6px;vertical-align:middle;}
+/* 백데이터 — 별칭코드 chip / 세트(조합)상품 UI */
+.bd-alias-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 9px;border-radius:11px;background:#EEF4FF;color:#2563EB;font-size:11px;font-weight:600;white-space:nowrap;}
+.bd-alias-chip button{border:none;background:transparent;color:#2563EB;cursor:pointer;font-size:13px;line-height:1;padding:0 2px;}
+.bd-alias-tag{font-size:10px;color:var(--tx2);margin-top:2px;}
+.bd-combo-item-row{display:grid;grid-template-columns:1fr 90px 100px 28px;gap:6px;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--bd);font-size:12px;}
+.bd-combo-total{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-weight:700;font-size:14px;}
+.bd-merge-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 6px;border-radius:8px;cursor:pointer;transition:background .12s;}
+.bd-merge-row:hover{background:var(--bg2);}
+.bd-combo-dropdown{display:none;position:absolute;left:0;right:0;top:calc(100% - 2px);max-height:240px;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:50;}
+.bd-combo-drop-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:12px;}
+.bd-combo-drop-row:hover{background:var(--bg2);}
+.bd-combo-drop-empty{padding:10px;text-align:center;color:var(--tx2);font-size:11.5px;}
 /* 조합 계산기 — 선택 제품 리스트 상단 KPI 카드(빠른 세트 추가) 바 */
 .cmb-kpi-bar{display:flex;gap:8px;padding:10px 12px;border-bottom:0.5px solid var(--bd);overflow-x:auto;flex-shrink:0;scrollbar-width:thin;}
 .cmb-kpi-bar::-webkit-scrollbar{height:6px;}
@@ -5266,13 +5278,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
             <input type="text" id="bdSrch" placeholder="코드, 상품명 검색..." oninput="renderBdTable()">
           </div>
           <button class="btn btn-pr btn-sm" onclick="openBdAdd()">+ 새 코드 추가</button>
+          <button class="btn btn-sm" onclick="openBdComboAdd()" style="background:#0D9488;color:#fff;border:none;" title="여러 제품을 묶은 세트(조합)상품을 등록합니다. 구성품 단가가 바뀌면 세트단가도 자동으로 재계산됩니다.">🧩 세트제품 등록</button>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
         <button class="btn btn-sm" onclick="downloadBackdataExcel()" style="background:#059669;color:#fff;border:none;">📥 엑셀 다운로드</button>
         <button class="btn btn-sm" onclick="openBdUpload()" style="background:#3182F6;color:#fff;border:none;">📤 엑셀 수정·업로드</button>
-        <button class="btn btn-sm" onclick="resyncRevenuePrices()" style="background:#D97706;color:#fff;border:none;" title="현재 백데이터 단가로 통합 데이터(올해 이번달~)의 단가·마진을 일괄 재계산합니다">🔄 통합 단가 일괄 반영</button>
-        <span style="font-size:11px;color:var(--tx2);">이번 달 1일부터 데이터에 현재 단가 적용</span>
+        <button class="btn btn-sm" onclick="resyncRevenuePrices()" style="background:#D97706;color:#fff;border:none;" title="현재 백데이터 단가로 통합 데이터의 단가·마진을 일괄 재계산합니다. 반영 시작일을 직접 지정할 수 있습니다(그 이전 데이터는 유지)">🔄 통합 단가 일괄 반영</button>
+        <span style="font-size:11px;color:var(--tx2);">클릭 시 반영 시작일 입력 — 그 이전 통합·일일보고 데이터는 기존 단가로 유지</span>
         <button class="btn btn-sm" onclick="resyncRevenueTypes()" style="background:#7C3AED;color:#fff;border:none;" title="현재 백데이터 '구분'을 통합 데이터 전체(날짜 제한 없음)에 일괄 반영합니다. 단가·마진은 변경하지 않습니다">🏷️ 구분 수정</button>
         <span style="font-size:11px;color:var(--tx2);">구분만 전체 기간에 적용 (날짜 제한 없음)</span>
       </div>
@@ -6354,6 +6367,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="field"><label>공급가(단가, 원)</label><input id="bdPrice" type="number" min="0" placeholder="0"></div>
     </div>
     <div class="field"><label>상품명 *</label><input id="bdName" placeholder="상품명을 입력하세요"></div>
+    <div class="field">
+      <label>별칭 코드 (같은 상품, 다른 곳에서 쓰는 코드)</label>
+      <div style="display:flex;gap:6px;">
+        <input id="bdAliasInput" placeholder="예: J-1206" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();bdAddAliasChip();}">
+        <button type="button" class="btn btn-sm" onclick="bdAddAliasChip()">추가</button>
+      </div>
+      <div id="bdAliasChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div>
+      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">재고관리 코드/판매처 코드처럼 이름·단가가 같은데 코드만 다른 경우, 여기에 추가하면 어느 코드로 판매가 들어와도 이 단가로 매칭됩니다.</div>
+    </div>
     <div class="field" id="bdEffDateField" style="display:none;">
       <label>공급가 변경 반영 시작일</label>
       <input id="bdEffDate" type="date">
@@ -6362,6 +6384,62 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ma">
       <button class="btn" onclick="closeModal('bdModal')">취소</button>
       <button class="btn btn-pr" onclick="saveBdModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 백데이터 코드 병합 모달 -->
+<div class="modal-overlay" id="bdMergeModal">
+  <div class="modal" style="max-width:440px;">
+    <h3 id="bdMergeTitle">🔗 코드 병합</h3>
+    <div style="font-size:11.5px;color:var(--tx2);margin-bottom:8px;">같은 상품인데 코드만 다른 행을 선택하면, 선택한 행이 이 행의 별칭코드로 합쳐지고 삭제됩니다. 계속 선택해서 3개 이상도 하나로 합칠 수 있습니다.</div>
+    <div id="bdMergeAliasSummary" style="font-size:11.5px;margin-bottom:8px;"></div>
+    <div class="search-box" style="margin-bottom:8px;">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input type="text" id="bdMergeSrch" placeholder="코드, 상품명 검색..." oninput="bdRenderMergeList()">
+    </div>
+    <div id="bdMergeList" style="max-height:320px;overflow-y:auto;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('bdMergeModal');renderBdTable();">닫기</button></div>
+  </div>
+</div>
+
+<!-- 세트(조합)상품 등록/수정 모달 -->
+<div class="modal-overlay" id="bdComboModal">
+  <div class="modal" style="max-width:560px;">
+    <h3 id="bdComboModalTitle">🧩 세트제품 등록</h3>
+    <input type="hidden" id="bdComboEditKey">
+    <input type="hidden" id="bdComboOldPrice">
+    <div id="bdComboOldPriceHint" style="display:none;font-size:11.5px;background:#FEF3C7;color:#92400E;padding:7px 10px;border-radius:8px;margin-bottom:8px;"></div>
+    <div class="field-grid">
+      <div class="field">
+        <label>세트코드 *</label>
+        <input id="bdComboCode" placeholder="예: SET-001" oninput="bdComboCodeChanged()">
+        <div id="bdComboCodeWarn" style="display:none;color:#DC2626;font-size:10.5px;margin-top:3px;"></div>
+      </div>
+      <div class="field"><label>구분</label><select id="bdComboType"></select></div>
+    </div>
+    <div class="field"><label>세트상품명 *</label><input id="bdComboName" placeholder="세트상품명을 입력하세요"></div>
+    <div class="field" style="position:relative;">
+      <label>구성품 추가</label>
+      <div style="display:flex;gap:6px;">
+        <input id="bdComboItemCode" placeholder="상품명 또는 코드로 검색" autocomplete="off" style="flex:1;" oninput="bdComboItemSearch()" onfocus="bdComboItemSearch()">
+        <span id="bdComboItemName" style="flex:1.4;font-size:12px;color:var(--tx2);align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+        <input id="bdComboItemQty" type="number" min="1" value="1" style="width:60px;" placeholder="수량">
+        <button type="button" class="btn btn-sm" onclick="bdComboAddItem()">추가</button>
+      </div>
+      <div id="bdComboItemDropdown" class="bd-combo-dropdown"></div>
+      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">여러 다른 제품을 묶은 세트뿐 아니라, 같은 제품을 2개·3개 묶은 "N개입" 상품 등록에도 쓸 수 있습니다 — 그 제품 1개만 추가하고 수량을 2·3으로 넣으면 됩니다.</div>
+    </div>
+    <div id="bdComboItemList" style="max-height:220px;overflow-y:auto;margin-top:4px;"></div>
+    <div class="bd-combo-total"><span>세트단가 합계</span><span id="bdComboTotal">0원</span></div>
+    <div class="field" id="bdComboEffDateField" style="display:none;">
+      <label>공급가 변경 반영 시작일</label>
+      <input id="bdComboEffDate" type="date">
+      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">구성품 합계가 기존 단가와 달라지면, 선택한 날짜부터의 통합 데이터에 새 세트단가·마진이 반영됩니다.</div>
+    </div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('bdComboModal')">취소</button>
+      <button class="btn btn-pr" onclick="saveBdCombo()">저장</button>
     </div>
   </div>
 </div>
@@ -14666,7 +14744,9 @@ async function loadBackdata(){
       supplier: r.supplier||'',
       type: r.item_type||'',
       name: r.name||'',
-      price: r.price!=null?Number(r.price):null
+      price: r.price!=null?Number(r.price):null,
+      aliasCodes: Array.isArray(r.alias_codes)?r.alias_codes.filter(Boolean):[],
+      comboItems: Array.isArray(r.combo_items)?r.combo_items:null
     }));
     _bdLoaded = true;
     renderBdTable();
@@ -14700,6 +14780,8 @@ async function saveBdToSupabase(row, isEdit){
     item_type: row.type||null,
     name: row.name,
     price: row.price!=null?row.price:null,
+    alias_codes: Array.isArray(row.aliasCodes)?row.aliasCodes:[],
+    combo_items: Array.isArray(row.comboItems)?row.comboItems:null,
     updated_at: new Date().toISOString()
   };
   if(isEdit && row.id){
@@ -20465,7 +20547,7 @@ function renderBdTable(){
   }
   const typeFilter=typeSel?typeSel.value:'ALL';
   const filtered = _bdData.filter(r=>
-    (!srch || (r.code||'').toLowerCase().includes(srch) || (r.name||'').toLowerCase().includes(srch))
+    (!srch || (r.code||'').toLowerCase().includes(srch) || (r.name||'').toLowerCase().includes(srch) || (r.aliasCodes||[]).some(ac=>String(ac).toLowerCase().includes(srch)))
     && (typeFilter==='ALL' || (r.type||'')===typeFilter)
   );
   const tbody = document.getElementById('bdTbody');
@@ -20480,7 +20562,10 @@ function renderBdTable(){
   tbody.innerHTML = filtered.map(r=>`
     <tr>
       <td>${r.supplier||'—'}</td>
-      <td><code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px;">${r.code||''}</code></td>
+      <td>
+        <code style="font-size:11px;background:var(--bg2);padding:1px 5px;border-radius:4px;">${(r.comboItems&&r.comboItems.length)?'🧩 ':''}${r.code||''}</code>
+        ${(r.aliasCodes&&r.aliasCodes.length)?`<div class="bd-alias-tag">별칭: ${r.aliasCodes.map(_bdEscHtml).join(', ')}</div>`:''}
+      </td>
       <td>${r.type||'—'}</td>
       <td style="font-weight:500;">${r.name||'—'}</td>
       <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</td>
@@ -20488,7 +20573,11 @@ function renderBdTable(){
         <input type="number" min="1" value="${bdQtyMultiplier(r.code)}" style="width:48px;text-align:center;padding:3px 4px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);font-size:12px;"
           onchange="bdSetPackMultiplier('${String(r.code||'').replace(/'/g,"\\'")}', this.value)">
       </td>
-      <td style="text-align:center;"><button class="btn btn-sm" onclick="openBdEdit('${String(r.id).replace(/'/g,"\\'")}')">수정</button></td>
+      <td style="text-align:center;white-space:nowrap;">
+        <button class="btn btn-sm" onclick="openBdEdit('${String(r.id).replace(/'/g,"\\'")}')">수정</button>
+        ${(r.comboItems&&r.comboItems.length)?'':`<button class="btn btn-sm" onclick="openBdMerge('${String(r.id).replace(/'/g,"\\'")}')" title="같은 상품, 다른 코드로 등록된 행을 이 행에 별칭코드로 합칩니다">🔗 병합</button>`}
+        ${(r.comboItems&&r.comboItems.length)?'':`<button class="btn btn-sm" onclick="openBdConvertToCombo('${String(r.id).replace(/'/g,"\\'")}')" title="공급가를 수기로 합산해둔 코드를 구성품 기반 세트(조합)로 전환합니다">🧩 세트전환</button>`}
+      </td>
     </tr>`).join('');
 }
 
@@ -20520,12 +20609,14 @@ function openBdAdd(){
   document.getElementById('bdPrice').value='';
   document.getElementById('bdEditKey').value='';
   document.getElementById('bdEffDateField').style.display='none';
+  _bdAliasChips=[]; bdRenderAliasChips();
   openModal('bdModal');
 }
 
 function openBdEdit(id){
   const r = _bdData.find(x=>String(x.id)===String(id));
   if(!r) return;
+  if(Array.isArray(r.comboItems) && r.comboItems.length){ openBdComboEdit(id); return; }
   document.getElementById('bdModalTitle').textContent='코드 수정';
   document.getElementById('bdCode').value=r.code||'';
   document.getElementById('bdCode').disabled=true;
@@ -20538,6 +20629,7 @@ function openBdEdit(id){
   const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
   document.getElementById('bdEffDate').value=defEffDate;
   document.getElementById('bdEffDateField').style.display='';
+  _bdAliasChips=(r.aliasCodes||[]).slice(); bdRenderAliasChips();
   openModal('bdModal');
 }
 
@@ -20569,9 +20661,11 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
       if(error) throw error;
       revRows=(data||[]).filter(r=>normName(r.model_name)===bdNameKey);
     } else {
+      // 대표코드 + 별칭코드(aliasCodes) 전부 대상 — 코드가 달라도 같은 상품이면 함께 반영
+      const codes=[code, ...((bdRow.aliasCodes||[]).map(c=>String(c||'')).filter(Boolean))];
       const {data,error}=await sb.from('revenue')
         .select('id,order_qty,settlement,shipping_fee,sale_date,year')
-        .eq('item_code',code)
+        .in('item_code', codes)
         .eq('year', curYear)
         .gte('sale_date', monthMD);
       if(error) throw error;
@@ -20604,19 +20698,74 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
   return updates.length;
 }
 
+// ── 세트(조합)상품 단가 자동 재계산 ──
+// changedCode가 구성품으로 들어있는 모든 세트 행의 unitPrice·합계(price)를 최신화하고,
+// 개별 저장(단가 수정 모달)에서 호출되면 revenue에도 바로 전파한다.
+async function recalcComboRowsUsingCode(changedCode, effDate){
+  const key=(changedCode||'').toLowerCase(); if(!key) return;
+  const bdMap=getBdMap();
+  for(const row of _bdData){
+    if(!Array.isArray(row.comboItems) || !row.comboItems.length) continue;
+    if(!row.comboItems.some(it=>String(it.code||'').toLowerCase()===key)) continue;
+    const oldPrice=row.price;
+    let changed=false;
+    row.comboItems = row.comboItems.map(it=>{
+      const src=bdMap[String(it.code||'').toLowerCase()];
+      const latest = src && src.price!=null ? src.price : it.unitPrice;
+      if(latest!==it.unitPrice) changed=true;
+      return {...it, unitPrice:latest};
+    });
+    const newPrice = row.comboItems.reduce((a,it)=>a+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0);
+    if(newPrice===oldPrice && !changed) continue;
+    row.price=newPrice;
+    try{
+      await saveBdToSupabase(row, true);
+      await propagateBdPriceChange(row, oldPrice, effDate);
+    }catch(e){ console.warn('세트상품 자동 재계산 저장 실패:',row.code,e); }
+  }
+  renderBdTable();
+}
+// 전체 세트 행을 현재 _bdData 기준으로 재계산·저장만 함(전파는 뒤따르는 resyncRevenuePrices가 처리)
+async function recalcAllComboPrices(){
+  const bdMap=getBdMap();
+  for(const row of _bdData){
+    if(!Array.isArray(row.comboItems) || !row.comboItems.length) continue;
+    let changed=false;
+    row.comboItems = row.comboItems.map(it=>{
+      const src=bdMap[String(it.code||'').toLowerCase()];
+      const latest = src && src.price!=null ? src.price : it.unitPrice;
+      if(latest!==it.unitPrice) changed=true;
+      return {...it, unitPrice:latest};
+    });
+    const newPrice = row.comboItems.reduce((a,it)=>a+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0);
+    if(newPrice===row.price && !changed) continue;
+    row.price=newPrice;
+    try{ await saveBdToSupabase(row, true); }
+    catch(e){ console.warn('세트상품 일괄 재계산 저장 실패:',row.code,e); }
+  }
+}
+
 // 현재 백데이터 단가로 통합 데이터(올해, 이번달 1일~) 단가·마진 일괄 재계산
 async function resyncRevenuePrices(){
   if(!_bdData || !_bdData.length){ await loadBackdata(); }
   if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
   const today=new Date();
-  const curYear=today.getFullYear();
-  const monthMD=`${String(today.getMonth()+1).padStart(2,'0')}-01`;
-  if(!confirm(`현재 백데이터 단가를 통합 데이터에 일괄 반영합니다.\n대상: ${curYear}년 ${parseInt(monthMD)}월 1일 이후 전체\n\n진행할까요?`)) return;
+  const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  // 단가 인하/인상이 특정일부터 적용되는 경우를 위해 반영 시작일을 직접 지정 가능하게 함
+  // (그 이전 날짜의 통합·일일보고 데이터는 옛 단가로 그대로 유지됨)
+  const effInput=(prompt('몇 월 며칠 데이터부터 새 단가를 반영할까요?\n(그 이전 통합·일일보고 데이터는 기존 단가로 그대로 유지됩니다)\nYYYY-MM-DD 형식으로 입력하세요.', defEffDate)||'').trim();
+  if(!effInput) return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(effInput)){ alert('날짜 형식이 올바르지 않습니다. 예: 2026-09-07'); return; }
+  const curYear=parseInt(effInput.slice(0,4),10);
+  const monthMD=effInput.slice(5);
+  if(!confirm(`현재 백데이터 단가를 통합 데이터에 일괄 반영합니다.\n대상: ${curYear}년 ${parseInt(monthMD.slice(0,2))}월 ${parseInt(monthMD.slice(3,5))}일 이후 전체 (그 이전 데이터는 유지)\n\n진행할까요?`)) return;
+  await recalcAllComboPrices();
 
-  // 백데이터 맵
+  // 백데이터 맵 (대표코드 + 별칭코드 모두 포함)
   const bdMap={}; const bdNameMap={};
   _bdData.forEach(r=>{
     bdMap[(r.code||'').toLowerCase()]=r;
+    (r.aliasCodes||[]).forEach(ac=>{ if(ac) bdMap[String(ac).toLowerCase()]=r; });
     if(r.name){
       const k=normName(r.name);
       const ck=(r.code||'').toLowerCase();
@@ -20744,6 +20893,23 @@ async function resyncRevenueTypes(){
   }
 }
 
+// 별칭코드 chip 편집 상태 (bdModal 열려있는 동안만 유지)
+let _bdAliasChips = [];
+function bdRenderAliasChips(){
+  const box=document.getElementById('bdAliasChips'); if(!box) return;
+  box.innerHTML = _bdAliasChips.map((c,i)=>
+    `<span class="bd-alias-chip">${_bdEscHtml(c)}<button type="button" onclick="bdRemoveAliasChip(${i})" title="삭제">×</button></span>`
+  ).join('') || `<span style="font-size:11px;color:var(--tx2);">등록된 별칭 코드 없음</span>`;
+}
+function bdAddAliasChip(){
+  const inp=document.getElementById('bdAliasInput'); if(!inp) return;
+  const v=(inp.value||'').trim(); if(!v) return;
+  if(_bdAliasChips.some(c=>c.toLowerCase()===v.toLowerCase())){ inp.value=''; return; }
+  _bdAliasChips.push(v); inp.value=''; bdRenderAliasChips();
+}
+function bdRemoveAliasChip(i){ _bdAliasChips.splice(i,1); bdRenderAliasChips(); }
+function _bdEscHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 async function saveBdModal(){
   const code = document.getElementById('bdCode').value.trim();
   const supplier = document.getElementById('bdSupplier').value.trim();
@@ -20751,6 +20917,7 @@ async function saveBdModal(){
   const name = document.getElementById('bdName').value.trim();
   const price = document.getElementById('bdPrice').value!==''?parseFloat(document.getElementById('bdPrice').value):null;
   const editKey = document.getElementById('bdEditKey').value;
+  const aliasCodes = _bdAliasChips.slice();
   if(!code){alert('전체상품코드를 입력하세요.');return;}
   if(!name){alert('상품명을 입력하세요.');return;}
 
@@ -20763,7 +20930,7 @@ async function saveBdModal(){
       const idx = _bdData.findIndex(x=>String(x.id)===String(editKey));
       if(idx>=0){
         const oldPrice = _bdData[idx].price;
-        row = {..._bdData[idx],supplier,type,name,price};
+        row = {..._bdData[idx],supplier,type,name,price,aliasCodes};
         await saveBdToSupabase(row, true);
         _bdData[idx] = row;
         // 공급가 변경 시 매칭된 revenue 단가·마진 일괄 재계산
@@ -20773,14 +20940,17 @@ async function saveBdModal(){
           try{
             const cnt=await propagateBdPriceChange(row, oldPrice, effDate);
             if(cnt>0) console.log(`백데이터 단가 변경 → revenue ${cnt}건 업데이트`);
+            // 이 코드를 구성품으로 쓰는 세트상품이 있으면 세트단가도 같이 재계산
+            await recalcComboRowsUsingCode(row.code, effDate);
+            for(const ac of aliasCodes) await recalcComboRowsUsingCode(ac, effDate);
           } catch(pe){ console.warn('단가 전파 실패:',pe); }
         }
       }
     } else {
-      // ss소장 코드만 중복 허용 (다른 코드는 중복 불가)
-      const isDuplicate = _bdData.find(x=>x.code===code);
-      if(isDuplicate && code!=='ss소장'){alert('이미 존재하는 코드입니다.');return;}
-      row = {code,supplier,type,name,price};
+      // ss소장 코드만 중복 허용 (다른 코드는 중복 불가) — 별칭코드로 이미 쓰이는 코드도 차단
+      const isDuplicate = findBdByAnyCode(code);
+      if(isDuplicate && code!=='ss소장'){alert('이미 존재하는 코드입니다(별칭코드로 등록돼 있을 수 있습니다).');return;}
+      row = {code,supplier,type,name,price,aliasCodes};
       await saveBdToSupabase(row, false);
       _bdData.push(row);
     }
@@ -20792,6 +20962,269 @@ async function saveBdModal(){
   } finally {
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='저장';}
   }
+}
+
+// ── 코드 병합 (같은 상품, 다른 코드를 별칭코드로 합치기) ──
+let _bdMergeSourceId=null;
+function openBdMerge(id){
+  const src=_bdData.find(x=>String(x.id)===String(id)); if(!src) return;
+  _bdMergeSourceId=id;
+  document.getElementById('bdMergeSrch').value='';
+  bdRenderMergeHeader();
+  bdRenderMergeList();
+  openModal('bdMergeModal');
+}
+function bdRenderMergeHeader(){
+  const src=_bdData.find(x=>String(x.id)===String(_bdMergeSourceId)); if(!src) return;
+  document.getElementById('bdMergeTitle').textContent=`🔗 "${src.name||src.code}" 코드 병합`;
+  const box=document.getElementById('bdMergeAliasSummary'); if(!box) return;
+  const aliases=src.aliasCodes||[];
+  box.innerHTML = `<b>${_bdEscHtml(src.code)}</b>` + (aliases.length
+    ? ` = ${aliases.map(a=>`<span class="bd-alias-chip" style="margin-left:4px;">${_bdEscHtml(a)}</span>`).join('')} 합쳐짐`
+    : ` — 아직 합쳐진 별칭 코드 없음`);
+}
+function bdRenderMergeList(){
+  const q=(document.getElementById('bdMergeSrch')?.value||'').toLowerCase();
+  const box=document.getElementById('bdMergeList'); if(!box) return;
+  const list=_bdData.filter(r=>String(r.id)!==String(_bdMergeSourceId) && !(r.comboItems&&r.comboItems.length) &&
+    (!q || (r.code||'').toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q)));
+  if(!list.length){ box.innerHTML=`<div style="padding:14px;text-align:center;color:var(--tx2);font-size:12px;">검색 결과가 없습니다.</div>`; return; }
+  box.innerHTML=list.map(r=>`
+    <div class="bd-merge-row" onclick="bdMergeConfirm('${String(r.id).replace(/'/g,"\\'")}')">
+      <div style="min-width:0;">
+        <div style="font-weight:600;font-size:12.5px;">${_bdEscHtml(r.name||'')}</div>
+        <code style="font-size:11px;color:var(--tx2);">${_bdEscHtml(r.code||'')}</code>
+      </div>
+      <div style="font-size:12px;font-weight:600;flex-shrink:0;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</div>
+    </div>`).join('');
+}
+// 병합은 반복 호출 가능 — 같은 대표행(src)에 계속 다른 행을 골라 별칭으로 흡수시키면
+// 3개 이상의 코드도 하나로 합칠 수 있음 (모달을 닫지 않고 목록만 갱신)
+async function bdMergeConfirm(targetId){
+  const src=_bdData.find(x=>String(x.id)===String(_bdMergeSourceId));
+  const tgt=_bdData.find(x=>String(x.id)===String(targetId));
+  if(!src||!tgt) return;
+  if(!confirm(`"${tgt.name}" (코드: ${tgt.code})를\n"${src.name}" (코드: ${src.code})의 별칭코드로 합칠까요?\n\n합친 뒤 "${tgt.code}" 행은 삭제되고, 앞으로 이 코드로 들어오는 판매·재고 데이터는 전부 "${src.code}" 단가로 매칭됩니다.`)) return;
+  const mergedAliases=[...new Set([...(src.aliasCodes||[]), tgt.code, ...(tgt.aliasCodes||[])].filter(Boolean))];
+  const updated={...src, aliasCodes:mergedAliases};
+  try{
+    await saveBdToSupabase(updated,true);
+    await deleteBdFromSupabase(tgt.id);
+    const si=_bdData.findIndex(x=>String(x.id)===String(src.id));
+    if(si>=0) _bdData[si]=updated;
+    _bdData=_bdData.filter(x=>String(x.id)!==String(tgt.id));
+    addHistory({menu:'매출관리',type:'edit',code:updated.code,name:updated.name,desc:`코드 병합 (${tgt.code} 흡수)`,before:'-',after:'병합',user:'수동'});
+    bdRenderMergeHeader();
+    bdRenderMergeList();
+    renderBdTable();
+    if(typeof toast==='function') toast(`"${tgt.code}" 코드를 "${updated.code}"의 별칭으로 합쳤습니다. 계속 다른 코드를 더 합칠 수 있습니다.`);
+  }catch(e){ alert('병합 실패: '+e.message); }
+}
+
+// ── 세트(조합)상품 등록/수정 ──
+let _bdComboEditKey=null;
+let _bdComboItemsBuf=[]; // [{code,name,qty,unitPrice}]
+function openBdComboAdd(){
+  document.getElementById('bdComboModalTitle').textContent='🧩 세트제품 등록';
+  document.getElementById('bdComboEditKey').value='';
+  document.getElementById('bdComboOldPrice').value='';
+  document.getElementById('bdComboOldPriceHint').style.display='none';
+  document.getElementById('bdComboEffDateField').style.display='none';
+  document.getElementById('bdComboCode').value='';
+  document.getElementById('bdComboCode').disabled=false;
+  document.getElementById('bdComboCodeWarn').style.display='none';
+  document.getElementById('bdComboName').value='';
+  document.getElementById('bdComboItemCode').value='';
+  document.getElementById('bdComboItemName').textContent='';
+  document.getElementById('bdComboItemQty').value='1';
+  bdComboHideDropdown();
+  fillBdComboTypeOptions('');
+  _bdComboEditKey=null;
+  _bdComboItemsBuf=[];
+  bdComboRenderItems();
+  openModal('bdComboModal');
+}
+function openBdComboEdit(id){
+  const r=_bdData.find(x=>String(x.id)===String(id)); if(!r) return;
+  bdOpenComboModalCommon(r, r.comboItems||[], false);
+}
+// 기존에 "단가만 수기 합산"으로 등록해둔 일반 코드를 세트(조합)로 전환 —
+// 구성품 목록은 비운 채로 열어서, 관리자가 직접 구성품을 다시 추가해 기존 단가와 맞는지 확인하게 함
+function openBdConvertToCombo(id){
+  const r=_bdData.find(x=>String(x.id)===String(id)); if(!r) return;
+  if(!confirm(`"${r.name}" (코드: ${r.code})를 세트(조합)상품으로 전환할까요?\n\n기존 단가(${r.price!=null?Number(r.price).toLocaleString()+'원':'—'})는 참고용으로만 뜨고, 구성품을 새로 추가해서 나온 합계가 실제 저장 단가가 됩니다. 합계가 기존 단가와 다르면 저장 시 통합 데이터에도 반영될 수 있습니다.`)) return;
+  bdOpenComboModalCommon(r, [], true);
+}
+function bdOpenComboModalCommon(r, initialItems, isConvert){
+  document.getElementById('bdComboModalTitle').textContent = isConvert ? '🧩 세트(조합)로 전환' : '✏️ 세트제품 수정';
+  document.getElementById('bdComboEditKey').value=String(r.id);
+  document.getElementById('bdComboOldPrice').value = r.price!=null?r.price:'';
+  document.getElementById('bdComboCode').value=r.code||'';
+  document.getElementById('bdComboCode').disabled=true;
+  document.getElementById('bdComboCodeWarn').style.display='none';
+  document.getElementById('bdComboName').value=r.name||'';
+  document.getElementById('bdComboItemCode').value='';
+  document.getElementById('bdComboItemName').textContent='';
+  document.getElementById('bdComboItemQty').value='1';
+  bdComboHideDropdown();
+  fillBdComboTypeOptions(r.type||'');
+  _bdComboEditKey=r.id;
+  // 구성품 단가는 항상 최신 백데이터 기준으로 다시 조회해서 보여줌
+  const bdMap=getBdMap();
+  _bdComboItemsBuf=(initialItems||[]).map(it=>{
+    const src=bdMap[String(it.code||'').toLowerCase()];
+    return {code:it.code, name:(src&&src.name)||it.name, qty:it.qty, unitPrice:(src&&src.price!=null)?src.price:it.unitPrice};
+  });
+  const hint=document.getElementById('bdComboOldPriceHint');
+  if(isConvert){
+    hint.style.display='';
+    hint.textContent = `⚠ 기존 단가: ${r.price!=null?Number(r.price).toLocaleString()+'원':'—'} (수동 입력값) — 구성품을 추가해서 합계가 이 금액과 맞는지 확인하세요. 다르면 저장 시 실제 단가가 이 합계로 바뀝니다.`;
+  } else {
+    hint.style.display='none';
+  }
+  const today=new Date();
+  const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  document.getElementById('bdComboEffDate').value=defEffDate;
+  document.getElementById('bdComboEffDateField').style.display='';
+  bdComboRenderItems();
+  openModal('bdComboModal');
+}
+function fillBdComboTypeOptions(selected){
+  const sel=document.getElementById('bdComboType'); if(!sel) return;
+  const types=[...new Set(_bdData.map(r=>r.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(selected && !types.includes(selected)) types.unshift(selected);
+  if(!types.includes('조합')) types.unshift('조합');
+  sel.innerHTML='<option value="">구분 선택</option>'+types.map(t=>`<option value="${t}">${t}</option>`).join('');
+  sel.value=selected||'조합';
+}
+// 세트코드 중복 여부 실시간 안내 (신규 등록 시에만 — 수정 모드는 코드 입력칸이 비활성화됨)
+function bdComboCodeChanged(){
+  const code=(document.getElementById('bdComboCode').value||'').trim();
+  const warn=document.getElementById('bdComboCodeWarn');
+  const dup = code ? findBdByAnyCode(code) : null;
+  if(dup){ warn.style.display=''; warn.textContent=`⚠ 이미 등록된 코드입니다 ("${dup.name}"${dup.aliasCodes&&dup.aliasCodes.includes(code)?' 의 별칭코드':''}) — 다른 코드를 입력하세요.`; }
+  else { warn.style.display='none'; warn.textContent=''; }
+}
+function bdComboItemCodeChanged(){
+  const code=(document.getElementById('bdComboItemCode').value||'').trim();
+  const match=_bdData.find(r=>(r.code||'').toLowerCase()===code.toLowerCase());
+  document.getElementById('bdComboItemName').textContent = match ? `${match.name} · ${match.price!=null?Number(match.price).toLocaleString()+'원':'단가없음'}` : (code?'⚠ 등록되지 않은 코드':'');
+}
+// 구성품 검색 — 코드/상품명에 입력한 글자가 포함되면 전부 후보로 보여줌 (네이티브 datalist는 이름 검색이 안 돼서 직접 구현)
+function bdComboItemSearch(){
+  const q=(document.getElementById('bdComboItemCode').value||'').trim().toLowerCase();
+  const box=document.getElementById('bdComboItemDropdown');
+  bdComboItemCodeChanged();
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  const list=_bdData.filter(r=>!(r.comboItems&&r.comboItems.length) &&
+    ((r.code||'').toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q))
+  ).slice(0,30);
+  if(!list.length){ box.innerHTML=`<div class="bd-combo-drop-empty">"${_bdEscHtml(q)}" 검색 결과가 없습니다.</div>`; box.style.display=''; return; }
+  box.innerHTML=list.map(r=>`
+    <div class="bd-combo-drop-row" onmousedown="event.preventDefault();bdComboItemPick('${String(r.code||'').replace(/'/g,"\\'")}')">
+      <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_bdEscHtml(r.name||'')} <code style="color:var(--tx2);">${_bdEscHtml(r.code||'')}</code></div>
+      <div style="flex-shrink:0;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</div>
+    </div>`).join('');
+  box.style.display='';
+}
+function bdComboItemPick(code){
+  document.getElementById('bdComboItemCode').value=code;
+  bdComboItemCodeChanged();
+  bdComboHideDropdown();
+  document.getElementById('bdComboItemQty').focus();
+}
+function bdComboHideDropdown(){
+  const box=document.getElementById('bdComboItemDropdown');
+  if(box){ box.style.display='none'; box.innerHTML=''; }
+}
+// 모달 안(드롭다운/입력칸 바깥)을 클릭하면 드롭다운만 닫음 — 배경(overlay) 클릭 감지와는 별개
+document.addEventListener('click', e=>{
+  const dd=document.getElementById('bdComboItemDropdown');
+  const inp=document.getElementById('bdComboItemCode');
+  if(!dd || dd.style.display==='none') return;
+  if(e.target===inp || dd.contains(e.target)) return;
+  bdComboHideDropdown();
+});
+function bdComboAddItem(){
+  const code=(document.getElementById('bdComboItemCode').value||'').trim();
+  const qty=Math.max(1, parseInt(document.getElementById('bdComboItemQty').value)||1);
+  if(!code){ alert('구성품 코드를 입력하세요.'); return; }
+  const match=_bdData.find(r=>(r.code||'').toLowerCase()===code.toLowerCase());
+  if(!match){ alert('백데이터에 등록되지 않은 코드입니다. 먼저 개별 코드로 등록해주세요.'); return; }
+  if(match.comboItems && match.comboItems.length){ alert('세트제품은 다른 세트의 구성품으로 추가할 수 없습니다.'); return; }
+  const exist=_bdComboItemsBuf.find(it=>it.code.toLowerCase()===code.toLowerCase());
+  if(exist){ exist.qty+=qty; }
+  else { _bdComboItemsBuf.push({code:match.code, name:match.name, qty, unitPrice:match.price!=null?match.price:0}); }
+  document.getElementById('bdComboItemCode').value='';
+  document.getElementById('bdComboItemName').textContent='';
+  document.getElementById('bdComboItemQty').value='1';
+  bdComboHideDropdown();
+  bdComboRenderItems();
+}
+function bdComboRemoveItem(i){ _bdComboItemsBuf.splice(i,1); bdComboRenderItems(); }
+// 수량(몇개입) 직접 수정 — 예: 2개입→3개입으로 올리면 세트단가가 즉시 재계산되어 보임
+function bdComboUpdateQty(i, val){
+  const q=Math.max(1, parseInt(val)||1);
+  if(!_bdComboItemsBuf[i]) return;
+  _bdComboItemsBuf[i].qty=q;
+  bdComboRenderItems();
+}
+function bdComboRenderItems(){
+  const box=document.getElementById('bdComboItemList'); if(!box) return;
+  box.innerHTML = _bdComboItemsBuf.map((it,i)=>`
+    <div class="bd-combo-item-row">
+      <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_bdEscHtml(it.name)} <code style="color:var(--tx2);">${_bdEscHtml(it.code)}</code></div>
+      <div style="text-align:right;">${Number(it.unitPrice||0).toLocaleString()}원 ×
+        <input type="number" min="1" value="${it.qty}" style="width:44px;text-align:center;padding:2px 3px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);font-size:11.5px;" onchange="bdComboUpdateQty(${i},this.value)">
+      </div>
+      <div style="text-align:right;font-weight:600;">${(Number(it.unitPrice||0)*Number(it.qty||0)).toLocaleString()}원</div>
+      <button type="button" class="btn btn-sm" onclick="bdComboRemoveItem(${i})" style="padding:2px 6px;">×</button>
+    </div>`).join('') || `<div style="padding:12px;text-align:center;color:var(--tx2);font-size:12px;">구성품을 추가하세요.</div>`;
+  const total=_bdComboItemsBuf.reduce((a,it)=>a+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0);
+  document.getElementById('bdComboTotal').textContent=total.toLocaleString()+'원';
+}
+async function saveBdCombo(){
+  const code=document.getElementById('bdComboCode').value.trim();
+  const name=document.getElementById('bdComboName').value.trim();
+  const type=document.getElementById('bdComboType').value.trim();
+  const editKey=document.getElementById('bdComboEditKey').value;
+  if(!code){ alert('세트코드를 입력하세요.'); return; }
+  if(!name){ alert('세트상품명을 입력하세요.'); return; }
+  if(!_bdComboItemsBuf.length){ alert('구성품을 1개 이상 추가하세요.'); return; }
+  const price=_bdComboItemsBuf.reduce((a,it)=>a+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0);
+  const comboItems=_bdComboItemsBuf.map(it=>({...it}));
+  const saveBtn=document.querySelector('#bdComboModal .btn-pr');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='저장 중...';}
+  try{
+    let row;
+    if(editKey){
+      const idx=_bdData.findIndex(x=>String(x.id)===String(editKey));
+      if(idx<0) throw new Error('대상을 찾을 수 없습니다.');
+      const oldPrice=_bdData[idx].price;
+      row={..._bdData[idx],name,type,price,comboItems};
+      await saveBdToSupabase(row,true);
+      _bdData[idx]=row;
+      // 구성품 합계가 기존 단가와 달라졌으면 매칭된 revenue 단가·마진도 일괄 재계산 (일반 코드 수정과 동일한 동작)
+      if(price!==oldPrice){
+        if(saveBtn) saveBtn.textContent='단가 반영 중...';
+        const effDate=document.getElementById('bdComboEffDate').value;
+        try{
+          const cnt=await propagateBdPriceChange(row, oldPrice, effDate);
+          if(cnt>0) console.log(`세트상품 단가 변경 → revenue ${cnt}건 업데이트`);
+        }catch(pe){ console.warn('세트 단가 전파 실패:',pe); }
+      }
+    } else {
+      const dup=findBdByAnyCode(code);
+      if(dup){ alert('이미 존재하는 코드입니다.'); return; }
+      row={code,supplier:'',type,name,price,comboItems,aliasCodes:[]};
+      await saveBdToSupabase(row,false);
+      _bdData.push(row);
+    }
+    addHistory({menu:'매출관리',type:'edit',code:row.code,name:row.name,desc:editKey?'세트제품 수정':'세트제품 등록',before:'-',after:editKey?'수정':'등록',user:'수동'});
+    closeModal('bdComboModal');
+    renderBdTable();
+  }catch(e){ alert('저장 실패: '+e.message); }
+  finally{ if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='저장';} }
 }
 
 // ── 업로드 슬롯 ──
@@ -20970,9 +21403,21 @@ function readXlsxRows(file){
   });
 }
 
-// 백데이터 조회 맵 (code → row)
+// 백데이터 조회 맵 (code → row) — 대표코드 + 별칭코드(aliasCodes) 전부 같은 행으로 매칭
 // 대소문자 무시 조회: 키를 소문자로 저장
-function getBdMap(){ return Object.fromEntries(_bdData.map(r=>[(r.code||'').toLowerCase(), r])); }
+function getBdMap(){
+  const m={};
+  _bdData.forEach(r=>{
+    if(r.code) m[r.code.toLowerCase()]=r;
+    (r.aliasCodes||[]).forEach(ac=>{ if(ac) m[String(ac).toLowerCase()]=r; });
+  });
+  return m;
+}
+// 대표코드 또는 별칭코드로 기존 행 찾기 (신규 코드 등록 시 중복/충돌 체크용)
+function findBdByAnyCode(code){
+  const k=(code||'').toLowerCase(); if(!k) return null;
+  return _bdData.find(r=>(r.code||'').toLowerCase()===k || (r.aliasCodes||[]).some(ac=>String(ac).toLowerCase()===k)) || null;
+}
 // 상품명 정규화 (소문자+공백제거+전각괄호→반각)
 function normName(s){ return String(s||'').toLowerCase()
   .replace(/[【〔]/g,'[').replace(/[】〕]/g,']')
