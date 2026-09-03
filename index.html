@@ -2027,7 +2027,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 당근 판매 주문건 등록 ═══ -->
 <div class="modal-overlay" id="logiCarrotAddModal" style="z-index:340;" data-keep-open>
   <div class="modal" style="max-width:460px;">
-    <h3>🥕 당근 판매 주문건 등록</h3>
+    <h3 id="lcrModalTitle">🥕 당근 판매 주문건 등록</h3>
+    <input type="hidden" id="lcrEditId">
     <div style="display:flex;flex-direction:column;gap:13px;margin-top:6px;">
       <div>
         <div class="cl-lbl">고객명</div>
@@ -2826,7 +2827,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <table class="lcr-table">
         <thead><tr>
           <th style="width:96px;">등록일</th><th>고객명</th><th>연락처</th><th>주소</th><th>제품명</th>
-          <th style="width:64px;">수량</th><th style="width:100px;">판매금액</th><th style="width:110px;">ERP 재고 차감 확인</th><th style="width:52px;">삭제</th>
+          <th style="width:64px;">수량</th><th style="width:100px;">공급가</th><th style="width:100px;">판매금액</th><th style="width:110px;">ERP 재고 차감 확인</th><th style="width:80px;">관리</th>
         </tr></thead>
         <tbody id="lcrBody"></tbody>
       </table>
@@ -9624,7 +9625,22 @@ function lcrRender(){
   if(q) list = list.filter(o=>[o.customerName,o.phone,o.productName].some(v=>(v||'').toLowerCase().includes(q)));
   list = list.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')||String(b.id||'').localeCompare(String(a.id||'')));
   tb.innerHTML = list.length ? list.map(lcrRowHtml).join('')
-    : `<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--tx2);">${q?'검색 결과가 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
+    : `<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--tx2);">${q?'검색 결과가 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
+}
+// 제품명으로 백데이터(_bdData) 공급가 조회 — 이름 완전일치 기준
+function lcrUnitCost(productName){
+  const nm=(productName||'').trim(); if(!nm) return null;
+  const bd=(typeof _bdData!=='undefined'?_bdData:[]).find(r=>(r.name||'').trim()===nm);
+  return (bd && bd.price!=null) ? Number(bd.price) : null;
+}
+function lcrCostCell(o){
+  const unit=lcrUnitCost(o.productName);
+  if(unit==null) return '<span style="color:var(--tx2);">—</span>';
+  const qty=Number(o.qty)||0;
+  if(qty>1){
+    return `${_lcrWon(unit*qty)}<div class="lcr-meta">(개당 ${_lcrWon(unit)})</div>`;
+  }
+  return _lcrWon(unit);
 }
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
@@ -9636,9 +9652,10 @@ function lcrRowHtml(o){
     <td class="lcr-l">${addrDisp}</td>
     <td class="lcr-l">${_lcrEsc(o.productName)}</td>
     <td>${_lbxNum(o.qty)}</td>
+    <td class="lcr-r">${lcrCostCell(o)}</td>
     <td class="lcr-r">${_lcrWon(o.price)}</td>
     <td><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
-    <td><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
+    <td><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
   </tr>`;
 }
 function lcrToggleVisit(cb){
@@ -9647,6 +9664,8 @@ function lcrToggleVisit(cb){
   else { addrEl.disabled=false; addrEl.placeholder='배송지 주소'; }
 }
 function lcrOpenAdd(){
+  document.getElementById('lcrModalTitle').textContent = '🥕 당근 판매 주문건 등록';
+  document.getElementById('lcrEditId').value = '';
   document.getElementById('lcrName').value = '';
   document.getElementById('lcrPhone').value = '';
   document.getElementById('lcrAddr').value = '';
@@ -9659,7 +9678,24 @@ function lcrOpenAdd(){
   openModal('logiCarrotAddModal');
   setTimeout(()=>document.getElementById('lcrName')?.focus(), 50);
 }
+function lcrOpenEdit(id){
+  const o = (_lcrOrders||[]).find(x=>x.id===id); if(!o) return;
+  document.getElementById('lcrModalTitle').textContent = '✎ 당근 판매 주문건 수정';
+  document.getElementById('lcrEditId').value = o.id;
+  document.getElementById('lcrName').value = o.customerName||'';
+  document.getElementById('lcrPhone').value = o.phone||'';
+  document.getElementById('lcrVisit').checked = !!o.visitSale;
+  document.getElementById('lcrAddr').disabled = !!o.visitSale;
+  document.getElementById('lcrAddr').placeholder = o.visitSale ? '방문판매 (주소 불필요)' : '배송지 주소';
+  document.getElementById('lcrAddr').value = o.address||'';
+  document.getElementById('lcrProdName').value = o.productName||'';
+  document.getElementById('lcrQty').value = o.qty!=null?o.qty:'';
+  document.getElementById('lcrPrice').value = o.price!=null?o.price:'';
+  openModal('logiCarrotAddModal');
+  setTimeout(()=>document.getElementById('lcrName')?.focus(), 50);
+}
 async function lcrSave(){
+  const editId = (document.getElementById('lcrEditId').value||'').trim();
   const name = (document.getElementById('lcrName').value||'').trim();
   const phone = (document.getElementById('lcrPhone').value||'').trim();
   const visitSale = document.getElementById('lcrVisit').checked;
@@ -9668,17 +9704,23 @@ async function lcrSave(){
   const qty = _lbxNum(document.getElementById('lcrQty').value);
   const price = _lbxNum(document.getElementById('lcrPrice').value);
   if(!productName){ toast('제품명을 입력하세요.'); document.getElementById('lcrProdName').focus(); return; }
-  const row = { id:_lcrId(), createdAt:_lcrToday(), createdBy:_lcrActor(),
-    customerName:name, phone, address:addr, visitSale, productName, qty, price,
-    erpChecked:false, erpCheckedAt:'', erpCheckedBy:'' };
   let latest = await cloudKvLoad('logi_carrot_orders');
   latest = Array.isArray(latest) ? latest : [];
-  latest.push(row);
+  if(editId){
+    const idx = latest.findIndex(o=>o.id===editId);
+    if(idx<0){ toast('수정할 주문건을 찾을 수 없습니다.'); return; }
+    latest[idx] = {...latest[idx], customerName:name, phone, address:addr, visitSale, productName, qty, price};
+  } else {
+    const row = { id:_lcrId(), createdAt:_lcrToday(), createdBy:_lcrActor(),
+      customerName:name, phone, address:addr, visitSale, productName, qty, price,
+      erpChecked:false, erpCheckedAt:'', erpCheckedBy:'' };
+    latest.push(row);
+  }
   _lcrOrders = latest;
   closeModal('logiCarrotAddModal');
   lcrRender();
   await cloudKvSave('logi_carrot_orders', latest);
-  toast('✅ 주문건이 등록되었습니다.');
+  toast(editId ? '✅ 주문건이 수정되었습니다.' : '✅ 주문건이 등록되었습니다.');
 }
 async function lcrToggleErp(id){
   let latest = await cloudKvLoad('logi_carrot_orders');
