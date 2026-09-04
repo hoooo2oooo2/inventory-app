@@ -14834,6 +14834,16 @@ async function bdSetPackMultiplier(code, val){
   await cloudKvSave('bd_pack_multiplier', _bdPackMultiplier, {force:true});
   renderBdTable();
 }
+// 세트(조합)상품의 개입수를 구성품 구조와 항상 자동으로 맞춰둠 — 수동 오설정(예: 2개입인데 3으로 잘못 입력) 자체를 원천 차단
+//  - 구성품이 1종류뿐(=같은 제품 N개입)이면 그 수량으로 개입수를 자동 동기화하고, 표에서 수동 수정 못 하게 잠금
+//  - 구성품이 2종류 이상(=서로 다른 제품을 묶은 진짜 세트)이면 개입수는 항상 1로 고정(세트 자체가 1개 단위이므로)
+async function bdSyncComboPackMultiplier(code, comboItems){
+  const key=(code||'').toLowerCase(); if(!key) return;
+  const n = (comboItems && comboItems.length===1) ? Math.max(1, parseInt(comboItems[0].qty)||1) : 1;
+  if(_bdPackMultiplier[key]===n) return;
+  _bdPackMultiplier={..._bdPackMultiplier, [key]: n};
+  await cloudKvSave('bd_pack_multiplier', _bdPackMultiplier, {force:true});
+}
 
 async function saveBdToSupabase(row, isEdit){
   const d = {
@@ -20632,8 +20642,13 @@ function renderBdTable(){
       <td style="font-weight:500;">${r.name||'—'}</td>
       <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</td>
       <td style="text-align:center;">
-        <input type="number" min="1" value="${bdQtyMultiplier(r.code)}" style="width:48px;text-align:center;padding:3px 4px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);font-size:12px;"
-          onchange="bdSetPackMultiplier('${String(r.code||'').replace(/'/g,"\\'")}', this.value)">
+        ${(r.comboItems&&r.comboItems.length===1)
+          ? `<span title="세트 구성품 수량과 자동 연동 — 세트 수정에서 수량을 바꾸면 여기도 같이 바뀝니다" style="font-weight:600;">${bdQtyMultiplier(r.code)} 🔒</span>`
+          : (r.comboItems&&r.comboItems.length>1)
+            ? `<span title="서로 다른 제품을 묶은 세트는 개입수 1로 고정됩니다" style="color:var(--tx2);">1 🔒</span>`
+            : `<input type="number" min="1" value="${bdQtyMultiplier(r.code)}" style="width:48px;text-align:center;padding:3px 4px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);font-size:12px;"
+                onchange="bdSetPackMultiplier('${String(r.code||'').replace(/'/g,"\\'")}', this.value)">`
+        }
       </td>
       <td style="text-align:center;white-space:nowrap;">
         <button class="btn btn-sm" onclick="openBdEdit('${String(r.id).replace(/'/g,"\\'")}')">수정</button>
@@ -21380,6 +21395,7 @@ async function saveBdCombo(){
       row={..._bdData[idx],name,type,price,comboItems};
       await saveBdToSupabase(row,true);
       _bdData[idx]=row;
+      await bdSyncComboPackMultiplier(row.code, comboItems);
       // 구성품 합계가 기존 단가와 달라졌으면 매칭된 revenue 단가·마진도 일괄 재계산 (일반 코드 수정과 동일한 동작)
       if(price!==oldPrice){
         if(saveBtn) saveBtn.textContent='단가 반영 중...';
@@ -21395,6 +21411,7 @@ async function saveBdCombo(){
       row={code,supplier:'',type,name,price,comboItems,aliasCodes:[]};
       await saveBdToSupabase(row,false);
       _bdData.push(row);
+      await bdSyncComboPackMultiplier(row.code, comboItems);
     }
     addHistory({menu:'매출관리',type:'edit',code:row.code,name:row.name,desc:editKey?'세트제품 수정':'세트제품 등록',before:'-',after:editKey?'수정':'등록',user:'수동'});
     closeModal('bdComboModal');
