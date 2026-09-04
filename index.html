@@ -973,9 +973,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* 위탁: 폭 고정 래퍼(표가 화면 전체로 늘어나 휑해지는 문제 방지) */
 .cs-wrap{max-width:1360px;}
 /* 위탁: 주문·거래 리스트 옆 미니 달력(정산금액 합계) */
-.cs-order-layout{display:flex;gap:16px;align-items:flex-start;}
-.cs-order-layout .cs-card{flex:1;min-width:0;}
-.cs-order-cal{width:250px;flex-shrink:0;border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:14px;}
+.cs-order-layout{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;}
+.cs-order-layout .cs-card{flex:1 1 1020px;min-width:0;}
+.cs-order-cal{width:250px;flex:0 0 250px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:14px;}
 .cs-order-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .cs-order-cal-title{font-size:12.5px;font-weight:700;color:var(--tx);}
 .cs-order-cal-nav{display:flex;gap:4px;}
@@ -27905,8 +27905,8 @@ function csRenderOrders(){
   csRenderOrderCal();
   if(!_csVendors.length){ card.innerHTML = `<div class="cs-empty">먼저 위쪽 <b>[＋ 배송처]</b>로 위탁 배송처를 추가하세요.</div>`; return; }
   if(!list.length){ card.innerHTML = `<div class="cs-empty">${_csOrders.length?'조건에 맞는 주문이 없습니다.':'저장된 주문이 없습니다. <b>[＋ 주문 추가]</b>로 등록하세요.'}</div>`; return; }
-  card.innerHTML = `<table class="cs-table cs-order-table" style="min-width:980px;"><thead><tr>
-      <th style="width:96px;">날짜</th>
+  card.innerHTML = `<table class="cs-table cs-order-table" style="min-width:1020px;"><thead><tr>
+      <th style="width:104px;">날짜</th>
       ${showV?'<th style="width:96px;">배송처</th>':''}
       <th style="width:90px;">고객명</th>
       <th style="text-align:left;min-width:220px;">구매제품</th>
@@ -27914,7 +27914,7 @@ function csRenderOrders(){
       <th style="width:96px;">배송비</th>
       <th style="width:108px;">정산금액</th>
       <th style="width:96px;">마진</th>
-      <th style="width:64px;">마진율</th>
+      <th style="width:84px;">마진율</th>
       <th style="width:44px;text-align:center;">관리</th>
     </tr></thead><tbody>${list.map(o=>{
       const m = _csOrderMargin(o);
