@@ -6545,8 +6545,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <p style="font-size:12px;color:var(--tx2);margin:4px 0 12px;line-height:1.6;">
       📥 엑셀 다운로드로 받은 파일을 수정해서 올리세요.<br>
       • <b>ID</b>가 있는 행 → 해당 코드 수정 &nbsp; • <b>ID</b> 비어있는 행 → 새로 추가<br>
-      <span style="color:#DC2626;">※ 컬럼 순서: ID · 공급자명 · 전체상품코드 · 구분 · 상품명 · 공급가 · 구단가재고수량</span><br>
-      <span style="color:#D97706;">⏳ "구단가재고수량"에 숫자를 넣은 행은 공급가를 바로 안 바꾸고, 그 수량만큼 실제로 팔린 뒤 자동전환되도록 예약만 등록/갱신합니다(공급가 칸엔 전환될 새 단가를 적어주세요). 비워두면 지금까지처럼 즉시 적용됩니다.</span>
+      <span style="color:#DC2626;">※ 컬럼 순서: ID · 공급자명 · 전체상품코드 · 구분 · 상품명 · 공급가 · 구재고수량(예약용) · 예약후 새단가(예약용)</span><br>
+      <span style="color:#D97706;">⏳ 지금 바로 단가를 바꿀 상품은 "공급가" 칸만 새 값으로 고치고 뒤 두 칸은 비워두세요.<br>
+      ⏳ 구재고가 남아서 예약이 필요한 상품은 <b>"공급가" 칸은 그대로 두고</b>, "구재고수량"에 남은 개수, "예약후 새단가"에 전환될 가격을 적으세요 — 지금 단가는 자동으로 기억되고, 그 수량만큼 팔리면 자동전환됩니다.</span>
     </p>
     <div id="bdDropZone" style="border:2px dashed var(--bd);border-radius:12px;padding:34px 16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg);">
       <div style="font-size:30px;margin-bottom:6px;">📁</div>
@@ -14750,10 +14751,10 @@ async function recalcShippingForKey(channel,item_no,feeObj){
 // ── 백데이터 엑셀 다운로드 / 업로드 ──
 function downloadBackdataExcel(){
   if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
-  const aoa=[['ID','공급자명','전체상품코드','구분','상품명','공급가(새 단가는 여기)','구재고 몇개 남았나(입력 시 소진될 때까지 예약, 새단가 아님)']];
-  _bdData.forEach(r=>aoa.push([r.id, r.supplier||'', r.code||'', r.type||'', r.name||'', r.price!=null?r.price:'', '']));
+  const aoa=[['ID','공급자명','전체상품코드','구분','상품명','공급가(지금 당장 바꿀 때만 여기 수정)','예약할 경우: 구재고 수량','예약할 경우: 전환될 새단가']];
+  _bdData.forEach(r=>aoa.push([r.id, r.supplier||'', r.code||'', r.type||'', r.name||'', r.price!=null?r.price:'', '', '']));
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:8},{wch:14},{wch:16},{wch:10},{wch:40},{wch:12},{wch:20}];
+  ws['!cols']=[{wch:8},{wch:14},{wch:16},{wch:10},{wch:40},{wch:12},{wch:16},{wch:16}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'백데이터');
   const d=new Date();
@@ -14788,19 +14789,23 @@ async function _readBdUpload(file){
   try{
     const rows=await readXlsxRows(file);
     if(!rows.length){ alert('빈 파일입니다.'); return; }
-    // 컬럼: ID, 공급자명, 전체상품코드, 구분, 상품명, 공급가, 구단가재고수량(선택 — 있으면 즉시적용 대신 예약)
-    const updates=[], inserts=[], reservations=[]; let bad=0, resSkipped=0;
+    // 컬럼: ID, 공급자명, 전체상품코드, 구분, 상품명, 공급가(즉시변경용), 구재고수량(예약용), 예약후 새단가(예약용)
+    // G열(구재고수량)에 값이 있으면 이 행은 예약행 — F열(공급가)은 무시하고 H열(예약후 새단가)을 씀.
+    // 그래서 예약행은 F열을 안 건드려도 됨(현재값 그대로 둬도 무방).
+    const updates=[], inserts=[], reservations=[]; let bad=0, resSkipped=0, resNoPriceSkipped=0;
     for(let i=1;i<rows.length;i++){
       const r=rows[i]; if(!r||r.every(v=>v===''||v==null)) continue;
       const id=_s(r[0]), supplier=_s(r[1]), code=_s(r[2]), type=_s(r[3]), name=_s(r[4]);
       const price=_n(r[5]);
       const resQty = r.length>6 ? _n(r[6]) : null;
+      const resNewPrice = r.length>7 ? _n(r[7]) : null;
       if(!code||!name){ bad++; continue; }
       if(resQty!=null && resQty>0){
-        // 구단가재고수량이 있으면 이 행은 즉시 단가변경이 아니라 재고소진 예약 대상 — 기존에 등록된 코드여야 함
+        // 구재고수량이 있으면 이 행은 즉시 단가변경이 아니라 재고소진 예약 대상 — 기존에 등록된 코드여야 함
         const existing = findBdByAnyCode(code);
         if(!existing){ resSkipped++; continue; }
-        reservations.push({ code:existing.code, name:existing.name, bdId:existing.id, oldPrice:existing.price, newPrice:price, oldStockQty:resQty });
+        if(resNewPrice==null){ resNoPriceSkipped++; continue; } // H열(예약후 새단가) 누락 — 예약 안 만들고 건너뜀
+        reservations.push({ code:existing.code, name:existing.name, bdId:existing.id, oldPrice:existing.price, newPrice:resNewPrice, oldStockQty:resQty });
         continue;
       }
       const rec={ code, supplier:supplier||null, item_type:type||null, name, price:price!=null?price:null, updated_at:new Date().toISOString() };
@@ -14815,6 +14820,7 @@ async function _readBdUpload(file){
         ${reservations.length?` · <b style="color:#D97706;">⏳ 재고소진 예약 등록/갱신 ${reservations.length}건</b>`:''}
         ${bad?` · <span style="color:#DC2626;">코드/상품명 누락 ${bad}건 제외</span>`:''}
         ${resSkipped?` · <span style="color:#DC2626;">예약하려 했지만 기존에 없는 코드라 제외 ${resSkipped}건</span>`:''}
+        ${resNoPriceSkipped?` · <span style="color:#DC2626;">예약하려 했지만 "예약후 새단가"가 비어있어 제외 ${resNoPriceSkipped}건</span>`:''}
       </div>`;
     document.getElementById('bdUploadApplyBtn').disabled=(updates.length+inserts.length+reservations.length===0);
   }catch(e){ alert('파일 읽기 실패: '+e.message); }
