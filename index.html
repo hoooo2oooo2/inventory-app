@@ -6462,6 +6462,31 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
+<!-- 재고소진 후 단가 자동전환 예약 모달 -->
+<div class="modal-overlay" id="bdResModal">
+  <div class="modal" style="max-width:420px;">
+    <h3>⏳ 재고소진 후 단가 자동전환 예약</h3>
+    <input type="hidden" id="bdResId">
+    <input type="hidden" id="bdResBdId">
+    <div style="font-size:11.5px;color:var(--tx2);margin-bottom:10px;">아래 입력한 "구단가 재고수량"만큼 시작일 이후 실제 판매(daily_sales 출고량 기준)되면, 그 다음날부터 자동으로 새 단가로 전환되고 통합 데이터에도 반영됩니다. 재고관리 현재고는 입고로도 늘어나서 판정에 안 씁니다.</div>
+    <div class="field"><label>대상 상품</label><div id="bdResSubject" style="font-size:13px;font-weight:600;padding:4px 0;"></div></div>
+    <div class="field-grid">
+      <div class="field"><label>현재(구) 단가</label><div id="bdResOldPrice" style="padding:8px 0;font-weight:600;"></div></div>
+      <div class="field"><label>새 단가 *</label><input id="bdResNewPrice" type="number" min="0" placeholder="0"></div>
+    </div>
+    <div class="field-grid">
+      <div class="field"><label>구단가 재고수량 *</label><input id="bdResQty" type="number" min="1" placeholder="예: 23"></div>
+      <div class="field"><label>추적 시작일</label><input id="bdResStart" type="date"></div>
+    </div>
+    <div id="bdResSold" style="font-size:11px;color:var(--tx2);margin-top:2px;"></div>
+    <div class="ma">
+      <button class="btn" id="bdResCancelBtn" style="color:#DC2626;" onclick="bdCancelReserve()">예약 취소</button>
+      <button class="btn" onclick="closeModal('bdResModal')">닫기</button>
+      <button class="btn btn-pr" onclick="bdSaveReserve()">저장</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="revColModal">
   <div class="modal" style="max-width:640px;max-height:82vh;overflow-y:auto;">
     <h3>가져올 열 설정 — <span id="revColModalCh"></span></h3>
@@ -13597,6 +13622,8 @@ async function erpApplyImport(){
       if(error) console.error('ERP daily_sales 오류', error.message);
     }
     if(dailyRows.length) await _bumpDaily();
+    // 재고소진 자동전환 예약 체크 — 방금 갱신된 daily_sales 기준으로 구단가 재고 소진 여부 확인(백그라운드)
+    if(dailyRows.length){ (_bdLoaded?Promise.resolve():loadBackdata()).then(()=>bdCheckPriceReservations()).catch(()=>{}); }
 
     const monthlyUpd={};
     dailyRows.forEach(dr=>{
@@ -14823,6 +14850,8 @@ async function loadBackdata(){
     }));
     _bdLoaded = true;
     renderBdTable();
+    // 재고소진 자동전환 예약 로드 후 배지 갱신 + 소진 여부 체크(백그라운드, 렌더 안 막음)
+    bdLoadPriceReservations().then(()=>{ renderBdTable(); bdCheckPriceReservations(); }).catch(()=>{});
   } catch(e){ console.warn('backdata 로드 실패:',e); }
 }
 async function loadBdPackMultiplier(){
@@ -14854,6 +14883,125 @@ async function bdSyncComboPackMultiplier(code, comboItems){
   if(_bdPackMultiplier[key]===n) return;
   _bdPackMultiplier={..._bdPackMultiplier, [key]: n};
   await cloudKvSave('bd_pack_multiplier', _bdPackMultiplier, {force:true});
+}
+
+// ── 재고소진 후 단가 자동전환 예약 ──
+// 인하 전 단가로 들여온 재고가 남아있는 동안은 옛 단가를 유지하다가, 그 재고가 실제로
+// 다 팔리는 시점부터 자동으로 새 단가로 전환한다. 재고관리 현재고는 매일 입고로도 늘어나서
+// "구단가 재고가 몇 개 남았는지"를 알 수 없으므로, 입고와 무관하게 순수 판매량만 쌓이는
+// daily_sales.qty 누적치로 소진 여부를 판단한다(코드체계가 재고관리/매출관리 사이에 다를 수
+// 있어 상품명 정규화 매칭 사용).
+let _bdPriceRes = [];
+let _bdPriceResLoaded = false;
+function _bdPrId(){ return 'bdpr_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _bdToday(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function _bdActor(){ const u=window.__CURRENT_USER; return u?(u.name||u.username):(window.__ACTOR||'-'); }
+function _bdAddDays(dateStr, n){
+  const d=new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+n);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+async function bdLoadPriceReservations(){
+  const d = await cloudKvLoad('bd_price_reservations');
+  _bdPriceRes = Array.isArray(d) ? d : [];
+  _bdPriceResLoaded = true;
+}
+function bdActiveReservationFor(code){
+  return _bdPriceRes.find(r=>r.status==='pending' && String(r.code||'').toLowerCase()===String(code||'').toLowerCase()) || null;
+}
+// pending 예약을 daily_sales 누적판매량과 대조 — 구단가재고만큼 팔렸으면 그 다음날부터 자동 전환
+// 순수 계산 함수(테스트 용이) — daily_sales 원본행 배열에서 상품명이 일치하는 것만 뽑아
+// 날짜순 누적판매량을 구하고, oldStockQty에 도달하는 첫 날짜(소진일)와 최종 누적치를 반환
+function _bdCalcDepletion(rows, nameKey, oldStockQty){
+  const filtered = (rows||[]).filter(r=>normName(r.name)===nameKey).sort((a,b)=>a.sale_date<b.sale_date?-1:(a.sale_date>b.sale_date?1:0));
+  let cum=0, depletedDate=null;
+  for(const r of filtered){
+    cum += Number(r.qty)||0;
+    if(!depletedDate && cum>=oldStockQty){ depletedDate=r.sale_date; }
+  }
+  return { cum, depletedDate };
+}
+async function bdCheckPriceReservations(){
+  if(!_bdPriceResLoaded) await bdLoadPriceReservations();
+  const pending = _bdPriceRes.filter(r=>r.status==='pending');
+  if(!pending.length) return;
+  let anyChange=false;
+  for(const res of pending){
+    try{
+      const nameKey = normName(res.name);
+      const {data,error} = await sb.from('daily_sales').select('sale_date,qty,name').eq('is_rg', false).gte('sale_date', res.startDate);
+      if(error){ console.warn('재고소진 예약 체크 조회 실패:', res.code, error.message); continue; }
+      const {cum, depletedDate} = _bdCalcDepletion(data||[], nameKey, res.oldStockQty);
+      if(res.soldSinceStart!==cum){ res.soldSinceStart=cum; anyChange=true; }
+      if(!depletedDate) continue;
+      const bdRow = _bdData.find(x=>String(x.id)===String(res.bdId)) || _bdData.find(x=>x.code===res.code);
+      if(!bdRow){ console.warn('재고소진 예약 대상 백데이터 행을 찾을 수 없음:', res.code); continue; }
+      const oldPrice = bdRow.price;
+      const effDate = _bdAddDays(depletedDate, 1);
+      const updated = {...bdRow, price: res.newPrice};
+      await saveBdToSupabase(updated, true);
+      const idx=_bdData.findIndex(x=>x.id===bdRow.id);
+      if(idx>=0) _bdData[idx]=updated;
+      try{ await propagateBdPriceChange(updated, oldPrice, effDate); }catch(pe){ console.warn('예약 단가전파 실패:',pe); }
+      try{ await recalcComboRowsUsingCode(null, effDate); }catch(ce){ console.warn('예약 세트 재계산 실패:',ce); }
+      res.status='applied';
+      res.appliedDate=effDate;
+      anyChange=true;
+      addHistory({menu:'매출관리',type:'edit',code:updated.code,name:updated.name,desc:`재고소진 자동 단가전환 (${oldPrice!=null?oldPrice.toLocaleString():'-'}→${res.newPrice.toLocaleString()}원, ${effDate}부터)`,before:String(oldPrice),after:String(res.newPrice),user:'자동'});
+      if(typeof toast==='function') toast(`"${updated.name}" 구단가 재고 소진 — 단가가 ${res.newPrice.toLocaleString()}원으로 자동 전환됐습니다.`);
+    }catch(e){ console.warn('재고소진 예약 체크 오류:', res.code, e); }
+  }
+  if(anyChange){ await cloudKvSave('bd_price_reservations', _bdPriceRes); renderBdTable(); }
+}
+function openBdReserve(id){
+  const r=_bdData.find(x=>String(x.id)===String(id)); if(!r) return;
+  const existing = bdActiveReservationFor(r.code);
+  document.getElementById('bdResSubject').textContent = `${r.name} (${r.code})`;
+  document.getElementById('bdResId').value = existing?existing.id:'';
+  document.getElementById('bdResBdId').value = r.id;
+  document.getElementById('bdResOldPrice').textContent = r.price!=null?Number(r.price).toLocaleString()+'원':'—';
+  document.getElementById('bdResNewPrice').value = existing?existing.newPrice:'';
+  document.getElementById('bdResQty').value = existing?existing.oldStockQty:'';
+  document.getElementById('bdResStart').value = existing?existing.startDate:_bdToday();
+  document.getElementById('bdResSold').textContent = existing?`지금까지 누적판매 ${existing.soldSinceStart||0}개`:'';
+  document.getElementById('bdResCancelBtn').style.display = existing?'':'none';
+  openModal('bdResModal');
+}
+async function bdSaveReserve(){
+  const bdId = document.getElementById('bdResBdId').value;
+  const resId = document.getElementById('bdResId').value;
+  const newPrice = parseFloat(document.getElementById('bdResNewPrice').value)||0;
+  const oldStockQty = parseInt(document.getElementById('bdResQty').value)||0;
+  const startDate = document.getElementById('bdResStart').value || _bdToday();
+  const row = _bdData.find(x=>String(x.id)===String(bdId)); if(!row) return;
+  if(!newPrice){ alert('새 단가를 입력하세요.'); return; }
+  if(!oldStockQty || oldStockQty<=0){ alert('구단가 재고수량을 입력하세요.'); return; }
+  if(!_bdPriceResLoaded) await bdLoadPriceReservations();
+  let latest = await cloudKvLoad('bd_price_reservations');
+  latest = Array.isArray(latest) ? latest : [];
+  if(resId){
+    const idx=latest.findIndex(r=>r.id===resId);
+    if(idx>=0) latest[idx] = {...latest[idx], newPrice, oldStockQty, startDate};
+  } else {
+    if(latest.some(r=>r.code===row.code && r.status==='pending')){ alert('이미 이 코드에 진행중인 예약이 있습니다. 기존 예약을 취소하거나 수정해주세요.'); return; }
+    latest.push({ id:_bdPrId(), code:row.code, name:row.name, bdId:row.id, oldPrice:row.price, newPrice, oldStockQty, soldSinceStart:0, startDate, status:'pending', appliedDate:null, createdAt:_bdToday(), createdBy:_bdActor() });
+  }
+  _bdPriceRes = latest;
+  await cloudKvSave('bd_price_reservations', latest);
+  closeModal('bdResModal');
+  renderBdTable();
+  if(typeof toast==='function') toast('재고소진 자동전환 예약을 저장했습니다.');
+}
+async function bdCancelReserve(){
+  const resId = document.getElementById('bdResId').value; if(!resId) return;
+  if(!confirm('이 예약을 취소할까요?')) return;
+  let latest = await cloudKvLoad('bd_price_reservations');
+  latest = Array.isArray(latest) ? latest : [];
+  latest = latest.filter(r=>r.id!==resId);
+  _bdPriceRes = latest;
+  await cloudKvSave('bd_price_reservations', latest);
+  closeModal('bdResModal');
+  renderBdTable();
 }
 
 async function saveBdToSupabase(row, isEdit){
@@ -20657,7 +20805,9 @@ function renderBdTable(){
       </td>
       <td>${r.type||'—'}</td>
       <td style="font-weight:500;">${r.name||'—'}</td>
-      <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}</td>
+      <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}
+        ${(()=>{const res=bdActiveReservationFor(r.code); return res?`<div style="font-size:10px;font-weight:400;color:#D97706;text-align:right;">⏳ ${Number(res.newPrice).toLocaleString()}원 전환 예약 · 잔여 ${Math.max(0,res.oldStockQty-(res.soldSinceStart||0))}개</div>`:'';})()}
+      </td>
       <td style="text-align:center;">
         ${(r.comboItems&&r.comboItems.length===1)
           ? `<span title="세트 구성품 수량과 자동 연동 — 세트 수정에서 수량을 바꾸면 여기도 같이 바뀝니다" style="font-weight:600;">${bdQtyMultiplier(r.code)} 🔒</span>`
@@ -20671,6 +20821,7 @@ function renderBdTable(){
         <button class="btn btn-sm" onclick="openBdEdit('${String(r.id).replace(/'/g,"\\'")}')">수정</button>
         ${(r.comboItems&&r.comboItems.length)?'':`<button class="btn btn-sm" onclick="openBdMerge('${String(r.id).replace(/'/g,"\\'")}')" title="같은 상품, 다른 코드로 등록된 행을 이 행에 별칭코드로 합칩니다">🔗 병합</button>`}
         ${(r.comboItems&&r.comboItems.length)?'':`<button class="btn btn-sm" onclick="openBdConvertToCombo('${String(r.id).replace(/'/g,"\\'")}')" title="공급가를 수기로 합산해둔 코드를 구성품 기반 세트(조합)로 전환합니다">🧩 세트전환</button>`}
+        <button class="btn btn-sm" style="color:#D97706;" onclick="openBdReserve('${String(r.id).replace(/'/g,"\\'")}')" title="구단가 재고가 다 팔리면 자동으로 새 단가로 전환되도록 예약합니다">${bdActiveReservationFor(r.code)?'⏳ 예약중':'⏳ 예약'}</button>
         <button class="btn btn-sm" style="color:#DC2626;" onclick="bdDeleteRow('${String(r.id).replace(/'/g,"\\'")}')" title="이 행을 완전히 삭제합니다(병합/중복정리로 안 지워지는 경우 직접 삭제)">🗑</button>
       </td>
     </tr>`).join('');
@@ -23495,6 +23646,7 @@ async function confirmUpload(){
         if(error) console.error('daily_sales upsert error:',error.message);
       }
       if(dailyRows.length) await _bumpDaily();   // 같은 날짜 재업로드(덮어쓰기)도 캐시 무효화
+      if(dailyRows.length){ (_bdLoaded?Promise.resolve():loadBackdata()).then(()=>bdCheckPriceReservations()).catch(()=>{}); }
       await addHistory({menu:'판매분석',type:'upload',code:'MULTI',name:`${_pendingRows.length}건`,desc:'출고 데이터 업로드',before:'-',after:`${Object.keys(upd).length}개 상품`,user:'업로드'});
       if(currentPage==='sales'){renderSalesPeriod();renderSalesTbody();}
     } else if(type==='order'){
