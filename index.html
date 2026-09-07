@@ -5402,6 +5402,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <input type="text" id="revUniSrch" placeholder="주문번호, 상품번호, 상품명, 구매자, 수취인, 연락처..." oninput="_uniPage=0;renderUnifiedTable()">
         </div>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx2);cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" id="revUniAddrChk" onchange="_uniPage=0;document.getElementById('revUniSrch').placeholder=this.checked?'주소 검색...':'주문번호, 상품번호, 상품명, 구매자, 수취인, 연락처...';renderUnifiedTable()">주소검색
+        </label>
         <span style="font-size:11px;color:var(--tx2);" id="revUniCount">0건</span>
         <div id="revUniSumInline" style="flex:1;"></div>
         <span style="font-size:11px;color:var(--tx2);" id="revUniSelCount"></span>
@@ -19073,7 +19076,9 @@ function goToRevenueRow(id){
   _uniFilter.chs.clear();
   _uniSort.key=null;
   const srchEl=document.getElementById('revUniSrch');
-  if(srchEl) srchEl.value='';
+  if(srchEl){ srchEl.value=''; srchEl.placeholder='주문번호, 상품번호, 상품명, 구매자, 수취인, 연락처...'; }
+  const addrChk=document.getElementById('revUniAddrChk');
+  if(addrChk) addrChk.checked=false;
   renderUnifiedTable();
   const idx=_uniRowsCache.findIndex(r=>r.id===id);
   if(idx<0){ toast('필터를 초기화했지만 해당 주문을 찾지 못했습니다.'); return; }
@@ -20119,6 +20124,7 @@ function renderUnifiedTable(){
   buildUniFilterBtns();
   document.getElementById('revUniTable')?.classList.toggle('uni-locked', !_uniEditMode);
   const srch=(document.getElementById('revUniSrch')?.value||'').toLowerCase();
+  const addrOnly=document.getElementById('revUniAddrChk')?.checked;
   const empty=document.getElementById('revUniEmpty');
   const scroll=document.getElementById('revUniScroll');
 
@@ -20128,7 +20134,10 @@ function renderUnifiedTable(){
     if(_uniFilter.months.size>0&&!_uniFilter.months.has(r.month)) return false;
     if(_uniFilter.chs.size>0&&!_uniFilter.chs.has(r.ch)) return false;
     if(srch){
-      const hay=`${r.year}${r.date}${r.ch}${r.orderNo}${r.buyer}${r.receiver}${r.phone1}${r.phone2}${r.modelName}${r.itemCode}${r.itemNo}`.toLowerCase();
+      // "주소검색" 체크 시 주소만 검색 대상 — 일반 검색과 섞으면 주소 문구가 다른 필드와 우연히 겹쳐 오탐될 수 있어 분리
+      const hay=addrOnly
+        ? String(r.addr||'').toLowerCase()
+        : `${r.year}${r.date}${r.ch}${r.orderNo}${r.buyer}${r.receiver}${r.phone1}${r.phone2}${r.modelName}${r.itemCode}${r.itemNo}`.toLowerCase();
       if(!hay.includes(srch)) return false;
     }
     return true;
