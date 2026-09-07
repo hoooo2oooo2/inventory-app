@@ -20662,6 +20662,7 @@ function renderBdTable(){
         <button class="btn btn-sm" onclick="openBdEdit('${String(r.id).replace(/'/g,"\\'")}')">수정</button>
         ${(r.comboItems&&r.comboItems.length)?'':`<button class="btn btn-sm" onclick="openBdMerge('${String(r.id).replace(/'/g,"\\'")}')" title="같은 상품, 다른 코드로 등록된 행을 이 행에 별칭코드로 합칩니다">🔗 병합</button>`}
         ${(r.comboItems&&r.comboItems.length)?'':`<button class="btn btn-sm" onclick="openBdConvertToCombo('${String(r.id).replace(/'/g,"\\'")}')" title="공급가를 수기로 합산해둔 코드를 구성품 기반 세트(조합)로 전환합니다">🧩 세트전환</button>`}
+        <button class="btn btn-sm" style="color:#DC2626;" onclick="bdDeleteRow('${String(r.id).replace(/'/g,"\\'")}')" title="이 행을 완전히 삭제합니다(병합/중복정리로 안 지워지는 경우 직접 삭제)">🗑</button>
       </td>
     </tr>`).join('');
 }
@@ -21148,6 +21149,29 @@ async function bdUnmergeAlias(primaryId, aliasCode){
     renderBdTable();
     if(typeof toast==='function') toast(`"${aliasCode}" 코드를 별도 행으로 분리했습니다.`);
   }catch(e){ alert('분리 실패: '+e.message); }
+}
+
+// 개별 행 직접 삭제 — 병합/중복정리 대상에서 빠지는 경우(예: 한쪽만 세트로 전환된 중복행)를 위한 수동 삭제.
+// 별칭코드가 딸려있거나 다른 세트의 구성품으로 쓰이고 있으면 그 사실을 먼저 알려주고 확인받는다.
+async function bdDeleteRow(id){
+  const row=_bdData.find(x=>String(x.id)===String(id)); if(!row) return;
+  const warnings=[];
+  if(row.aliasCodes && row.aliasCodes.length){
+    warnings.push(`이 행에 별칭코드가 ${row.aliasCodes.length}개(${row.aliasCodes.join(', ')}) 연결돼 있습니다 — 삭제하면 그 코드들은 더 이상 어떤 상품과도 매칭되지 않습니다.`);
+  }
+  const usedBy=_bdData.filter(r=>Array.isArray(r.comboItems)&&r.comboItems.some(it=>String(it.bdId)===String(row.id)));
+  if(usedBy.length){
+    warnings.push(`이 코드는 세트상품 ${usedBy.length}개(${usedBy.map(r=>r.code).join(', ')})의 구성품으로 쓰이고 있습니다 — 삭제하면 그 세트들의 단가가 최신화되지 않습니다.`);
+  }
+  const msg = `"${row.name}" (코드: ${row.code})를 완전히 삭제할까요?`+(warnings.length?`\n\n⚠ ${warnings.join('\n⚠ ')}`:'')+`\n\n이 작업은 되돌릴 수 없습니다.`;
+  if(!confirm(msg)) return;
+  try{
+    await deleteBdFromSupabase(row.id);
+    _bdData=_bdData.filter(x=>String(x.id)!==String(row.id));
+    addHistory({menu:'매출관리',type:'edit',code:row.code,name:row.name,desc:'백데이터 삭제',before:'존재',after:'삭제',user:'수동'});
+    renderBdTable();
+    if(typeof toast==='function') toast(`"${row.code}" 행을 삭제했습니다.`);
+  }catch(e){ alert('삭제 실패: '+e.message); }
 }
 
 // ── 완전 중복행 정리 (코드·구분·상품명·공급가 4개가 전부 동일한 경우만) ──
