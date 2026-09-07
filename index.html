@@ -6545,7 +6545,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <p style="font-size:12px;color:var(--tx2);margin:4px 0 12px;line-height:1.6;">
       📥 엑셀 다운로드로 받은 파일을 수정해서 올리세요.<br>
       • <b>ID</b>가 있는 행 → 해당 코드 수정 &nbsp; • <b>ID</b> 비어있는 행 → 새로 추가<br>
-      <span style="color:#DC2626;">※ 컬럼 순서: ID · 공급자명 · 전체상품코드 · 구분 · 상품명 · 공급가</span>
+      <span style="color:#DC2626;">※ 컬럼 순서: ID · 공급자명 · 전체상품코드 · 구분 · 상품명 · 공급가 · 구단가재고수량</span><br>
+      <span style="color:#D97706;">⏳ "구단가재고수량"에 숫자를 넣은 행은 공급가를 바로 안 바꾸고, 그 수량만큼 실제로 팔린 뒤 자동전환되도록 예약만 등록/갱신합니다(공급가 칸엔 전환될 새 단가를 적어주세요). 비워두면 지금까지처럼 즉시 적용됩니다.</span>
     </p>
     <div id="bdDropZone" style="border:2px dashed var(--bd);border-radius:12px;padding:34px 16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg);">
       <div style="font-size:30px;margin-bottom:6px;">📁</div>
@@ -14749,10 +14750,10 @@ async function recalcShippingForKey(channel,item_no,feeObj){
 // ── 백데이터 엑셀 다운로드 / 업로드 ──
 function downloadBackdataExcel(){
   if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
-  const aoa=[['ID','공급자명','전체상품코드','구분','상품명','공급가']];
-  _bdData.forEach(r=>aoa.push([r.id, r.supplier||'', r.code||'', r.type||'', r.name||'', r.price!=null?r.price:'']));
+  const aoa=[['ID','공급자명','전체상품코드','구분','상품명','공급가','구단가재고수량(예약, 선택)']];
+  _bdData.forEach(r=>aoa.push([r.id, r.supplier||'', r.code||'', r.type||'', r.name||'', r.price!=null?r.price:'', '']));
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:8},{wch:14},{wch:16},{wch:10},{wch:40},{wch:12}];
+  ws['!cols']=[{wch:8},{wch:14},{wch:16},{wch:10},{wch:40},{wch:12},{wch:20}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'백데이터');
   const d=new Date();
@@ -14787,29 +14788,40 @@ async function _readBdUpload(file){
   try{
     const rows=await readXlsxRows(file);
     if(!rows.length){ alert('빈 파일입니다.'); return; }
-    // 컬럼: ID, 공급자명, 전체상품코드, 구분, 상품명, 공급가
-    const updates=[], inserts=[]; let bad=0;
+    // 컬럼: ID, 공급자명, 전체상품코드, 구분, 상품명, 공급가, 구단가재고수량(선택 — 있으면 즉시적용 대신 예약)
+    const updates=[], inserts=[], reservations=[]; let bad=0, resSkipped=0;
     for(let i=1;i<rows.length;i++){
       const r=rows[i]; if(!r||r.every(v=>v===''||v==null)) continue;
       const id=_s(r[0]), supplier=_s(r[1]), code=_s(r[2]), type=_s(r[3]), name=_s(r[4]);
       const price=_n(r[5]);
+      const resQty = r.length>6 ? _n(r[6]) : null;
       if(!code||!name){ bad++; continue; }
+      if(resQty!=null && resQty>0){
+        // 구단가재고수량이 있으면 이 행은 즉시 단가변경이 아니라 재고소진 예약 대상 — 기존에 등록된 코드여야 함
+        const existing = findBdByAnyCode(code);
+        if(!existing){ resSkipped++; continue; }
+        reservations.push({ code:existing.code, name:existing.name, bdId:existing.id, oldPrice:existing.price, newPrice:price, oldStockQty:resQty });
+        continue;
+      }
       const rec={ code, supplier:supplier||null, item_type:type||null, name, price:price!=null?price:null, updated_at:new Date().toISOString() };
       if(id && /^\d+$/.test(id)){ rec.id=Number(id); updates.push(rec); }
       else inserts.push(rec);
     }
-    _bdUploadParsed={updates,inserts,bad};
+    _bdUploadParsed={updates,inserts,bad,reservations,resSkipped};
     document.getElementById('bdDropText').textContent=`✅ ${file.name}`;
     document.getElementById('bdUploadPreview').innerHTML=
       `<div style="padding:10px 12px;background:var(--bg);border:0.5px solid var(--bd);border-radius:8px;">
-        수정 <b style="color:#3182F6;">${updates.length}</b>건 · 신규 추가 <b style="color:#059669;">${inserts.length}</b>건${bad?` · <span style="color:#DC2626;">코드/상품명 누락 ${bad}건 제외</span>`:''}
+        즉시 단가변경 <b style="color:#3182F6;">${updates.length}</b>건 · 신규 추가 <b style="color:#059669;">${inserts.length}</b>건
+        ${reservations.length?` · <b style="color:#D97706;">⏳ 재고소진 예약 등록/갱신 ${reservations.length}건</b>`:''}
+        ${bad?` · <span style="color:#DC2626;">코드/상품명 누락 ${bad}건 제외</span>`:''}
+        ${resSkipped?` · <span style="color:#DC2626;">예약하려 했지만 기존에 없는 코드라 제외 ${resSkipped}건</span>`:''}
       </div>`;
-    document.getElementById('bdUploadApplyBtn').disabled=(updates.length+inserts.length===0);
+    document.getElementById('bdUploadApplyBtn').disabled=(updates.length+inserts.length+reservations.length===0);
   }catch(e){ alert('파일 읽기 실패: '+e.message); }
 }
 async function applyBdUpload(){
   if(!_bdUploadParsed){ return; }
-  const {updates,inserts}=_bdUploadParsed;
+  const {updates,inserts,reservations}=_bdUploadParsed;
   const btn=document.getElementById('bdUploadApplyBtn');
   btn.disabled=true; btn.textContent='적용 중...';
   try{
@@ -14817,9 +14829,23 @@ async function applyBdUpload(){
     for(let i=0;i<updates.length;i+=500){ const {error}=await sb.from('backdata').upsert(updates.slice(i,i+500)); if(error) throw error; }
     // 신규 insert
     for(let i=0;i<inserts.length;i+=500){ const {error}=await sb.from('backdata').insert(inserts.slice(i,i+500)); if(error) throw error; }
+    // 재고소진 예약 일괄 등록/갱신 (같은 코드로 이미 진행중인 예약이 있으면 새단가·수량만 갱신)
+    let resApplied=0;
+    if(reservations && reservations.length){
+      let latest = await cloudKvLoad('bd_price_reservations'); latest=Array.isArray(latest)?latest:[];
+      const today=_bdToday();
+      for(const rv of reservations){
+        const idx=latest.findIndex(x=>x.status==='pending' && x.code===rv.code);
+        if(idx>=0){ latest[idx]={...latest[idx], newPrice:rv.newPrice, oldStockQty:rv.oldStockQty}; }
+        else { latest.push({ id:_bdPrId(), code:rv.code, name:rv.name, bdId:rv.bdId, oldPrice:rv.oldPrice, newPrice:rv.newPrice, oldStockQty:rv.oldStockQty, soldSinceStart:0, startDate:today, status:'pending', appliedDate:null, createdAt:today, createdBy:_bdActor() }); }
+        resApplied++;
+      }
+      await cloudKvSave('bd_price_reservations', latest);
+      _bdPriceRes=latest; _bdPriceResLoaded=true;
+    }
     _bdLoaded=false; await loadBackdata(); renderBdTable();
     closeModal('bdUploadModal');
-    alert(`적용 완료\n수정 ${updates.length}건 · 신규 ${inserts.length}건`);
+    alert(`적용 완료\n즉시 단가변경 ${updates.length}건 · 신규 ${inserts.length}건${resApplied?` · 예약 등록/갱신 ${resApplied}건(오늘부터 추적 시작)`:''}`);
   }catch(e){ alert('적용 실패: '+e.message); btn.disabled=false; btn.textContent='적용'; }
 }
 
