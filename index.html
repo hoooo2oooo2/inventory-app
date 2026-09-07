@@ -14750,7 +14750,7 @@ async function recalcShippingForKey(channel,item_no,feeObj){
 // ── 백데이터 엑셀 다운로드 / 업로드 ──
 function downloadBackdataExcel(){
   if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
-  const aoa=[['ID','공급자명','전체상품코드','구분','상품명','공급가','구단가재고수량(예약, 선택)']];
+  const aoa=[['ID','공급자명','전체상품코드','구분','상품명','공급가(새 단가는 여기)','구재고 몇개 남았나(입력 시 소진될 때까지 예약, 새단가 아님)']];
   _bdData.forEach(r=>aoa.push([r.id, r.supplier||'', r.code||'', r.type||'', r.name||'', r.price!=null?r.price:'', '']));
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:8},{wch:14},{wch:16},{wch:10},{wch:40},{wch:12},{wch:20}];
@@ -14843,7 +14843,10 @@ async function applyBdUpload(){
       await cloudKvSave('bd_price_reservations', latest);
       _bdPriceRes=latest; _bdPriceResLoaded=true;
     }
-    _bdLoaded=false; await loadBackdata(); renderBdTable();
+    _bdLoaded=false; await loadBackdata();
+    // 방금 바뀐 구성품 단가를 세트(조합) 코드에도 즉시 반영 — 통합 반영 버튼을 누르기 전에도 백데이터 표에 정확한 세트단가가 보이도록
+    await recalcAllComboPrices();
+    renderBdTable();
     closeModal('bdUploadModal');
     alert(`적용 완료\n즉시 단가변경 ${updates.length}건 · 신규 ${inserts.length}건${resApplied?` · 예약 등록/갱신 ${resApplied}건(오늘부터 추적 시작)`:''}`);
   }catch(e){ alert('적용 실패: '+e.message); btn.disabled=false; btn.textContent='적용'; }
