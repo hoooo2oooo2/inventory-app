@@ -9517,13 +9517,14 @@ function lsoToggleUse(rowNum){
 function _lsoAllocate(){
   const remain = {};
   return _lsoRows.map(r=>{
-    if(!r.matchId) return { ...r, covered:0, short:0 };
+    if(!r.matchId) return { ...r, covered:0, short:0, remainBefore:null };
     if(!(r.matchId in remain)) remain[r.matchId] = r.matchQty;
-    if(!r.use) return { ...r, covered:0, short:0 };
+    const remainBefore = remain[r.matchId]; // 이 행 처리 직전 시점의 남은 재고 — 앞선 행이 이미 다 썼는지 구분용
+    if(!r.use) return { ...r, covered:0, short:0, remainBefore };
     const avail = remain[r.matchId];
     const covered = Math.max(0, Math.min(avail, r.qty));
     remain[r.matchId] = avail - covered;
-    return { ...r, covered, short: r.qty - covered };
+    return { ...r, covered, short: r.qty - covered, remainBefore };
   });
 }
 function lsoRenderModal(){
@@ -9550,9 +9551,16 @@ function lsoRenderModal(){
     } else if(r.short<=0){
       stockNote = `<span class="lso-tag lso-yes">소장재고 있음 · ${matchLabel} (재고 ${_lbxNum(r.matchQty)})</span>`;
     } else if(r.covered>0){
-      stockNote = `<span class="lso-tag lso-warn">⚠️ 재고 부족 · ${_lbxNum(r.covered)}개만 소장재고, ${_lbxNum(r.short)}개 추가발주 필요</span>`;
+      // 앞선 다른 발주 행이 같은 소장재고 일부를 먼저 가져간 뒤 시작된 경우 명시 (그냥 재고 자체가 적어서 부족한 것과 구분)
+      const partiallyUsedByOther = r.remainBefore!=null && r.remainBefore<r.matchQty;
+      stockNote = `<span class="lso-tag lso-warn">⚠️ 재고 부족 · ${_lbxNum(r.covered)}개만 소장재고, ${_lbxNum(r.short)}개 추가발주 필요`
+        + (partiallyUsedByOther?` (이 상품 재고 ${_lbxNum(r.matchQty)}개 중 ${_lbxNum(r.matchQty-r.remainBefore)}개는 앞선 행이 먼저 사용)`:'') + `</span>`;
     } else {
-      stockNote = `<span class="lso-tag lso-warn">⚠️ 소장재고 소진 · 전량(${_lbxNum(r.qty)}개) 추가발주 필요</span>`;
+      // 재고가 0인 게 원래부터 없어서인지, 같은 상품의 다른 발주 행이 방금 다 가져가서인지 구분해서 보여줌
+      const usedByOtherRow = r.matchQty>0 && r.remainBefore===0;
+      stockNote = usedByOtherRow
+        ? `<span class="lso-tag lso-warn">⚠️ 소장재고 소진 · 이 상품 재고 ${_lbxNum(r.matchQty)}개는 앞선 다른 발주 행에서 이미 전부 배분됨 · 전량(${_lbxNum(r.qty)}개) 추가발주 필요</span>`
+        : `<span class="lso-tag lso-warn">⚠️ 소장재고 소진 · 전량(${_lbxNum(r.qty)}개) 추가발주 필요</span>`;
     }
     const nameDisp = r.name ? _logiEsc(r.name)
       : (r.matchId ? `<span style="color:var(--tx2);">(코드로 매칭됨) ${_logiEsc(r.matchName)}</span>` : `<span style="color:var(--tx2);">상품명 없음${r.code?' · 코드 '+_logiEsc(r.code):''}</span>`);
