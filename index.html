@@ -14982,7 +14982,22 @@ async function bdCheckPriceReservations(){
       const nameKey = normName(bdRow.name);
       const {data,error} = await sb.from('daily_sales').select('sale_date,qty,name,code').eq('is_rg', false).gte('sale_date', res.startDate);
       if(error){ console.warn('재고소진 예약 체크 조회 실패:', res.code, error.message); continue; }
-      const matched = (data||[]).filter(r => codeSet.has(String(r.code||'').toLowerCase()) || normName(r.name)===nameKey);
+      // 1) 이 상품 자체의 직접 판매분
+      let matched = (data||[]).filter(r => codeSet.has(String(r.code||'').toLowerCase()) || normName(r.name)===nameKey)
+        .map(r=>({sale_date:r.sale_date, qty:Number(r.qty)||0}));
+      // 2) 이 상품을 구성품으로 쓰는 세트(N개입 포함)가 팔린 분도 그 세트 안의 수량만큼 곱해서 같이 소진 처리
+      //    (예: 1개입에 예약 걸어놨는데 2개입 세트로 팔리면, 세트 코드 자체의 판매분은 daily_sales에서
+      //    이 상품 이름/코드로는 안 잡히므로 따로 찾아서 배수를 곱해줘야 함)
+      const consumingSets = _bdData.filter(s=>Array.isArray(s.comboItems) && s.comboItems.some(it=>String(it.bdId)===String(bdRow.id)));
+      for(const setRow of consumingSets){
+        const item = setRow.comboItems.find(it=>String(it.bdId)===String(bdRow.id));
+        const mult = Number(item&&item.qty)||1;
+        const setCodeSet = new Set([setRow.code, ...(setRow.aliasCodes||[])].filter(Boolean).map(c=>String(c).toLowerCase()));
+        const setNameKey = normName(setRow.name);
+        const setEvents = (data||[]).filter(r => setCodeSet.has(String(r.code||'').toLowerCase()) || normName(r.name)===setNameKey)
+          .map(r=>({sale_date:r.sale_date, qty:(Number(r.qty)||0)*mult}));
+        matched = matched.concat(setEvents);
+      }
       const {cum, depletedDate} = _bdCalcDepletion(matched, res.oldStockQty);
       if(res.soldSinceStart!==cum){ res.soldSinceStart=cum; anyChange=true; }
       if(!depletedDate) continue;
