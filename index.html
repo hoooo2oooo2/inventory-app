@@ -6382,6 +6382,15 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div id="bdAliasChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div>
       <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">재고관리 코드/판매처 코드처럼 이름·단가가 같은데 코드만 다른 경우, 여기에 추가하면 어느 코드로 판매가 들어와도 이 단가로 매칭됩니다.</div>
     </div>
+    <div class="field">
+      <label>별칭 상품명 (ss소장처럼 코드가 겹쳐서 이름으로 구분하는 경우)</label>
+      <div style="display:flex;gap:6px;">
+        <input id="bdAliasNameInput" placeholder="예: 검정기둥" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();bdAddAliasNameChip();}">
+        <button type="button" class="btn btn-sm" onclick="bdAddAliasNameChip()">추가</button>
+      </div>
+      <div id="bdAliasNameChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div>
+      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">ss소장처럼 코드가 겹쳐서 상품명으로 구분하는 경우, 여기에 다른 이름을 추가하면 그 이름으로 들어오는 판매 데이터도 이 상품의 단가로 매칭됩니다.</div>
+    </div>
     <div class="field" id="bdEffDateField" style="display:none;">
       <label>공급가 변경 반영 시작일</label>
       <input id="bdEffDate" type="date">
@@ -20924,6 +20933,7 @@ function openBdAdd(){
   document.getElementById('bdEditKey').value='';
   document.getElementById('bdEffDateField').style.display='none';
   _bdAliasChips=[]; _bdAliasChipsOriginal=[]; bdRenderAliasChips();
+  _bdAliasNameChips=[]; _bdAliasNameChipsOriginal=[]; bdRenderAliasNameChips();
   openModal('bdModal');
 }
 
@@ -20944,6 +20954,7 @@ function openBdEdit(id){
   document.getElementById('bdEffDate').value=defEffDate;
   document.getElementById('bdEffDateField').style.display='';
   _bdAliasChips=(r.aliasCodes||[]).slice(); _bdAliasChipsOriginal=(r.aliasCodes||[]).slice(); bdRenderAliasChips();
+  _bdAliasNameChips=(r.aliasNames||[]).slice(); _bdAliasNameChipsOriginal=(r.aliasNames||[]).slice(); bdRenderAliasNameChips();
   openModal('bdModal');
 }
 
@@ -21215,6 +21226,24 @@ function bdAddAliasChip(){
 function bdRemoveAliasChip(i){ _bdAliasChips.splice(i,1); bdRenderAliasChips(); }
 function _bdEscHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// 별칭 상품명(aliasNames) chip 편집 상태 (bdModal 열려있는 동안만 유지) — ss소장처럼 코드가
+// 겹쳐서 이름으로 구분해야 하는 경우, 병합 없이도 직접 다른 이름을 추가할 수 있게 한다.
+let _bdAliasNameChips = [];
+let _bdAliasNameChipsOriginal = []; // 모달 연 시점의 별칭 상품명 스냅샷 — 저장 시 이 중 빠진 게 있으면 별도 행으로 되살림
+function bdRenderAliasNameChips(){
+  const box=document.getElementById('bdAliasNameChips'); if(!box) return;
+  box.innerHTML = _bdAliasNameChips.map((c,i)=>
+    `<span class="bd-alias-chip">${_bdEscHtml(c)}<button type="button" onclick="bdRemoveAliasNameChip(${i})" title="삭제">×</button></span>`
+  ).join('') || `<span style="font-size:11px;color:var(--tx2);">등록된 별칭 상품명 없음</span>`;
+}
+function bdAddAliasNameChip(){
+  const inp=document.getElementById('bdAliasNameInput'); if(!inp) return;
+  const v=(inp.value||'').trim(); if(!v) return;
+  if(_bdAliasNameChips.some(c=>normName(c)===normName(v))){ inp.value=''; return; }
+  _bdAliasNameChips.push(v); inp.value=''; bdRenderAliasNameChips();
+}
+function bdRemoveAliasNameChip(i){ _bdAliasNameChips.splice(i,1); bdRenderAliasNameChips(); }
+
 async function saveBdModal(){
   const code = document.getElementById('bdCode').value.trim();
   const supplier = document.getElementById('bdSupplier').value.trim();
@@ -21223,6 +21252,7 @@ async function saveBdModal(){
   const price = document.getElementById('bdPrice').value!==''?parseFloat(document.getElementById('bdPrice').value):null;
   const editKey = document.getElementById('bdEditKey').value;
   const aliasCodes = _bdAliasChips.slice();
+  const aliasNames = _bdAliasNameChips.slice();
   if(!code){alert('전체상품코드를 입력하세요.');return;}
   if(!name){alert('상품명을 입력하세요.');return;}
 
@@ -21235,7 +21265,7 @@ async function saveBdModal(){
       const idx = _bdData.findIndex(x=>String(x.id)===String(editKey));
       if(idx>=0){
         const oldPrice = _bdData[idx].price;
-        row = {..._bdData[idx],supplier,type,name,price,aliasCodes};
+        row = {..._bdData[idx],supplier,type,name,price,aliasCodes,aliasNames};
         await saveBdToSupabase(row, true);
         _bdData[idx] = row;
         // 이미 저장돼있던 별칭코드를 이번에 빼버렸으면(되돌리기) 그 코드는 별도 행으로 되살림
@@ -21244,6 +21274,13 @@ async function saveBdModal(){
           const spun={code:ac, supplier:row.supplier, type:row.type, name:row.name, price:row.price, aliasCodes:[], comboItems:null};
           try{ await saveBdToSupabase(spun,false); _bdData.push(spun); }
           catch(se){ console.warn('별칭 분리 실패:',ac,se); }
+        }
+        // 별칭 상품명을 이번에 빼버렸으면(되돌리기) 그 이름은 같은 코드의 별도 행으로 되살림
+        const removedAliasNames=_bdAliasNameChipsOriginal.filter(a=>!aliasNames.some(n=>normName(n)===normName(a)));
+        for(const an of removedAliasNames){
+          const spun={code:row.code, supplier:row.supplier, type:row.type, name:an, price:row.price, aliasCodes:[], aliasNames:[], comboItems:null};
+          try{ await saveBdToSupabase(spun,false); _bdData.push(spun); }
+          catch(se){ console.warn('별칭 상품명 분리 실패:',an,se); }
         }
         // 공급가 변경 시 매칭된 revenue 단가·마진 일괄 재계산
         if(price !== oldPrice){
@@ -21261,7 +21298,7 @@ async function saveBdModal(){
       // ss소장 코드만 중복 허용 (다른 코드는 중복 불가) — 별칭코드로 이미 쓰이는 코드도 차단
       const isDuplicate = findBdByAnyCode(code);
       if(isDuplicate && code!=='ss소장'){alert('이미 존재하는 코드입니다(별칭코드로 등록돼 있을 수 있습니다).');return;}
-      row = {code,supplier,type,name,price,aliasCodes};
+      row = {code,supplier,type,name,price,aliasCodes,aliasNames};
       await saveBdToSupabase(row, false);
       _bdData.push(row);
     }
