@@ -5290,6 +5290,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <button class="btn btn-sm" onclick="resyncRevenueTypes()" style="background:#7C3AED;color:#fff;border:none;" title="현재 백데이터 '구분'을 통합 데이터 전체(날짜 제한 없음)에 일괄 반영합니다. 단가·마진은 변경하지 않습니다">🏷️ 구분 수정</button>
         <span style="font-size:11px;color:var(--tx2);">구분만 전체 기간에 적용 (날짜 제한 없음)</span>
         <button class="btn btn-sm" onclick="openBdDedupe()" style="background:#DC2626;color:#fff;border:none;" title="코드·구분·상품명·공급가 4개가 전부 동일한 행을 찾아 1개만 남기고 정리합니다">🧹 중복 정리</button>
+        <button class="btn btn-sm" onclick="bdDiagnoseSharedMerges()" style="background:#0891B2;color:#fff;border:none;" title="ss소장처럼 코드가 겹치는 상품끼리 과거에 병합돼 상품명이 유실됐을 수 있는 행을 찾아 보여줍니다(읽기 전용, 아무것도 바꾸지 않음)">🔍 병합 이름유실 점검</button>
       </div>
       <div class="rev-tbl-card">
         <div class="tw">
@@ -14880,7 +14881,7 @@ async function loadBackdata(){
       type: r.item_type||'',
       name: r.name||'',
       price: r.price!=null?Number(r.price):null,
-      aliasCodes: Array.isArray(r.alias_codes)?r.alias_codes.filter(Boolean):[],
+      ..._bdSplitAliasCodes(r.alias_codes),
       comboItems: Array.isArray(r.combo_items)?r.combo_items:null
     }));
     _bdLoaded = true;
@@ -15076,7 +15077,7 @@ async function saveBdToSupabase(row, isEdit){
     item_type: row.type||null,
     name: row.name,
     price: row.price!=null?row.price:null,
-    alias_codes: Array.isArray(row.aliasCodes)?row.aliasCodes:[],
+    alias_codes: _bdJoinAliasCodes(row.aliasCodes, row.aliasNames),
     combo_items: Array.isArray(row.comboItems)?row.comboItems:null,
     updated_at: new Date().toISOString()
   };
@@ -20869,7 +20870,9 @@ function renderBdTable(){
         ${(r.aliasCodes&&r.aliasCodes.length)?`<div class="bd-alias-tag">별칭: ${r.aliasCodes.map(a=>`${_bdEscHtml(a)}<button type="button" onclick="bdUnmergeAlias('${String(r.id).replace(/'/g,"\\'")}','${String(a).replace(/'/g,"\\'")}')" title="분리(되돌리기)" style="border:none;background:transparent;color:var(--tx2);cursor:pointer;font-size:10px;padding:0 2px;">×</button>`).join(', ')}</div>`:''}
       </td>
       <td>${r.type||'—'}</td>
-      <td style="font-weight:500;">${r.name||'—'}</td>
+      <td style="font-weight:500;">${r.name||'—'}
+        ${(r.aliasNames&&r.aliasNames.length)?`<div class="bd-alias-tag">별칭 상품명: ${r.aliasNames.map(a=>`${_bdEscHtml(a)}<button type="button" onclick="bdUnmergeAliasName('${String(r.id).replace(/'/g,"\\'")}','${String(a).replace(/'/g,"\\'")}')" title="분리(되돌리기)" style="border:none;background:transparent;color:var(--tx2);cursor:pointer;font-size:10px;padding:0 2px;">×</button>`).join(', ')}</div>`:''}
+      </td>
       <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}
         ${(()=>{const res=bdActiveReservationFor(r.code, r.aliasCodes); return res?`<div style="font-size:10px;font-weight:400;color:#D97706;text-align:right;">⏳ 이전 ${Number(res.oldPrice).toLocaleString()}원 → 변경 ${Number(res.newPrice).toLocaleString()}원 · 잔여 ${Math.max(0,res.oldStockQty-(res.soldSinceStart||0))}개</div>`:'';})()}
       </td>
@@ -20952,7 +20955,8 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
   if(newPrice===(oldPrice!=null?oldPrice:0)) return 0;
   const code = bdRow.code||'';
   const isSharedCode = SHARED_BD_CODES.has(code.toLowerCase())||!code;
-  const bdNameKey = normName(bdRow.name);
+  // 대표 상품명 + 별칭 상품명(aliasNames — ss소장끼리 병합해서 흡수된 상품명) 전부 대상
+  const bdNameKeys = new Set([normName(bdRow.name), ...((bdRow.aliasNames||[]).map(normName))].filter(Boolean));
 
   const today = new Date();
   const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
@@ -20970,7 +20974,7 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
         .eq('year', curYear)
         .gte('sale_date', monthMD);
       if(error) throw error;
-      revRows=(data||[]).filter(r=>normName(r.model_name)===bdNameKey);
+      revRows=(data||[]).filter(r=>bdNameKeys.has(normName(r.model_name)));
     } else {
       // 대표코드 + 별칭코드(aliasCodes) 전부 대상 — 코드가 달라도 같은 상품이면 함께 반영
       const codes=[code, ...((bdRow.aliasCodes||[]).map(c=>String(c||'')).filter(Boolean))];
@@ -21080,18 +21084,8 @@ async function resyncRevenuePrices(){
   if(!confirm(`현재 백데이터 단가를 통합 데이터에 일괄 반영합니다.\n대상: ${curYear}년 ${parseInt(monthMD.slice(0,2))}월 ${parseInt(monthMD.slice(3,5))}일 이후 전체 (그 이전 데이터는 유지)\n\n진행할까요?`)) return;
   await recalcAllComboPrices();
 
-  // 백데이터 맵 (대표코드 + 별칭코드 모두 포함)
-  const bdMap={}; const bdNameMap={};
-  _bdData.forEach(r=>{
-    bdMap[(r.code||'').toLowerCase()]=r;
-    (r.aliasCodes||[]).forEach(ac=>{ if(ac) bdMap[String(ac).toLowerCase()]=r; });
-    if(r.name){
-      const k=normName(r.name);
-      const ck=(r.code||'').toLowerCase();
-      const special=(!r.code||SHARED_BD_CODES.has(ck));
-      if(!(k in bdNameMap)||special) bdNameMap[k]=r;
-    }
-  });
+  // 백데이터 맵 (대표코드+별칭코드, 대표상품명+별칭상품명 모두 포함 — getBdMap/getBdNameMap과 동일 규칙)
+  const bdMap=getBdMap(), bdNameMap=getBdNameMap();
 
   // 진행 표시
   const btns=document.querySelectorAll('[onclick="resyncRevenuePrices()"]');
@@ -21154,16 +21148,7 @@ async function resyncRevenueTypes(){
   if(!confirm(`현재 백데이터의 '구분'을 통합 데이터 전체(전체 기간·날짜 제한 없음)에 일괄 반영합니다.\n구분만 변경되며 단가·마진은 그대로 유지됩니다.\n\n진행할까요?`)) return;
 
   // 백데이터 맵 (단가 반영과 동일한 매칭 규칙)
-  const bdMap={}; const bdNameMap={};
-  _bdData.forEach(r=>{
-    bdMap[(r.code||'').toLowerCase()]=r;
-    if(r.name){
-      const k=normName(r.name);
-      const ck=(r.code||'').toLowerCase();
-      const special=(!r.code||SHARED_BD_CODES.has(ck));
-      if(!(k in bdNameMap)||special) bdNameMap[k]=r;
-    }
-  });
+  const bdMap=getBdMap(), bdNameMap=getBdNameMap();
 
   const btns=document.querySelectorAll('[onclick="resyncRevenueTypes()"]');
   btns.forEach(b=>{b.disabled=true;b.dataset._t=b.textContent;b.textContent='반영 중...';});
@@ -21305,9 +21290,13 @@ function bdRenderMergeHeader(){
   document.getElementById('bdMergeTitle').textContent=`🔗 "${src.name||src.code}" 코드 병합`;
   const box=document.getElementById('bdMergeAliasSummary'); if(!box) return;
   const aliases=src.aliasCodes||[];
+  const aliasNames=src.aliasNames||[];
   box.innerHTML = `<b>${_bdEscHtml(src.code)}</b>` + (aliases.length
     ? ` = ${aliases.map(a=>`<span class="bd-alias-chip" style="margin-left:4px;">${_bdEscHtml(a)}<button type="button" onclick="bdUnmergeAlias('${String(src.id).replace(/'/g,"\\'")}','${String(a).replace(/'/g,"\\'")}')" title="이 코드를 다시 별도 행으로 분리(되돌리기)">×</button></span>`).join('')} 합쳐짐`
-    : ` — 아직 합쳐진 별칭 코드 없음`);
+    : ` — 아직 합쳐진 별칭 코드 없음`)
+    + (aliasNames.length
+      ? `<br><span style="color:var(--tx2);">별칭 상품명:</span> ${aliasNames.map(a=>`<span class="bd-alias-chip" style="margin-left:4px;">${_bdEscHtml(a)}<button type="button" onclick="bdUnmergeAliasName('${String(src.id).replace(/'/g,"\\'")}','${String(a).replace(/'/g,"\\'")}')" title="이 상품명을 다시 별도 행으로 분리(되돌리기)">×</button></span>`).join('')}`
+      : '');
 }
 function bdRenderMergeList(){
   const q=(document.getElementById('bdMergeSrch')?.value||'').toLowerCase();
@@ -21339,7 +21328,16 @@ async function bdMergeConfirm(targetId){
     : '';
   if(!confirm(`"${tgt.name}" (코드: ${tgt.code}, ${tgtPriceTxt})를\n"${src.name}" (코드: ${src.code}, ${srcPriceTxt})의 별칭코드로 합칠까요?\n\n합친 뒤 "${tgt.code}" 행은 삭제되고, 앞으로 이 코드로 들어오는 판매·재고 데이터는 전부 "${src.code}" 단가로 매칭됩니다.${priceWarn}`)) return;
   const mergedAliases=[...new Set([...(src.aliasCodes||[]), tgt.code, ...(tgt.aliasCodes||[])].filter(Boolean))];
-  const updated={...src, aliasCodes:mergedAliases};
+  // 코드가 ss소장처럼 여러 상품이 공유하는 코드면, 코드만으로는 흡수된 상품을 구분할 수 없어서
+  // 앞으로 들어오는 판매 데이터는 "상품명"으로 매칭된다. 그래서 흡수되는 행의 상품명(과 그 행이
+  // 이미 갖고 있던 별칭 상품명)을 잃어버리지 않도록 별칭 상품명(aliasNames)으로 남겨둔다.
+  const srcIsShared=SHARED_BD_CODES.has(String(src.code||'').toLowerCase());
+  const tgtIsShared=SHARED_BD_CODES.has(String(tgt.code||'').toLowerCase());
+  const mergedNames = (srcIsShared||tgtIsShared)
+    ? [...new Set([...(src.aliasNames||[]), tgt.name, ...(tgt.aliasNames||[])].filter(Boolean))]
+        .filter(n=>normName(n)!==normName(src.name))
+    : (src.aliasNames||[]);
+  const updated={...src, aliasCodes:mergedAliases, aliasNames:mergedNames};
   try{
     await saveBdToSupabase(updated,true);
     await deleteBdFromSupabase(tgt.id);
@@ -21375,6 +21373,50 @@ async function bdUnmergeAlias(primaryId, aliasCode){
     if(typeof toast==='function') toast(`"${aliasCode}" 코드를 별도 행으로 분리했습니다.`);
   }catch(e){ alert('분리 실패: '+e.message); }
 }
+// 별칭 "상품명" 분리(되돌리기) — ss소장처럼 코드가 겹쳐서 상품명으로만 합쳐졌던 경우.
+// 분리된 행은 대표행과 같은 코드(코드로는 구분 불가하므로)에 이 상품명을 가진 새 행으로 되살아난다.
+async function bdUnmergeAliasName(primaryId, aliasName){
+  const src=_bdData.find(x=>String(x.id)===String(primaryId)); if(!src) return;
+  const priceTxt = src.price!=null?Number(src.price).toLocaleString()+'원':'단가없음';
+  if(!confirm(`"${aliasName}" 상품명을 "${src.name}"에서 분리해서 다시 별도 행으로 만들까요?\n\n분리된 행은 코드 "${src.code}"(공유코드라 코드로는 구분되지 않음), 상품명 "${aliasName}", ${priceTxt}으로 새로 생성됩니다.`)) return;
+  const newAliasNames=(src.aliasNames||[]).filter(a=>a!==aliasName);
+  const updatedSrc={...src, aliasNames:newAliasNames};
+  const newRow={code:src.code, supplier:src.supplier, type:src.type, name:aliasName, price:src.price, aliasCodes:[], aliasNames:[], comboItems:null};
+  try{
+    await saveBdToSupabase(updatedSrc,true);
+    await saveBdToSupabase(newRow,false);
+    const si=_bdData.findIndex(x=>String(x.id)===String(src.id));
+    if(si>=0) _bdData[si]=updatedSrc;
+    _bdData.push(newRow);
+    addHistory({menu:'매출관리',type:'edit',code:updatedSrc.code,name:updatedSrc.name,desc:`상품명 병합 취소 (${aliasName} 분리)`,before:'별칭',after:'분리',user:'수동'});
+    bdRenderMergeHeader();
+    bdRenderMergeList();
+    renderBdTable();
+    if(typeof toast==='function') toast(`"${aliasName}" 상품명을 별도 행으로 분리했습니다.`);
+  }catch(e){ alert('분리 실패: '+e.message); }
+}
+
+// 읽기 전용 점검 — ss소장처럼 여러 상품이 공유하는 코드끼리 과거에 병합된 행을 찾는다.
+// 이런 행은 흡수된 상품의 "이름"이 유실됐을 가능성이 있다(코드가 같아서 코드로는 구분이 안 되고,
+// 이 버그가 고쳐지기 전에는 별칭 상품명으로 남기지 않은 채 그 행 자체가 삭제됐기 때문).
+// 아무 것도 수정하지 않고 현재 메모리에 로드된 _bdData만 검사해서 목록을 보여준다.
+function bdDiagnoseSharedMerges(){
+  if(!_bdData || !_bdData.length){ alert('백데이터가 로드되지 않았습니다.'); return; }
+  const affected = _bdData.filter(r=>
+    SHARED_BD_CODES.has(String(r.code||'').toLowerCase()) &&
+    (r.aliasCodes||[]).some(ac=>SHARED_BD_CODES.has(String(ac||'').toLowerCase()))
+  );
+  if(!affected.length){
+    alert('✅ 공유코드(ss소장 등)끼리 병합된 행이 없습니다.\n\n"이름으로만 구분되는 상품끼리의 병합"으로 인한 상품명 유실 사례는 없는 것으로 보입니다.\n(코드가 서로 다른 일반 상품끼리의 병합은 이 문제와 무관하며 영향 없습니다.)');
+    return;
+  }
+  const lines = affected.map(r=>{
+    const sharedAliasCount=(r.aliasCodes||[]).filter(ac=>SHARED_BD_CODES.has(String(ac||'').toLowerCase())).length;
+    const namesTxt=(r.aliasNames&&r.aliasNames.length)?`, 현재 별칭 상품명: ${r.aliasNames.join(', ')}`:', 별칭 상품명 없음';
+    return `· "${r.name}" (${r.code}) — 과거 병합 흔적 ${sharedAliasCount}건${namesTxt}`;
+  });
+  alert(`⚠ 공유코드(ss소장 등)끼리 병합된 행 ${affected.length}개를 찾았습니다.\n\n이 행들은 과거(오늘 버그 수정 전) 병합 때 흡수된 상품의 "이름"이 유실됐을 수 있습니다.\n실제로 판매 데이터를 올릴 때 그 이름이 인식 안 되는 오류가 났던 적이 있다면, 어떤 상품명이었는지 기억해서 "🔗 병합" 화면에서 별칭 상품명으로 다시 등록해주세요.\n\n${lines.join('\n')}`);
+}
 
 // 개별 행 직접 삭제 — 병합/중복정리 대상에서 빠지는 경우(예: 한쪽만 세트로 전환된 중복행)를 위한 수동 삭제.
 // 별칭코드가 딸려있거나 다른 세트의 구성품으로 쓰이고 있으면 그 사실을 먼저 알려주고 확인받는다.
@@ -21383,6 +21425,9 @@ async function bdDeleteRow(id){
   const warnings=[];
   if(row.aliasCodes && row.aliasCodes.length){
     warnings.push(`이 행에 별칭코드가 ${row.aliasCodes.length}개(${row.aliasCodes.join(', ')}) 연결돼 있습니다 — 삭제하면 그 코드들은 더 이상 어떤 상품과도 매칭되지 않습니다.`);
+  }
+  if(row.aliasNames && row.aliasNames.length){
+    warnings.push(`이 행에 별칭 상품명이 ${row.aliasNames.length}개(${row.aliasNames.join(', ')}) 연결돼 있습니다 — 삭제하면 그 상품명들은 더 이상 어떤 상품과도 매칭되지 않습니다.`);
   }
   const usedBy=_bdData.filter(r=>Array.isArray(r.comboItems)&&r.comboItems.some(it=>String(it.bdId)===String(row.id)));
   if(usedBy.length){
@@ -21465,7 +21510,8 @@ async function bdConfirmDedupe(){
       const keeper=_bdDedupeKeeper(g);
       const others=g.filter(r=>r.id!==keeper.id);
       const mergedAliases=[...new Set([...(keeper.aliasCodes||[]), ...others.flatMap(o=>[o.code, ...(o.aliasCodes||[])])].filter(Boolean).filter(c=>c.toLowerCase()!==keeper.code.toLowerCase()))];
-      const updatedKeeper={...keeper, aliasCodes:mergedAliases};
+      const mergedNames=[...new Set([...(keeper.aliasNames||[]), ...others.flatMap(o=>o.aliasNames||[])].filter(Boolean))];
+      const updatedKeeper={...keeper, aliasCodes:mergedAliases, aliasNames:mergedNames};
       await saveBdToSupabase(updatedKeeper, true);
       for(const o of others){ await deleteBdFromSupabase(o.id); deleted++; }
       const ki=_bdData.findIndex(x=>x.id===keeper.id);
@@ -21916,16 +21962,40 @@ function normName(s){ return String(s||'').toLowerCase()
   .replace(/\s+/g,''); }
 // 공유코드(ss소장 직접 소싱) — 상품명으로 매칭
 const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
+// 별칭 "상품명"(aliasNames)을 alias_codes 컬럼에 코드와 함께 저장할 때 붙이는 구분자.
+// ss소장처럼 코드가 여러 상품에 겹쳐 쓰이는 경우, 코드로는 서로 구분이 안 되므로 병합 시
+// 흡수된 행의 "상품명"을 이 접두사를 붙여 alias_codes 배열에 같이 저장해두고, 로드할 때
+// 다시 분리해 aliasNames로 복원한다(별도 DB 컬럼 추가 없이 기존 컬럼을 재사용).
+const BD_ALIAS_NAME_PREFIX = 'NAME:';
+function _bdSplitAliasCodes(rawAliasCodes){
+  const raw = Array.isArray(rawAliasCodes)?rawAliasCodes.filter(Boolean):[];
+  const aliasCodes=[], aliasNames=[];
+  raw.forEach(a=>{
+    const s=String(a);
+    if(s.startsWith(BD_ALIAS_NAME_PREFIX)) aliasNames.push(s.slice(BD_ALIAS_NAME_PREFIX.length));
+    else aliasCodes.push(s);
+  });
+  return {aliasCodes, aliasNames};
+}
+function _bdJoinAliasCodes(aliasCodes, aliasNames){
+  return [
+    ...(Array.isArray(aliasCodes)?aliasCodes.filter(Boolean):[]),
+    ...(Array.isArray(aliasNames)?aliasNames.filter(Boolean).map(n=>BD_ALIAS_NAME_PREFIX+n):[])
+  ];
+}
 // 상품명 매칭 맵: ss소장/코드없음 판매건을 백데이터 "전체 상품명"으로 매칭
 //  (특수항목=코드없음·ss소장 은 동일 상품명 충돌 시 우선)
+//  대표 상품명뿐 아니라 별칭 상품명(aliasNames — ss소장 코드끼리 병합할 때 흡수된 상품명)도 함께 등록한다.
 function getBdNameMap(){
   const m={};
   _bdData.forEach(r=>{
-    if(!r.name) return;
-    const k=normName(r.name);
     const ck=(r.code||'').toLowerCase();
     const special=(!r.code || SHARED_BD_CODES.has(ck));
-    if(!(k in m) || special) m[k]=r;   // 미존재면 등록, 특수항목이면 덮어써서 우선
+    const names=[r.name, ...(r.aliasNames||[])].filter(Boolean);
+    names.forEach(nm=>{
+      const k=normName(nm);
+      if(!(k in m) || special) m[k]=r;   // 미존재면 등록, 특수항목이면 덮어써서 우선
+    });
   });
   return m;
 }
