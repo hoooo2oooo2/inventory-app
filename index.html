@@ -5291,6 +5291,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <span style="font-size:11px;color:var(--tx2);">구분만 전체 기간에 적용 (날짜 제한 없음)</span>
         <button class="btn btn-sm" onclick="openBdDedupe()" style="background:#DC2626;color:#fff;border:none;" title="코드·구분·상품명·공급가 4개가 전부 동일한 행을 찾아 1개만 남기고 정리합니다">🧹 중복 정리</button>
         <button class="btn btn-sm" onclick="bdDiagnoseSharedMerges()" style="background:#0891B2;color:#fff;border:none;" title="ss소장처럼 코드가 겹치는 상품끼리 과거에 병합돼 상품명이 유실됐을 수 있는 행을 찾아 보여줍니다(읽기 전용, 아무것도 바꾸지 않음)">🔍 병합 이름유실 점검</button>
+        <button class="btn btn-sm" onclick="bdDiagnoseAmbiguousCodes()" style="background:#0891B2;color:#fff;border:none;" title="일반 코드인데 상품명이 다른 행이 여러 개 등록돼 코드만으로 구분 안 되는 경우를 찾아 보여줍니다(읽기 전용, 아무것도 바꾸지 않음)">🔍 코드공유 상품 점검</button>
       </div>
       <div class="rev-tbl-card">
         <div class="tw">
@@ -21455,6 +21456,34 @@ function bdDiagnoseSharedMerges(){
   alert(`⚠ 공유코드(ss소장 등)끼리 병합된 행 ${affected.length}개를 찾았습니다.\n\n이 행들은 과거(오늘 버그 수정 전) 병합 때 흡수된 상품의 "이름"이 유실됐을 수 있습니다.\n실제로 판매 데이터를 올릴 때 그 이름이 인식 안 되는 오류가 났던 적이 있다면, 어떤 상품명이었는지 기억해서 "🔗 병합" 화면에서 별칭 상품명으로 다시 등록해주세요.\n\n${lines.join('\n')}`);
 }
 
+// 읽기 전용 점검 — ss소장 같은 "공유코드"로 지정돼 있지 않은 일반 코드인데도, 같은 코드에
+// 상품명이 서로 다른 행이 여러 개 등록돼 있는 경우를 찾는다(주로 엑셀 일괄업로드로 발생 —
+// 그 화면은 코드 중복 체크를 하지 않음). 이런 코드는 오늘 수정 전까지는 코드 매칭에서
+// 5개 중 1개 행의 단가만 임의로 골라 나머지 전부에 잘못 적용되는 문제가 있었다(오늘 수정으로
+// 앞으로는 상품명 매칭으로 자동 대체되지만, 이 목록에 뜨는 코드는 과거에 잘못 반영된 통합
+// 데이터가 있을 수 있으므로 "🔄 통합 단가 일괄 반영"으로 재계산해서 확인해볼 것을 권장한다).
+function bdDiagnoseAmbiguousCodes(){
+  if(!_bdData || !_bdData.length){ alert('백데이터가 로드되지 않았습니다.'); return; }
+  const byCode={};
+  _bdData.forEach(r=>{
+    const k=(r.code||'').toLowerCase(); if(!k) return;
+    (byCode[k]=byCode[k]||[]).push(r);
+  });
+  const affected = Object.keys(byCode)
+    .filter(k=>!SHARED_BD_CODES.has(k))
+    .map(k=>byCode[k])
+    .filter(rows=>rows.length>1 && new Set(rows.map(r=>normName(r.name))).size>1);
+  if(!affected.length){
+    alert('✅ 코드는 같은데 상품명이 서로 다른 행은 없습니다.');
+    return;
+  }
+  const lines = affected.map(rows=>
+    `· 코드 "${rows[0].code}" — ${rows.length}개 상품 공유:\n   ` +
+    rows.map(r=>`${r.name} (${r.price!=null?Number(r.price).toLocaleString()+'원':'단가없음'})`).join('\n   ')
+  );
+  alert(`⚠ 코드 하나에 서로 다른 상품명이 섞여 등록된 경우 ${affected.length}건을 찾았습니다.\n\n오늘 수정 전까지는 이런 코드로 판매 데이터가 들어오면 상품명과 무관하게 아무 행 1개의 단가가 전부에 적용됐을 수 있습니다(매출 원가·마진 오류 가능). 오늘부터는 상품명으로 정확히 구분되지만, 과거 데이터는 "🔄 통합 단가 일괄 반영"으로 재계산해서 값이 맞는지 확인해보세요.\n\n${lines.join('\n\n')}`);
+}
+
 // 개별 행 직접 삭제 — 병합/중복정리 대상에서 빠지는 경우(예: 한쪽만 세트로 전환된 중복행)를 위한 수동 삭제.
 // 별칭코드가 딸려있거나 다른 세트의 구성품으로 쓰이고 있으면 그 사실을 먼저 알려주고 확인받는다.
 async function bdDeleteRow(id){
@@ -21979,11 +22008,23 @@ function readXlsxRows(file){
 
 // 백데이터 조회 맵 (code → row) — 대표코드 + 별칭코드(aliasCodes) 전부 같은 행으로 매칭
 // 대소문자 무시 조회: 키를 소문자로 저장
+// 엑셀 업로드 등으로 같은 코드에 서로 다른 상품명을 가진 행이 여러 개 등록된 경우(예: 세트
+// 구성은 다른데 제조사 코드는 공통인 상품군), 코드만으로는 그중 어느 행인지 특정할 수 없다.
+// 이런 "모호한 코드"는 아예 맵에 올리지 않는다 — 그러면 모든 호출부에 이미 있는
+// "코드매칭 실패 시 상품명으로 폴백" 처리가 자동으로 상품명 매칭을 시도하게 되어, 임의의
+// 한 행 단가가 나머지 행들에 잘못 적용되는 사고를 막을 수 있다.
 function getBdMap(){
-  const m={};
+  const byCode={};
   _bdData.forEach(r=>{
-    if(r.code) m[r.code.toLowerCase()]=r;
-    (r.aliasCodes||[]).forEach(ac=>{ if(ac) m[String(ac).toLowerCase()]=r; });
+    const codes=[r.code, ...(r.aliasCodes||[])].filter(Boolean).map(c=>String(c).toLowerCase());
+    codes.forEach(k=>{ (byCode[k]=byCode[k]||[]).push(r); });
+  });
+  const m={};
+  Object.keys(byCode).forEach(k=>{
+    const rows=byCode[k];
+    const distinctNames=new Set(rows.map(r=>normName(r.name)));
+    if(distinctNames.size<=1) m[k]=rows[0]; // 이름까지 같으면(혹은 1개뿐이면) 안전하게 사용
+    // 이름이 서로 다르면 이 코드는 등록하지 않음 → 상품명 매칭으로 폴백
   });
   return m;
 }
