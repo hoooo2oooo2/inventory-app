@@ -5285,6 +5285,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
         <button class="btn btn-sm" onclick="downloadBackdataExcel()" style="background:#059669;color:#fff;border:none;">📥 엑셀 다운로드</button>
         <button class="btn btn-sm" onclick="openBdUpload()" style="background:#3182F6;color:#fff;border:none;">📤 엑셀 수정·업로드</button>
+        <button class="btn btn-sm" onclick="openBdPriceCut()" style="background:#DC2626;color:#fff;border:none;" title="ERP 원본 엑셀(전체상품코드 C열·상품명 E열·공급가 I열)을 그대로 읽어 백데이터 공급가를 일괄 변경하고, 지정한 반영일부터 통합·일일보고에도 자동 반영합니다. 백데이터에 없는 코드는 건드리지 않고 건너뜁니다.">📉 단가 인하 엑셀 적용</button>
         <button class="btn btn-sm" onclick="resyncRevenuePrices()" style="background:#D97706;color:#fff;border:none;" title="현재 백데이터 단가로 통합 데이터의 단가·마진을 일괄 재계산합니다. 반영 시작일을 직접 지정할 수 있습니다(그 이전 데이터는 유지)">🔄 통합 단가 일괄 반영</button>
         <span style="font-size:11px;color:var(--tx2);">클릭 시 반영 시작일 입력 — 그 이전 통합·일일보고 데이터는 기존 단가로 유지</span>
         <button class="btn btn-sm" onclick="resyncRevenueTypes()" style="background:#7C3AED;color:#fff;border:none;" title="현재 백데이터 '구분'을 통합 데이터 전체(날짜 제한 없음)에 일괄 반영합니다. 단가·마진은 변경하지 않습니다">🏷️ 구분 수정</button>
@@ -6367,6 +6368,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="modal" style="max-width:480px;">
     <h3 id="bdModalTitle">새 코드 추가</h3>
     <input type="hidden" id="bdEditKey">
+    <div id="bdPriceChangeNotice" style="display:none;font-size:11.5px;background:#EFF6FF;color:#1D4ED8;padding:7px 10px;border-radius:8px;margin-bottom:8px;"></div>
     <div class="field-grid">
       <div class="field"><label>전체상품코드 *</label><input id="bdCode" placeholder="예: ABC-001"></div>
       <div class="field"><label>공급자명</label><input id="bdSupplier" placeholder="예: OEM제조사"></div>
@@ -6570,6 +6572,41 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ma">
       <button class="btn" onclick="closeModal('bdUploadModal')">취소</button>
       <button class="btn btn-pr" id="bdUploadApplyBtn" onclick="applyBdUpload()" disabled>적용</button>
+    </div>
+  </div>
+</div>
+
+<!-- 단가 인하 엑셀 일괄 적용 모달 -->
+<div class="modal-overlay" id="bdPriceCutModal">
+  <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto;">
+    <h3>📉 단가 인하 엑셀 적용</h3>
+    <p style="font-size:12px;color:var(--tx2);margin:4px 0 12px;line-height:1.6;">
+      원본 ERP 엑셀을 그대로 올리면 <b>전체상품코드(C열) · 상품명(E열) · 공급가(I열)</b>만 읽어서 백데이터 공급가를 바꿉니다.<br>
+      • 백데이터에 등록 안 된 코드는 손대지 않고 건너뜁니다(아래서 목록만 다운로드).<br>
+      • 별칭코드로 병합돼 다른 대표코드에 숨어있는 상품도 자동으로 찾아서 반영합니다.<br>
+      <span style="color:#DC2626;">※ 지정한 반영 시작일 이전의 통합·일일보고 데이터는 그대로 유지되고, 그 날짜 이후 데이터에만 새 단가·마진이 반영됩니다.</span>
+    </p>
+    <div class="field">
+      <label>반영 시작일 * (예: 9/7부터 적용하려면 2026-09-07 — 9/6까지는 기존 단가 유지)</label>
+      <input id="bdPriceCutEffDate" type="date">
+    </div>
+    <div id="bdPriceCutDropZone" style="border:2px dashed var(--bd);border-radius:12px;padding:34px 16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg);margin-top:10px;">
+      <div style="font-size:30px;margin-bottom:6px;">📁</div>
+      <div style="font-size:13px;font-weight:600;" id="bdPriceCutDropText">엑셀 파일을 드래그하거나 클릭해서 선택</div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:4px;">.xlsx 파일</div>
+      <input type="file" id="bdPriceCutInput" accept=".xlsx,.xls" style="display:none;">
+    </div>
+    <div id="bdPriceCutPreview" style="margin-top:12px;font-size:12px;"></div>
+    <div class="ma" style="justify-content:space-between;">
+      <button class="btn btn-sm" id="bdPriceCutDownloadBtn" onclick="downloadBdPriceCutNotFound()" disabled>📥 미매칭 목록 다운로드</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="closeModal('bdPriceCutModal')">취소</button>
+        <button class="btn btn-pr" id="bdPriceCutApplyBtn" onclick="applyBdPriceCut()" disabled style="background:#DC2626;">적용</button>
+      </div>
+    </div>
+    <div style="margin-top:16px;border-top:1px solid var(--bd);padding-top:10px;">
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;">적용 이력 (문제가 있으면 되돌리기)</div>
+      <div id="bdPriceCutBatchList" style="max-height:170px;overflow-y:auto;"></div>
     </div>
   </div>
 </div>
@@ -14869,6 +14906,210 @@ async function applyBdUpload(){
   }catch(e){ alert('적용 실패: '+e.message); btn.disabled=false; btn.textContent='적용'; }
 }
 
+// ── 단가 인하 엑셀 일괄 적용 ──
+// ERP 원본 엑셀(전체상품코드 C열·상품명 E열·공급가 I열)을 그대로 읽어서 백데이터 공급가를 바꾸는 전용 기능.
+// 기존 "엑셀 수정·업로드"는 백데이터 자체 템플릿(ID/공급자명/코드/...)을 요구해서, 회사 ERP에서 그대로
+// 내려받은 원본 엑셀은 못 썼음 — 이 기능은 그 원본을 그대로 올려도 되게 컬럼 위치로 직접 파싱한다.
+let _bdPriceCutMarks={}, _bdPriceCutMarksLoaded=false;   // {[bdId]: {prevPrice,newPrice,effDate,changedAt,batchId}} — 표 뱃지/수정팝업 안내용
+let _bdPriceCutBatches=[], _bdPriceCutBatchesLoaded=false; // 적용 이력(되돌리기용) — [{id,appliedAt,effDate,items:[{bdId,code,name,oldPrice,newPrice}],status}]
+let _bdPriceCutParsed=null;
+async function bdLoadPriceCutMarks(){
+  const d=await cloudKvLoad('bd_price_cut_marks');
+  _bdPriceCutMarks=(d && typeof d==='object' && !Array.isArray(d)) ? d : {};
+  _bdPriceCutMarksLoaded=true;
+}
+async function bdLoadPriceCutBatches(){
+  const d=await cloudKvLoad('bd_price_cut_batches');
+  _bdPriceCutBatches=Array.isArray(d)?d:[];
+  _bdPriceCutBatchesLoaded=true;
+}
+// code+name으로 백데이터 행 찾기 — ss소장처럼 코드가 여러 상품에 겹치면 코드만으론 못 찾으므로
+// 그 경우엔 같은 코드를 쓰면서 상품명(또는 별칭 상품명)까지 일치하는 행을 찾는다(정확히 1개일 때만 인정).
+function _bdResolvePriceCutRow(code, name){
+  const k=(code||'').trim().toLowerCase(); if(!k) return null;
+  if(SHARED_BD_CODES.has(k)){
+    const nk=normName(name);
+    const candidates=_bdData.filter(r=>{
+      const codes=[r.code, ...(r.aliasCodes||[])].filter(Boolean).map(c=>String(c).toLowerCase());
+      if(!codes.includes(k)) return false;
+      const names=[normName(r.name), ...((r.aliasNames||[]).map(normName))];
+      return names.includes(nk);
+    });
+    return candidates.length===1 ? candidates[0] : null;
+  }
+  return findBdByAnyCode(code);
+}
+function openBdPriceCut(){
+  _bdPriceCutParsed=null;
+  document.getElementById('bdPriceCutPreview').innerHTML='';
+  document.getElementById('bdPriceCutDropText').textContent='엑셀 파일을 드래그하거나 클릭해서 선택';
+  document.getElementById('bdPriceCutApplyBtn').disabled=true;
+  document.getElementById('bdPriceCutDownloadBtn').disabled=true;
+  const inp=document.getElementById('bdPriceCutInput'); if(inp) inp.value='';
+  if(!document.getElementById('bdPriceCutEffDate').value) document.getElementById('bdPriceCutEffDate').value=_bdToday();
+  bdLoadPriceCutBatches().then(bdRenderPriceCutBatches);
+  openModal('bdPriceCutModal');
+  setupBdPriceCutDropZone();
+}
+let _bdPriceCutDropSetup=false;
+function setupBdPriceCutDropZone(){
+  if(_bdPriceCutDropSetup) return; _bdPriceCutDropSetup=true;
+  const zone=document.getElementById('bdPriceCutDropZone');
+  const inp=document.getElementById('bdPriceCutInput');
+  zone.addEventListener('click',()=>inp.click());
+  inp.addEventListener('change',e=>{ if(e.target.files[0]) _readBdPriceCutFile(e.target.files[0]); });
+  zone.addEventListener('dragover',e=>{ e.preventDefault(); zone.style.borderColor='#3182F6'; zone.style.background='var(--prl)'; });
+  zone.addEventListener('dragleave',e=>{ e.preventDefault(); zone.style.borderColor='var(--bd)'; zone.style.background='var(--bg)'; });
+  zone.addEventListener('drop',e=>{
+    e.preventDefault(); zone.style.borderColor='var(--bd)'; zone.style.background='var(--bg)';
+    const f=e.dataTransfer.files[0]; if(f) _readBdPriceCutFile(f);
+  });
+}
+async function _readBdPriceCutFile(file){
+  try{
+    const rows=await readXlsxRows(file);
+    if(!rows.length){ alert('빈 파일입니다.'); return; }
+    // 고정 컬럼 위치: C열(idx2)=전체상품코드, E열(idx4)=상품명, I열(idx8)=공급가. 1행은 헤더로 건너뜀.
+    const toApply=[], unchanged=[], notFound=[], bad=[];
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i]; if(!r||r.every(v=>v===''||v==null)) continue;
+      const code=_s(r[2]), name=_s(r[4]), price=_n(r[8]);
+      if(!code||!name||price==null){ bad.push({row:i+1,code,name}); continue; }
+      const bdRow=_bdResolvePriceCutRow(code,name);
+      if(!bdRow){ notFound.push({code,name,price}); continue; }
+      if(bdRow.price===price){ unchanged.push({code,name,price,bdId:bdRow.id}); continue; }
+      toApply.push({code,name,bdId:bdRow.id,bdCode:bdRow.code,bdName:bdRow.name,oldPrice:bdRow.price,newPrice:price});
+    }
+    _bdPriceCutParsed={toApply,unchanged,notFound,bad};
+    document.getElementById('bdPriceCutDropText').textContent=`✅ ${file.name}`;
+    document.getElementById('bdPriceCutPreview').innerHTML=
+      `<div style="padding:10px 12px;background:var(--bg);border:0.5px solid var(--bd);border-radius:8px;">
+        변경 필요 <b style="color:#DC2626;">${toApply.length}</b>건 · 이미 동일해서 변경 불필요 <b>${unchanged.length}</b>건 · 백데이터 미등록(건너뜀) <b style="color:#D97706;">${notFound.length}</b>건
+        ${bad.length?` · <span style="color:#DC2626;">코드/상품명/공급가 누락 ${bad.length}건 제외</span>`:''}
+      </div>`;
+    document.getElementById('bdPriceCutApplyBtn').disabled = toApply.length===0;
+    document.getElementById('bdPriceCutDownloadBtn').disabled = notFound.length===0;
+  }catch(e){ alert('파일 읽기 실패: '+e.message); }
+}
+// 미매칭(백데이터에 없어 건너뛴) 상품 목록을 다시 이 기능으로 업로드할 수 있는 형식(C/E/I 위치 동일)으로 다운로드
+function downloadBdPriceCutNotFound(){
+  if(!_bdPriceCutParsed || !_bdPriceCutParsed.notFound.length){ alert('다운로드할 미매칭 목록이 없습니다.'); return; }
+  const aoa=[['','','전체상품코드','','상품명(한글)','','','','공급가']];
+  _bdPriceCutParsed.notFound.forEach(x=>aoa.push(['','',x.code,'',x.name,'','','',x.price]));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:4},{wch:4},{wch:16},{wch:4},{wch:40},{wch:4},{wch:4},{wch:4},{wch:12}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'미매칭');
+  const d=new Date();
+  XLSX.writeFile(wb,`단가인하_미매칭_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+}
+async function applyBdPriceCut(){
+  if(!_bdPriceCutParsed || !_bdPriceCutParsed.toApply.length) return;
+  const effDate=(document.getElementById('bdPriceCutEffDate').value||'').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(effDate)){ alert('반영 시작일을 YYYY-MM-DD 형식으로 입력하세요.'); return; }
+  const {toApply, notFound}=_bdPriceCutParsed;
+  if(!confirm(`백데이터 공급가 ${toApply.length}건을 변경합니다.\n반영 시작일: ${effDate} (그 이전 통합·일일보고 데이터는 기존 단가로 유지)\n백데이터 미등록이라 건너뛰는 상품: ${notFound.length}건\n\n진행할까요?`)) return;
+
+  const btn=document.getElementById('bdPriceCutApplyBtn');
+  btn.disabled=true; btn.textContent='적용 중...';
+  try{
+    const batchId='bpc_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    const items=[];
+    for(const it of toApply){
+      const row=_bdData.find(x=>String(x.id)===String(it.bdId));
+      if(!row) continue;
+      const oldPrice=row.price;
+      const updated={...row, price:it.newPrice};
+      try{
+        await saveBdToSupabase(updated,true);
+        const idx=_bdData.findIndex(x=>x.id===row.id);
+        if(idx>=0) _bdData[idx]=updated;
+        items.push({bdId:row.id, code:row.code, name:row.name, oldPrice, newPrice:it.newPrice});
+      }catch(e){ console.warn('단가 인하 적용 실패:', row.code, e); }
+    }
+    await recalcAllComboPrices();
+
+    // 통합/일일보고 반영 — 지정한 반영일 이전 데이터는 쿼리 단계에서부터 제외되어 안전
+    btn.textContent='통합 데이터 반영 중...';
+    let revResult={scanned:0,updated:0};
+    try{ revResult=await _resyncRevenuePricesCore(effDate); }
+    catch(e){ console.warn('통합 반영 실패:', e); }
+
+    // 되돌리기용 배치 백업 저장
+    let batches=await cloudKvLoad('bd_price_cut_batches'); batches=Array.isArray(batches)?batches:[];
+    batches.unshift({ id:batchId, appliedAt:_bdToday(), effDate, items, status:'applied' });
+    if(batches.length>30) batches=batches.slice(0,30);
+    await cloudKvSave('bd_price_cut_batches', batches, {force:true});
+    _bdPriceCutBatches=batches; _bdPriceCutBatchesLoaded=true;
+
+    // 표 뱃지 / 수정팝업 안내용 마크 갱신
+    let marks=await cloudKvLoad('bd_price_cut_marks'); marks=(marks&&typeof marks==='object'&&!Array.isArray(marks))?marks:{};
+    for(const it of items){ marks[it.bdId]={prevPrice:it.oldPrice,newPrice:it.newPrice,effDate,changedAt:_bdToday(),batchId}; }
+    await cloudKvSave('bd_price_cut_marks', marks, {force:true});
+    _bdPriceCutMarks=marks; _bdPriceCutMarksLoaded=true;
+
+    addHistory({menu:'매출관리',type:'edit',code:'BULK',name:'단가 인하 엑셀 일괄적용',desc:`${items.length}건 변경, 반영일 ${effDate}부터 (통합 ${revResult.updated}건 재계산, 미매칭 ${notFound.length}건 건너뜀)`,before:'-',after:'일괄적용',user:'수동'});
+
+    renderBdTable();
+    bdRenderPriceCutBatches();
+    if(typeof toast==='function') toast(`단가 인하 적용 완료 — ${items.length}건 변경`);
+    alert(`✅ 적용 완료\n\n백데이터 단가 변경: ${items.length}건\n통합/일일보고 재계산: ${revResult.scanned.toLocaleString()}건 검사, ${revResult.updated.toLocaleString()}건 반영 (반영일 ${effDate}부터, 그 이전은 그대로 유지)\n백데이터 미등록이라 건너뛴 상품: ${notFound.length}건\n\n혹시 문제가 있으면 이 창 하단 "적용 이력"에서 방금 적용을 되돌릴 수 있습니다.`);
+  } finally {
+    btn.disabled=false; btn.textContent='적용';
+  }
+}
+function bdRenderPriceCutBatches(){
+  const box=document.getElementById('bdPriceCutBatchList'); if(!box) return;
+  if(!_bdPriceCutBatches.length){ box.innerHTML='<div style="color:var(--tx2);font-size:11.5px;padding:4px 0;">적용 이력이 없습니다.</div>'; return; }
+  box.innerHTML=_bdPriceCutBatches.slice(0,15).map(b=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);font-size:11.5px;">
+      <div>
+        <b>${_bdEscHtml(b.appliedAt)}</b> · ${b.items.length}건 · 반영일 ${_bdEscHtml(b.effDate)}
+        ${b.status==='rolledback'?`<span style="color:#DC2626;"> (되돌림됨${b.rolledBackAt?', '+_bdEscHtml(b.rolledBackAt):''})</span>`:''}
+      </div>
+      ${b.status!=='rolledback'?`<button type="button" class="btn btn-sm" style="color:#DC2626;" onclick="bdRollbackPriceCutBatch('${String(b.id).replace(/'/g,"\\'")}')">되돌리기</button>`:''}
+    </div>`).join('');
+}
+async function bdRollbackPriceCutBatch(batchId){
+  let batches=await cloudKvLoad('bd_price_cut_batches'); batches=Array.isArray(batches)?batches:[];
+  const batch=batches.find(b=>b.id===batchId);
+  if(!batch){ alert('이력을 찾을 수 없습니다.'); return; }
+  if(batch.status==='rolledback'){ alert('이미 되돌린 이력입니다.'); return; }
+  if(!confirm(`${batch.appliedAt}에 적용한 ${batch.items.length}건을 되돌릴까요?\n\n그 사이 다른 작업으로 단가가 또 바뀐 상품은 안전을 위해 건너뜁니다.`)) return;
+
+  let reverted=0, skipped=0;
+  for(const it of batch.items){
+    const row=_bdData.find(x=>String(x.id)===String(it.bdId));
+    if(!row){ skipped++; continue; }
+    if(row.price!==it.newPrice){ skipped++; continue; } // 그 사이 또 바뀐 경우 안전하게 건너뜀
+    const updated={...row, price:it.oldPrice};
+    try{
+      await saveBdToSupabase(updated,true);
+      const idx=_bdData.findIndex(x=>x.id===row.id);
+      if(idx>=0) _bdData[idx]=updated;
+      reverted++;
+    }catch(e){ console.warn('되돌리기 실패:', row.code, e); skipped++; }
+  }
+  await recalcAllComboPrices();
+  let revResult={scanned:0,updated:0};
+  try{ revResult=await _resyncRevenuePricesCore(batch.effDate); }
+  catch(e){ console.warn('되돌리기 통합 재계산 실패:', e); }
+
+  batch.status='rolledback'; batch.rolledBackAt=_bdToday();
+  await cloudKvSave('bd_price_cut_batches', batches, {force:true});
+  _bdPriceCutBatches=batches;
+
+  let marks=await cloudKvLoad('bd_price_cut_marks'); marks=(marks&&typeof marks==='object'&&!Array.isArray(marks))?marks:{};
+  for(const it of batch.items){ if(marks[it.bdId] && marks[it.bdId].batchId===batchId) delete marks[it.bdId]; }
+  await cloudKvSave('bd_price_cut_marks', marks, {force:true});
+  _bdPriceCutMarks=marks;
+
+  addHistory({menu:'매출관리',type:'edit',code:'BULK',name:'단가 인하 되돌리기',desc:`${reverted}건 복원, 반영일 ${batch.effDate}부터 재계산(${revResult.updated}건) · 건너뜀 ${skipped}건`,before:'-',after:'되돌림',user:'수동'});
+  renderBdTable();
+  bdRenderPriceCutBatches();
+  alert(`되돌리기 완료: ${reverted}건 복원, ${skipped}건 건너뜀(그 사이 다시 바뀐 상품)`);
+}
+
 // ── 백데이터 Supabase CRUD ──
 async function loadBackdata(){
   try {
@@ -14898,6 +15139,8 @@ async function loadBackdata(){
     renderBdTable();
     // 재고소진 자동전환 예약 로드 후 배지 갱신 + 소진 여부 체크(백그라운드, 렌더 안 막음)
     bdLoadPriceReservations().then(()=>{ renderBdTable(); bdCheckPriceReservations(); }).catch(()=>{});
+    // 단가 인하 일괄적용 표시(뱃지) 로드 (백그라운드, 렌더 안 막음)
+    bdLoadPriceCutMarks().then(()=>renderBdTable()).catch(()=>{});
   } catch(e){ console.warn('backdata 로드 실패:',e); }
 }
 async function loadBdPackMultiplier(){
@@ -20911,6 +21154,7 @@ function renderBdTable(){
       </td>
       <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}
         ${(()=>{const res=bdActiveReservationFor(r); return res?`<div style="font-size:10px;font-weight:400;color:#D97706;text-align:right;">⏳ 이전 ${Number(res.oldPrice).toLocaleString()}원 → 변경 ${Number(res.newPrice).toLocaleString()}원 · 잔여 ${Math.max(0,res.oldStockQty-(res.soldSinceStart||0))}개</div>`:'';})()}
+        ${(()=>{const m=_bdPriceCutMarks[r.id]; return m?`<div style="font-size:10px;font-weight:400;color:#2563EB;text-align:right;" title="일괄적용 시각: ${m.changedAt}">🔽 ${m.effDate}부터 인하 (이전 ${Number(m.prevPrice).toLocaleString()}원)</div>`:'';})()}
       </td>
       <td style="text-align:center;">
         ${(r.comboItems&&r.comboItems.length===1)
@@ -20959,6 +21203,7 @@ function openBdAdd(){
   document.getElementById('bdPrice').value='';
   document.getElementById('bdEditKey').value='';
   document.getElementById('bdEffDateField').style.display='none';
+  const notice0=document.getElementById('bdPriceChangeNotice'); if(notice0){ notice0.style.display='none'; notice0.innerHTML=''; }
   _bdAliasChips=[]; _bdAliasChipsOriginal=[]; bdRenderAliasChips();
   _bdAliasNameChips=[]; _bdAliasNameChipsOriginal=[]; bdRenderAliasNameChips();
   openModal('bdModal');
@@ -20980,6 +21225,17 @@ function openBdEdit(id){
   const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
   document.getElementById('bdEffDate').value=defEffDate;
   document.getElementById('bdEffDateField').style.display='';
+  // 단가 인하 엑셀 일괄적용으로 이 상품 단가가 바뀐 적 있으면, 언제·이전 단가가 얼마였는지 안내
+  const mark=_bdPriceCutMarks[r.id];
+  const noticeEl=document.getElementById('bdPriceChangeNotice');
+  if(noticeEl){
+    if(mark){
+      noticeEl.style.display='';
+      noticeEl.innerHTML=`🔽 <b>${mark.changedAt}</b>에 단가 인하 일괄적용됨 — 이전 단가 <b>${Number(mark.prevPrice).toLocaleString()}원</b> → 현재 <b>${Number(mark.newPrice).toLocaleString()}원</b> (반영일 ${mark.effDate}부터)`;
+    } else {
+      noticeEl.style.display='none'; noticeEl.innerHTML='';
+    }
+  }
   _bdAliasChips=(r.aliasCodes||[]).slice(); _bdAliasChipsOriginal=(r.aliasCodes||[]).slice(); bdRenderAliasChips();
   _bdAliasNameChips=(r.aliasNames||[]).slice(); _bdAliasNameChipsOriginal=(r.aliasNames||[]).slice(); bdRenderAliasNameChips();
   openModal('bdModal');
@@ -21106,7 +21362,58 @@ async function recalcAllComboPrices(){
   }
 }
 
-// 현재 백데이터 단가로 통합 데이터(올해, 이번달 1일~) 단가·마진 일괄 재계산
+// 통합/일일보고 단가·마진 일괄 재계산 핵심 로직 — effDate(YYYY-MM-DD) 이전 데이터는 쿼리 단계에서부터
+// 제외되므로 손대지 않는다. 버튼(resyncRevenuePrices)과 단가 인하 엑셀 일괄적용(applyBdPriceCut)이 공유해서 쓴다.
+async function _resyncRevenuePricesCore(effDate){
+  const curYear=parseInt(effDate.slice(0,4),10);
+  const monthMD=effDate.slice(5);
+  // 백데이터 맵 (대표코드+별칭코드, 대표상품명+별칭상품명 모두 포함 — getBdMap/getBdNameMap과 동일 규칙)
+  const bdMap=getBdMap(), bdNameMap=getBdNameMap();
+  let from=0, updated=0, scanned=0;
+  const PAGE=1000;
+  while(true){
+    const {data,error}=await sb.from('revenue')
+      .select('id,item_code,model_name,order_qty,settlement,shipping_fee,unit_cost,cost_price,margin')
+      .eq('year',curYear).gte('sale_date',monthMD).range(from,from+PAGE-1);
+    if(error){ throw error; }
+    if(!data||!data.length) break;
+    scanned+=data.length;
+    const upd=[];
+    data.forEach(r=>{
+      const codeKey=(r.item_code||'').toLowerCase();
+      const isShared=SHARED_BD_CODES.has(codeKey)||!r.item_code;
+      const nameKey=normName(r.model_name);
+      const bd=isShared?(nameKey?bdNameMap[nameKey]:null):(bdMap[codeKey]||(nameKey?bdNameMap[nameKey]:null));
+      if(!bd||bd.price==null) return;
+      const unitCost=bd.price;
+      const costPrice=Math.round(unitCost*(r.order_qty||0));
+      const settle=r.settlement||0, shipping=r.shipping_fee||0;
+      const margin=Math.round(settle-costPrice-shipping);
+      const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
+      if(unitCost!==(r.unit_cost||0)||costPrice!==(r.cost_price||0)||margin!==(r.margin||0)){
+        upd.push({id:r.id,unit_cost:unitCost,cost_price:costPrice,margin,margin_rate:marginRate});
+      }
+    });
+    // 배치 업데이트 — bulk_update_revenue RPC로 청크당 요청 1건만
+    const CHUNK=2000;
+    for(let i=0;i<upd.length;i+=CHUNK){
+      const {error}=await sb.rpc('bulk_update_revenue',{updates:upd.slice(i,i+CHUNK)});
+      if(error) console.warn('단가 일괄반영 저장 실패:', error.message);
+    }
+    // 메모리 반영
+    if(_revLoaded && upd.length){
+      const m=new Map(upd.map(u=>[u.id,u]));
+      _revData.forEach(r=>{const u=m.get(r.id);if(u){r.unitCost=u.unit_cost;r.costPrice=u.cost_price;r.margin=u.margin;r.marginRate=u.margin_rate;}});
+    }
+    updated+=upd.length;
+    if(data.length<PAGE) break; from+=PAGE;
+  }
+  if(updated) await _bumpRev(curYear);
+  if(_revLoaded) _renderRevCurrentPage();
+  return {scanned, updated};
+}
+
+// 현재 백데이터 단가로 통합 데이터(올해, 이번달 1일~) 단가·마진 일괄 재계산 (버튼 — 반영일 직접 입력)
 async function resyncRevenuePrices(){
   if(!_bdData || !_bdData.length){ await loadBackdata(); }
   if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
@@ -21122,55 +21429,12 @@ async function resyncRevenuePrices(){
   if(!confirm(`현재 백데이터 단가를 통합 데이터에 일괄 반영합니다.\n대상: ${curYear}년 ${parseInt(monthMD.slice(0,2))}월 ${parseInt(monthMD.slice(3,5))}일 이후 전체 (그 이전 데이터는 유지)\n\n진행할까요?`)) return;
   await recalcAllComboPrices();
 
-  // 백데이터 맵 (대표코드+별칭코드, 대표상품명+별칭상품명 모두 포함 — getBdMap/getBdNameMap과 동일 규칙)
-  const bdMap=getBdMap(), bdNameMap=getBdNameMap();
-
   // 진행 표시
   const btns=document.querySelectorAll('[onclick="resyncRevenuePrices()"]');
   btns.forEach(b=>{b.disabled=true;b.dataset._t=b.textContent;b.textContent='반영 중...';});
 
   try{
-    let from=0, updated=0, scanned=0;
-    const PAGE=1000;
-    while(true){
-      const {data,error}=await sb.from('revenue')
-        .select('id,item_code,model_name,order_qty,settlement,shipping_fee,unit_cost,cost_price,margin')
-        .eq('year',curYear).gte('sale_date',monthMD).range(from,from+PAGE-1);
-      if(error){ throw error; }
-      if(!data||!data.length) break;
-      scanned+=data.length;
-      const upd=[];
-      data.forEach(r=>{
-        const codeKey=(r.item_code||'').toLowerCase();
-        const isShared=SHARED_BD_CODES.has(codeKey)||!r.item_code;
-        const nameKey=normName(r.model_name);
-        const bd=isShared?(nameKey?bdNameMap[nameKey]:null):(bdMap[codeKey]||(nameKey?bdNameMap[nameKey]:null));
-        if(!bd||bd.price==null) return;
-        const unitCost=bd.price;
-        const costPrice=Math.round(unitCost*(r.order_qty||0));
-        const settle=r.settlement||0, shipping=r.shipping_fee||0;
-        const margin=Math.round(settle-costPrice-shipping);
-        const marginRate=settle>0?Math.round(margin/settle*10000)/10000:0;
-        if(unitCost!==(r.unit_cost||0)||costPrice!==(r.cost_price||0)||margin!==(r.margin||0)){
-          upd.push({id:r.id,unit_cost:unitCost,cost_price:costPrice,margin,margin_rate:marginRate});
-        }
-      });
-      // 배치 업데이트 — bulk_update_revenue RPC로 청크당 요청 1건만
-      const CHUNK=2000;
-      for(let i=0;i<upd.length;i+=CHUNK){
-        const {error}=await sb.rpc('bulk_update_revenue',{updates:upd.slice(i,i+CHUNK)});
-        if(error) console.warn('단가 일괄반영 저장 실패:', error.message);
-      }
-      // 메모리 반영
-      if(_revLoaded && upd.length){
-        const m=new Map(upd.map(u=>[u.id,u]));
-        _revData.forEach(r=>{const u=m.get(r.id);if(u){r.unitCost=u.unit_cost;r.costPrice=u.cost_price;r.margin=u.margin;r.marginRate=u.margin_rate;}});
-      }
-      updated+=upd.length;
-      if(data.length<PAGE) break; from+=PAGE;
-    }
-    if(updated) await _bumpRev(curYear);
-    if(_revLoaded) _renderRevCurrentPage();
+    const {scanned,updated} = await _resyncRevenuePricesCore(effInput);
     alert(`완료: ${scanned.toLocaleString()}건 검사, ${updated.toLocaleString()}건 단가·마진 반영했습니다.`);
   }catch(e){
     alert('일괄 반영 실패: '+e.message);
