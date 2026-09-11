@@ -4816,16 +4816,21 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #insightTrendModal .ins-trend-code{font-size:12px;color:var(--tx2);font-weight:500;margin-top:2px;}
 #insightTrendModal .ins-trend-section{margin-bottom:18px;}
 #insightTrendModal .ins-trend-section:last-of-type{margin-bottom:10px;}
-#insightTrendModal .ins-trend-section-title{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:6px;}
+#insightTrendModal .ins-trend-section-title{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:2px;}
 #insightTrendModal .ins-trend-section-sum{font-size:12px;font-weight:600;color:var(--tx2);}
+#insightTrendModal .ins-trend-section-sum b{color:var(--tx);}
+#insightTrendModal .ins-trend-section-range{font-size:11px;color:var(--tx2);margin-bottom:8px;}
 #insightTrendModal .ins-trend-canvaswrap{height:190px;position:relative;}
-#insightTrendModal .ins-trend-range{background:var(--bg2);border:0.5px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:16px;}
+#insightTrendModal .ins-trend-range{background:var(--bg2);border:1.5px solid var(--pr);border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+#insightTrendModal .ins-trend-range-badge{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:var(--pr);border-radius:5px;padding:2px 7px;margin-bottom:8px;}
 #insightTrendModal .ins-trend-range-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
 #insightTrendModal .ins-trend-range-row input[type=date]{padding:3px 6px;font-size:11px;}
 #insightTrendModal .ins-trend-range-sep{color:var(--tx2);font-size:11px;}
 #insightTrendModal .ins-trend-range-summary{margin-top:8px;font-size:13.5px;font-weight:700;color:var(--tx);}
 #insightTrendModal .ins-trend-range-summary small{font-size:11.5px;font-weight:500;color:var(--tx2);margin-left:6px;}
 #insightTrendModal .ins-trend-range-summary .ins-avg{color:var(--pr);}
+#insightTrendModal .ins-trend-longterm-head{display:flex;align-items:baseline;gap:8px;font-size:12.5px;font-weight:700;color:var(--tx2);margin:4px 0 12px;padding-top:4px;border-top:0.5px solid var(--bd);}
+#insightTrendModal .ins-trend-longterm-head small{font-weight:500;font-size:11px;}
 #insightTrendModal .ins-calc-detail{margin-bottom:14px;}
 #insightTrendModal .ins-calc-toggle{width:100%;text-align:left;padding:8px 10px;border:0.5px solid var(--bd);border-radius:8px;background:var(--bg2);color:var(--tx);font-size:12.5px;font-weight:600;cursor:pointer;}
 #insightTrendModal .ins-calc-toggle:hover{background:var(--bd);}
@@ -4848,6 +4853,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="ins-calc-body" id="insightCalcDetailBody" style="display:none;"></div>
     </div>
     <div class="ins-trend-range">
+      <span class="ins-trend-range-badge">🎯 이 구간이 발주 계산에 쓰입니다</span>
       <div class="ins-trend-range-row" id="insightRangePtabs">
         <button class="ptab" data-days="7" onclick="insightSetTrendRange(7)">최근 7일</button>
         <button class="ptab" data-days="14" onclick="insightSetTrendRange(14)">최근 14일</button>
@@ -4861,16 +4867,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
       <div class="ins-trend-range-summary" id="insightRangeSummary"></div>
     </div>
+    <div class="ins-trend-longterm-head">📈 장기 추이 (참고용) <small>— 아래 3개 그래프는 위 선택 구간과 무관하게 각각 정해진 기간을 고정으로 보여줍니다</small></div>
     <div class="ins-trend-section">
       <div class="ins-trend-section-title">📅 일별 <span class="ins-trend-section-sum" id="insightTrendSumDaily"></span></div>
+      <div class="ins-trend-section-range" id="insightTrendRangeDaily"></div>
       <div class="ins-trend-canvaswrap"><canvas id="insightTrendCanvasDaily"></canvas></div>
     </div>
     <div class="ins-trend-section">
       <div class="ins-trend-section-title">🗓 주별 <span class="ins-trend-section-sum" id="insightTrendSumWeekly"></span></div>
+      <div class="ins-trend-section-range" id="insightTrendRangeWeekly"></div>
       <div class="ins-trend-canvaswrap"><canvas id="insightTrendCanvasWeekly"></canvas></div>
     </div>
     <div class="ins-trend-section">
       <div class="ins-trend-section-title">📆 월별 <span class="ins-trend-section-sum" id="insightTrendSumMonthly"></span></div>
+      <div class="ins-trend-section-range" id="insightTrendRangeMonthly"></div>
       <div class="ins-trend-canvaswrap"><canvas id="insightTrendCanvasMonthly"></canvas></div>
     </div>
     <div class="ins-empty" id="insightTrendEmpty" style="display:none;padding:40px 10px;">판매 데이터가 없습니다.</div>
@@ -13785,12 +13795,14 @@ function insightRenderCalcDetail(code){
   body.innerHTML=html;
 }
 function insightBuildPeriodData(dates, series, period){
-  let labels=[], values=[], dateKeys=[];
+  let labels=[], values=[], dateKeys=[], rangeText='', bucketLabel='';
   if(period==='daily'){
     const last=dates.slice(-60);
     dateKeys=last;
     labels=last.map(d=>{ const s2=d.split('-'); return s2[1]+'/'+s2[2]; });
     values=last.map(d=>series[d]||0);
+    bucketLabel='일';
+    if(last.length) rangeText=`${last[0]} ~ ${last[last.length-1]} (최근 ${last.length}일 고정)`;
   } else if(period==='weekly'){
     const wk={};
     dates.forEach(d=>{
@@ -13803,17 +13815,25 @@ function insightBuildPeriodData(dates, series, period){
     const keys=Object.keys(wk).sort().slice(-20);
     labels=keys.map(k=>{ const s2=k.split('-'); return s2[1]+'/'+s2[2]+'~'; });
     values=keys.map(k=>wk[k]);
+    bucketLabel='주';
+    if(keys.length){
+      const lastMonday=new Date(keys[keys.length-1]+'T00:00:00');
+      const lastSunday=new Date(lastMonday); lastSunday.setDate(lastMonday.getDate()+6);
+      rangeText=`${keys[0]}(월) ~ ${fmtDate(lastSunday)}(일) (최근 ${keys.length}주 고정)`;
+    }
   } else {
     const mo={};
     dates.forEach(d=>{ const ym=d.slice(0,7); mo[ym]=(mo[ym]||0)+series[d]; });
     const keys=Object.keys(mo).sort().slice(-24);
     labels=keys.map(k=>{ const s2=k.split('-'); return s2[0].slice(2)+'/'+s2[1]; });
     values=keys.map(k=>mo[k]);
+    bucketLabel='월';
+    if(keys.length) rangeText=`${keys[0]} ~ ${keys[keys.length-1]} (최근 ${keys.length}개월 고정)`;
   }
-  return {labels,values,dateKeys};
+  return {labels,values,dateKeys,rangeText,bucketLabel};
 }
-function insightDrawPeriodChart(period, canvasId, sumElId, dates, series){
-  const {labels,values,dateKeys}=insightBuildPeriodData(dates, series, period);
+function insightDrawPeriodChart(period, canvasId, sumElId, rangeElId, dates, series){
+  const {labels,values,dateKeys,rangeText,bucketLabel}=insightBuildPeriodData(dates, series, period);
   if(period==='daily') _insightTrendDailyDates=dateKeys;
   const dark=_currentTheme()==='dark';
   const ctx=document.getElementById(canvasId).getContext('2d');
@@ -13833,7 +13853,10 @@ function insightDrawPeriodChart(period, canvasId, sumElId, dates, series){
   const total=values.reduce((a,b)=>a+b,0);
   const avg=values.length?Math.round(total/values.length*10)/10:0;
   const sumEl=document.getElementById(sumElId);
-  if(sumEl) sumEl.textContent=`합계 ${total.toLocaleString()}개 · 구간평균 ${avg.toLocaleString()}개`;
+  // "구간평균"처럼 어느 단위 평균인지 모호한 표현 대신, 일/주/월별로 정확히 어떤 평균인지 명시
+  if(sumEl) sumEl.innerHTML=`합계 <b>${total.toLocaleString()}개</b> · ${bucketLabel}평균 ${avg.toLocaleString()}개`;
+  const rangeEl=document.getElementById(rangeElId);
+  if(rangeEl) rangeEl.textContent=rangeText;
 }
 function insightRenderTrend(){
   const code=_insightTrendCode; if(!code) return;
@@ -13852,9 +13875,9 @@ function insightRenderTrend(){
   sections.forEach(s=>s.style.display='');
   if(rangeBox) rangeBox.style.display='';
   if(empty) empty.style.display='none';
-  insightDrawPeriodChart('daily','insightTrendCanvasDaily','insightTrendSumDaily', dates, series);
-  insightDrawPeriodChart('weekly','insightTrendCanvasWeekly','insightTrendSumWeekly', dates, series);
-  insightDrawPeriodChart('monthly','insightTrendCanvasMonthly','insightTrendSumMonthly', dates, series);
+  insightDrawPeriodChart('daily','insightTrendCanvasDaily','insightTrendSumDaily','insightTrendRangeDaily', dates, series);
+  insightDrawPeriodChart('weekly','insightTrendCanvasWeekly','insightTrendSumWeekly','insightTrendRangeWeekly', dates, series);
+  insightDrawPeriodChart('monthly','insightTrendCanvasMonthly','insightTrendSumMonthly','insightTrendRangeMonthly', dates, series);
   insightRenderRangeSummary();
 }
 // 프리셋 버튼(7/14/30/60/90일) 선택 — 직접입력 날짜는 초기화하고 즉시 합계 재계산
@@ -13893,7 +13916,7 @@ function insightRenderRangeSummary(){
   const avg=dayCount?Math.round(sum/dayCount*10)/10:0;
   const label=(from===to)?from:`${from} ~ ${to}`;
   const el=document.getElementById('insightRangeSummary');
-  if(el) el.innerHTML=`📌 ${label} 합계 <b>${sum.toLocaleString()}개</b><small>일평균</small> <span class="ins-avg">${avg.toLocaleString()}개</span><small>· 발주 참고용 자동 합산 (아래 일별 그래프에서 파란색으로 표시)</small>`;
+  if(el) el.innerHTML=`📌 ${label} 합계 <b>${sum.toLocaleString()}개</b><small>일평균</small> <span class="ins-avg">${avg.toLocaleString()}개</span><small>· 아래 "일별" 그래프에서 이 구간만 파란색으로 표시됩니다</small>`;
   const chart=_insightTrendCharts.daily;
   if(chart && _insightTrendDailyDates.length){
     const dark=_currentTheme()==='dark';
