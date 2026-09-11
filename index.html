@@ -14849,8 +14849,10 @@ async function _readBdUpload(file){
       const resNewPrice = r.length>7 ? _n(r[7]) : null;
       if(!code||!name){ bad++; continue; }
       if(resQty!=null && resQty>0){
-        // 구재고수량이 있으면 이 행은 즉시 단가변경이 아니라 재고소진 예약 대상 — 기존에 등록된 코드여야 함
-        const existing = findBdByAnyCode(code);
+        // 구재고수량이 있으면 이 행은 즉시 단가변경이 아니라 재고소진 예약 대상 — 기존에 등록된 코드여야 함.
+        // ID가 있으면(원래 다운로드한 행) 그 ID로 정확히 찾고, 없으면 코드+상품명으로 안전하게 매칭
+        // (SSCOB100처럼 같은 코드를 여러 상품이 쓰는 경우 코드만으로는 엉뚱한 행이 걸릴 수 있어서).
+        const existing = (id && /^\d+$/.test(id)) ? _bdData.find(x=>String(x.id)===String(id)) : _bdResolvePriceCutRow(code, name);
         if(!existing){ resSkipped++; continue; }
         if(resNewPrice==null){ resNoPriceSkipped++; continue; } // H열(예약후 새단가) 누락 — 예약 안 만들고 건너뜀
         reservations.push({ code:existing.code, name:existing.name, bdId:existing.id, oldPrice:existing.price, newPrice:resNewPrice, oldStockQty:resQty });
@@ -14927,7 +14929,7 @@ async function bdLoadPriceCutBatches(){
 // 그 경우엔 같은 코드를 쓰면서 상품명(또는 별칭 상품명)까지 일치하는 행을 찾는다(정확히 1개일 때만 인정).
 function _bdResolvePriceCutRow(code, name){
   const k=(code||'').trim().toLowerCase(); if(!k) return null;
-  if(SHARED_BD_CODES.has(k)){
+  if(isBdCodeShared(k)){
     const nk=normName(name);
     const candidates=_bdData.filter(r=>{
       const codes=[r.code, ...(r.aliasCodes||[])].filter(Boolean).map(c=>String(c).toLowerCase());
@@ -15258,7 +15260,13 @@ async function bdCheckPriceReservations(){
         || _bdData.find(x=>(x.aliasCodes||[]).includes(res.code));
       if(!bdRow){ console.warn('재고소진 예약 대상 백데이터 행을 찾을 수 없음:', res.code); continue; }
       if(res.bdId!==bdRow.id){ res.bdId=bdRow.id; anyChange=true; } // 병합 등으로 행이 바뀌었으면 예약을 새 행에 다시 연결
-      const codeSet = new Set([bdRow.code, ...(bdRow.aliasCodes||[])].filter(Boolean).map(c=>String(c).toLowerCase()));
+      // 대표코드가 SSCOB100처럼 다른 상품과 겹쳐 쓰이는 "사실상 공유코드"면, 그 코드만으로는 어느
+      // 상품 판매분인지 구분할 수 없으므로 코드 매칭에서 제외하고 이름 매칭만 신뢰한다(별칭코드는
+      // 병합으로 이 상품 전용으로 확인된 코드라 그대로 신뢰).
+      const codeSet = new Set([
+        ...(isBdCodeShared(bdRow.code) ? [] : [bdRow.code]),
+        ...(bdRow.aliasCodes||[])
+      ].filter(Boolean).map(c=>String(c).toLowerCase()));
       const nameKey = normName(bdRow.name);
       const {data,error} = await sb.from('daily_sales').select('sale_date,qty,name,code').eq('is_rg', false).gte('sale_date', res.startDate);
       if(error){ console.warn('재고소진 예약 체크 조회 실패:', res.code, error.message); continue; }
@@ -15272,7 +15280,10 @@ async function bdCheckPriceReservations(){
       for(const setRow of consumingSets){
         const item = setRow.comboItems.find(it=>String(it.bdId)===String(bdRow.id));
         const mult = Number(item&&item.qty)||1;
-        const setCodeSet = new Set([setRow.code, ...(setRow.aliasCodes||[])].filter(Boolean).map(c=>String(c).toLowerCase()));
+        const setCodeSet = new Set([
+          ...(isBdCodeShared(setRow.code) ? [] : [setRow.code]),
+          ...(setRow.aliasCodes||[])
+        ].filter(Boolean).map(c=>String(c).toLowerCase()));
         const setNameKey = normName(setRow.name);
         const setEvents = (data||[]).filter(r => setCodeSet.has(String(r.code||'').toLowerCase()) || normName(r.name)===setNameKey)
           .map(r=>({sale_date:r.sale_date, qty:(Number(r.qty)||0)*mult}));
@@ -21248,8 +21259,8 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
   const newPrice = bdRow.price!=null?bdRow.price:0;
   if(newPrice===(oldPrice!=null?oldPrice:0)) return 0;
   const code = bdRow.code||'';
-  const isSharedCode = SHARED_BD_CODES.has(code.toLowerCase())||!code;
-  // 대표 상품명 + 별칭 상품명(aliasNames — ss소장끼리 병합해서 흡수된 상품명) 전부 대상
+  const isSharedCode = isBdCodeShared(code);
+  // 대표 상품명 + 별칭 상품명(aliasNames — 공유코드끼리 병합해서 흡수된 상품명) 전부 대상
   const bdNameKeys = new Set([normName(bdRow.name), ...((bdRow.aliasNames||[]).map(normName))].filter(Boolean));
 
   const today = new Date();
@@ -21261,12 +21272,28 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
   let revRows=[];
   try{
     if(isSharedCode){
-      // ss소장: 공유코드 전체 fetch 후 상품명으로 필터 (대소문자 무관)
-      const {data,error}=await sb.from('revenue')
-        .select('id,order_qty,settlement,shipping_fee,model_name,sale_date,year')
-        .or('item_code.ilike.ss소장,item_code.ilike.ss 소장,item_code.ilike.소장,item_code.eq.')
-        .eq('year', curYear)
-        .gte('sale_date', monthMD);
+      const officiallySharedCode = SHARED_BD_CODES.has(code.toLowerCase());
+      let data, error;
+      if(officiallySharedCode){
+        // ss소장: 실제 입력 시 흔한 표기 변형(공백 유무 등)까지 폭넓게 허용해서 fetch 후 상품명으로 필터
+        ({data,error}=await sb.from('revenue')
+          .select('id,order_qty,settlement,shipping_fee,model_name,sale_date,year')
+          .or('item_code.ilike.ss소장,item_code.ilike.ss 소장,item_code.ilike.소장,item_code.eq.')
+          .eq('year', curYear)
+          .gte('sale_date', monthMD));
+      } else {
+        // ss소장은 아니지만 백데이터에 같은 코드를 쓰는 서로 다른 상품이 실제로 등록돼 있는 경우
+        // (예: SSCOB100처럼 의도한 공유코드는 아니지만 결과적으로 겹치게 된 코드) — 이 코드(+별칭코드)로
+        // 들어온 행 전체를 가져온 뒤 상품명으로 다시 걸러서, 코드가 같은 다른 상품 매출과 섞이지 않게 한다.
+        const codes=[...new Set([code, ...((bdRow.aliasCodes||[]).map(c=>String(c||'')).filter(Boolean))].filter(Boolean).map(c=>c.toLowerCase()))];
+        const orParts=codes.map(c=>`item_code.ilike.${c}`);
+        orParts.push('item_code.eq.');
+        ({data,error}=await sb.from('revenue')
+          .select('id,order_qty,settlement,shipping_fee,model_name,sale_date,year')
+          .or(orParts.join(','))
+          .eq('year', curYear)
+          .gte('sale_date', monthMD));
+      }
       if(error) throw error;
       revRows=(data||[]).filter(r=>bdNameKeys.has(normName(r.model_name)));
     } else {
@@ -22340,6 +22367,25 @@ function normName(s){ return String(s||'').toLowerCase()
   .replace(/\s+/g,''); }
 // 공유코드(ss소장 직접 소싱) — 상품명으로 매칭
 const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
+// 코드만으로 매칭하면 위험한 "사실상 공유 코드"인지 판정 — ss소장처럼 원래부터 공유코드로 취급하는
+// 것(SHARED_BD_CODES)뿐 아니라, 지금 백데이터에 실제로 같은 코드(대표코드+별칭코드 기준)를 쓰는
+// 서로 다른 상품명이 2개 이상 등록돼 있으면(예: SSCOB100처럼 의도한 공유코드는 아니지만 결과적으로
+// 겹치게 된 경우) 마찬가지로 이름 매칭을 강제해야 안전하다 — 2026-09-11, 이 케이스에서 코드 단독
+// 매칭 시 서로 다른 상품의 매출 데이터가 섞일 수 있는 위험이 발견돼 추가.
+function _bdSharedCodeSet(){
+  const byCode={};
+  _bdData.forEach(r=>{
+    const codes=[r.code, ...(r.aliasCodes||[])].filter(Boolean).map(c=>String(c).toLowerCase());
+    codes.forEach(k=>{ (byCode[k]=byCode[k]||new Set()).add(normName(r.name)); });
+  });
+  const shared=new Set(SHARED_BD_CODES);
+  Object.keys(byCode).forEach(k=>{ if(byCode[k].size>1) shared.add(k); });
+  return shared;
+}
+function isBdCodeShared(code){
+  if(!code) return true;
+  return _bdSharedCodeSet().has(String(code).toLowerCase());
+}
 // 별칭 "상품명"(aliasNames)을 alias_codes 컬럼에 코드와 함께 저장할 때 붙이는 구분자.
 // ss소장처럼 코드가 여러 상품에 겹쳐 쓰이는 경우, 코드로는 서로 구분이 안 되므로 병합 시
 // 흡수된 행의 "상품명"을 이 접두사를 붙여 alias_codes 배열에 같이 저장해두고, 로드할 때
