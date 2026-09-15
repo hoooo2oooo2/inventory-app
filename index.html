@@ -1359,6 +1359,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .fo-prod-add:hover{background:#DCE8FF;}
 .fo-item-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 3px;flex-shrink:0;}
 .fo-item-del:hover{color:#DC2626;}
+.fo-item-edit{background:none;border:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 3px;flex-shrink:0;}
+.fo-item-edit:hover{color:#3182F6;}
 /* 우측: 저장 목록 + 주문서 */
 .fo-order-list{flex:0 0 260px;background:var(--bg);border-bottom:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;}
 .fo-ol-head{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:0.5px solid var(--bd);flex-shrink:0;}
@@ -4425,8 +4427,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
       <!-- 업체 필터 바 -->
       <div class="fo-vendor-bar" id="foVendorBar"></div>
-      <!-- 인라인 추가 폼 -->
+      <!-- 인라인 추가/수정 폼 -->
       <div class="fo-form" id="foForm" style="display:none;">
+        <div class="fo-form-row" style="margin-bottom:4px;"><b id="foFormTitle" style="font-size:12px;">상품 추가</b></div>
         <div class="fo-form-row">
           <div class="fo-form-lbl">업체분류</div>
           <select class="fo-form-inp" id="foVendor">
@@ -4454,7 +4457,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
           </div>
         </div>
         <div class="fo-form-btns">
-          <button class="fo-save-btn" onclick="foSaveProduct()">저장</button>
+          <button class="fo-save-btn" id="foSaveBtn" onclick="foSaveProduct()">저장</button>
           <button class="fo-cancel-btn" onclick="foToggleForm(false)">취소</button>
         </div>
       </div>
@@ -26867,6 +26870,7 @@ const FO_DEFAULT_PRODUCTS = [
 
 let _foProducts = [];
 let _foVendorFilter = null;
+let _foEditingId = null;
 let _foOrders = [];
 let _foOlFilter = null;
 let _foCurOrderId = null;
@@ -26923,6 +26927,7 @@ function foRenderProductList(){
           <div class="fo-prod-meta">${_esc(p.code)} · ${(p.qtyBox||0).toLocaleString()}개/박스 · ${(p.price||0).toLocaleString()}원</div>
         </div>
         <button class="fo-prod-add" onclick="event.stopPropagation();foAddToOrder(${pj})">＋</button>
+        <button class="fo-item-edit" onclick="event.stopPropagation();foEditProduct('${p.id}')" title="수정">✎</button>
         <button class="fo-item-del" onclick="event.stopPropagation();foDeleteProduct('${p.id}')" title="삭제">✕</button>
       </div>`;
     });
@@ -26936,10 +26941,31 @@ function foToggleForm(open){
   const show = (open !== undefined) ? !!open : (form.style.display === 'none');
   form.style.display = show ? '' : 'none';
   if(show && open === undefined){
+    _foEditingId = null;
     ['foCode','foName','foQtyBox','foPrice'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     const vs = document.getElementById('foVendor'); if(vs) vs.selectedIndex=0;
+    const t=document.getElementById('foFormTitle'); if(t) t.textContent='상품 추가';
+    const b=document.getElementById('foSaveBtn'); if(b) b.textContent='저장';
   }
+  if(!show) _foEditingId = null;
   if(show) setTimeout(()=>{ const v=document.getElementById('foCode'); if(v) v.focus(); },50);
+}
+
+function foEditProduct(id){
+  const p = _foProducts.find(x=>x.id===id);
+  if(!p) return;
+  _foEditingId = id;
+  const form = document.getElementById('foForm');
+  if(form) form.style.display='';
+  const vs=document.getElementById('foVendor'); if(vs) vs.value=p.vendor||'태광';
+  const set=(id2,v)=>{ const el=document.getElementById(id2); if(el) el.value=v; };
+  set('foCode', p.code||'');
+  set('foName', p.name||'');
+  set('foQtyBox', p.qtyBox||'');
+  set('foPrice', p.price||'');
+  const t=document.getElementById('foFormTitle'); if(t) t.textContent='상품 수정';
+  const b=document.getElementById('foSaveBtn'); if(b) b.textContent='수정 완료';
+  setTimeout(()=>{ const v=document.getElementById('foPrice'); if(v) v.focus(); },50);
 }
 
 function foSaveProduct(){
@@ -26949,7 +26975,13 @@ function foSaveProduct(){
   const qtyBox = parseInt(document.getElementById('foQtyBox').value)||0;
   const price  = parseInt(document.getElementById('foPrice').value)||0;
   if(!name){ toast('상품명을 입력해주세요.'); return; }
-  _foProducts.push({id:'fp'+Date.now(), vendor, code, name, qtyBox, price});
+  if(_foEditingId){
+    const p = _foProducts.find(x=>x.id===_foEditingId);
+    if(p){ p.vendor=vendor; p.code=code; p.name=name; p.qtyBox=qtyBox; p.price=price; }
+    _foEditingId = null;
+  } else {
+    _foProducts.push({id:'fp'+Date.now(), vendor, code, name, qtyBox, price});
+  }
   _foFlushProducts();
   foToggleForm(false);
   foRenderProductList();
