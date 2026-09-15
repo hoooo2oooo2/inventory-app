@@ -17671,12 +17671,25 @@ function renderDailyReport(){
   if(_dlyFilter.day!==null) rows=rows.filter(r=>r.date===`${monStr}-${pad(_dlyFilter.day)}`);
   if(_dlyFilter.ch!=='ALL') rows=rows.filter(r=>chMatchDly(r.ch));
 
-  // ── 전월 동기간 데이터 (전월 대비) ──
-  const prevM=_dlyFilter.month===1?12:_dlyFilter.month-1;
-  const prevY=_dlyFilter.month===1?_dlyFilter.year-1:_dlyFilter.year;
-  const prevMonStr=pad(prevM);
+  // ── 비교 기준 데이터 ──
+  // 특정 날짜 선택 시: 요일이 어긋나는 "전월 동일 날짜"가 아니라 "전주 동일 요일(7일 전)"과 비교
+  // 월 전체 선택 시: 기존과 동일하게 "전월 동기간"과 비교
+  let prevM, prevY, prevMonStr, prevDay, compareLabel;
+  if(_dlyFilter.day!==null){
+    const pd=new Date(_dlyFilter.year, _dlyFilter.month-1, _dlyFilter.day);
+    pd.setDate(pd.getDate()-7);
+    prevY=pd.getFullYear(); prevM=pd.getMonth()+1; prevDay=pd.getDate();
+    prevMonStr=pad(prevM);
+    compareLabel='전주';
+  } else {
+    prevM=_dlyFilter.month===1?12:_dlyFilter.month-1;
+    prevY=_dlyFilter.month===1?_dlyFilter.year-1:_dlyFilter.year;
+    prevMonStr=pad(prevM);
+    prevDay=null;
+    compareLabel='전월';
+  }
   let prevRows=_revData.filter(r=>r.year===prevY&&r.date?.startsWith(prevMonStr));
-  if(_dlyFilter.day!==null) prevRows=prevRows.filter(r=>r.date===`${prevMonStr}-${pad(_dlyFilter.day)}`);
+  if(prevDay!==null) prevRows=prevRows.filter(r=>r.date===`${prevMonStr}-${pad(prevDay)}`);
   if(_dlyFilter.ch!=='ALL') prevRows=prevRows.filter(r=>chMatchDly(r.ch));
 
   // 택배건수 = 합포장 기준 고유 배송 건수 (날짜+판매처+주문번호+수취인+연락처1+주소)
@@ -17690,7 +17703,7 @@ function renderDailyReport(){
   const totalOrders=new Set(rows.map(pkgKey)).size;
   const prevSettle=prevRows.reduce((s,r)=>s+(r.settlement||0),0);
   const prevMarginGross=prevRows.reduce((s,r)=>s+(r.margin||0),0);
-  const adPrev=sumAdSpend({year:prevY, month:prevM, day:_dlyFilter.day, ch:_dlyFilter.ch});
+  const adPrev=sumAdSpend({year:prevY, month:prevM, day:prevDay, ch:_dlyFilter.ch});
   const prevMargin=prevMarginGross-adPrev;
   const prevRate=prevSettle>0?(prevMargin/prevSettle*100):0;
   const prevOrders=new Set(prevRows.map(pkgKey)).size;
@@ -17708,18 +17721,18 @@ function renderDailyReport(){
   const rgActive = rgIncluded;
   const curFrom=_dlyFilter.day!==null?`${_dlyFilter.year}-${monStr}-${pad(_dlyFilter.day)}`:`${_dlyFilter.year}-${monStr}-01`;
   const curTo=_dlyFilter.day!==null?curFrom:`${_dlyFilter.year}-${monStr}-31`;
-  const prevFrom=_dlyFilter.day!==null?`${prevY}-${prevMonStr}-${pad(_dlyFilter.day)}`:`${prevY}-${prevMonStr}-01`;
-  const prevTo=_dlyFilter.day!==null?prevFrom:`${prevY}-${prevMonStr}-31`;
+  const prevFrom=prevDay!==null?`${prevY}-${prevMonStr}-${pad(prevDay)}`:`${prevY}-${prevMonStr}-01`;
+  const prevTo=prevDay!==null?prevFrom:`${prevY}-${prevMonStr}-31`;
   const rgFin = rgActive ? rgSumSettlementMargin(curFrom, curTo) : {settlement:0,margin:0};
   const rgPrevFin = rgActive ? rgSumSettlementMargin(prevFrom, prevTo) : {settlement:0,margin:0};
   const totalSettleDisp = totalSettle + rgFin.settlement, prevSettleDisp = prevSettle + rgPrevFin.settlement;
 
-  // 전월 대비 텍스트 생성
+  // 전월(또는 전주 동요일) 대비 텍스트 생성
   const diffHtml=(cur,prv,unit='')=>{
-    if(!prv) return `<span style="color:var(--tx2);">전월 데이터 없음</span>`;
+    if(!prv) return `<span style="color:var(--tx2);">${compareLabel} 데이터 없음</span>`;
     const d=cur-prv, pct=Math.abs(d/prv*100).toFixed(1);
     const up=d>=0;
-    return `<span style="color:${up?'#DC2626':'#059669'};font-weight:600;">${up?'▲':'▼'} ${pct}%</span>&nbsp;<span style="color:var(--tx2);">전월 ${fmt(prv)}${unit}</span>`;
+    return `<span style="color:${up?'#DC2626':'#059669'};font-weight:600;">${up?'▲':'▼'} ${pct}%</span>&nbsp;<span style="color:var(--tx2);">${compareLabel} ${fmt(prv)}${unit}</span>`;
   };
 
   document.getElementById('revDlyK0').textContent=fmt(totalSettleDisp);
@@ -17732,9 +17745,9 @@ function renderDailyReport(){
     document.getElementById('revDlyK1').textContent=fmt(rgFin.margin);
     document.getElementById('revDlyK1s').innerHTML=diffHtml(rgFin.margin,rgPrevFin.margin);
     document.getElementById('revDlyK2').textContent=rgRate.toFixed(1)+'%';
-    document.getElementById('revDlyK2s').innerHTML=rgPrevFin.settlement?`<span style="color:${rgRate>=rgPrevRate?'#DC2626':'#059669'};font-weight:600;">${rgRate>=rgPrevRate?'▲':'▼'} ${Math.abs(rgRate-rgPrevRate).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">전월 ${rgPrevRate.toFixed(1)}%</span>`:'<span style="color:var(--tx2);">전월 데이터 없음</span>';
+    document.getElementById('revDlyK2s').innerHTML=rgPrevFin.settlement?`<span style="color:${rgRate>=rgPrevRate?'#DC2626':'#059669'};font-weight:600;">${rgRate>=rgPrevRate?'▲':'▼'} ${Math.abs(rgRate-rgPrevRate).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">${compareLabel} ${rgPrevRate.toFixed(1)}%</span>`:`<span style="color:var(--tx2);">${compareLabel} 데이터 없음</span>`;
     const rgOrdersCur=rgSumDailyField('orders', _dlyFilter.year, _dlyFilter.month, _dlyFilter.day);
-    const rgOrdersPrev=rgSumDailyField('orders', prevY, prevM, _dlyFilter.day);
+    const rgOrdersPrev=rgSumDailyField('orders', prevY, prevM, prevDay);
     document.getElementById('revDlyK3').textContent=rgOrdersCur.toLocaleString()+'건';
     document.getElementById('revDlyK3s').innerHTML=diffHtml(rgOrdersCur,rgOrdersPrev,'건');
     document.getElementById('revDlyK4').textContent='-';
@@ -17748,7 +17761,7 @@ function renderDailyReport(){
     document.getElementById('revDlyK1').textContent=fmt(totalMarginDisp);
     document.getElementById('revDlyK1s').innerHTML=diffHtml(totalMarginDisp,prevMarginDisp);
     document.getElementById('revDlyK2').textContent=totalRateDisp.toFixed(1)+'%';
-    document.getElementById('revDlyK2s').innerHTML=prevSettleDisp?`<span style="color:${totalRateDisp>=prevRateDisp?'#DC2626':'#059669'};font-weight:600;">${totalRateDisp>=prevRateDisp?'▲':'▼'} ${Math.abs(totalRateDisp-prevRateDisp).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">전월 ${prevRateDisp.toFixed(1)}%</span>`:'<span style="color:var(--tx2);">전월 데이터 없음</span>';
+    document.getElementById('revDlyK2s').innerHTML=prevSettleDisp?`<span style="color:${totalRateDisp>=prevRateDisp?'#DC2626':'#059669'};font-weight:600;">${totalRateDisp>=prevRateDisp?'▲':'▼'} ${Math.abs(totalRateDisp-prevRateDisp).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">${compareLabel} ${prevRateDisp.toFixed(1)}%</span>`:`<span style="color:var(--tx2);">${compareLabel} 데이터 없음</span>`;
     document.getElementById('revDlyK3').textContent=totalOrders.toLocaleString()+'건';
     document.getElementById('revDlyK3s').innerHTML=diffHtml(totalOrders,prevOrders,'건');
     // 광고비: 마이너스 없이 검은 글씨로 금액만 표시
