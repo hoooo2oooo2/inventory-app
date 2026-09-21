@@ -6765,6 +6765,28 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div style="position:relative;height:260px;">
       <canvas id="dlyProdChartCv"></canvas>
     </div>
+
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bd);">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">📅 날짜 비교 (사이트별)</div>
+      <div class="rev-filter" style="padding:0 0 8px;flex-wrap:wrap;">
+        <span class="rev-filter-lbl">기준일</span>
+        <input type="date" class="sel" id="dlyProdCmpDateA" onchange="renderDlyProdCompare()">
+        <span class="rev-filter-lbl">비교일</span>
+        <input type="date" class="sel" id="dlyProdCmpDateB" onchange="renderDlyProdCompare()">
+      </div>
+      <div id="dlyProdCmpQuickBtns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div class="tw"><table class="dt" style="width:100%;">
+        <thead><tr>
+          <th style="text-align:left;">판매처</th>
+          <th style="text-align:right;" id="dlyProdCmpHdrA">기준일</th>
+          <th style="text-align:right;" id="dlyProdCmpHdrB">비교일</th>
+          <th style="text-align:right;">증감</th>
+        </tr></thead>
+        <tbody id="dlyProdCmpTbody"></tbody>
+      </table></div>
+      <div id="dlyProdCmpEmpty" style="display:none;padding:14px;text-align:center;color:var(--tx2);font-size:12px;">두 날짜 모두 판매 데이터가 없습니다.</div>
+    </div>
+
     <div class="ma" style="margin-top:12px;">
       <button class="btn" onclick="closeModal('dlyProdChartModal')">닫기</button>
     </div>
@@ -19715,8 +19737,117 @@ async function openDlyProdChart(i){
     const curCh=Array.isArray(_dlyFilter.ch)?_dlyFilter.ch[0]:_dlyFilter.ch;
     chSel.value=curCh&&(REV_CHANNELS.includes(curCh)||curCh==='로켓그로스')?curCh:'ALL';
   }
+  // 날짜 비교 섹션 기본값: 기준일=현재 선택된 날(일일보고에서 특정 일 선택 중이면 그 날, 아니면 최근 데이터일), 비교일=1주 전
+  const dateAEl=document.getElementById('dlyProdCmpDateA'), dateBEl=document.getElementById('dlyProdCmpDateB');
+  const defA=_dlyFilter.day!=null ? new Date(_dlyFilter.year,_dlyFilter.month-1,_dlyFilter.day) : _trendLatestDate();
+  const defAStr=_ymd(defA);
+  if(dateAEl) dateAEl.value=defAStr;
+  if(dateBEl) dateBEl.value=_dlyCmpDateFromBasis('week1', defAStr);
+
   openModal('dlyProdChartModal');
   await renderDlyProdChart();
+  await renderDlyProdCompare();
+}
+
+// ── 제품별 일별 판매수량 팝업 내 "날짜 비교(사이트별)" ──
+const DLY_CMP_BASIS = [
+  {id:'yesterday',label:'어제'},{id:'week1',label:'1주 전'},{id:'week2',label:'2주 전'},
+  {id:'lastmonth',label:'저번달'},{id:'lastyear',label:'작년'}
+];
+// basis(프리셋)와 기준일(dateA, 'YYYY-MM-DD')로부터 비교일을 계산 — 월/연 이동은 말일 클램프(_trendAddMonthsClamped) 재사용
+function _dlyCmpDateFromBasis(basis, dateAStr){
+  const [y,m,d]=dateAStr.split('-').map(Number);
+  const base=new Date(y,m-1,d);
+  if(basis==='yesterday'){ base.setDate(base.getDate()-1); return _ymd(base); }
+  if(basis==='week1'){ base.setDate(base.getDate()-7); return _ymd(base); }
+  if(basis==='week2'){ base.setDate(base.getDate()-14); return _ymd(base); }
+  if(basis==='lastmonth') return _ymd(_trendAddMonthsClamped(base,-1));
+  if(basis==='lastyear') return _ymd(_trendAddMonthsClamped(base,-12));
+  return _ymd(base);
+}
+function setDlyProdCmpBasis(basis){
+  const aEl=document.getElementById('dlyProdCmpDateA'), bEl=document.getElementById('dlyProdCmpDateB');
+  if(!aEl||!aEl.value) return;
+  if(bEl) bEl.value=_dlyCmpDateFromBasis(basis, aEl.value);
+  renderDlyProdCompare();
+}
+// 특정 날짜 하루의 제품 1개 판매수량을 판매처별로 집계 (일반 채널 + 로켓그로스)
+async function _dlyProdDateBreakdown(name, year, month, day){
+  await ensureRevYear(year);
+  const monStr=String(month).padStart(2,'0'), dayStr=String(day).padStart(2,'0');
+  const dateStr=`${monStr}-${dayStr}`;
+  const keyOf=r=>r.modelName||r.itemCode||'미상';
+  const map={};
+  _revData.forEach(r=>{
+    if(r.year!==year||r.date!==dateStr||keyOf(r)!==name) return;
+    const ch=r.ch||'기타';
+    map[ch]=(map[ch]||0)+(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName);
+  });
+  const ym=`${year}-${monStr}`;
+  await rgEnsureProdMonths(ym, ym);
+  let rgQty=0;
+  (_rgProdCache[ym]||[]).forEach(r=>{
+    if(!r.date||r.date.slice(8,10)!==dayStr) return;
+    const rname=rgResolveName(r.optionId)||r.productName||'미상';
+    if(rname!==name) return;
+    rgQty+=(r.qty||0)*rgQtyMultiplier(r.optionId);
+  });
+  if(rgQty>0) map['로켓그로스']=(map['로켓그로스']||0)+rgQty;
+  return map;
+}
+async function renderDlyProdCompare(){
+  const name=_dlyProdChartKey; if(!name) return;
+  const aVal=document.getElementById('dlyProdCmpDateA').value;
+  const bVal=document.getElementById('dlyProdCmpDateB').value;
+  const quickEl=document.getElementById('dlyProdCmpQuickBtns');
+  if(!aVal||!bVal){ if(quickEl) quickEl.innerHTML=''; return; }
+  if(quickEl) quickEl.innerHTML=DLY_CMP_BASIS.map(b=>{
+    const active=_dlyCmpDateFromBasis(b.id,aVal)===bVal;
+    return `<button class="rfbtn${active?' active':''}" onclick="setDlyProdCmpBasis('${b.id}')">${b.label}</button>`;
+  }).join('');
+
+  const [ay,am,ad]=aVal.split('-').map(Number), [by,bm,bd]=bVal.split('-').map(Number);
+  document.getElementById('dlyProdCmpHdrA').textContent=aVal;
+  document.getElementById('dlyProdCmpHdrB').textContent=bVal;
+
+  const [mapA,mapB]=await Promise.all([
+    _dlyProdDateBreakdown(name,ay,am,ad),
+    _dlyProdDateBreakdown(name,by,bm,bd)
+  ]);
+  const chs=sortCh([...new Set([...Object.keys(mapA),...Object.keys(mapB)])]);
+  const tbody=document.getElementById('dlyProdCmpTbody');
+  const emptyEl=document.getElementById('dlyProdCmpEmpty');
+  if(!chs.length){
+    if(tbody) tbody.innerHTML='';
+    if(emptyEl) emptyEl.style.display='';
+    return;
+  }
+  if(emptyEl) emptyEl.style.display='none';
+  let totalA=0, totalB=0;
+  const rows=chs.map(ch=>{
+    const a=mapA[ch]||0, b=mapB[ch]||0;
+    totalA+=a; totalB+=b;
+    const diff=a-b, up=diff>0, down=diff<0;
+    const color=up?'#DC2626':down?'#059669':'var(--tx2)';
+    const arrow=up?'▲':down?'▼':'-';
+    const pct=b>0?(diff/b*100):(a>0?100:0);
+    return `<tr>
+      <td>${escAttr(ch)}</td>
+      <td style="text-align:right;">${a.toLocaleString()}개</td>
+      <td style="text-align:right;">${b.toLocaleString()}개</td>
+      <td style="text-align:right;color:${color};font-weight:600;">${arrow} ${Math.abs(diff).toLocaleString()}${b>0?` (${Math.abs(pct).toFixed(0)}%)`:(a>0?' (신규)':'')}</td>
+    </tr>`;
+  });
+  const totalDiff=totalA-totalB, tUp=totalDiff>0, tDown=totalDiff<0;
+  const tColor=tUp?'#DC2626':tDown?'#059669':'var(--tx2)';
+  const tArrow=tUp?'▲':tDown?'▼':'-';
+  rows.push(`<tr style="font-weight:700;background:var(--bg2);">
+    <td>합계</td>
+    <td style="text-align:right;">${totalA.toLocaleString()}개</td>
+    <td style="text-align:right;">${totalB.toLocaleString()}개</td>
+    <td style="text-align:right;color:${tColor};">${tArrow} ${Math.abs(totalDiff).toLocaleString()}</td>
+  </tr>`);
+  if(tbody) tbody.innerHTML=rows.join('');
 }
 
 // 선택 연/월의 특정 판매처(또는 'ALL'/'로켓그로스') 기준 제품 1개의 일별 판매수량 배열(길이=그 달 일수)
