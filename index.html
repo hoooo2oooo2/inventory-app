@@ -6342,7 +6342,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="field"><label>제품구분</label><select id="pm_type"><option>의류</option><option>잡화</option><option>식품</option><option>전자</option><option>기타</option></select></div>
       <div class="field"><label>현재고</label><input id="pm_stock" type="number" placeholder="0"></div>
       <div class="field"><label>박스당 수량</label><input id="pm_boxqty" type="number" placeholder="12"></div>
-      <div class="field"><label>리드타임 (일)</label><input id="pm_lead" type="number" min="1" placeholder="40"><div style="font-size:10px;color:var(--tx2);margin-top:3px;">발주 후 입고까지 걸리는 일수</div></div>
+      <div class="field"><label>리드타임 (일)</label><input id="pm_lead" type="number" min="1" placeholder="45"><div style="font-size:10px;color:var(--tx2);margin-top:3px;">발주 후 입고까지 걸리는 일수</div></div>
       <div class="field"><label>발주시점 재고</label><input id="pm_reorder" type="number" placeholder="50"></div>
       <div class="field"><label>단종여부</label><select id="pm_disc"><option value="0">정상</option><option value="1">단종</option></select></div>
     </div>
@@ -22916,7 +22916,7 @@ async function applyIO(id){
   if(p){const b=p.stock;p.stock=Math.max(0,p.stock+inn-out);await sb.from('products').update({stock:p.stock}).eq('id',id);_bumpProducts();await addHistory({menu:'재고관리',type:'io',code:p.code,name:p.name,desc:`입고+${inn}/출고-${out}`,before:String(b),after:String(p.stock),user:'수동'});}
   ioTarget=null;renderInv();updateFloat();
 }
-function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='40';document.getElementById('pm_disc').value='0';_fillTypeOptions('기타');openModal('prodModal');}
+function openAddProd(){editProdId=null;document.getElementById('prodModalTitle').textContent='상품 추가';['pm_code','pm_name','pm_stock','pm_boxqty','pm_reorder'].forEach(id=>document.getElementById(id).value='');document.getElementById('pm_lead').value='45';document.getElementById('pm_disc').value='0';_fillTypeOptions('기타');openModal('prodModal');}
 // 제품구분 드롭다운을 실제 존재하는 구분들로 채움 (커스텀 구분 보존)
 function _fillTypeOptions(selected){
   const sel=document.getElementById('pm_type'); if(!sel) return;
@@ -22932,7 +22932,7 @@ async function saveProd(){
   const code=document.getElementById('pm_code').value.trim();
   const name=document.getElementById('pm_name').value.trim();
   if(!code||!name){alert('코드와 상품명을 입력해주세요.');return;}
-  const d={code,name,type:document.getElementById('pm_type').value,stock:parseInt(document.getElementById('pm_stock').value)||0,box_qty:parseInt(document.getElementById('pm_boxqty').value)||1,lead_time:(parseFloat(document.getElementById('pm_lead').value)||40)/30,reorder_point:parseInt(document.getElementById('pm_reorder').value)||0,discontinued:document.getElementById('pm_disc').value==='1'};
+  const d={code,name,type:document.getElementById('pm_type').value,stock:parseInt(document.getElementById('pm_stock').value)||0,box_qty:parseInt(document.getElementById('pm_boxqty').value)||1,lead_time:(parseFloat(document.getElementById('pm_lead').value)||45)/30,reorder_point:parseInt(document.getElementById('pm_reorder').value)||0,discontinued:document.getElementById('pm_disc').value==='1'};
   if(editProdId){await sb.from('products').update(d).eq('id',editProdId);await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code,name,desc:'상품수정',before:'-',after:'수정완료',user:'수동'});await loadProducts(true);}
   else{await sb.from('products').insert({...d,monthly:Array(12).fill(0),last_yr:Array(12).fill(0)});await _bumpProducts();await addHistory({menu:'재고관리',type:'edit',code,name,desc:'신규등록',before:'-',after:'등록',user:'수동'});await loadProducts(true);if(products.length===1)salesSel=new Set([products[0].id]);}
   closeModal('prodModal');renderInv();updateFloat();
