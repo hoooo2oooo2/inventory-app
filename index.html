@@ -12977,6 +12977,34 @@ function insightFamPendingFor(famCode){
   });
   return sum;
 }
+// famCode로 저장된 주문서 중 아직 남은수량이 있는 행들의 가장 오래된 주문일 — 선적 지연 체크용
+function insightFamOldestPendingDate(famCode){
+  if(!famCode) return null;
+  let oldest=null;
+  _foOrders.forEach(o=>{
+    (o.rows||[]).forEach((r,idx)=>{
+      if(r.code!==famCode) return;
+      const totalQty=(r.qtyBox||0)*(r.boxes||0);
+      if(totalQty<=0) return;
+      const totalRecv=(_foImports[`${o.id}_${idx}`]||[]).reduce((s,v)=>s+(parseFloat(v)||0),0);
+      if(totalQty-totalRecv<=0) return;
+      if(o.date && (!oldest || o.date<oldest)) oldest=o.date;
+    });
+  });
+  return oldest;
+}
+// 발주관리(receive_list) 미입고분 + 패밀리오더 미입고분 중 가장 오래된 주문일 — 오래 걸릴수록 선적 독촉 필요
+function insightOldestPendingDate(p, famProd){
+  let oldest=null;
+  receiveList.filter(r=>r.code===p.code && (r.orderQty-r.in1-r.in2)>0).forEach(r=>{
+    if(r.orderDate && (!oldest || r.orderDate<oldest)) oldest=r.orderDate;
+  });
+  if(famProd){
+    const fd=insightFamOldestPendingDate(famProd.code);
+    if(fd && (!oldest || fd<oldest)) oldest=fd;
+  }
+  return oldest;
+}
 // 매칭 저장 — 다른 PC의 동시수정을 덮어쓰지 않도록 저장 직전 최신본을 재로드해 병합
 async function insightSetFamMap(productId, famId){
   const latest = await cloudKvLoad(INSIGHT_FAM_MAP_KIND);
@@ -13332,13 +13360,17 @@ function insightBuildRows(){
     // 연결된 경우 패밀리오더 박스 단위(qtyBox)로 다시 계산한 권장 발주 박스수 + 최근 주문 이력(참고용)
     const famBoxes=(famProd && netNeeded!=null)?Math.ceil(netNeeded/(famProd.qtyBox||1)):null;
     const famLatest=famProd?insightFamLatestOrder(famProd.code):null;
+    // 진행중 발주 중 가장 오래된 주문일로부터 경과일 — 한달(30일) 넘으면 선적 독촉 대상으로 별도 표시
+    const pendingOldestDate=pending>0?insightOldestPendingDate(p, famProd):null;
+    const pendingDays=pendingOldestDate?Math.floor((Date.now()-new Date(pendingOldestDate).getTime())/86400000):null;
+    const pendingOverdue=pendingDays!=null && pendingDays>=30;
     // 급변 감지 — 최근 14일 판매가 그 이전 14일 대비 뚜렷이 늘거나(품절 위험) 줄었으면(재고 과잉 위험)
     // 표시한다. prev14가 실제로 있을 때만(데이터가 있어야 비교가 의미있음) 판단하고, 데이터가 너무
     // 적으면(30일 중 5일 미만) 노이즈일 수 있어 제외한다.
     const hasReliableAccel=!c.noData && c.prev14>0 && c.dataPoints30>=5;
     const surge=hasReliableAccel && c.accel>=1.6;
     const drop=hasReliableAccel && c.accel<=0.5 && p.stock>0;
-    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop};
+    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue};
   });
 }
 
@@ -13410,7 +13442,7 @@ function insightRowHtml(r){
     <td>${r.exhaustDate?`<div class="ins-num">${fmtDate(r.exhaustDate)}</div><div class="ins-sub">D-${r.daysLeft}</div>`:'<span class="ins-sub">산출불가</span>'}</td>
     <td>${r.reorderByDate==null?'<span class="ins-sub">산출불가</span>':(r.daysToReorder<=0?'<span class="ins-num" style="color:#DC2626;">지금 발주</span>':`<div class="ins-num">${fmtDate(r.reorderByDate)}</div><div class="ins-sub">D-${r.daysToReorder}</div>`)}</td>
     <td style="text-align:right;">${orderCell}</td>
-    <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>`:'<span class="ins-sub">-</span>'}</td>
+    <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>${r.pendingDays!=null?`<div class="ins-sub" ${r.pendingOverdue?'style="color:#DC2626;font-weight:700;"':''} title="가장 오래된 미입고 주문일로부터 경과일">${r.pendingDays}일째${r.pendingOverdue?' 🚨선적독촉':''}</div>`:''}`:'<span class="ins-sub">-</span>'}</td>
     <td style="text-align:right;">${r.rgQty>0?`<div class="ins-num">${Math.round(r.rgQty).toLocaleString()}개</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
     <td>${insightFamCellHtml(r)}</td>
     <td>${insightSeasonCellHtml(r.season)}</td>
