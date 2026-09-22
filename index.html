@@ -13437,7 +13437,7 @@ function insightRowHtml(r){
     <td><div class="ins-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px;" onclick="insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이 그래프를 볼 수 있어요">${r.p.name}${r.surge?' <span class="ins-tag" style="background:#FEF2F2;color:#DC2626;font-size:10px;padding:1px 6px;" title="최근 14일 판매가 이전 14일보다 뚜렷이 늘었습니다 — 품절 위험 재검토">🔺급증</span>':''}${r.drop?' <span class="ins-tag" style="background:#EFF6FF;color:#2563EB;font-size:10px;padding:1px 6px;" title="최근 14일 판매가 이전 14일보다 뚜렷이 줄었습니다 — 재고 과잉 위험, 발주 보류 검토">🔻급감</span>':''}</div><div class="ins-code">${r.p.code}</div></td>
     <td>${r.p.type||'기타'}</td>
     <td><span class="ins-tag" style="background:var(--bg2);color:${gradeColor};font-weight:800;">${r.grade}</span></td>
-    <td style="text-align:right;" class="ins-num">${r.p.stock.toLocaleString()}</td>
+    <td style="text-align:right;${(st==='부족'||st==='긴급')?`color:${stColor};font-weight:800;`:''}" class="ins-num" title="${(st==='부족'||st==='긴급')?'판매속도 대비 재고 '+st:''}">${r.p.stock.toLocaleString()}</td>
     <td style="text-align:right;" class="ins-num">${r.avgDay>0?r.avgDay.toFixed(1):'-'}</td>
     <td>${r.exhaustDate?`<div class="ins-num">${fmtDate(r.exhaustDate)}</div><div class="ins-sub">D-${r.daysLeft}</div>`:'<span class="ins-sub">산출불가</span>'}</td>
     <td>${r.reorderByDate==null?'<span class="ins-sub">산출불가</span>':(r.daysToReorder<=0?'<span class="ins-num" style="color:#DC2626;">지금 발주</span>':`<div class="ins-num">${fmtDate(r.reorderByDate)}</div><div class="ins-sub">D-${r.daysToReorder}</div>`)}</td>
