@@ -1537,9 +1537,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-table{width:100%;table-layout:auto;border-collapse:collapse;font-size:13px;}
 .lcr-table thead th{position:sticky;top:0;z-index:1;background:var(--bg2);padding:9px 10px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lcr-table tbody td{padding:8px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;white-space:nowrap;overflow-wrap:break-word;word-break:break-word;}
-/* 주소만 길어질 수 있는 자유 텍스트라 줄바꿈 허용 — 나머지 칸은 줄바꿈 없이 내용 길이에 맞춰 칸이 늘어남(제품명 등) */
-.lcr-table tbody td:nth-child(4){white-space:normal;}
+/* 주소는 행 높이가 일정하게 유지되도록 줄바꿈 대신 말줄임(...) 처리 — 전체 주소는 행 클릭 시 상세팝업에서 확인 */
+.lcr-table tbody td:nth-child(4){max-width:150px;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
 .lcr-table tbody tr:hover{background:var(--bg2);}
+.lcr-table tbody tr.lcr-row{cursor:pointer;}
 .lcr-table tbody tr:last-child td{border-bottom:none;}
 /* ERP 재고 차감 확인된 주문건 — 반투명 초록 틴트라 라이트/다크 모드 배경 위에서 둘 다 자연스럽게
    보이고, 별도 글씨색 보정 없이도 기본 글씨색(var(--tx))이 그대로 잘 읽힘 */
@@ -1554,6 +1555,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-del-btn{border:none;background:none;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1;color:var(--tx2);}
 .lcr-del-btn:hover{color:#DC2626;}
 .lcr-visit-tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:#DCFCE7;color:#15803D;white-space:nowrap;}
+/* 당근 판매 주문 상세보기 팝업 */
+.lcr-det-row{display:flex;align-items:flex-start;gap:12px;padding-bottom:9px;border-bottom:0.5px solid var(--bd);}
+.lcr-det-row:last-child{border-bottom:none;padding-bottom:0;}
+.lcr-det-lbl{flex-shrink:0;width:72px;font-size:12.5px;font-weight:700;color:var(--tx2);padding-top:1px;}
+.lcr-det-val{flex:1;font-size:14px;color:var(--tx);word-break:break-all;text-align:right;}
 /* 메모장 (글씨 크게) */
 .lh2-memo-status{font-size:11px;color:var(--tx2);font-weight:600;}
 .lh2-memo{flex:1;min-height:140px;width:100%;box-sizing:border-box;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:18px;line-height:1.7;color:var(--tx);background:var(--bg2);resize:none;font-family:inherit;word-break:keep-all;overflow-wrap:break-word;}
@@ -2097,6 +2103,26 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 <div class="arq-prod-drop" id="lcrProdDrop"></div>
+
+<!-- ═══ 당근 판매 주문건 상세보기 ═══ -->
+<div class="modal-overlay" id="lcrDetailModal" style="z-index:340;">
+  <div class="modal" style="max-width:420px;">
+    <h3>🥕 당근 판매 주문 상세</h3>
+    <div style="display:flex;flex-direction:column;gap:11px;margin-top:8px;">
+      <div class="lcr-det-row"><span class="lcr-det-lbl">고객명</span><span id="lcrDetName" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">연락처</span><span id="lcrDetPhone" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">주소</span><span id="lcrDetAddr" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">제품명</span><span id="lcrDetProd" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">수량</span><span id="lcrDetQty" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">판매금액</span><span id="lcrDetPrice" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">마진</span><span id="lcrDetMargin" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">마진율</span><span id="lcrDetMarginRate" class="lcr-det-val"></span></div>
+    </div>
+    <div class="ma">
+      <button class="btn" onclick="closeModal('lcrDetailModal')">닫기</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ 진행 예정 프로젝트 등록/수정 ═══ -->
 <div class="modal-overlay" id="planProjModal">
@@ -2852,7 +2878,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="lcr-table-scroll">
       <table class="lcr-table">
         <thead><tr>
-          <th style="width:96px;">등록일</th><th>고객명</th><th>연락처</th><th>주소</th><th>제품명</th>
+          <th style="width:96px;">등록일</th><th>고객명</th><th>연락처</th><th style="width:150px;">주소</th><th>제품명</th>
           <th style="width:64px;">수량</th><th style="width:100px;">공급가</th><th style="width:100px;">판매금액</th><th style="width:90px;">마진</th><th style="width:70px;">마진율</th><th style="width:110px;">ERP 재고 차감 확인</th><th style="width:80px;">관리</th>
         </tr></thead>
         <tbody id="lcrBody"></tbody>
@@ -9813,14 +9839,28 @@ function lcrMarginRateCell(o){
   const c=_lcrMarginColor(m.rate);
   return `<span style="${c?`color:${c};`:''}">${m.rate.toFixed(1)}%</span>`;
 }
+// 행 클릭(수정·삭제·ERP 체크박스 제외) 시 주문건 상세 팝업
+function lcrOpenDetail(id, ev){
+  if(ev && ev.target.closest('button, input')) return;
+  const o = (_lcrOrders||[]).find(x=>x.id===id); if(!o) return;
+  document.getElementById('lcrDetName').textContent = o.customerName || '-';
+  document.getElementById('lcrDetPhone').textContent = o.phone || '-';
+  document.getElementById('lcrDetAddr').textContent = o.visitSale ? '🚶 방문판매' : (o.address || '-');
+  document.getElementById('lcrDetProd').textContent = o.productName || '-';
+  document.getElementById('lcrDetQty').textContent = _lbxNum(o.qty);
+  document.getElementById('lcrDetPrice').textContent = _lcrWon(o.price);
+  document.getElementById('lcrDetMargin').innerHTML = lcrMarginCell(o);
+  document.getElementById('lcrDetMarginRate').innerHTML = lcrMarginRateCell(o);
+  openModal('lcrDetailModal');
+}
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
   const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
-  return `<tr data-row="${o.id}" class="${o.erpChecked?'lcr-erp-done':''}">
+  return `<tr data-row="${o.id}" class="lcr-row ${o.erpChecked?'lcr-erp-done':''}" onclick="lcrOpenDetail('${o.id}', event)">
     <td>${_lcrEsc(o.createdAt)}</td>
     <td class="lcr-l">${_lcrEsc(o.customerName)}</td>
     <td>${_lcrEsc(o.phone)}</td>
-    <td class="lcr-l">${addrDisp}</td>
+    <td class="lcr-l" title="${_lcrEsc(o.address)}">${addrDisp}</td>
     <td class="lcr-l lcr-prod">${_lcrEsc(o.productName)}</td>
     <td>${_lbxNum(o.qty)}</td>
     <td class="lcr-r">${lcrCostCell(o)}</td>
@@ -24523,9 +24563,8 @@ async function executeClear(){
 // ══════════════════════════════════════════════
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-// 배경(어두운 영역) 클릭 시 자동으로 닫힘 — 입력 중인 내용이 있는 폼 모달은
-// data-keep-open 속성을 붙여 이 동작에서 제외한다(예: 당근 판매 주문건 등록).
-document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el && !el.hasAttribute('data-keep-open'))el.classList.remove('open');});});
+// 배경(어두운 영역) 클릭해도 닫히지 않음 — 실수로 바깥을 눌러 입력 중이던 내용이
+// 날아가는 사고를 막기 위해 모든 모달에서 닫기/취소 버튼으로만 닫도록 통일.
 
 // ══════════════════════════════════════════════
 // GROQ AI 채팅
