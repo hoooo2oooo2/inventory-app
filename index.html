@@ -13173,15 +13173,36 @@ async function insightToggleOrderConfirm(id, checked){
   renderInsight();
 }
 
+// code의 특정 연-월 합계 중 하루치 주문이 그 달 합계의 60% 이상을 차지하면서 나머지 날들 평균의
+// 10배 넘게 크면(1회성 대량 도매주문 등으로 의심) 그 하루를 뺀 합계를 대신 반환한다 — 정상적인
+// 반복 수요가 아니라 단발성 이벤트 하나로 그 달 전체가 "성수기"처럼 보이는 왜곡을 막기 위함
+// (2026-09 사용자 리포트: 평소 하루 3~16개 팔리던 가든엣지가 특정 하루에만 600개 찍혀 10월 전체가
+// 평소 대비 4배로 부풀려짐 — 일별 원본 daily_sales로 실제 확인함). 일별 원본(_dCache)이 없거나
+// 로켓그로스 비중이 큰 상품(_dCache는 정규채널만 기록)은 판단 근거가 부족하므로 원래 값을 그대로 둔다.
+function _insightDeOutlierMonth(code, year, monthIdx, monthTotal){
+  if(monthTotal<=0) return monthTotal;
+  const daily=_dCache[code]; if(!daily) return monthTotal;
+  const ymPrefix=`${year}-${String(monthIdx+1).padStart(2,'0')}-`;
+  const dayVals=Object.entries(daily).filter(([d])=>d.startsWith(ymPrefix)).map(([,q])=>q);
+  // 판매일이 너무 적으면(2~3일치) "나머지 날 평균"이 한두 건으로만 계산돼 그 자체가 불안정하다 —
+  // 예: 한 달에 주문이 딱 2건(1개·10개)뿐이면 10개가 1개의 10배라도 그냥 정상적인 소량판매 편차이지
+  // 이상치가 아니다. 최소 5일치 판매 기록이 있어야 "평소"를 판단할 근거가 있다고 본다.
+  if(dayVals.length<5) return monthTotal;
+  const maxDay=Math.max(...dayVals);
+  if(maxDay<monthTotal*0.6) return monthTotal;
+  const restSum=monthTotal-maxDay, restCount=dayVals.length-1;
+  const restAvg=restCount>0?restSum/restCount:0;
+  return (restAvg>0 && maxDay>=restAvg*10) ? restSum : monthTotal;
+}
 function insightSeasonInfo(p){
   const prev=getTotalM(p, CUR_YEAR-1), prevTotal=prev.reduce((a,b)=>a+b,0);
-  let m=prev, total=prevTotal, basis=(CUR_YEAR-1)+'년', monthsSpan=12;
-  if(total<=0){
+  let m=prev, basisYear=CUR_YEAR-1, basis=(CUR_YEAR-1)+'년', monthsSpan=12;
+  if(prevTotal<=0){
     const cur=getTotalM(p, CUR_YEAR), curTotal=cur.reduce((a,b)=>a+b,0);
     if(curTotal<=0) return {status:'nodata'};
     // 전년 데이터가 없어 올해 누적치로 대신할 때는 아직 지나지 않은 달(항상 0)이 평균에 섞여
     // "비수기 -100%"로 잘못 잡히는 걸 막기 위해 지금까지 지난 달까지만 대상으로 삼는다
-    m=cur; total=cur.slice(0,MONTH+1).reduce((a,b)=>a+b,0); basis=CUR_YEAR+'년(누적)'; monthsSpan=MONTH+1;
+    m=cur; basisYear=CUR_YEAR; basis=CUR_YEAR+'년(누적)'; monthsSpan=MONTH+1;
   }
   const activeMonths=m.slice(0,monthsSpan);
   // 판매 실적이 있는 달이 너무 적으면(신상품이 한두 달치 데이터만 있는 경우 등) 나머지 달이 전부
@@ -13189,10 +13210,14 @@ function insightSeasonInfo(p){
   // +1100%"로 뜨는 문제, 2026-09 사용자 리포트) — 이런 경우는 성수기 단정 대신 데이터 부족으로 보류
   const nonZeroCount=activeMonths.filter(v=>v>0).length;
   if(monthsSpan<3 || nonZeroCount<3) return {status:'nodata'};
+  // 성수기·비수기 판정(어느 달이 peak/trough인지, 몇 %인지)에는 하루짜리 대량주문을 제외한 값을
+  // 쓰고, 화면에 그대로 보여주는 월별 실적(m, 아래 스파크라인)은 실제 원본을 건드리지 않는다.
+  const cleanMonths=activeMonths.map((v,i)=>_insightDeOutlierMonth(p.code, basisYear, i, v));
+  const total=cleanMonths.reduce((a,b)=>a+b,0);
   const avg=total/monthsSpan;
   let peakI=0, troughI=0;
-  activeMonths.forEach((v,i)=>{ if(v>activeMonths[peakI]) peakI=i; if(v<activeMonths[troughI]) troughI=i; });
-  const peakRatio=avg>0?activeMonths[peakI]/avg:1, troughRatio=avg>0?activeMonths[troughI]/avg:1;
+  cleanMonths.forEach((v,i)=>{ if(v>cleanMonths[peakI]) peakI=i; if(v<cleanMonths[troughI]) troughI=i; });
+  const peakRatio=avg>0?cleanMonths[peakI]/avg:1, troughRatio=avg>0?cleanMonths[troughI]/avg:1;
   const flat=peakRatio<1.15;
   let upcoming=null;
   if(!flat){
