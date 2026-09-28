@@ -13909,12 +13909,16 @@ async function erpApplyImport(){
 let _insightTrendCharts={daily:null,weekly:null,monthly:null}, _insightTrendCode=null, _insightTrendName=null;
 // 발주 참고용 구간 합계 — 기본 최근 30일, 프리셋 버튼 또는 직접 날짜 지정 시 자동으로 합계·일평균 계산 (열려있는 동안 선택 유지)
 let _insightTrendRangeDays=30, _insightTrendRangeFrom=null, _insightTrendRangeTo=null, _insightTrendDailyDates=[];
-function insightMergedSeries(code,name){
-  const out={};
-  Object.entries(_dCache[code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
+// 정규채널·로켓그로스를 합계와 각 채널별로 따로 반환 — 출고 추이 그래프의 합계·채널별 내역 표시용
+function insightMergedSeriesDetailed(code,name){
+  const reg={}, rg={};
+  Object.entries(_dCache[code]||{}).forEach(([d,q])=>{ reg[d]=(reg[d]||0)+q; });
   const bdId=insightBdIdFor({code,name});
-  if(bdId!=null) Object.entries(_insightRgQtyByIdCache[bdId]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
-  return out;
+  if(bdId!=null) Object.entries(_insightRgQtyByIdCache[bdId]||{}).forEach(([d,q])=>{ rg[d]=(rg[d]||0)+q; });
+  const total={};
+  Object.entries(reg).forEach(([d,q])=>{ total[d]=(total[d]||0)+q; });
+  Object.entries(rg).forEach(([d,q])=>{ total[d]=(total[d]||0)+q; });
+  return {total,reg,rg};
 }
 function insightOpenTrend(code,name){
   _insightTrendCode=code;
@@ -13976,27 +13980,35 @@ function insightRenderCalcDetail(code){
   if(c.suspect) html+='<div class="ins-calc-note" style="color:#DC2626;">⚠ 최근 데이터가 적은데(30일 중 10일 미만) 계산값이 발주시점 역산치의 2.5배를 넘습니다. 배치 입력 오류나 일시적 이상치가 섞였을 수 있으니 위 출고 추이 그래프로 직접 확인해보세요.</div>';
   body.innerHTML=html;
 }
-function insightBuildPeriodData(dates, series, period){
-  let labels=[], values=[], dateKeys=[], rangeText='', bucketLabel='';
+// total/reg/rg 세 시리즈를 동일한 일/주/월 버킷 기준으로 함께 집계 — 합계·채널별 수치가 항상 같은 구간을 가리키게 함
+function insightBuildPeriodData(dates, total, reg, rg, period){
+  let labels=[], valuesT=[], valuesR=[], valuesG=[], dateKeys=[], rangeText='', bucketLabel='';
   if(period==='daily'){
     const last=dates.slice(-60);
     dateKeys=last;
     labels=last.map(d=>{ const s2=d.split('-'); return s2[1]+'/'+s2[2]; });
-    values=last.map(d=>series[d]||0);
+    valuesT=last.map(d=>total[d]||0);
+    valuesR=last.map(d=>reg[d]||0);
+    valuesG=last.map(d=>rg[d]||0);
     bucketLabel='일';
     if(last.length) rangeText=`${last[0]} ~ ${last[last.length-1]} (최근 ${last.length}일 고정)`;
   } else if(period==='weekly'){
-    const wk={};
+    const wkT={}, wkR={}, wkG={};
     dates.forEach(d=>{
       const dt=new Date(d+'T00:00:00');
       const dow=(dt.getDay()+6)%7; // 0=월요일
       const monday=new Date(dt); monday.setDate(dt.getDate()-dow);
       const key=fmtDate(monday);
-      wk[key]=(wk[key]||0)+series[d];
+      wkT[key]=(wkT[key]||0)+(total[d]||0);
+      wkR[key]=(wkR[key]||0)+(reg[d]||0);
+      wkG[key]=(wkG[key]||0)+(rg[d]||0);
     });
-    const keys=Object.keys(wk).sort().slice(-20);
+    const keys=Object.keys(wkT).sort().slice(-20);
+    dateKeys=keys;
     labels=keys.map(k=>{ const s2=k.split('-'); return s2[1]+'/'+s2[2]+'~'; });
-    values=keys.map(k=>wk[k]);
+    valuesT=keys.map(k=>wkT[k]);
+    valuesR=keys.map(k=>wkR[k]||0);
+    valuesG=keys.map(k=>wkG[k]||0);
     bucketLabel='주';
     if(keys.length){
       const lastMonday=new Date(keys[keys.length-1]+'T00:00:00');
@@ -14004,46 +14016,54 @@ function insightBuildPeriodData(dates, series, period){
       rangeText=`${keys[0]}(월) ~ ${fmtDate(lastSunday)}(일) (최근 ${keys.length}주 고정)`;
     }
   } else {
-    const mo={};
-    dates.forEach(d=>{ const ym=d.slice(0,7); mo[ym]=(mo[ym]||0)+series[d]; });
-    const keys=Object.keys(mo).sort().slice(-24);
+    const moT={}, moR={}, moG={};
+    dates.forEach(d=>{ const ym=d.slice(0,7); moT[ym]=(moT[ym]||0)+(total[d]||0); moR[ym]=(moR[ym]||0)+(reg[d]||0); moG[ym]=(moG[ym]||0)+(rg[d]||0); });
+    const keys=Object.keys(moT).sort().slice(-24);
+    dateKeys=keys;
     labels=keys.map(k=>{ const s2=k.split('-'); return s2[0].slice(2)+'/'+s2[1]; });
-    values=keys.map(k=>mo[k]);
+    valuesT=keys.map(k=>moT[k]);
+    valuesR=keys.map(k=>moR[k]||0);
+    valuesG=keys.map(k=>moG[k]||0);
     bucketLabel='월';
     if(keys.length) rangeText=`${keys[0]} ~ ${keys[keys.length-1]} (최근 ${keys.length}개월 고정)`;
   }
-  return {labels,values,dateKeys,rangeText,bucketLabel};
+  return {labels,valuesT,valuesR,valuesG,dateKeys,rangeText,bucketLabel};
 }
-function insightDrawPeriodChart(period, canvasId, sumElId, rangeElId, dates, series){
-  const {labels,values,dateKeys,rangeText,bucketLabel}=insightBuildPeriodData(dates, series, period);
+function insightDrawPeriodChart(period, canvasId, sumElId, rangeElId, dates, total, reg, rg){
+  const {labels,valuesT,valuesR,valuesG,dateKeys,rangeText,bucketLabel}=insightBuildPeriodData(dates, total, reg, rg, period);
   if(period==='daily') _insightTrendDailyDates=dateKeys;
   const dark=_currentTheme()==='dark';
   const ctx=document.getElementById(canvasId).getContext('2d');
   if(_insightTrendCharts[period]){ _insightTrendCharts[period].destroy(); }
   _insightTrendCharts[period]=new Chart(ctx,{
     type:'bar',
-    data:{ labels, datasets:[{ label:'출고수량', data:values, backgroundColor:dark?'#5B9BFF':'#3182F6', borderRadius:3, maxBarThickness:26 }] },
+    data:{ labels, datasets:[{ label:'출고수량', data:valuesT, backgroundColor:dark?'#5B9BFF':'#3182F6', borderRadius:3, maxBarThickness:26 }] },
     options:{
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.parsed.y.toLocaleString()}개`}} },
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>{
+        const i=c.dataIndex;
+        return [` 합계 ${(valuesT[i]||0).toLocaleString()}개`, ` ㄴ일반판매 ${(valuesR[i]||0).toLocaleString()}개`, ` ㄴ로켓그로스 ${(valuesG[i]||0).toLocaleString()}개`];
+      }}} },
       scales:{
         x:{ ticks:{ color:_axColor(), maxRotation:0, autoSkip:true, font:{size:11} }, grid:{ display:false } },
         y:{ ticks:{ color:_axColor() }, grid:{ color:dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)' }, beginAtZero:true }
       }
     }
   });
-  const total=values.reduce((a,b)=>a+b,0);
-  const avg=values.length?Math.round(total/values.length*10)/10:0;
+  const totalSum=valuesT.reduce((a,b)=>a+b,0);
+  const regSum=valuesR.reduce((a,b)=>a+b,0);
+  const rgSum=valuesG.reduce((a,b)=>a+b,0);
+  const avg=valuesT.length?Math.round(totalSum/valuesT.length*10)/10:0;
   const sumEl=document.getElementById(sumElId);
   // "구간평균"처럼 어느 단위 평균인지 모호한 표현 대신, 일/주/월별로 정확히 어떤 평균인지 명시
-  if(sumEl) sumEl.innerHTML=`합계 <b>${total.toLocaleString()}개</b> · ${bucketLabel}평균 ${avg.toLocaleString()}개`;
+  if(sumEl) sumEl.innerHTML=`합계 <b>${totalSum.toLocaleString()}개</b> · ${bucketLabel}평균 ${avg.toLocaleString()}개 <small>(일반판매 ${regSum.toLocaleString()}개 · 로켓그로스 ${rgSum.toLocaleString()}개)</small>`;
   const rangeEl=document.getElementById(rangeElId);
   if(rangeEl) rangeEl.textContent=rangeText;
 }
 function insightRenderTrend(){
   const code=_insightTrendCode; if(!code) return;
-  const series=insightMergedSeries(code, _insightTrendName);
-  const dates=Object.keys(series).sort();
+  const {total,reg,rg}=insightMergedSeriesDetailed(code, _insightTrendName);
+  const dates=Object.keys(total).sort();
   const sections=document.querySelectorAll('#insightTrendModal .ins-trend-section');
   const rangeBox=document.querySelector('#insightTrendModal .ins-trend-range');
   const empty=document.getElementById('insightTrendEmpty');
@@ -14057,9 +14077,9 @@ function insightRenderTrend(){
   sections.forEach(s=>s.style.display='');
   if(rangeBox) rangeBox.style.display='';
   if(empty) empty.style.display='none';
-  insightDrawPeriodChart('daily','insightTrendCanvasDaily','insightTrendSumDaily','insightTrendRangeDaily', dates, series);
-  insightDrawPeriodChart('weekly','insightTrendCanvasWeekly','insightTrendSumWeekly','insightTrendRangeWeekly', dates, series);
-  insightDrawPeriodChart('monthly','insightTrendCanvasMonthly','insightTrendSumMonthly','insightTrendRangeMonthly', dates, series);
+  insightDrawPeriodChart('daily','insightTrendCanvasDaily','insightTrendSumDaily','insightTrendRangeDaily', dates, total, reg, rg);
+  insightDrawPeriodChart('weekly','insightTrendCanvasWeekly','insightTrendSumWeekly','insightTrendRangeWeekly', dates, total, reg, rg);
+  insightDrawPeriodChart('monthly','insightTrendCanvasMonthly','insightTrendSumMonthly','insightTrendRangeMonthly', dates, total, reg, rg);
   insightRenderRangeSummary();
 }
 // 프리셋 버튼(7/14/30/60/90일) 선택 — 직접입력 날짜는 초기화하고 즉시 합계 재계산
@@ -14083,7 +14103,7 @@ function insightSetTrendCustomRange(){
 // 선택된 구간의 합계·일평균을 자동 계산해 표시 + 일별 차트에서 해당 구간 막대를 강조
 function insightRenderRangeSummary(){
   const code=_insightTrendCode; if(!code) return;
-  const series=insightMergedSeries(code, _insightTrendName);
+  const {total,reg,rg}=insightMergedSeriesDetailed(code, _insightTrendName);
   let from, to;
   if(_insightTrendRangeFrom && _insightTrendRangeTo){ from=_insightTrendRangeFrom; to=_insightTrendRangeTo; }
   else {
@@ -14091,14 +14111,15 @@ function insightRenderRangeSummary(){
     to=fmtDate(today);
     from=fmtDate(new Date(today.getTime()-(_insightTrendRangeDays-1)*86400000));
   }
-  let sum=0, dayCount=0;
+  let sum=0, regSum=0, rgSum=0, dayCount=0;
   for(let d=new Date(from+'T00:00:00'); fmtDate(d)<=to; d.setDate(d.getDate()+1)){
-    sum+=series[fmtDate(d)]||0; dayCount++;
+    const ds=fmtDate(d);
+    sum+=total[ds]||0; regSum+=reg[ds]||0; rgSum+=rg[ds]||0; dayCount++;
   }
   const avg=dayCount?Math.round(sum/dayCount*10)/10:0;
   const label=(from===to)?from:`${from} ~ ${to}`;
   const el=document.getElementById('insightRangeSummary');
-  if(el) el.innerHTML=`📌 ${label} 합계 <b>${sum.toLocaleString()}개</b><small>일평균</small> <span class="ins-avg">${avg.toLocaleString()}개</span><small>· 아래 "일별" 그래프에서 이 구간만 파란색으로 표시됩니다</small>`;
+  if(el) el.innerHTML=`📌 ${label} 합계 <b>${sum.toLocaleString()}개</b><small>(일반판매 ${regSum.toLocaleString()}개 · 로켓그로스 ${rgSum.toLocaleString()}개)</small><small>일평균</small> <span class="ins-avg">${avg.toLocaleString()}개</span><small>· 아래 "일별" 그래프에서 이 구간만 파란색으로 표시됩니다</small>`;
   const chart=_insightTrendCharts.daily;
   if(chart && _insightTrendDailyDates.length){
     const dark=_currentTheme()==='dark';
