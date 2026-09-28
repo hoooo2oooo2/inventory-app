@@ -4787,19 +4787,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <!-- ═══ 발주 인사이트 (CX팀) ═══ -->
 <style>
 #page-insight .main{gap:14px;}
-#page-insight .ins-kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
-#page-insight .ins-kpi-card{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;cursor:pointer;position:relative;overflow:hidden;transition:box-shadow .15s,transform .15s;}
-#page-insight .ins-kpi-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bd);}
+#page-insight .ins-kpi{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+#page-insight .ins-kpi-card{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;overflow:hidden;transition:box-shadow .15s,transform .15s;}
+#page-insight .ins-kpi-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--bd);}
 #page-insight .ins-kpi-card:hover{box-shadow:0 3px 14px rgba(16,24,40,.10);transform:translateY(-1px);}
 #page-insight .ins-kpi-card.active{border-color:var(--pr);box-shadow:0 0 0 2px var(--prl);}
+#page-insight .ins-kpi-card[data-st=""]::before{background:var(--tx2);}
 #page-insight .ins-kpi-card[data-st="부족"]::before{background:#DC2626;}
 #page-insight .ins-kpi-card[data-st="긴급"]::before{background:#EA580C;}
 #page-insight .ins-kpi-card[data-st="임박"]::before{background:#D97706;}
 #page-insight .ins-kpi-card[data-st="정상"]::before{background:#059669;}
 #page-insight .ins-kpi-card[data-st="season"]::before{background:#534AB7;}
-#page-insight .ins-kpi-lbl{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:6px;}
-#page-insight .ins-kpi-val{font-size:30px;font-weight:800;letter-spacing:-.5px;}
-#page-insight .ins-kpi-sub{font-size:12px;color:var(--tx2);margin-top:3px;}
+#page-insight .ins-kpi-lbl{font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#page-insight .ins-kpi-val{font-size:20px;font-weight:800;letter-spacing:-.5px;}
+#page-insight .ins-kpi-sub{font-size:10px;color:var(--tx2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #page-insight .ins-filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 16px;}
 #page-insight .ins-filter-bar .search-box input{width:220px;font-size:14px;}
 #page-insight .ins-filter-bar select{font-size:13px;padding:7px 10px;}
@@ -4819,7 +4820,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-insight .ins-empty{padding:60px 20px;text-align:center;color:var(--tx2);font-size:14px;}
 #page-insight .tw tbody tr.ins-row-confirmed{opacity:.45;}
 #page-insight .tw tbody tr.ins-row-confirmed:hover{opacity:.7;}
-@media(max-width:1200px){#page-insight .ins-kpi{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:1200px){#page-insight .ins-kpi{grid-template-columns:repeat(4,1fr);}}
 @media(max-width:700px){#page-insight .ins-kpi{grid-template-columns:repeat(2,1fr);}}
 </style>
 <div class="page" id="page-insight">
@@ -13615,6 +13616,7 @@ function renderInsightKpi(rows){
   const card=(key,label,val,sub)=>`<div class="ins-kpi-card ${insightStatusF===key?'active':''}" data-st="${key}" onclick="insightSetStatus('${key}')">
     <div class="ins-kpi-lbl">${label}</div><div class="ins-kpi-val">${val.toLocaleString()}</div><div class="ins-kpi-sub">${sub}</div></div>`;
   el.innerHTML =
+    card('','⚪ 전체',rows.length,'검색·필터된 전체')+
     card('부족','🔴 즉시발주',cnt.부족,'재고 30% 이하')+
     card('긴급','🟠 긴급',cnt.긴급,'재고 60% 이하')+
     card('임박','🟡 임박',cnt.임박,'발주 검토 필요')+
