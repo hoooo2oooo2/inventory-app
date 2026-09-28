@@ -1533,10 +1533,10 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-wrap{max-width:1320px;margin:0 auto;padding:16px 18px;height:calc(100vh - 140px);display:flex;flex-direction:column;box-sizing:border-box;}
 .lcr-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
 .lcr-title{font-size:18px;font-weight:800;color:var(--tx);}
-.lcr-table-scroll{flex:1;overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
-.lcr-table{width:100%;border-collapse:collapse;font-size:13px;}
-.lcr-table thead th{position:sticky;top:0;z-index:1;background:var(--bg2);padding:9px 10px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11.5px;white-space:nowrap;}
-.lcr-table tbody td{padding:8px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;}
+.lcr-table-scroll{flex:1;overflow-y:auto;overflow-x:hidden;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
+.lcr-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;}
+.lcr-table thead th{position:sticky;top:0;z-index:1;background:var(--bg2);padding:9px 10px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lcr-table tbody td{padding:8px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;white-space:normal;overflow-wrap:break-word;word-break:break-word;}
 .lcr-table tbody tr:hover{background:var(--bg2);}
 .lcr-table tbody tr:last-child td{border-bottom:none;}
 /* ERP 재고 차감 확인된 주문건 — 반투명 초록 틴트라 라이트/다크 모드 배경 위에서 둘 다 자연스럽게
@@ -2850,7 +2850,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <table class="lcr-table">
         <thead><tr>
           <th style="width:96px;">등록일</th><th>고객명</th><th>연락처</th><th>주소</th><th>제품명</th>
-          <th style="width:64px;">수량</th><th style="width:100px;">공급가</th><th style="width:100px;">판매금액</th><th style="width:110px;">ERP 재고 차감 확인</th><th style="width:80px;">관리</th>
+          <th style="width:64px;">수량</th><th style="width:100px;">공급가</th><th style="width:100px;">판매금액</th><th style="width:90px;">마진</th><th style="width:70px;">마진율</th><th style="width:110px;">ERP 재고 차감 확인</th><th style="width:80px;">관리</th>
         </tr></thead>
         <tbody id="lcrBody"></tbody>
       </table>
@@ -9769,7 +9769,7 @@ function lcrRender(){
   if(q) list = list.filter(o=>[o.customerName,o.phone,o.productName].some(v=>(v||'').toLowerCase().includes(q)));
   list = list.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')||String(b.id||'').localeCompare(String(a.id||'')));
   tb.innerHTML = list.length ? list.map(lcrRowHtml).join('')
-    : `<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--tx2);">${q?'검색 결과가 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
+    : `<tr><td colspan="12" style="text-align:center;padding:28px;color:var(--tx2);">${q?'검색 결과가 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
 }
 // 제품명으로 백데이터(_bdData) 공급가 조회 — 이름 완전일치 기준
 function lcrUnitCost(productName){
@@ -9788,6 +9788,25 @@ function lcrCostCell(o){
   }
   return _lcrWon(unit);
 }
+// 마진 = 판매금액(o.price, 행 전체 합산액) - 공급가(o.unitCost × 수량). 공급가 스냅샷이 없으면 계산 불가
+function lcrMargin(o){
+  const unit=o.unitCost;
+  if(unit==null || o.price==null) return null;
+  const qty=Number(o.qty)||0;
+  const margin=Number(o.price)-(unit*qty);
+  const rate=Number(o.price)!==0 ? (margin/Number(o.price)*100) : null;
+  return {margin,rate};
+}
+function lcrMarginCell(o){
+  const m=lcrMargin(o);
+  if(!m) return '<span style="color:var(--tx2);">—</span>';
+  return `<span style="${m.margin<0?'color:#DC2626;':''}">${_lcrWon(m.margin)}</span>`;
+}
+function lcrMarginRateCell(o){
+  const m=lcrMargin(o);
+  if(!m || m.rate==null) return '<span style="color:var(--tx2);">—</span>';
+  return `<span style="${m.rate<0?'color:#DC2626;':''}">${m.rate.toFixed(1)}%</span>`;
+}
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
   const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
@@ -9800,6 +9819,8 @@ function lcrRowHtml(o){
     <td>${_lbxNum(o.qty)}</td>
     <td class="lcr-r">${lcrCostCell(o)}</td>
     <td class="lcr-r">${_lcrWon(o.price)}</td>
+    <td class="lcr-r">${lcrMarginCell(o)}</td>
+    <td class="lcr-r">${lcrMarginRateCell(o)}</td>
     <td><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
     <td><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
   </tr>`;
@@ -9884,6 +9905,9 @@ async function lcrToggleErp(id){
   await cloudKvSave('logi_carrot_orders', latest);
 }
 async function lcrDelete(id){
+  const pw = prompt('삭제 비밀번호를 입력하세요:');
+  if(pw===null) return;
+  if(pw!=='123123'){ alert('비밀번호가 올바르지 않습니다.'); return; }
   if(!confirm('이 주문건을 삭제하시겠습니까?')) return;
   let latest = await cloudKvLoad('logi_carrot_orders');
   latest = Array.isArray(latest) ? latest : [];
