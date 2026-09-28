@@ -1533,10 +1533,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-wrap{max-width:1320px;margin:0 auto;padding:16px 18px;height:calc(100vh - 140px);display:flex;flex-direction:column;box-sizing:border-box;}
 .lcr-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
 .lcr-title{font-size:18px;font-weight:800;color:var(--tx);}
-.lcr-table-scroll{flex:1;overflow-y:auto;overflow-x:hidden;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
-.lcr-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;}
+.lcr-table-scroll{flex:1;overflow-y:auto;overflow-x:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
+.lcr-table{width:100%;table-layout:auto;border-collapse:collapse;font-size:13px;}
 .lcr-table thead th{position:sticky;top:0;z-index:1;background:var(--bg2);padding:9px 10px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.lcr-table tbody td{padding:8px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;white-space:normal;overflow-wrap:break-word;word-break:break-word;}
+.lcr-table tbody td{padding:8px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;white-space:nowrap;overflow-wrap:break-word;word-break:break-word;}
+/* 주소만 길어질 수 있는 자유 텍스트라 줄바꿈 허용 — 나머지 칸은 줄바꿈 없이 내용 길이에 맞춰 칸이 늘어남(제품명 등) */
+.lcr-table tbody td:nth-child(4){white-space:normal;}
 .lcr-table tbody tr:hover{background:var(--bg2);}
 .lcr-table tbody tr:last-child td{border-bottom:none;}
 /* ERP 재고 차감 확인된 주문건 — 반투명 초록 틴트라 라이트/다크 모드 배경 위에서 둘 다 자연스럽게
@@ -1544,6 +1546,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-table tbody tr.lcr-erp-done{background:rgba(5,192,114,.14);}
 .lcr-table tbody tr.lcr-erp-done:hover{background:rgba(5,192,114,.22);}
 .lcr-table td.lcr-l{text-align:left;}
+.lcr-table td.lcr-prod{white-space:nowrap;}
 .lcr-table td.lcr-r{text-align:right;font-family:ui-monospace,monospace;}
 .lcr-meta{font-size:10.5px;color:var(--tx2);margin-top:2px;}
 .lcr-erp-cell{display:flex;flex-direction:column;align-items:center;gap:2px;}
@@ -9797,15 +9800,18 @@ function lcrMargin(o){
   const rate=Number(o.price)!==0 ? (margin/Number(o.price)*100) : null;
   return {margin,rate};
 }
+function _lcrMarginColor(n){ return n<0?'#DC2626':n>0?'#059669':''; }
 function lcrMarginCell(o){
   const m=lcrMargin(o);
   if(!m) return '<span style="color:var(--tx2);">—</span>';
-  return `<span style="${m.margin<0?'color:#DC2626;':''}">${_lcrWon(m.margin)}</span>`;
+  const c=_lcrMarginColor(m.margin);
+  return `<span style="${c?`color:${c};`:''}">${_lcrWon(m.margin)}</span>`;
 }
 function lcrMarginRateCell(o){
   const m=lcrMargin(o);
   if(!m || m.rate==null) return '<span style="color:var(--tx2);">—</span>';
-  return `<span style="${m.rate<0?'color:#DC2626;':''}">${m.rate.toFixed(1)}%</span>`;
+  const c=_lcrMarginColor(m.rate);
+  return `<span style="${c?`color:${c};`:''}">${m.rate.toFixed(1)}%</span>`;
 }
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
@@ -9815,7 +9821,7 @@ function lcrRowHtml(o){
     <td class="lcr-l">${_lcrEsc(o.customerName)}</td>
     <td>${_lcrEsc(o.phone)}</td>
     <td class="lcr-l">${addrDisp}</td>
-    <td class="lcr-l">${_lcrEsc(o.productName)}</td>
+    <td class="lcr-l lcr-prod">${_lcrEsc(o.productName)}</td>
     <td>${_lbxNum(o.qty)}</td>
     <td class="lcr-r">${lcrCostCell(o)}</td>
     <td class="lcr-r">${_lcrWon(o.price)}</td>
