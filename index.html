@@ -4851,8 +4851,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <table>
         <thead><tr>
           <th style="text-align:center;" title="오늘 발주 처리했으면 체크 — 다음날 자동으로 초기화됩니다">✓</th><th>긴급도</th><th>상품</th><th>구분</th><th>등급</th>
-          <th style="text-align:right;">현재고</th><th style="text-align:right;">일평균판매</th>
-          <th>예상 소진일</th><th>발주 마감일</th><th style="text-align:right;">권장 발주</th>
+          <th style="text-align:right;">현재고</th><th style="text-align:right;">일평균판매</th><th style="text-align:right;">한달 평균 판매량</th>
+          <th>예상 소진일</th><th>발주 마감일</th><th style="text-align:right;">최근 일주일 판매량</th><th style="text-align:right;">최근 한달 판매량</th><th style="text-align:right;">권장 발주</th>
           <th>진행중 발주</th><th style="text-align:right;">🚀 로켓그로스 판매량</th><th>🔗 패밀리오더</th><th>성수기·비수기</th><th>전년 월별추이</th><th style="text-align:center;">관리</th>
         </tr></thead>
         <tbody id="insightTbody"></tbody>
@@ -10158,9 +10158,13 @@ function getAbcGrade(p){ ensureAbcGrades(); return _abcGrades[p.code]||'C'; }
 function safetyMonthsFor(p){ const g=getAbcGrade(p); return g==='A'?0.75:g==='C'?0.3:0.5; }
 
 function detectSeason(m){
+  // 판매 실적이 있는 달이 너무 적으면(신상품 등) 여름·겨울 3개월 평균이 한두 달치 우연으로
+  // 크게 부풀려져 실제로는 계절성이 없는 상품이 "여름철"/"겨울철"로 잘못 분류될 수 있다 —
+  // 이럴 땐 판단을 보류하고 안전한 기본값인 '사계절'로 둔다(2026-09 성수기 오탐 점검).
+  const nonZeroCount=m.filter(v=>v>0).length;
   const sA=(m[5]+m[6]+m[7])/3, wA=(m[11]+m[0]+m[1])/3;
   const all=m.reduce((a,b)=>a+b,0)/12||1, pk=Math.max(sA,wA)/all;
-  if(pk<1.18) return {label:'사계절',badge:'b-te',type:'all',peakStart:-1};
+  if(nonZeroCount<4 || pk<1.18) return {label:'사계절',badge:'b-te',type:'all',peakStart:-1};
   if(sA>=wA*1.25) return {label:'여름철',badge:'b-or',type:'summer',peakStart:5};
   if(wA>=sA*1.25) return {label:'겨울철',badge:'b-bl',type:'winter',peakStart:11};
   return {label:'봄·가을',badge:'b-pu',type:'spring',peakStart:2};
@@ -13171,16 +13175,24 @@ async function insightToggleOrderConfirm(id, checked){
 
 function insightSeasonInfo(p){
   const prev=getTotalM(p, CUR_YEAR-1), prevTotal=prev.reduce((a,b)=>a+b,0);
-  let m=prev, total=prevTotal, basis=(CUR_YEAR-1)+'년';
+  let m=prev, total=prevTotal, basis=(CUR_YEAR-1)+'년', monthsSpan=12;
   if(total<=0){
     const cur=getTotalM(p, CUR_YEAR), curTotal=cur.reduce((a,b)=>a+b,0);
     if(curTotal<=0) return {status:'nodata'};
-    m=cur; total=curTotal; basis=CUR_YEAR+'년(누적)';
+    // 전년 데이터가 없어 올해 누적치로 대신할 때는 아직 지나지 않은 달(항상 0)이 평균에 섞여
+    // "비수기 -100%"로 잘못 잡히는 걸 막기 위해 지금까지 지난 달까지만 대상으로 삼는다
+    m=cur; total=cur.slice(0,MONTH+1).reduce((a,b)=>a+b,0); basis=CUR_YEAR+'년(누적)'; monthsSpan=MONTH+1;
   }
-  const avg=total/12;
+  const activeMonths=m.slice(0,monthsSpan);
+  // 판매 실적이 있는 달이 너무 적으면(신상품이 한두 달치 데이터만 있는 경우 등) 나머지 달이 전부
+  // 0으로 잡혀 평균 대비 수백~수천% 왜곡이 생긴다(예: 12월에만 반짝 팔린 신상품이 "성수기 12월
+  // +1100%"로 뜨는 문제, 2026-09 사용자 리포트) — 이런 경우는 성수기 단정 대신 데이터 부족으로 보류
+  const nonZeroCount=activeMonths.filter(v=>v>0).length;
+  if(monthsSpan<3 || nonZeroCount<3) return {status:'nodata'};
+  const avg=total/monthsSpan;
   let peakI=0, troughI=0;
-  m.forEach((v,i)=>{ if(v>m[peakI]) peakI=i; if(v<m[troughI]) troughI=i; });
-  const peakRatio=avg>0?m[peakI]/avg:1, troughRatio=avg>0?m[troughI]/avg:1;
+  activeMonths.forEach((v,i)=>{ if(v>activeMonths[peakI]) peakI=i; if(v<activeMonths[troughI]) troughI=i; });
+  const peakRatio=avg>0?activeMonths[peakI]/avg:1, troughRatio=avg>0?activeMonths[troughI]/avg:1;
   const flat=peakRatio<1.15;
   let upcoming=null;
   if(!flat){
@@ -13261,6 +13273,20 @@ function insightMergedSeriesFor(p, rgQtyById, bdId){
   Object.entries(_dCache[p.code]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
   if(bdId!=null) Object.entries(rgQtyById[bdId]||{}).forEach(([d,q])=>{ out[d]=(out[d]||0)+q; });
   return out;
+}
+// 최근 7일/30일 실제 판매 합계(정규채널+로켓그로스, 오늘 포함) — 예측용 이상치 제거 없이 실측 그대로 보여준다
+function insightRecentTotals(series){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const todayStr=fmtDate(today);
+  const cut7=fmtDate(new Date(today.getTime()-6*86400000));
+  const cut30=fmtDate(new Date(today.getTime()-29*86400000));
+  let last7=0, last30=0;
+  Object.entries(series).forEach(([d,q])=>{
+    if(d>todayStr) return;
+    if(d>=cut30) last30+=q;
+    if(d>=cut7) last7+=q;
+  });
+  return {last7:Math.round(last7), last30:Math.round(last30)};
 }
 // 최근 판매속도(월 기준 base) — 재고관리 calcNeeded()의 이상치 제거·트렌드 감지·월별 총량 검증
 // 로직을 그대로 이식하되, "가장 최근 판매가 찍힌 날"이 아니라 "오늘"을 기준으로 창을 잡는다.
@@ -13428,6 +13454,7 @@ function insightBuildRows(){
   return products.filter(p=>!p.hidden && (insightShowDisc || !p.disc)).map(p=>{
     const bdId=insightBdIdFor(p);
     const mergedSeries=insightMergedSeriesFor(p, rgQtyById, bdId);
+    const recent=insightRecentTotals(mergedSeries);
     const c=insightCalcNeeded(p, mergedSeries);
     const grade=getAbcGrade(p);
     const er=insightEffectiveReorder(p, c);
@@ -13463,7 +13490,7 @@ function insightBuildRows(){
     const hasReliableAccel=!c.noData && c.prev14>0 && c.dataPoints30>=5;
     const surge=hasReliableAccel && c.accel>=1.6;
     const drop=hasReliableAccel && c.accel<=0.5 && p.stock>0;
-    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue};
+    return {p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue,recent};
   });
 }
 
@@ -13532,8 +13559,11 @@ function insightRowHtml(r){
     <td><span class="ins-tag" style="background:var(--bg2);color:${gradeColor};font-weight:800;">${r.grade}</span></td>
     <td style="text-align:right;${(st==='부족'||st==='긴급')?`color:${stColor};font-weight:800;`:''}" class="ins-num" title="${(st==='부족'||st==='긴급')?'판매속도 대비 재고 '+st:''}">${r.p.stock.toLocaleString()}</td>
     <td style="text-align:right;" class="ins-num">${r.avgDay>0?r.avgDay.toFixed(1):'-'}</td>
+    <td style="text-align:right;" class="ins-num">${r.c.noData?'-':r.c.expM.toLocaleString()+'개'}</td>
     <td>${r.exhaustDate?`<div class="ins-num">${fmtDate(r.exhaustDate)}</div><div class="ins-sub">D-${r.daysLeft}</div>`:'<span class="ins-sub">산출불가</span>'}</td>
     <td>${r.reorderByDate==null?'<span class="ins-sub">산출불가</span>':(r.daysToReorder<=0?'<span class="ins-num" style="color:#DC2626;">지금 발주</span>':`<div class="ins-num">${fmtDate(r.reorderByDate)}</div><div class="ins-sub">D-${r.daysToReorder}</div>`)}</td>
+    <td style="text-align:right;" class="ins-num" title="정규채널+로켓그로스 합산, 오늘 포함 최근 7일 실제 판매량">${r.recent.last7.toLocaleString()}개</td>
+    <td style="text-align:right;" class="ins-num" title="정규채널+로켓그로스 합산, 오늘 포함 최근 30일 실제 판매량">${r.recent.last30.toLocaleString()}개</td>
     <td style="text-align:right;">${orderCell}</td>
     <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>${r.pendingDays!=null?`<div class="ins-sub" ${r.pendingOverdue?'style="color:#DC2626;font-weight:700;"':''} title="가장 오래된 미입고 주문일로부터 경과일">${r.pendingDays}일째${r.pendingOverdue?' 🚨선적독촉':''}</div>`:''}`:'<span class="ins-sub">-</span>'}</td>
     <td style="text-align:right;">${r.rgQty>0?`<div class="ins-num">${Math.round(r.rgQty).toLocaleString()}개</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
@@ -13609,7 +13639,8 @@ function renderInsight(){
 function insightExportXlsx(){
   const {rows}=insightVisibleRows();
   if(!rows.length){ toast('내보낼 목록이 없습니다.'); return; }
-  const header=['긴급도','코드','상품명','구분','등급','현재고','일평균판매','예상소진일','발주마감일',
+  const header=['긴급도','코드','상품명','구분','등급','현재고','일평균판매','한달평균판매량','예상소진일','발주마감일',
+    '최근일주일판매량','최근한달판매량',
     '권장발주(박스)','권장발주(개)','진행중발주(개)','로켓그로스판매량(최근2개월)','패밀리오더 업체','패밀리오더 코드',
     '패밀리오더 발주(박스)','성수기','비수기','비고'];
   const aoa=[header];
@@ -13621,7 +13652,8 @@ function insightExportXlsx(){
     if(r.c.corrLabel && r.c.corrLabel!=='보정없음' && r.c.corrLabel!=='작년 데이터 없음') note.push(r.c.corrLabel);
     aoa.push([
       r.status, r.p.code, r.p.name, r.p.type||'기타', r.grade, r.p.stock,
-      r.avgDay>0?r.avgDay:'', r.exhaustDate?fmtDate(r.exhaustDate):'', r.reorderByDate?fmtDate(r.reorderByDate):'',
+      r.avgDay>0?r.avgDay:'', r.c.noData?'':r.c.expM, r.exhaustDate?fmtDate(r.exhaustDate):'', r.reorderByDate?fmtDate(r.reorderByDate):'',
+      r.recent.last7, r.recent.last30,
       r.c.noData||r.p.disc?'':r.netBoxes, r.c.noData||r.p.disc?'':r.netNeeded,
       r.pending, r.rgQty||'', r.famProd?r.famProd.vendor:'', r.famProd?r.famProd.code:'',
       r.famProd&&!r.c.noData?r.famBoxes:'',
