@@ -4854,7 +4854,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <button class="btn btn-sm btn-pr" onclick="openErpUpload()" title="외부 ERP 엑셀을 그대로 업로드하면 재고관리·판매분석에 자동 반영됩니다">📤 ERP 엑셀 업로드</button>
       <button class="btn btn-sm" onclick="insightExportXlsx()" title="현재 화면에 보이는(검색·필터·정렬 적용된) 목록을 엑셀로 저장">📥 엑셀 다운로드</button>
     </div>
-    <div class="tw" style="max-height:calc(100vh - 340px);overflow-y:auto;">
+    <div class="tw" id="insightTblWrap" style="max-height:calc(100vh - 340px);overflow-y:auto;">
       <table>
         <thead><tr>
           <th style="text-align:center;" title="오늘 발주 처리했으면 체크 — 다음날 자동으로 초기화됩니다">✓</th><th>긴급도</th><th>상품</th><th>구분</th><th>등급</th>
@@ -4865,6 +4865,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <tbody id="insightTbody"></tbody>
       </table>
     </div>
+    <div id="insightPager" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid var(--bd);font-size:12px;"></div>
     <div class="ins-empty" id="insightEmpty" style="display:none;">조건에 맞는 상품이 없습니다.</div>
   </div>
 </div>
@@ -13060,6 +13061,8 @@ function _hasEnoughDailyData(p){
 //  · 성수기/비수기만 신규: 전년 월별 실적(monthly_YYYY) 기준 최고/최저월 계산, 전년 데이터 없으면 판정 보류
 // ══════════════════════════════════════════════
 let insightSearch='', insightTypeF='', insightGradeF='', insightStatusF='', insightSort='urgency', insightShowDisc=false;
+let insightPage=0;
+const INSIGHT_PAGE_SIZE=50;   // 스크롤이 너무 길어지는 걸 막기 위한 페이지당 표시 행 수(2026-09 사용자 요청)
 
 // ── 패밀리 오더(타업체 사입) 상품 매칭 ──────────────────────────────────
 // 발주 인사이트는 재고관리 상품(products.code) 기준이지만, 다른 업체에서 사입해 발주관리 대신
@@ -13660,12 +13663,17 @@ function insightBuildRows(){
   });
 }
 
-function insightSetSearch(v){ insightSearch=v; renderInsight(); }
-function insightSetType(v){ insightTypeF=v; renderInsight(); }
-function insightSetGrade(v){ insightGradeF=v; renderInsight(); }
-function insightSetSort(v){ insightSort=v; renderInsight(); }
-function insightToggleDisc(v){ insightShowDisc=v; renderInsight(); }
-function insightSetStatus(st){ insightStatusF=(insightStatusF===st)?'':st; renderInsight(); }
+function insightSetSearch(v){ insightSearch=v; insightPage=0; renderInsight(); }
+function insightSetType(v){ insightTypeF=v; insightPage=0; renderInsight(); }
+function insightSetGrade(v){ insightGradeF=v; insightPage=0; renderInsight(); }
+function insightSetSort(v){ insightSort=v; insightPage=0; renderInsight(); }
+function insightToggleDisc(v){ insightShowDisc=v; insightPage=0; renderInsight(); }
+function insightSetStatus(st){ insightStatusF=(insightStatusF===st)?'':st; insightPage=0; renderInsight(); }
+function insightSetPage(p){
+  insightPage=p; renderInsight();
+  const wrap=document.getElementById('insightTblWrap');
+  if(wrap) wrap.scrollTop=0;
+}
 
 function insightInit(){
   const el=document.getElementById('insightUpdLbl');
@@ -13816,11 +13824,33 @@ function renderInsight(){
   const tbody=document.getElementById('insightTbody');
   const empty=document.getElementById('insightEmpty');
   const cntEl=document.getElementById('insightCount');
+  const pagerEl=document.getElementById('insightPager');
   if(cntEl) cntEl.textContent=rows.length.toLocaleString()+'개';
   if(!tbody) return;
-  if(!rows.length){ tbody.innerHTML=''; if(empty) empty.style.display=''; return; }
+  if(!rows.length){ tbody.innerHTML=''; if(empty) empty.style.display=''; if(pagerEl) pagerEl.innerHTML=''; return; }
   if(empty) empty.style.display='none';
-  tbody.innerHTML=rows.map(insightRowHtml).join('');
+  // 스크롤이 너무 길어지는 걸 막기 위해 페이지 단위로 나눠 표시(엑셀 다운로드·KPI는 전체 대상 그대로)
+  const maxPage=Math.max(0, Math.ceil(rows.length/INSIGHT_PAGE_SIZE)-1);
+  if(insightPage>maxPage) insightPage=maxPage;
+  const start=insightPage*INSIGHT_PAGE_SIZE;
+  const display=rows.slice(start, start+INSIGHT_PAGE_SIZE);
+  tbody.innerHTML=display.map(insightRowHtml).join('');
+  if(pagerEl){
+    if(rows.length<=INSIGHT_PAGE_SIZE){ pagerEl.innerHTML=''; }
+    else{
+      const totalPages=maxPage+1;
+      const from=start+1, to=Math.min(start+INSIGHT_PAGE_SIZE, rows.length);
+      pagerEl.innerHTML=`
+        <span style="color:var(--tx2);">${from.toLocaleString()}–${to.toLocaleString()} / 전체 ${rows.length.toLocaleString()}개</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="btn btn-sm" onclick="insightSetPage(0)" ${insightPage===0?'disabled':''}>처음</button>
+          <button class="btn btn-sm" onclick="insightSetPage(${insightPage-1})" ${insightPage===0?'disabled':''}>◀</button>
+          <span style="padding:0 6px;">${insightPage+1} / ${totalPages}</span>
+          <button class="btn btn-sm" onclick="insightSetPage(${insightPage+1})" ${insightPage>=totalPages-1?'disabled':''}>▶</button>
+          <button class="btn btn-sm" onclick="insightSetPage(${totalPages-1})" ${insightPage>=totalPages-1?'disabled':''}>끝</button>
+        </div>`;
+    }
+  }
 }
 // 현재 화면에 보이는(검색·필터·정렬 적용된) 목록을 그대로 엑셀로 내보낸다
 function insightExportXlsx(){
