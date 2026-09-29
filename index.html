@@ -4805,8 +4805,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 #page-insight .ins-filter-bar .search-box input{width:220px;font-size:14px;}
 #page-insight .ins-filter-bar select{font-size:13px;padding:7px 10px;}
 #page-insight .tw table{font-size:14.5px;border-collapse:separate;border-spacing:0;}
-#page-insight .tw thead th{position:sticky;top:0;background:var(--bg);z-index:1;font-size:13px;font-weight:700;color:var(--tx2);padding:12px 14px;white-space:nowrap;border-bottom:1.5px solid var(--bd);text-align:left;}
-#page-insight .tw tbody td{padding:13px 14px;white-space:nowrap;vertical-align:middle;border-bottom:0.5px solid var(--bd);}
+#page-insight .tw thead th{position:sticky;top:0;background:var(--bg);z-index:1;font-size:13px;font-weight:700;color:var(--tx2);padding:12px 10px;white-space:nowrap;border-bottom:1.5px solid var(--bd);text-align:left;}
+#page-insight .tw tbody td{padding:13px 10px;white-space:nowrap;vertical-align:middle;border-bottom:0.5px solid var(--bd);}
+/* 텍스트가 길어질 수 있는 칸(성수기·계절피크·패밀리오더 등)은 줄바꿈을 허용하고 폭을 제한해서
+   — 글씨 크기·상품명은 그대로 두고 — 표 전체 가로폭을 줄인다(2026-09 가로스크롤 불편 리포트) */
+#page-insight .tw tbody td.ins-td-wrap{white-space:normal;max-width:150px;}
+#page-insight .tw tbody td.ins-td-wrap .ins-tag,
+#page-insight .tw tbody td.ins-td-wrap .ins-sub,
+#page-insight .tw tbody td.ins-td-wrap > div{white-space:normal;word-break:keep-all;}
 #page-insight .tw tbody tr:nth-child(even){background:rgba(16,24,40,.015);}
 #page-insight .tw tbody tr:hover{background:var(--prl);}
 #page-insight .ins-name{font-size:15px;font-weight:700;}
@@ -13693,24 +13699,25 @@ function insightSeasonCellHtml(season){
   if(season.status==='nodata') return '<span class="ins-tag" style="background:var(--bg2);color:var(--tx2);">데이터 부족</span>';
   if(season.flat) return '<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">사계절 균등</span>';
   let html=`<span class="ins-tag" style="background:#FFF7ED;color:#EA580C;">성수기 ${season.peakMonth} (+${season.peakPct}%)</span><div class="ins-sub">비수기 ${season.troughMonth} (${season.troughPct}%)</div>`;
-  if(season.upcoming) html+=`<div style="font-size:12px;font-weight:700;color:#EA580C;margin-top:3px;">▲ ${season.upcoming.monthsAway}개월 후 성수기 진입</div>`;
+  if(season.upcoming) html+=`<div style="font-size:12px;font-weight:700;color:#EA580C;margin-top:3px;">▲${season.upcoming.monthsAway}개월 후 성수기</div>`;
   return html;
 }
 // 계절 피크 대비 발주 셀 — 성수기 시작 6개월 전부터 표시(그 전엔 'later'), 나머지는 '-'
+// 라벨은 짧게 유지하고(표 가로폭 절약, 2026-09 가로스크롤 불편 리포트) 상세 근거는 title 툴팁으로.
 function insightSeasonalPreCellHtml(sp){
   if(!sp || sp.status==='excluded' || sp.status==='nodata' || sp.status==='flat' || sp.status==='later') return '<span class="ins-sub">-</span>';
   const isWinter=sp.kind==='winter';
   const icon=isWinter?'❄':'☀';
-  const label=isWinter?'연초성수기(11월 마감)':`${MNAMES[sp.windowMonths[0]]} 성수기`;
-  const dl=fmtDate(sp.deadline);
+  const label=isWinter?'연초성수기':`${MNAMES[sp.windowMonths[0]]} 성수기`;
+  const dl=`${sp.deadline.getMonth()+1}/${sp.deadline.getDate()}`;
+  const closeNote=isWinter?'원청 공장 11월~익년3월 마감(생산중단) 대비 — 마감 5개월+재개후 리드타임 2개월(총 7개월)치 예상수요 기준':'성수기 구간 예상수요, 리드타임 2개월 기준';
   if(sp.neededQty<=0){
-    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">${icon} ${label} · 준비완료</span><div class="ins-sub">성수기 전 재고 충분</div>`;
+    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">${icon} ${label}·준비완료</span><div class="ins-sub" title="${closeNote}">재고 충분</div>`;
   }
   const urgent=sp.overdue;
-  const closeNote=isWinter?' — 마감 5개월+재개후 리드타임 2개월(총 7개월)치 예상수요 기준':' — 성수기 구간 예상수요, 리드타임 2개월 기준';
-  return `<span class="ins-tag" style="background:${urgent?'#FEF2F2':'#EFF6FF'};color:${urgent?'#DC2626':'#185FA5'};">${icon} ${label} 대비</span>
+  return `<span class="ins-tag" style="background:${urgent?'#FEF2F2':'#EFF6FF'};color:${urgent?'#DC2626':'#185FA5'};" title="${closeNote}">${icon} ${label}대비</span>
     <div class="ins-num">${sp.boxes.toLocaleString()}박스</div><div class="ins-sub">(${sp.neededQty.toLocaleString()}개)</div>
-    <div class="ins-sub" style="${urgent?'color:#DC2626;font-weight:700;':''}" title="성수기 전 확보해야 할 예상 필요량${closeNote}">${urgent?'🚨 발주마감 지남('+dl+')':'발주마감 '+dl+' (D-'+sp.daysToDeadline+')'}</div>`;
+    <div class="ins-sub" style="${urgent?'color:#DC2626;font-weight:700;':''}" title="발주 마감일 ${fmtDate(sp.deadline)} · ${closeNote}">${urgent?'🚨마감지남 '+dl:'마감 '+dl+'(D-'+sp.daysToDeadline+')'}</div>`;
 }
 
 function insightRowHtml(r){
@@ -13740,13 +13747,13 @@ function insightRowHtml(r){
     <td>${r.reorderByDate==null?'<span class="ins-sub">산출불가</span>':(r.daysToReorder<=0?'<span class="ins-num" style="color:#DC2626;">지금 발주</span>':`<div class="ins-num">${fmtDate(r.reorderByDate)}</div><div class="ins-sub">D-${r.daysToReorder}</div>`)}</td>
     <td style="text-align:right;" class="ins-num" title="정규채널+로켓그로스 합산, 오늘 포함 최근 7일 실제 판매량">${r.recent.last7.toLocaleString()}개</td>
     <td style="text-align:right;" class="ins-num" title="정규채널+로켓그로스 합산, 오늘 포함 최근 30일 실제 판매량">${r.recent.last30.toLocaleString()}개</td>
-    <td style="text-align:right;">${orderCell}</td>
-    <td>${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>${r.pendingDays!=null?`<div class="ins-sub" ${r.pendingOverdue?'style="color:#DC2626;font-weight:700;"':''} title="가장 오래된 미입고 주문일로부터 경과일">${r.pendingDays}일째${r.pendingOverdue?' 🚨선적독촉':''}</div>`:''}`:'<span class="ins-sub">-</span>'}</td>
+    <td style="text-align:right;" class="ins-td-wrap">${orderCell}</td>
+    <td class="ins-td-wrap">${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>${r.pendingDays!=null?`<div class="ins-sub" ${r.pendingOverdue?'style="color:#DC2626;font-weight:700;"':''} title="가장 오래된 미입고 주문일로부터 경과일">${r.pendingDays}일째${r.pendingOverdue?' 🚨선적독촉':''}</div>`:''}`:'<span class="ins-sub">-</span>'}</td>
     <td style="text-align:right;">${r.rgQty>0?`<div class="ins-num">${Math.round(r.rgQty).toLocaleString()}개</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
-    <td>${insightFamCellHtml(r)}</td>
-    <td>${insightSeasonCellHtml(r.season)}</td>
-    <td>${insightSeasonalPreCellHtml(r.seasonPre)}</td>
-    <td>${insightSparkHtml(r.season)}</td>
+    <td class="ins-td-wrap">${insightFamCellHtml(r)}</td>
+    <td class="ins-td-wrap">${insightSeasonCellHtml(r.season)}</td>
+    <td class="ins-td-wrap">${insightSeasonalPreCellHtml(r.seasonPre)}</td>
+    <td class="ins-td-wrap">${insightSparkHtml(r.season)}</td>
     <td style="text-align:center;white-space:nowrap;">
       <button class="btn btn-sm ${r.p.disc?'btn-or':'btn-gy'}" onclick="insightDiscProd(${r.p.id})" title="${r.p.disc?'단종 해제':'단종 처리 — 발주 알림 및 발주 목록에서 제외됩니다'}">${r.p.disc?'↩단종':'단종처리'}</button>
       <button class="btn btn-sm ${r.famProd?'btn-pr':'btn-gy'}" onclick="insightOpenFamPick(${r.p.id})" title="${r.famProd?'패밀리오더 연결 변경/해제':'다른 업체에서 사입해 패밀리 오더로 주문하는 상품이면 연결해보세요'}" style="margin-left:4px;">🔗</button>
