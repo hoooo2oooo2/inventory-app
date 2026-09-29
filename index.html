@@ -5183,6 +5183,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="rsni" id="rsni-adcenter" onclick="goRevPage('adcenter')">📢 광고센터</div>
     <div class="rsni" id="rsni-region" onclick="goRevPage('region')">📍 지역·연령별 현황</div>
     <div class="rsni" id="rsni-ssa" onclick="goRevPage('ssa')">🧭 판매·방문·고객분석</div>
+    <div class="rsni" id="rsni-bestseller" onclick="goRevPage('bestseller')">🏆 베스트셀러</div>
   </div>
   <div class="rmain">
 
@@ -6317,6 +6318,36 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
     </div>
 
+    <!-- ── 베스트셀러(채널별·기간별) ── -->
+    <div class="rpage" id="rpage-bestseller">
+      <div class="rev-filter rev-filter-sticky" style="flex-wrap:wrap;">
+        <span class="rev-filter-lbl">기간</span>
+        <div class="rev-filter-group" id="bestPeriodBtns"></div>
+        <span class="rev-filter-lbl" style="margin-left:6px;">판매처</span>
+        <div class="rev-filter-group" id="bestChBtns"></div>
+      </div>
+      <div class="rev-card" style="font-size:13.5px;line-height:1.6;color:var(--tx);" id="bestSummary">데이터를 불러오는 중...</div>
+      <div class="rev-tbl-card">
+        <div class="rev-tbl-head">
+          <span class="rev-tbl-title">🏆 판매량 TOP 30</span>
+          <span style="font-size:11px;color:var(--tx2);">상품명 기준 집계(운영관리 매출 통합 데이터) · 재고관리 등록 상품은 현재고를 함께 표시합니다</span>
+        </div>
+        <div class="rev-empty" id="bestEmpty" style="display:none;">해당 기간·판매처에 판매 데이터가 없습니다.</div>
+        <div class="tw"><table class="dt" id="bestTbl">
+          <thead><tr>
+            <th style="text-align:center;width:40px;">순위</th>
+            <th>상품명</th>
+            <th>구분</th>
+            <th>판매채널</th>
+            <th style="text-align:right;">판매수량</th>
+            <th style="text-align:right;">매출(정산금액)</th>
+            <th style="text-align:right;">재고관리 현재고</th>
+          </tr></thead>
+          <tbody id="bestTbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -7137,7 +7168,7 @@ const MENUS = [
 const REV_SUBS = [
   {id:'summary',label:'요약'}, {id:'monthly',label:'월별'}, {id:'backdata',label:'백데이터'},
   {id:'upload',label:'데이터업로드'}, {id:'unified',label:'통합'}, {id:'daily',label:'일일보고'}, {id:'adcenter',label:'광고센터'}, {id:'region',label:'지역·연령별'},
-  {id:'ssa',label:'판매·방문·고객분석'}
+  {id:'ssa',label:'판매·방문·고객분석'}, {id:'bestseller',label:'베스트셀러'}
 ];
 const PERM_LEVELS = [['none','없음'],['view','열람'],['edit','수정']];
 const _PERM_RANK = { none:0, view:1, edit:2 };
@@ -14890,6 +14921,7 @@ function _renderRevCurrentPage(){
   if(_revPage==='rocket')   renderRgPage();
   if(_revPage==='region')   renderRegionPage();
   if(_revPage==='ssa')      renderSsaPage();
+  if(_revPage==='bestseller') renderBestsellerPage();
 }
 
 // ── 택배비 CRUD (Supabase cloud 저장 + localStorage 백업) ──
@@ -15924,6 +15956,96 @@ function sortCh(arr){
   });
 }
 
+// ══════════════ 베스트셀러(채널별·기간별) ══════════════
+// 매출관리 통합(_revData)을 상품명(modelName) 기준으로 집계해 기간·판매처별 판매량 순위를 보여준다.
+// daily_sales(재고관리)가 채널 커버리지는 더 넓지만 "어느 판매처에서" 잘 팔리는지는 안 보여주므로,
+// 이 화면은 재고 수량 계산과는 무관하게(계산에 영향 없음) "어디서 뭐가 잘 팔리는지" 참고용으로만
+// 쓴다. 재고관리 등록 상품(products)과는 이름으로만 매칭해 현재고를 참고 표시한다(코드 네임스페이스가
+// 서로 달라 코드 매칭은 신뢰할 수 없음 — 2026-09 확인).
+const BEST_PERIODS = [
+  {id:'month', label:'이번달'}, {id:'d30', label:'최근30일'}, {id:'d90', label:'최근90일'},
+  {id:'year', label:'올해'}, {id:'lastyear', label:'작년'}
+];
+let _bestPeriod='d30', _bestCh='ALL';
+function setBestPeriod(id){ _bestPeriod=id; renderBestsellerPage(); }
+function setBestCh(ch){ _bestCh=ch; renderBestsellerPage(); }
+function _bestDateRange(periodId){
+  const today=new Date(); today.setHours(0,0,0,0);
+  if(periodId==='month') return {start:fmtDate(new Date(today.getFullYear(),today.getMonth(),1)), end:fmtDate(today)};
+  if(periodId==='d30')   return {start:fmtDate(new Date(today.getTime()-29*86400000)), end:fmtDate(today)};
+  if(periodId==='d90')   return {start:fmtDate(new Date(today.getTime()-89*86400000)), end:fmtDate(today)};
+  if(periodId==='year')  return {start:fmtDate(new Date(today.getFullYear(),0,1)), end:fmtDate(today)};
+  if(periodId==='lastyear') return {start:fmtDate(new Date(today.getFullYear()-1,0,1)), end:fmtDate(new Date(today.getFullYear()-1,11,31))};
+  return {start:fmtDate(today), end:fmtDate(today)};
+}
+function renderBestsellerPage(){
+  const {start,end}=_bestDateRange(_bestPeriod);
+  const years=[...new Set([Number(start.slice(0,4)), Number(end.slice(0,4))])];
+  const missing=years.filter(y=>!_revYearsLoaded.has(y));
+  if(missing.length){ Promise.all(missing.map(y=>ensureRevYear(y))).then(renderBestsellerPage); return; }
+
+  const periodBtnsEl=document.getElementById('bestPeriodBtns');
+  if(periodBtnsEl) periodBtnsEl.innerHTML=BEST_PERIODS.map(p=>
+    `<button class="rfbtn${_bestPeriod===p.id?' active':''}" onclick="setBestPeriod('${p.id}')">${p.label}</button>`).join('');
+  const chs=sortCh([...new Set(_revData.filter(r=>years.includes(r.year)).map(r=>r.ch).filter(Boolean))]);
+  const chBtnsEl=document.getElementById('bestChBtns');
+  if(chBtnsEl) chBtnsEl.innerHTML=`<button class="rfbtn${_bestCh==='ALL'?' active':''}" onclick="setBestCh('ALL')">전체</button>`
+    +chs.map(c=>`<button class="rfbtn${_bestCh===c?' active':''}" onclick="setBestCh('${c}')">${c}</button>`).join('');
+
+  const rows=_revData.filter(r=>{
+    if(!r.date || r.date<start || r.date>end) return false;
+    if(_bestCh!=='ALL' && r.ch!==_bestCh) return false;
+    return true;
+  });
+  const agg={};
+  rows.forEach(r=>{
+    const key=r.modelName||r.itemCode||'미상';
+    if(!agg[key]) agg[key]={name:key, qty:0, amount:0, chSet:new Set()};
+    agg[key].qty+=(r.orderQty||0);
+    agg[key].amount+=(r.settlement||0);
+    if(r.ch) agg[key].chSet.add(r.ch);
+  });
+  const list=Object.values(agg).filter(v=>v.qty>0).sort((a,b)=>b.qty-a.qty);
+  list.forEach(v=>{ v.matched=products.find(x=>!x.hidden && x.name===v.name) || null; });
+
+  const days=Math.max(1, Math.round((new Date(end)-new Date(start))/86400000)+1);
+  const periodLabel=(BEST_PERIODS.find(p=>p.id===_bestPeriod)||{}).label||'';
+  const chLabel=_bestCh==='ALL'?'전체 채널':_bestCh;
+  const sumEl=document.getElementById('bestSummary');
+  if(sumEl){
+    if(!list.length) sumEl.textContent=`${periodLabel}·${chLabel} 기준으로 판매 데이터가 없습니다.`;
+    else{
+      const top=list[0];
+      sumEl.innerHTML=`📊 <b>${periodLabel}</b>(${start}~${end}) · <b>${_esc(chLabel)}</b> 기준 가장 많이 팔린 상품은 <b>${_esc(top.name)}</b>이며, <b>${top.qty.toLocaleString()}개</b> 판매(매출 ${Math.round(top.amount).toLocaleString()}원)됐습니다. 상위 ${Math.min(30,list.length)}개 상품을 아래 표에서 확인하세요.`;
+    }
+  }
+
+  const tbody=document.getElementById('bestTbody');
+  const empty=document.getElementById('bestEmpty');
+  const tbl=document.getElementById('bestTbl');
+  if(!list.length){ if(tbody) tbody.innerHTML=''; if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return; }
+  if(empty) empty.style.display='none'; if(tbl) tbl.style.display='';
+
+  if(tbody) tbody.innerHTML=list.slice(0,30).map((v,i)=>{
+    const p=v.matched;
+    const avgDay=v.qty/days;
+    const stockDays=(p && avgDay>0)?Math.floor(p.stock/avgDay):null;
+    const lowStock=stockDays!=null && stockDays<=14;
+    const stockCell=p
+      ? `<span style="${lowStock?'color:#DC2626;font-weight:700;':'font-weight:600;'}">${p.stock.toLocaleString()}개${lowStock?' ⚠부족의심':''}</span>${stockDays!=null?`<div style="font-size:10.5px;color:var(--tx2);margin-top:2px;">이 판매속도로 약 ${stockDays}일분</div>`:''}`
+      : `<span style="color:var(--tx2);">재고관리 미등록</span>`;
+    return `<tr>
+      <td style="text-align:center;font-weight:700;color:${i<3?'#EA580C':'var(--tx2)'};">${i+1}</td>
+      <td style="font-weight:600;">${_esc(v.name)}</td>
+      <td>${p?(p.type||'기타'):'-'}</td>
+      <td style="font-size:11px;color:var(--tx2);">${[...v.chSet].join(', ')}</td>
+      <td style="text-align:right;font-weight:600;">${v.qty.toLocaleString()}개</td>
+      <td style="text-align:right;">${Math.round(v.amount).toLocaleString()}원</td>
+      <td style="text-align:right;">${stockCell}</td>
+    </tr>`;
+  }).join('');
+}
+
 // ── 광고비(광고센터) 데이터 ── { 'channel|YYYY-MM-DD': 금액 }
 let _adSpend = {};
 let _adLoaded = false;
@@ -15967,7 +16089,7 @@ function goRevPage(p){
     p = f.id;
   }
   _revPage = p;
-  ['summary','monthly','backdata','upload','unified','daily','rocket','adcenter','region','ssa'].forEach(x=>{
+  ['summary','monthly','backdata','upload','unified','daily','rocket','adcenter','region','ssa','bestseller'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
