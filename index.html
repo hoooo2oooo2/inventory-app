@@ -13226,7 +13226,24 @@ function _insightDeOutlierMonth(code, year, monthIdx, monthTotal){
   const restAvg=restCount>0?restSum/restCount:0;
   return (restAvg>0 && maxDay>=restAvg*10) ? restSum : monthTotal;
 }
+// 상품이 실제로 팔리기 시작한 지 몇 개월이나 됐는지(등록된 monthly_* 배열 전체에서 가장 이른 nonzero
+// 달 기준) — 성수기·비수기 판정은 최소 만 1년(12개월)의 실거래 이력을 요구한다.
+// (2026-09 사용자 리포트: SS576S-01처럼 출시 2~3개월차 신상품은 아직 안 지난 달들이 "데이터 없음"이
+// 아니라 그냥 "0"으로 잡혀서 "성수기 12월 +1002%/비수기 1월 -100%"처럼 왜곡된 판정이 나옴 — 실제로는
+// 다음해 1월 실적이 85개로 전혀 비수기가 아니었음. 아래 nonZeroCount>=3 문턱만으론 이 케이스를 못
+// 걸러냈다(정확히 3개월 걸침) — 출시 후 만 1년이 지났는지를 직접 확인해 근본적으로 막는다.)
+function _insightMonthsSinceFirstSale(p){
+  let earliest=null;
+  [CUR_YEAR-2, CUR_YEAR-1, CUR_YEAR].forEach(y=>{
+    const arr=getTotalM(p,y);
+    arr.forEach((v,i)=>{ if(v>0){ const d=new Date(y,i,1); if(!earliest||d<earliest) earliest=d; } });
+  });
+  if(!earliest) return null;
+  return (CUR_YEAR-earliest.getFullYear())*12 + (MONTH-earliest.getMonth());
+}
 function insightSeasonInfo(p){
+  const ageMonths=_insightMonthsSinceFirstSale(p);
+  if(ageMonths!=null && ageMonths<12) return {status:'nodata', tooNew:true, ageMonths};
   const prev=getTotalM(p, CUR_YEAR-1), prevTotal=prev.reduce((a,b)=>a+b,0);
   let m=prev, basisYear=CUR_YEAR-1, basis=(CUR_YEAR-1)+'년', monthsSpan=12;
   if(prevTotal<=0){
