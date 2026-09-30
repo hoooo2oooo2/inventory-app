@@ -13553,6 +13553,7 @@ function insightEffectiveReorder(p, ic){
 // 겹치는 상품(연초 성수기 상품)은 일반 규칙 대신 마감을 감안한 전용 계산(아래 겨울철 분기)을 쓴다.
 const SEASONAL_LEAD_MONTHS=2;      // 리드타임(넉넉히 2개월)
 const SEASONAL_PREP_MONTHS=6;      // 성수기 시작 몇 개월 전부터 "미리 준비" 알림을 띄울지
+const SEASONAL_TARGET_MONTHS=2.5;  // 평상시(비겨울) 성수기 대비 목표재고 — 2~3개월치(2026-09-30 사용자 확정)
 const WINTER_CLOSE_MONTHS=5;       // 원청 공장 마감기간(11~익년3월)
 const WINTER_COVER_MONTHS=WINTER_CLOSE_MONTHS+SEASONAL_LEAD_MONTHS; // 마감중 재발주 불가 총 기간(7개월)
 const _WINTER_MONTH_SET=new Set([9,10,11,0,1,2]); // 10,11,12,1,2,3월(0-idx)
@@ -13641,12 +13642,6 @@ function insightRampStartMonth(season){
   }
   return rampStart;
 }
-// start~end(순환) 구간의 월 인덱스를 전부 나열
-function _insightMonthRange(start, end){
-  const out=[]; let i=start;
-  while(true){ out.push(i); if(i===end || out.length>=12) break; i=(i+1)%12; }
-  return out;
-}
 function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, seasonIndex){
   if(p.disc) return {status:'excluded'};
   if(c.noData) return {status:'nodata'};
@@ -13657,25 +13652,30 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
   const today=new Date(); today.setHours(0,0,0,0);
 
   if(hasWindow && !isWinterWindow){
-    // 확정된 비겨울 성수기(봄/여름/가을): 정상적으로 재발주가 가능한 시기라 마감 보정 없이, 완만한
-    // 상승 시작월(있으면 그 달, 없으면 확정구간 시작월)부터 확정구간 끝까지의 예상수요(작년 동월
-    // 실적, 이상치 제거)를 리드타임만 반영해 확보한다. "later" 상태여도 실제 마감일은 항상 계산해
-    // 반환한다 — 몇 개월 남았는지만 보여주면 "그럼 그때 가서 주문하면 되나?"로 오해할 수 있다.
+    // 확정된 비겨울 성수기(봄/여름/가을): 겨울마감과 달리 이 시기엔 정상적으로 재발주가 가능하므로
+    // "성수기 구간 전체"를 미리 사둘 필요가 없다 — 리드타임(2개월)을 감안해 통상적인 목표재고 방식
+    // (2~3개월치)만 확보하면 된다(2026-09-30 사용자 확정: "평상시 계절엔 2~3개월치만 주문하면
+    // 된다. 겨울마감처럼 성수기 구간 전체를 사재기하는 건 아님"). 예전엔 겨울마감과 똑같이 "구간
+    // 전체 총량"을 계산해서, 성수기가 몇 달씩 이어지는 상품은 4~7개월치를 한 번에 사라고 나오는
+    // 오류가 있었음(두더지퇴치기 리포트로 발견).
     const rampStart=insightRampStartMonth(season);
     const effStartIdx = (rampStart!=null) ? rampStart : windowMonths[0];
-    const coverMonths=_insightMonthRange(effStartIdx, windowMonths[windowMonths.length-1]);
     const startDate=insightNextMonthDate(effStartIdx);
     const monthsAway=Math.round((startDate-today)/(30*86400000));
-    const forecastTotal=coverMonths.reduce((a,mi)=>a+season.cleanMonths[mi],0);
-    const daysToStart=Math.round((startDate-today)/86400000);
-    const consumeBeforeStart=Math.max(0,daysToStart)*expM/30;
-    const stockAtStart=Math.max(0, p.stock-consumeBeforeStart);
-    const neededQty=Math.max(0, Math.round(forecastTotal-stockAtStart-(pending||0)-(normalNetNeeded||0)));
-    const boxes=Math.ceil(neededQty/(p.boxQty||1));
     const deadline=new Date(startDate.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
     const daysToDeadline=Math.round((deadline-today)/86400000);
     if(monthsAway>SEASONAL_PREP_MONTHS) return {status:'later', monthsAway, startDate, deadline, daysToDeadline, windowMonths, startMonthIdx:effStartIdx};
-    return {status:'flag', kind:'other', reason:'seasonal', windowMonths, startDate, forecastTotal, stockAtStart, neededQty, boxes,
+    // 성수기 예상 월 평균(작년 성수기 구간 실적, 이상치 제거) — 단, 이미 지금 판매속도(expM, 최근
+    // 추세·전년비 보정 반영)가 그보다 높으면(=올해 판매량이 이미 늘었으면) 더 높은 쪽을 쓴다.
+    const seasonalAvgMonthly=windowMonths.reduce((a,mi)=>a+season.cleanMonths[mi],0)/windowMonths.length;
+    const expectedMonthly=Math.max(seasonalAvgMonthly, expM);
+    const daysToStart=Math.round((startDate-today)/86400000);
+    const consumeBeforeStart=Math.max(0,daysToStart)*expM/30; // 성수기 시작 전까지는 평소 속도로 소진
+    const stockAtStart=Math.max(0, p.stock-consumeBeforeStart);
+    const targetStock=expectedMonthly*SEASONAL_TARGET_MONTHS;
+    const neededQty=Math.max(0, Math.round(targetStock-stockAtStart-(pending||0)-(normalNetNeeded||0)));
+    const boxes=Math.ceil(neededQty/(p.boxQty||1));
+    return {status:'flag', kind:'other', reason:'seasonal', windowMonths, startDate, forecastTotal:targetStock, expectedMonthly, stockAtStart, neededQty, boxes,
       deadline, daysToDeadline, overdue:daysToDeadline<0, monthsAway, startMonthIdx:effStartIdx};
   }
 
@@ -13836,7 +13836,7 @@ function insightSeasonalPreCellHtml(sp){
   let label, closeNote;
   if(!isWinter){
     label=`${MNAMES[sp.startMonthIdx!=null?sp.startMonthIdx:sp.windowMonths[0]]} 성수기`;
-    closeNote='성수기 구간 예상수요, 리드타임 2개월 기준';
+    closeNote='겨울마감과 달리 이 시기엔 정상적으로 재발주가 가능해 성수기 구간 전체를 미리 사둘 필요는 없습니다 — 성수기 예상 월 평균(작년 실적, 올해 판매량이 이미 늘었으면 그 값 반영)의 2.5개월치를 목표재고로, 리드타임 2개월 기준';
   } else if(sp.reason==='seasonal'){
     label='겨울마감 대비(성수기)';
     closeNote='이 상품은 성수기가 원청 공장 11월~익년3월 마감(생산중단) 기간과 겹칩니다 — 마감 5개월+재개후 리드타임 2개월(총 7개월)치 예상수요, 자체 작년 실적 기준';
