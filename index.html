@@ -13433,7 +13433,15 @@ function insightDemandFromSeries(series){
   const isTrendUp=front15avg>0 && back15avg>=front15avg*2 && back15avg>=0.3;
 
   let base=0;
-  if(isTrendUp) base=Math.round(back15avg*30);
+  if(isTrendUp){
+    base=Math.round(back15avg*30);
+    // 데이터가 희소하면(30일 중 12일 미만 판매) 최근 15일 중 며칠의 반짝 대량주문만으로 트렌드를
+    // 오판해 base가 과도하게 부풀 수 있다 — 아래 accel 분기와 동일하게 avg30 기준 2배 캡을 걸어
+    // 안전판을 맞춘다(2026-09-30 사용자 리포트: 일평균 1개대 상품인데 30일 합계 대비 지나치게
+    // 큰 expM이 나와 겨울마감 대비 발주 제안까지 같이 부풀려짐 — 원인은 이 트렌드 분기가 기존
+    // "월별 총량 검증"의 !isTrendUp 조건에 걸려 안전판을 그냥 건너뛰고 있었던 것).
+    if(dataPoints30<12 && avg30>0) base=Math.min(base, Math.round(avg30*30*2));
+  }
   else if(accel>=1.2 && avg7>0 && prev14>0){
     base=Math.round(avg7*30);
     if(avg30>0) base=Math.min(base, Math.round(avg30*30*2));
@@ -13474,8 +13482,8 @@ function insightDemandFromSeries(series){
     }
   }
 
-  if(base<=0) return {noData:true, base:0, avgDay:0, dataPoints:dataPoints30};
-  return { noData:false, base, avgDay:Math.round(base/30*10)/10, dataPoints:dataPoints30, accel, isTrendUp, prev14 };
+  if(base<=0) return {noData:true, base:0, avgDay:0, dataPoints:dataPoints30, avg30:0};
+  return { noData:false, base, avgDay:Math.round(base/30*10)/10, dataPoints:dataPoints30, accel, isTrendUp, prev14, avg30 };
 }
 // calcNeeded()와 동일한 이상치 제거·트렌드 감지·월별 검증·시즌 보정·목표재고 공식을 쓰되, 판매량
 // 기준을 정규채널+로켓그로스 매출 합산 시리즈로 바꾸고 최근 30일/7일 창을 "오늘" 기준으로 계산한다.
@@ -13492,10 +13500,10 @@ function insightCalcNeeded(p, mergedSeries){
     const needed=Math.max(0, Math.round(_fixedExpM*(orderCycle+safetyM)-stockAtDelivery));
     const boxes=Math.ceil(needed/(p.boxQty||1));
     const avgDay=Math.round(_fixedExpM/30*10)/10;
-    return {needed, boxes, expM:_fixedExpM, base:_fixedExpM, avgDay, noData:false, corrLabel:'📌고정값', dataPoints30:0, safetyM, orderCycle, stockAtDelivery, fixedExpM:true};
+    return {needed, boxes, expM:_fixedExpM, base:_fixedExpM, avgDay, noData:false, corrLabel:'📌고정값', dataPoints30:0, safetyM, orderCycle, stockAtDelivery, fixedExpM:true, avg30:_fixedExpM/30};
   }
   const dem=insightDemandFromSeries(mergedSeries);
-  if(dem.noData) return {needed:0, boxes:0, expM:0, base:0, avgDay:0, noData:true, corrLabel:'', dataPoints30:dem.dataPoints};
+  if(dem.noData) return {needed:0, boxes:0, expM:0, base:0, avgDay:0, noData:true, corrLabel:'', dataPoints30:dem.dataPoints, avg30:0};
   let expM=dem.base;
   const base=dem.base;
   let corrLabel='';
@@ -13529,7 +13537,7 @@ function insightCalcNeeded(p, mergedSeries){
   const impliedExpM=p.reorderPoint>0?p.reorderPoint/Math.max(p.leadTime+0.5,1):0;
   const suspect=dem.dataPoints<10 && impliedExpM>0 && expM>impliedExpM*2.5;
   return {needed, boxes, expM, base, avgDay:dem.avgDay, noData:false, corrLabel, dataPoints30:dem.dataPoints,
-    safetyM, suspect, orderCycle, stockAtDelivery, sr, rawSr, accel:dem.accel, isTrendUp:dem.isTrendUp, prev14:dem.prev14};
+    safetyM, suspect, orderCycle, stockAtDelivery, sr, rawSr, accel:dem.accel, isTrendUp:dem.isTrendUp, prev14:dem.prev14, avg30:dem.avg30};
 }
 function insightEffectiveReorder(p, ic){
   if(p.reorderPoint>0) return p.reorderPoint;
@@ -13691,20 +13699,24 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
     forecastTotal=coverMonths.reduce((sum,mi)=>sum+(mi>=9?h1[mi]:h2[mi]),0);
     reason = hasWindow ? 'seasonal' : 'flat';
   } else {
-    // 신상품(자체 1년 실적 없음) — 같은 구분 상품군의 평균 계절지수로 "지금 판매속도"를 연평균으로
-    // 환산한 뒤, 겨울 커버 구간 각 달의 지수를 다시 곱해 재분배한다. 단순히 지금 속도를 그대로
-    // flat 투사하지 않는다(사용자 피드백 반영).
+    // 신상품(자체 1년 실적 없음) — 같은 구분 상품군의 평균 계절지수로 "판매속도"를 연평균으로 환산한
+    // 뒤, 겨울 커버 구간 각 달의 지수를 다시 곱해 재분배한다. 단순히 지금 속도를 그대로 flat 투사
+    // 하지 않는다(사용자 피드백 반영).
+    // 기준 속도는 expM(트렌드·가속도 보정 포함, 최근 15일 위주로 반응)이 아니라 최근 30일 평균
+    // (avg30)을 쓴다 — expM은 최근 며칠의 반짝 상승에도 크게 흔들리는데, 7개월치 겨울 재고를
+    // 결정하는 근거로 2주 남짓의 반짝 추세를 쓰는 건 과하다(2026-09-30 사용자 리포트: "이번달
+    // 30개 팔린 상품인데 왜 698개나 준비하라는거냐" — 확인해보니 expM이 최근 반짝 증가분을 크게
+    // 반영해 실제 30일 합계보다 훨씬 높게 잡혀 있었고, 그 위에 구분지수까지 곱해져 더 부풀려짐).
+    const baseRate=(c.avg30>0 ? c.avg30*30 : expM);
     const idx=insightSeasonIndexFor(seasonIndex, p.type);
     const curIdx=Math.max(idx[MONTH]||1, 0.3);
-    const impliedAvg=expM/curIdx;
+    const impliedAvg=baseRate/curIdx;
     forecastTotal=coverMonths.reduce((sum,mi)=>sum+impliedAvg*(idx[mi]||1),0);
     // 안전판: 지금 달의 지수가 낮으면(curIdx가 작으면) impliedAvg가 크게 부풀고, 거기에 겨울 커버
     // 구간의 높은 지수 달들이 또 곱해지면서 이중으로 증폭돼 실제 판매량 대비 터무니없이 큰 값이
-    // 나올 수 있다(2026-09-30 사용자 리포트: "판매량도 적은데 왜 856개나 준비해야 하냐" — 실측
-    // 확인 결과 현재월 지수가 낮고 커버구간에 지수가 아주 높은 달이 섞여 flat 투사의 2배를 훌쩍
-    // 넘김). insightDemandFromSeries의 기존 2배 캡 관행과 동일하게, flat 투사(현재속도×개월수)의
-    // 0.5~2배 범위로 clamp해서 구분지수 보정이 "방향"만 반영하고 폭주하지 않게 막는다.
-    const flatBase=expM*coverMonths.length;
+    // 나올 수 있다. insightDemandFromSeries의 기존 2배 캡 관행과 동일하게, flat 투사(기준속도×
+    // 개월수)의 0.5~2배 범위로 clamp해서 구분지수 보정이 "방향"만 반영하고 폭주하지 않게 막는다.
+    const flatBase=baseRate*coverMonths.length;
     if(flatBase>0) forecastTotal=Math.min(Math.max(forecastTotal, flatBase*0.5), flatBase*2);
     reason='new';
   }
