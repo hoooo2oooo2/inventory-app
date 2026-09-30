@@ -13615,6 +13615,30 @@ function insightSeasonIndexFor(seasonIndex, type){ return (seasonIndex&&seasonIn
 //   'seasonal' = 확정된 성수기 구간이 겨울과 겹침(자체 작년 실적 사용)
 //   'flat'     = 사계절 균등 판매(자체 작년 실적 있음, 그대로 사용)
 //   'new'      = 자체 1년 실적 없는 신상품(구분별 평균 계절지수로 현재 판매속도를 보정해 투사)
+// season.cleanMonths/avg/peakI를 바탕으로, 확정 성수기 구간(insightSeasonWindowMonths, 평균의
+// 1.2배 이상)보다 먼저 "완만하게 오르기 시작하는" 달을 찾는다(평균의 0.9배 이상 & 전달 이상).
+// 확정 구간만 기준으로 발주 마감일을 잡으면 실제 수요 상승이 이미 시작된 달을 놓쳐 마감일이
+// 너무 늦게 잡히는 문제가 있었다(2026-09-30 사용자 리포트: "두더지퇴치기는 4월부터 오른다면서
+// 왜 7개월 남았다고 하냐" — 서술은 완만상승 시작월(4월) 기준인데 마감일 계산은 확정구간 시작월
+// (5월) 기준이라 서로 다른 달을 가리켜 혼란을 줌. 이제 서술과 계산 모두 이 함수로 통일한다).
+function insightRampStartMonth(season){
+  if(season.status!=='ok' || season.flat) return null;
+  const {cleanMonths, avg, peakI}=season;
+  if(!(avg>0)) return null;
+  let rampStart=peakI;
+  for(let k=1;k<=6;k++){
+    const idx=(peakI-k+12)%12, prevIdx=(idx-1+12)%12;
+    if(cleanMonths[idx]>=avg*0.9 && cleanMonths[idx]>=cleanMonths[prevIdx]) rampStart=idx;
+    else break;
+  }
+  return rampStart;
+}
+// start~end(순환) 구간의 월 인덱스를 전부 나열
+function _insightMonthRange(start, end){
+  const out=[]; let i=start;
+  while(true){ out.push(i); if(i===end || out.length>=12) break; i=(i+1)%12; }
+  return out;
+}
 function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, seasonIndex){
   if(p.disc) return {status:'excluded'};
   if(c.noData) return {status:'nodata'};
@@ -13625,12 +13649,16 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
   const today=new Date(); today.setHours(0,0,0,0);
 
   if(hasWindow && !isWinterWindow){
-    // 확정된 비겨울 성수기(봄/여름/가을): 정상적으로 재발주가 가능한 시기라 마감 보정 없이, 성수기
-    // 구간 시작월의 예상수요(작년 동월 실적, 이상치 제거)를 리드타임만 반영해 확보한다.
-    const startDate=insightNextMonthDate(windowMonths[0]);
+    // 확정된 비겨울 성수기(봄/여름/가을): 정상적으로 재발주가 가능한 시기라 마감 보정 없이, 완만한
+    // 상승 시작월(있으면 그 달, 없으면 확정구간 시작월)부터 확정구간 끝까지의 예상수요(작년 동월
+    // 실적, 이상치 제거)를 리드타임만 반영해 확보한다. "later" 상태여도 실제 마감일은 항상 계산해
+    // 반환한다 — 몇 개월 남았는지만 보여주면 "그럼 그때 가서 주문하면 되나?"로 오해할 수 있다.
+    const rampStart=insightRampStartMonth(season);
+    const effStartIdx = (rampStart!=null) ? rampStart : windowMonths[0];
+    const coverMonths=_insightMonthRange(effStartIdx, windowMonths[windowMonths.length-1]);
+    const startDate=insightNextMonthDate(effStartIdx);
     const monthsAway=Math.round((startDate-today)/(30*86400000));
-    if(monthsAway>SEASONAL_PREP_MONTHS) return {status:'later', monthsAway};
-    const forecastTotal=windowMonths.reduce((a,mi)=>a+season.cleanMonths[mi],0);
+    const forecastTotal=coverMonths.reduce((a,mi)=>a+season.cleanMonths[mi],0);
     const daysToStart=Math.round((startDate-today)/86400000);
     const consumeBeforeStart=Math.max(0,daysToStart)*expM/30;
     const stockAtStart=Math.max(0, p.stock-consumeBeforeStart);
@@ -13638,8 +13666,9 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
     const boxes=Math.ceil(neededQty/(p.boxQty||1));
     const deadline=new Date(startDate.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
     const daysToDeadline=Math.round((deadline-today)/86400000);
+    if(monthsAway>SEASONAL_PREP_MONTHS) return {status:'later', monthsAway, startDate, deadline, daysToDeadline, windowMonths, startMonthIdx:effStartIdx};
     return {status:'flag', kind:'other', reason:'seasonal', windowMonths, startDate, forecastTotal, stockAtStart, neededQty, boxes,
-      deadline, daysToDeadline, overdue:daysToDeadline<0, monthsAway};
+      deadline, daysToDeadline, overdue:daysToDeadline<0, monthsAway, startMonthIdx:effStartIdx};
   }
 
   // 겨울마감 대비(공통) — 겨울과 겹치는 확정 성수기든, 사계절 균등이든, 자체 판정이 안 되는 신상품
@@ -13647,7 +13676,8 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
   // 보장으로 확보하고, 실제 감지된 성수기 구간이 이보다 더 길면 그만큼 더 늘린다.
   const closeStart=new Date(CUR_YEAR,10,1);
   const monthsAway=Math.round((closeStart-today)/(30*86400000));
-  if(monthsAway>SEASONAL_PREP_MONTHS) return {status:'later', monthsAway};
+  const _winterDeadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
+  if(monthsAway>SEASONAL_PREP_MONTHS) return {status:'later', monthsAway, startDate:closeStart, deadline:_winterDeadline, daysToDeadline:Math.round((_winterDeadline-today)/86400000)};
   const closureMinMonths=[10,11,0,1,2,3,4]; // 11,12,1,2,3,4,5월(0-idx) — 마감+재개리드타임 최소 보장 구간
   const coverMonths = hasWindow ? [...new Set([...windowMonths, ...closureMinMonths])] : closureMinMonths;
 
@@ -13785,7 +13815,7 @@ function insightSeasonalPreCellHtml(sp){
   const icon=isWinter?'❄':'☀';
   let label, closeNote;
   if(!isWinter){
-    label=`${MNAMES[sp.windowMonths[0]]} 성수기`;
+    label=`${MNAMES[sp.startMonthIdx!=null?sp.startMonthIdx:sp.windowMonths[0]]} 성수기`;
     closeNote='성수기 구간 예상수요, 리드타임 2개월 기준';
   } else if(sp.reason==='seasonal'){
     label='겨울마감 대비(성수기)';
@@ -14238,7 +14268,7 @@ function insightRenderSeasonAnalysis(code){
   if(!el) return;
   const row=insightBuildRows().find(r=>r.p.code===code);
   if(!row){ el.innerHTML='<div class="ins-sub">데이터를 찾을 수 없습니다.</div>'; return; }
-  const {p, c, season, seasonPre:sp}=row;
+  const {p, c, season, seasonPre:sp, exhaustDate, avgDay}=row;
   if(p.disc){ el.innerHTML='<div class="ins-sub">단종 처리된 상품입니다.</div>'; return; }
   if(c.noData){ el.innerHTML='<div class="ins-sub">최근 판매 데이터가 없어(또는 신규 상품이라) 분석할 수 없습니다.</div>'; return; }
 
@@ -14256,14 +14286,10 @@ function insightRenderSeasonAnalysis(code){
     html+=`<div style="font-size:12px;font-weight:700;margin-bottom:6px;">월별 평균 판매 패턴 <span style="font-weight:500;color:var(--tx2);">(${season.basis})</span></div>
       <div style="display:flex;align-items:flex-end;gap:2px;height:66px;margin-bottom:8px;">${bars}</div>`;
 
-    // 판매량이 오르기 시작하는 시점: peak월에서 거꾸로 올라가며 "평균의 90% 이상 & 전달보다 같거나 높음"이
-    // 이어지는 구간을 찾는다(최대 6개월 전까지).
-    let rampStart=null;
-    for(let k=1;k<=6;k++){
-      const idx=(peakI-k+12)%12, prevIdx=(idx-1+12)%12;
-      if(cleanMonths[idx]>=avg*0.9 && cleanMonths[idx]>=cleanMonths[prevIdx]) rampStart=idx;
-      else break;
-    }
+    // 판매량이 오르기 시작하는 시점 — insightSeasonalPreorderInfo의 발주 마감일 계산과 반드시 같은
+    // 기준(insightRampStartMonth)을 써야 한다. 서로 다른 기준을 쓰면 "○월부터 오른다"는 서술과
+    // "마감일까지 ○개월 남았다"는 계산이 다른 달을 가리켜 혼란을 준다(2026-09-30 사용자 리포트).
+    const rampStart=insightRampStartMonth(season);
     if(rampStart!=null && rampStart!==peakI){
       html+=`<div class="ins-sub" style="margin-bottom:8px;">📈 보통 <b>${MNAMES[rampStart]}</b>부터 판매량이 오르기 시작해 <b>${MNAMES[peakI]}</b>에 정점을 찍는 패턴입니다.</div>`;
     } else {
@@ -14279,7 +14305,7 @@ function insightRenderSeasonAnalysis(code){
       html+=`<div style="padding:9px 11px;background:#E1F5EE;border-radius:8px;font-size:12.5px;color:#0F6E56;">✅ 현재고·진행중 발주·권장 발주까지 반영하면 다음 대비 시점까지 재고가 충분합니다.</div>`;
     } else {
       const urgent=sp.overdue;
-      const label = sp.kind==='other' ? `${MNAMES[sp.windowMonths[0]]} 성수기`
+      const label = sp.kind==='other' ? `${MNAMES[sp.startMonthIdx!=null?sp.startMonthIdx:sp.windowMonths[0]]} 성수기`
         : sp.reason==='seasonal' ? '겨울마감(성수기)' : sp.reason==='flat' ? '겨울마감(사계절 판매)' : '겨울마감(신상품 추정)';
       html+=`<div style="padding:9px 11px;background:${urgent?'#FEF2F2':'#EFF6FF'};border-radius:8px;font-size:12.5px;line-height:1.6;color:${urgent?'#7A1212':'#0B3D66'};">
         📦 <b>${label}</b> 대비, 권장 발주와는 별개로 <b>${sp.boxes.toLocaleString()}박스(${sp.neededQty.toLocaleString()}개)</b>를
@@ -14287,7 +14313,13 @@ function insightRenderSeasonAnalysis(code){
       </div>`;
     }
   } else if(sp && sp.status==='later'){
-    html+=`<div class="ins-sub">다음 대비 시점까지 ${sp.monthsAway}개월 남아 아직 알림 대상은 아닙니다.</div>`;
+    // "몇 개월 남았다"고만 하면 "그럼 그때 가서(예: 성수기 시작월에) 주문하면 되나?"로 오해하기
+    // 쉽다(2026-09-30 사용자 리포트: "7개월 남았다고 4월에 주문하면 늦는거잖아") — 리드타임까지
+    // 반영한 실제 발주 마감일을 항상 못박아 보여주고, 그 전까지는 평소 "권장 발주" 주기로 재고가
+    // 버티는지(exhaustDate)도 함께 보여줘 안심하거나 미리 대비할 수 있게 한다.
+    const dl2=sp.deadline?fmtDate(sp.deadline):null;
+    const exhaustTxt = (avgDay>0 && exhaustDate) ? `평소 판매 속도(일평균 ${avgDay}개) 기준 현재고는 약 <b>${fmtDate(exhaustDate)}</b>까지 버틸 것으로 예상됩니다. 그 사이엔 "권장 발주" 칸의 정기 발주로 재고를 채워주시면 됩니다. ` : '';
+    html+=`<div class="ins-sub">${exhaustTxt}실제 대비 발주 마감일은(리드타임 2개월 반영) <b>${dl2||'-'}</b>이며, 아직 ${sp.monthsAway}개월 남아 지금 당장 알림 대상은 아닙니다 — 마감일이 다가오면 자동으로 위에 발주 제안이 표시됩니다.</div>`;
   } else {
     html+=`<div class="ins-sub">뚜렷한 계절 패턴이나 겨울마감 리스크가 확인되지 않았습니다.</div>`;
   }
