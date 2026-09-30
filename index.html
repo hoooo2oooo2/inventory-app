@@ -4854,6 +4854,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </select>
       <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="insightDiscChk" onchange="insightToggleDisc(this.checked)"> 단종 포함</label>
       <span style="font-size:13px;color:var(--tx2);" id="insightCount"></span>
+      <button class="btn btn-sm btn-or" onclick="insightOpenSeasonalSummary()" title="구정 주문 마감 전에 전체 제품을 한 번에 훑어보고 준비할 때 쓰는 요약 화면 — 마감임박순 정렬, 처리완료 체크, 재고여유 상품 구분까지 한 곳에서 볼 수 있어요">🎄 구정·성수기 준비 요약</button>
       <button class="btn btn-sm btn-pr" onclick="openErpUpload()" title="외부 ERP 엑셀을 그대로 업로드하면 재고관리·판매분석에 자동 반영됩니다">📤 ERP 엑셀 업로드</button>
       <button class="btn btn-sm" onclick="insightExportXlsx()" title="현재 화면에 보이는(검색·필터·정렬 적용된) 목록을 엑셀로 저장">📥 엑셀 다운로드</button>
     </div>
@@ -4978,6 +4979,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <input type="text" class="sel fam-pick-search" id="insightFamPickSearch" placeholder="패밀리오더 상품 검색 (업체·코드·상품명)" oninput="insightRenderFamPickList(this.value)">
     <div class="fam-pick-list" id="insightFamPickList"></div>
     <div class="ma"><button class="btn" onclick="closeModal('insightFamPickModal')">닫기</button></div>
+  </div>
+</div>
+
+<!-- ═══ 발주 인사이트 — 구정·성수기 대비 발주 준비 요약(2026-09-30, 마감 전 전체 훑어보기용) ═══ -->
+<style>
+#insightSeasSummaryModal .modal{max-width:640px;}
+#insightSeasSummaryModal .iss-tabs{display:flex;gap:6px;margin-bottom:12px;}
+#insightSeasSummaryModal .iss-tab{flex:1;padding:8px 10px;border-radius:8px;border:0.5px solid var(--bd);background:var(--bg2);color:var(--tx2);font-size:13px;font-weight:700;cursor:pointer;text-align:center;}
+#insightSeasSummaryModal .iss-tab.active{background:var(--pr);color:#fff;border-color:var(--pr);}
+#insightSeasSummaryModal .iss-banner{padding:10px 12px;border:0.5px solid var(--bd);border-radius:8px;background:var(--bg2);margin-bottom:10px;}
+#insightSeasSummaryModal .iss-group{font-size:12px;font-weight:700;color:var(--tx2);padding:10px 12px 4px;}
+#insightSeasSummaryModal .iss-list{max-height:52vh;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;}
+#insightSeasSummaryModal .iss-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:0.5px solid var(--bd);}
+#insightSeasSummaryModal .iss-row:last-child{border-bottom:none;}
+#insightSeasSummaryModal .iss-name{font-size:13.5px;font-weight:700;cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:2px;}
+#insightSeasSummaryModal .iss-code{font-size:11.5px;color:var(--tx2);}
+#insightSeasSummaryModal .iss-breakdown{font-size:11px;color:var(--tx2);white-space:pre-line;margin-top:3px;}
+</style>
+<div class="modal-overlay" id="insightSeasSummaryModal">
+  <div class="modal">
+    <h3 style="font-size:16px;margin:0 0 4px;">🎄 구정·성수기 대비 발주 준비 요약</h3>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">구정 주문 마감 전에 전체 제품을 한 번에 훑어보고 준비하는 화면입니다. 처리완료 체크는 팀 전체가 공유하고, 이번 시즌이 끝나면(다음 해로 넘어가면) 자동으로 초기화됩니다.</div>
+    <div class="iss-tabs">
+      <div class="iss-tab active" id="insightSeasTabWinter" onclick="insightSetSeasSummaryTab('winter')">❄ 구정재고 대비</div>
+      <div class="iss-tab" id="insightSeasTabOther" onclick="insightSetSeasSummaryTab('other')">☀ 계절성수기 대비</div>
+    </div>
+    <div class="iss-banner" id="insightSeasSummaryBanner"></div>
+    <div class="iss-list" id="insightSeasSummaryList"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('insightSeasSummaryModal')">닫기</button></div>
   </div>
 </div>
 
@@ -13219,6 +13249,46 @@ async function insightToggleOrderConfirm(id, checked){
   renderInsight();
 }
 
+// ── 구정·성수기 대비 발주 처리 체크리스트 ──────────────────────────────
+// 구정 주문 마감 전에 전체 제품을 한 번에 훑어보고 발주를 끝내는 워크플로우 지원(2026-09-30 요청:
+// "내가 구정 주문 준비할 때 전체 제품을 보고 주문하는데 주문 마감 시점이 있어서 마감 시점 전에
+// 구정 주문을 다 하려고 하는데"). 위 "오늘 발주 확인"과 달리 매일 초기화되면 안 되고(구정 준비는
+// 몇 주~몇 달에 걸쳐 진행) 그 시즌이 끝날 때까지 유지돼야 하므로, 체크 시점의 연도(CUR_YEAR)를
+// 저장해서 다음 시즌(연도가 바뀌면)엔 자동으로 정리되게 한다. 팀 전체가 같은 목록을 보며 발주를
+// 나눠 처리하므로 cloudKv로 공유.
+const INSIGHT_SEASONAL_CHECK_KIND='insight_seasonal_check_v1'; // { [products.id]: 체크한 시즌 연도 }
+let _insightSeasonalCheck={};
+let _insightSeasonalCheckLoaded=false;
+async function _insightEnsureSeasonalCheckData(){
+  if(_insightSeasonalCheckLoaded) return;
+  const m=await cloudKvLoad(INSIGHT_SEASONAL_CHECK_KIND);
+  _insightSeasonalCheck=(m&&typeof m==='object')?m:{};
+  _insightSeasonalCheckLoaded=true;
+}
+function insightIsSeasonalChecked(id){
+  return _insightSeasonalCheck[id]===CUR_YEAR;
+}
+async function insightToggleSeasonalCheck(id, checked){
+  const latest=await cloudKvLoad(INSIGHT_SEASONAL_CHECK_KIND);
+  const merged=(latest&&typeof latest==='object')?latest:{};
+  Object.keys(merged).forEach(k=>{ if(merged[k]!==CUR_YEAR) delete merged[k]; }); // 지난 시즌 체크 자동 정리
+  if(checked) merged[id]=CUR_YEAR; else delete merged[id];
+  _insightSeasonalCheck=merged;
+  await cloudKvSave(INSIGHT_SEASONAL_CHECK_KIND, merged);
+  renderInsight();
+  if(document.getElementById('insightSeasSummaryModal')?.classList.contains('open')) insightRenderSeasonalSummary();
+}
+// 겨울마감(구정) 발주 마감일은 모든 상품이 원청 공장의 같은 마감 시점(11월)을 기준으로 리드타임만
+// 빼는 방식이라 상품마다 다르지 않고 전부 동일하다 — 요약 화면 상단 배너에 개별 상품과 무관하게
+// 바로 보여줄 수 있게 별도 헬퍼로 분리(insightSeasonalPreorderInfo의 계산과 반드시 같은 공식 유지).
+function insightWinterDeadlineInfo(){
+  const closeStart=new Date(CUR_YEAR,10,1);
+  const deadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const daysToDeadline=Math.round((deadline-today)/86400000);
+  return {closeStart, deadline, daysToDeadline};
+}
+
 // code의 특정 연-월 합계 중 하루치 주문이 그 달 합계의 60% 이상을 차지하면서 나머지 날들 평균의
 // 10배 넘게 크면(1회성 대량 도매주문 등으로 의심) 그 하루를 뺀 합계를 대신 반환한다 — 정상적인
 // 반복 수요가 아니라 단발성 이벤트 하나로 그 달 전체가 "성수기"처럼 보이는 왜곡을 막기 위함
@@ -13800,6 +13870,7 @@ function insightInit(){
   renderInsight();
   _insightEnsureFamData().then(renderInsight); // 패밀리오더 매칭 데이터는 별도로 로드되는 대로 다시 반영
   _insightEnsureConfirmData().then(renderInsight); // 오늘 발주 확인 체크 상태도 별도로 로드되는 대로 반영
+  _insightEnsureSeasonalCheckData().then(renderInsight); // 구정·성수기 발주 처리 체크리스트도 별도로 로드되는 대로 반영
 }
 
 function insightSparkHtml(season){
@@ -13844,7 +13915,7 @@ function insightSeasonalBreakdownText(sp){
 }
 // 겨울마감 대비 칸 — kind==='winter'인 상품만 표시(구정 재고 대비, 10~3월 마감 대응).
 // 성수기든 사계절 판매든 신상품이든, 원청 공장 마감(재발주 자체 불가)에 걸리는 상품은 전부 여기로.
-function insightWinterCareCellHtml(sp){
+function insightWinterCareCellHtml(sp, pid){
   if(!sp || sp.kind!=='winter') return '<span class="ins-sub">-</span>';
   if(sp.status==='later'){
     const dl0=fmtDate(sp.deadline);
@@ -13860,7 +13931,11 @@ function insightWinterCareCellHtml(sp){
   const breakdown=insightSeasonalBreakdownText(sp);
   const dl=`${sp.deadline.getMonth()+1}/${sp.deadline.getDate()}`;
   if(sp.neededQty<=0){
-    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">❄ ${label}·준비완료</span><div class="ins-sub" title="${closeNote}\n\n${breakdown}">현재고·진행중발주로 충분</div>`;
+    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">❄ ${label}·재고여유</span><div class="ins-sub" title="${closeNote}\n\n${breakdown}">현재고·진행중발주로 충분</div>`;
+  }
+  if(insightIsSeasonalChecked(pid)){
+    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;" title="구정·성수기 준비 요약 화면에서 발주 처리 완료로 체크된 상품입니다.">❄ ${label}·발주완료✅</span>
+    <div class="ins-sub" title="${breakdown}">${sp.boxes.toLocaleString()}박스(${sp.neededQty.toLocaleString()}개) 처리됨</div>`;
   }
   const urgent=sp.overdue;
   return `<span class="ins-tag" style="background:${urgent?'#FEF2F2':'#EFF6FF'};color:${urgent?'#DC2626':'#185FA5'};" title="${closeNote}">❄ ${label}</span>
@@ -13869,7 +13944,7 @@ function insightWinterCareCellHtml(sp){
 }
 // 계절 성수기 대비 칸 — kind==='other'인 상품만 표시(평상시 성수기, 재발주 가능한 시기).
 // 겨울과 무관한 봄/여름/가을 성수기 전용, 목표재고 2.5개월치 방식(구정재고 대비와는 계산식이 다름).
-function insightSeasonCareCellHtml(sp){
+function insightSeasonCareCellHtml(sp, pid){
   if(!sp || sp.kind!=='other') return '<span class="ins-sub">-</span>';
   if(sp.status==='later'){
     const dl0=fmtDate(sp.deadline);
@@ -13881,12 +13956,95 @@ function insightSeasonCareCellHtml(sp){
   const breakdown=insightSeasonalBreakdownText(sp);
   const dl=`${sp.deadline.getMonth()+1}/${sp.deadline.getDate()}`;
   if(sp.neededQty<=0){
-    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">☀ ${label}·준비완료</span><div class="ins-sub" title="${closeNote}\n\n${breakdown}">현재고·진행중발주로 충분</div>`;
+    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">☀ ${label}·재고여유</span><div class="ins-sub" title="${closeNote}\n\n${breakdown}">현재고·진행중발주로 충분</div>`;
+  }
+  if(insightIsSeasonalChecked(pid)){
+    return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;" title="구정·성수기 준비 요약 화면에서 발주 처리 완료로 체크된 상품입니다.">☀ ${label}·발주완료✅</span>
+    <div class="ins-sub" title="${breakdown}">${sp.boxes.toLocaleString()}박스(${sp.neededQty.toLocaleString()}개) 처리됨</div>`;
   }
   const urgent=sp.overdue;
   return `<span class="ins-tag" style="background:${urgent?'#FEF2F2':'#EFF6FF'};color:${urgent?'#DC2626':'#185FA5'};" title="${closeNote}">☀ ${label}</span>
     <div class="ins-num" title="${breakdown}">${sp.boxes.toLocaleString()}박스</div><div class="ins-sub" title="${breakdown}">(${sp.neededQty.toLocaleString()}개) · 근거 보려면 마우스를 올려보세요</div>
     <div class="ins-sub" style="${urgent?'color:#DC2626;font-weight:700;':''}" title="발주 마감일 ${fmtDate(sp.deadline)}">${urgent?'🚨마감지남 '+dl:'마감 '+dl+'(D-'+sp.daysToDeadline+')'}</div>`;
+}
+
+// ── 구정·성수기 대비 발주 준비 요약 화면 ────────────────────────────────
+// 구정 주문 마감 전에 전체 제품을 한 번에 훑어보고 발주를 끝내는 작업을 지원(2026-09-30 요청).
+// 메인 표는 상품별로 흩어져 있어 "마감까지 며칠 남았고, 몇 개가 아직 남았는지"를 한눈에 보기
+// 어려워서, 겨울(구정)/평상시(성수기) 탭으로 나눠 마감임박순으로 모아 보여주고, 처리완료 체크와
+// 재고 여유 상품 구분까지 한 화면에서 끝낼 수 있게 만들었다. 계산은 insightBuildRows()가 이미
+// 만들어 둔 seasonPre를 그대로 재사용 — 새 계산 없음.
+let _insightSeasSummaryTab='winter'; // 'winter' | 'other' (r.seasonPre.kind와 동일한 값)
+function insightOpenSeasonalSummary(){
+  _insightSeasSummaryTab='winter';
+  openModal('insightSeasSummaryModal');
+  insightRenderSeasonalSummary();
+}
+function insightSetSeasSummaryTab(tab){
+  _insightSeasSummaryTab=tab;
+  insightRenderSeasonalSummary();
+}
+function insightRenderSeasonalSummary(){
+  const tab=_insightSeasSummaryTab;
+  const tabWinterEl=document.getElementById('insightSeasTabWinter');
+  const tabOtherEl=document.getElementById('insightSeasTabOther');
+  if(tabWinterEl) tabWinterEl.classList.toggle('active', tab==='winter');
+  if(tabOtherEl) tabOtherEl.classList.toggle('active', tab==='other');
+
+  const rows=insightBuildRows().filter(r=>r.seasonPre && r.seasonPre.kind===tab && (r.seasonPre.status==='flag'||r.seasonPre.status==='later'));
+  const flagRows=rows.filter(r=>r.seasonPre.status==='flag');
+  const laterCnt=rows.length-flagRows.length;
+  const needRows=flagRows.filter(r=>r.seasonPre.neededQty>0 && !insightIsSeasonalChecked(r.p.id));
+  const doneRows=flagRows.filter(r=>r.seasonPre.neededQty>0 && insightIsSeasonalChecked(r.p.id));
+  const readyRows=flagRows.filter(r=>r.seasonPre.neededQty<=0);
+  needRows.sort((a,b)=>(a.seasonPre.daysToDeadline-b.seasonPre.daysToDeadline)||(b.seasonPre.neededQty-a.seasonPre.neededQty));
+  doneRows.sort((a,b)=>a.seasonPre.daysToDeadline-b.seasonPre.daysToDeadline);
+  readyRows.sort((a,b)=>a.p.name.localeCompare(b.p.name));
+
+  const bannerEl=document.getElementById('insightSeasSummaryBanner');
+  const totalCnt=flagRows.length+laterCnt;
+  const laterNote=laterCnt?` · 아직 대상 아님(6개월 이상 남음) ${laterCnt}개`:'';
+  if(tab==='winter'){
+    const {deadline, daysToDeadline}=insightWinterDeadlineInfo();
+    const overdue=daysToDeadline<0;
+    bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;color:${overdue?'#DC2626':'var(--tx)'};">❄ 원청 공장 마감(11월~익년3월) 대비 발주 마감일 — ${fmtDate(deadline)} ${overdue?`(🚨 마감 ${Math.abs(daysToDeadline)}일 지남)`:`(D-${daysToDeadline})`}</div>
+      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">이 마감일은 원청 공장이 매년 같은 시기(11월)에 문을 닫아 전 상품이 동일합니다. 전체 ${totalCnt}개 중 미처리 <b>${needRows.length}</b>개 · 처리완료 ${doneRows.length}개 · 재고여유 ${readyRows.length}개${laterNote}</div>`;
+  } else {
+    const soonest=needRows.length?needRows.reduce((a,b)=>a.seasonPre.daysToDeadline<b.seasonPre.daysToDeadline?a:b):null;
+    bannerEl.innerHTML = soonest
+      ? `<div style="font-size:13px;font-weight:700;color:${soonest.seasonPre.overdue?'#DC2626':'var(--tx)'};">☀ 가장 임박한 마감일 — ${fmtDate(soonest.seasonPre.deadline)}(${soonest.seasonPre.overdue?'🚨지남':'D-'+soonest.seasonPre.daysToDeadline}) · ${soonest.p.name}</div>
+         <div style="font-size:12px;color:var(--tx2);margin-top:4px;">겨울마감과 달리 상품마다 성수기 시점이 달라 마감일도 제각각입니다. 전체 ${totalCnt}개 중 미처리 <b>${needRows.length}</b>개 · 처리완료 ${doneRows.length}개 · 재고여유 ${readyRows.length}개${laterNote}</div>`
+      : `<div style="font-size:13px;font-weight:700;color:#059669;">✅ 지금 당장 미처리 항목이 없습니다.</div><div style="font-size:12px;color:var(--tx2);margin-top:4px;">전체 ${totalCnt}개 중 처리완료 ${doneRows.length}개 · 재고여유 ${readyRows.length}개${laterNote}</div>`;
+  }
+
+  const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  const rowHtml=r=>{
+    const sp=r.seasonPre;
+    const checked=insightIsSeasonalChecked(r.p.id);
+    const label = tab==='winter'
+      ? (sp.reason==='seasonal'?'구정재고 대비(성수기)':sp.reason==='flat'?'구정재고 대비(사계절)':'구정재고 대비(신상품)')
+      : `${MNAMES[sp.startMonthIdx!=null?sp.startMonthIdx:sp.windowMonths[0]]} 성수기 대비`;
+    const body = sp.neededQty>0
+      ? `<div style="font-size:12.5px;margin-top:4px;"><b>${sp.boxes.toLocaleString()}박스</b> (${sp.neededQty.toLocaleString()}개) 추가 필요 · <span style="${sp.overdue?'color:#DC2626;font-weight:700;':''}">${sp.overdue?'🚨마감지남 '+fmtDate(sp.deadline):'마감 '+fmtDate(sp.deadline)+'(D-'+sp.daysToDeadline+')'}</span></div>
+         <div class="iss-breakdown">${insightSeasonalBreakdownText(sp)}</div>`
+      : `<div style="font-size:12.5px;margin-top:4px;color:#0F6E56;font-weight:700;">✅ 현재고·진행중발주로 충분(추가 발주 불필요)</div>`;
+    return `<div class="iss-row" style="${checked?'opacity:.5;':''}">
+      <input type="checkbox" style="margin-top:3px;" ${checked?'checked':''} onchange="insightToggleSeasonalCheck(${r.p.id}, this.checked)" title="발주 처리 완료 체크(팀 공유, 이번 시즌 동안 유지됩니다)">
+      <div style="flex:1;min-width:0;">
+        <div class="iss-name" onclick="closeModal('insightSeasSummaryModal');insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이·발주 근거를 자세히 볼 수 있어요">${r.p.name}</div>
+        <div class="iss-code">${r.p.code} · ${label}</div>
+        ${body}
+      </div>
+    </div>`;
+  };
+
+  const listEl=document.getElementById('insightSeasSummaryList');
+  let html='';
+  if(needRows.length) html+=`<div class="iss-group">🔲 미처리 (${needRows.length})</div>`+needRows.map(rowHtml).join('');
+  if(doneRows.length) html+=`<div class="iss-group">✅ 처리완료 (${doneRows.length})</div>`+doneRows.map(rowHtml).join('');
+  if(readyRows.length) html+=`<div class="iss-group">🟢 재고 여유 — 추가 발주 불필요 (${readyRows.length})</div>`+readyRows.map(rowHtml).join('');
+  if(!html) html='<div class="ins-empty">해당 상품이 없습니다.</div>';
+  if(listEl) listEl.innerHTML=html;
 }
 
 function insightRowHtml(r){
@@ -13921,8 +14079,8 @@ function insightRowHtml(r){
     <td style="text-align:right;">${r.rgQty>0?`<div class="ins-num">${Math.round(r.rgQty).toLocaleString()}개</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
     <td class="ins-td-wrap">${insightFamCellHtml(r)}</td>
     <td class="ins-td-wrap">${insightSeasonCellHtml(r.season)}</td>
-    <td class="ins-td-wrap">${insightWinterCareCellHtml(r.seasonPre)}</td>
-    <td class="ins-td-wrap">${insightSeasonCareCellHtml(r.seasonPre)}</td>
+    <td class="ins-td-wrap">${insightWinterCareCellHtml(r.seasonPre, r.p.id)}</td>
+    <td class="ins-td-wrap">${insightSeasonCareCellHtml(r.seasonPre, r.p.id)}</td>
     <td class="ins-td-wrap">${insightSparkHtml(r.season)}</td>
     <td style="text-align:center;white-space:nowrap;">
       <button class="btn btn-sm ${r.p.disc?'btn-or':'btn-gy'}" onclick="insightDiscProd(${r.p.id})" title="${r.p.disc?'단종 해제':'단종 처리 — 발주 알림 및 발주 목록에서 제외됩니다'}">${r.p.disc?'↩단종':'단종처리'}</button>
@@ -13939,13 +14097,14 @@ async function insightDiscProd(id){
 function renderInsightKpi(rows){
   const el=document.getElementById('insightKpi'); if(!el) return;
   const cnt={부족:0,긴급:0,임박:0,정상:0};
-  let seasonCnt=0, volatileCnt=0, winterCareCnt=0, seasonCareCnt=0;
+  let seasonCnt=0, volatileCnt=0, winterCareCnt=0, seasonCareCnt=0, seasonReadyCnt=0;
   rows.forEach(r=>{
     if(cnt[r.status]!=null) cnt[r.status]++;
     if(r.season.status==='ok'&&r.season.upcoming) seasonCnt++;
     if(r.surge||r.drop) volatileCnt++;
-    if(r.seasonPre&&r.seasonPre.status==='flag'&&r.seasonPre.neededQty>0){
-      if(r.seasonPre.kind==='winter') winterCareCnt++; else if(r.seasonPre.kind==='other') seasonCareCnt++;
+    if(r.seasonPre&&r.seasonPre.status==='flag'){
+      if(r.seasonPre.neededQty<=0 || insightIsSeasonalChecked(r.p.id)) seasonReadyCnt++;
+      else if(r.seasonPre.kind==='winter') winterCareCnt++; else if(r.seasonPre.kind==='other') seasonCareCnt++;
     }
   });
   const card=(key,label,val,sub)=>`<div class="ins-kpi-card ${insightStatusF===key?'active':''}" data-st="${key}" onclick="insightSetStatus('${key}')">
@@ -13958,8 +14117,9 @@ function renderInsightKpi(rows){
     card('정상','🟢 정상',cnt.정상,'재고 충분')+
     card('season','🟣 성수기 임박',seasonCnt,'3개월 내 성수기 진입')+
     card('volatile','🔀 급변 감지',volatileCnt,'최근14일 vs 이전14일 급증·급감')+
-    card('wintercare','❄ 구정재고 대비',winterCareCnt,'마감(10~3월) 대비 미리 발주 필요')+
-    card('seasoncare','☀ 계절성수기 대비',seasonCareCnt,'2.5개월분 미리 발주 필요');
+    card('wintercare','❄ 구정재고 대비',winterCareCnt,'마감(10~3월) 대비 아직 발주 필요')+
+    card('seasoncare','☀ 계절성수기 대비',seasonCareCnt,'2.5개월분 아직 발주 필요')+
+    card('seasonready','✅ 계절대비 준비완료',seasonReadyCnt,'재고 여유 또는 발주 처리완료');
 }
 
 // 검색·구분·등급·상태 필터 + 정렬까지 적용한 최종 목록 — 화면 렌더링과 엑셀 내보내기가 같은 결과를
@@ -13973,8 +14133,9 @@ function insightVisibleRows(){
   });
   let rows=base;
   if(insightStatusF==='season') rows=rows.filter(r=>r.season.status==='ok'&&r.season.upcoming);
-  else if(insightStatusF==='wintercare') rows=rows.filter(r=>r.seasonPre&&r.seasonPre.status==='flag'&&r.seasonPre.neededQty>0&&r.seasonPre.kind==='winter');
-  else if(insightStatusF==='seasoncare') rows=rows.filter(r=>r.seasonPre&&r.seasonPre.status==='flag'&&r.seasonPre.neededQty>0&&r.seasonPre.kind==='other');
+  else if(insightStatusF==='wintercare') rows=rows.filter(r=>r.seasonPre&&r.seasonPre.status==='flag'&&r.seasonPre.neededQty>0&&r.seasonPre.kind==='winter'&&!insightIsSeasonalChecked(r.p.id));
+  else if(insightStatusF==='seasoncare') rows=rows.filter(r=>r.seasonPre&&r.seasonPre.status==='flag'&&r.seasonPre.neededQty>0&&r.seasonPre.kind==='other'&&!insightIsSeasonalChecked(r.p.id));
+  else if(insightStatusF==='seasonready') rows=rows.filter(r=>r.seasonPre&&r.seasonPre.status==='flag'&&(r.seasonPre.neededQty<=0||insightIsSeasonalChecked(r.p.id)));
   else if(insightStatusF==='volatile') rows=rows.filter(r=>r.surge||r.drop);
   else if(insightStatusF) rows=rows.filter(r=>r.status===insightStatusF);
   const rank={부족:0,긴급:1,임박:2,정상:3,단종:4};
