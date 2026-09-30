@@ -13698,6 +13698,14 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
     const curIdx=Math.max(idx[MONTH]||1, 0.3);
     const impliedAvg=expM/curIdx;
     forecastTotal=coverMonths.reduce((sum,mi)=>sum+impliedAvg*(idx[mi]||1),0);
+    // 안전판: 지금 달의 지수가 낮으면(curIdx가 작으면) impliedAvg가 크게 부풀고, 거기에 겨울 커버
+    // 구간의 높은 지수 달들이 또 곱해지면서 이중으로 증폭돼 실제 판매량 대비 터무니없이 큰 값이
+    // 나올 수 있다(2026-09-30 사용자 리포트: "판매량도 적은데 왜 856개나 준비해야 하냐" — 실측
+    // 확인 결과 현재월 지수가 낮고 커버구간에 지수가 아주 높은 달이 섞여 flat 투사의 2배를 훌쩍
+    // 넘김). insightDemandFromSeries의 기존 2배 캡 관행과 동일하게, flat 투사(현재속도×개월수)의
+    // 0.5~2배 범위로 clamp해서 구분지수 보정이 "방향"만 반영하고 폭주하지 않게 막는다.
+    const flatBase=expM*coverMonths.length;
+    if(flatBase>0) forecastTotal=Math.min(Math.max(forecastTotal, flatBase*0.5), flatBase*2);
     reason='new';
   }
 
