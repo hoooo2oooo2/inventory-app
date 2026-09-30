@@ -23639,7 +23639,9 @@ function getBdMap(){
   Object.keys(byCode).forEach(k=>{
     const rows=byCode[k];
     const distinctNames=new Set(rows.map(r=>normName(r.name)));
-    if(distinctNames.size<=1) m[k]=rows[0]; // 이름까지 같으면(혹은 1개뿐이면) 안전하게 사용
+    // 이름이 달라도 단가·구분이 전부 같으면(예: "[신성]" 접두어만 다른 중복등록) 어느 행을 써도 결과가 같으므로 안전
+    const samePriceType=rows.every(r=>(r.price||0)===(rows[0].price||0) && (r.type||'')===(rows[0].type||''));
+    if(distinctNames.size<=1 || samePriceType) m[k]=rows[0]; // 이름까지 같으면(혹은 1개뿐이면) 안전하게 사용
     // 이름이 서로 다르면 이 코드는 등록하지 않음 → 상품명 매칭으로 폴백
   });
   return m;
