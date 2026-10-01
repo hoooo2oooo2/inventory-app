@@ -1590,7 +1590,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-table tbody tr.lcr-erp-done:hover{background:rgba(5,192,114,.22);}
 .lcr-table td.lcr-l{text-align:left;}
 .lcr-table td.lcr-prod,.lcr-table td.lcr-nm{white-space:normal;line-height:1.35;}
-.lcr-trk-in{width:116px;height:30px;border:1.5px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font-size:12.5px;padding:0 7px;box-sizing:border-box;text-align:center;font-family:inherit;outline:none;}
+.lcr-trk-wrap{display:flex;gap:4px;justify-content:center;align-items:center;}
+.lcr-car-sel{width:68px;height:30px;border:1.5px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font-size:11.5px;padding:0 2px;font-family:inherit;cursor:pointer;}
+.lcr-trk-in{width:100px;height:30px;border:1.5px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font-size:12.5px;padding:0 7px;box-sizing:border-box;text-align:center;font-family:inherit;outline:none;}
 .lcr-trk-in:focus{border-color:#3182F6;}
 .lcr-st{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;}
 .lcr-st.st-wait{background:#F3F4F6;color:#4B5563;}
@@ -2949,7 +2951,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <table class="lcr-table">
         <thead><tr>
           <th style="width:84px;">등록일</th><th>고객명</th><th style="width:104px;">연락처</th><th style="width:130px;">주소</th><th>제품명</th>
-          <th style="width:44px;">수량</th><th style="width:84px;">공급가</th><th style="width:84px;">판매금액</th><th style="width:76px;">마진</th><th style="width:58px;">마진율</th><th style="width:84px;">ERP 재고<br>차감 확인</th><th style="width:128px;">송장번호</th><th style="width:92px;">배송상태</th><th style="width:60px;">관리</th>
+          <th style="width:44px;">수량</th><th style="width:84px;">공급가</th><th style="width:84px;">판매금액</th><th style="width:76px;">마진</th><th style="width:58px;">마진율</th><th style="width:84px;">ERP 재고<br>차감 확인</th><th style="width:184px;">택배사 · 송장번호</th><th style="width:92px;">배송상태</th><th style="width:60px;">관리</th>
         </tr></thead>
         <tbody id="lcrBody"></tbody>
       </table>
@@ -10024,6 +10026,8 @@ function lcrRender(){
 //   상태는 주문 목록(logi_carrot_orders)이 아니라 별도 키 'logi_carrot_track' {주문id:{no,status,...}} 에만 서버가 기록
 //   → 직원이 주문을 저장하는 동시에 서버가 써도 서로 덮어쓰지 않음. 화면은 읽기만 한다.
 let _lcrTrack = {};
+// 스마트택배 택배사 코드 (기본 CJ대한통운 — 당근 바로구매 전담)
+const LCR_CARRIERS = [['04','CJ대한통운'],['08','롯데'],['05','한진'],['06','로젠'],['01','우체국']];
 const LCR_ST = { wait:'수거대기', delay:'수거지연', pickup:'수거완료', transit:'배송중', done:'배송완료' };
 async function lcrLoadTrack(){
   const d = await cloudKvLoad('logi_carrot_track');
@@ -10032,7 +10036,7 @@ async function lcrLoadTrack(){
 }
 function lcrTrackInfo(o){
   if(!o.trackNo) return null;
-  const t = _lcrTrack[o.id], ok = t && t.no===o.trackNo;   // 송장번호가 바뀐 뒤의 옛 상태는 무시
+  const t = _lcrTrack[o.id], ok = t && t.no===o.trackNo && (t.code||'04')===(o.carrier||'04');   // 송장번호가 바뀐 뒤의 옛 상태는 무시
   let st = ok ? t.status : 'wait';
   if(st==='wait' && o.trackNoAt && Date.now()-Date.parse(o.trackNoAt) > 24*3600*1000) st='delay';
   return { st, t: ok?t:null };
@@ -10044,6 +10048,17 @@ function lcrTrackBadge(o, plain){
   const chk = t&&t.checkedAt ? `<span class="lcr-meta" style="margin:0;">조회 ${_lcrEsc(t.checkedAt.slice(5,16).replace('T',' '))}</span>` : '<span class="lcr-meta" style="margin:0;">미조회</span>';
   const btn = (i.st!=='done' && !plain) ? `<button class="lcr-refresh" title="지금 조회" onclick="lcrTrackNow('${o.id}',this)">🔄</button>` : '';
   return `<span class="lcr-st st-${i.st}" title="${_lcrEsc(tip)}">${LCR_ST[i.st]}</span>${plain?'':chk+btn}${t&&t.err?'<span title="'+_lcrEsc(t.err)+'" style="font-size:11px;">⚠</span>':''}`;
+}
+async function lcrSetCarrier(id, code){
+  let latest = await cloudKvLoad('logi_carrot_orders');
+  latest = Array.isArray(latest) ? latest : [];
+  const row = latest.find(o=>o.id===id); if(!row) return;
+  if((row.carrier||'04')===code){ _lcrOrders = latest; lcrRender(); return; }
+  row.carrier = code;
+  _lcrOrders = latest;
+  lcrRender();
+  await cloudKvSave('logi_carrot_orders', latest);
+  toast('택배사가 변경되었습니다. 🔄로 배송상태를 다시 조회하세요.');
 }
 async function lcrSetTrack(id, raw){
   const no = String(raw||'').replace(/[^0-9]/g,'');
@@ -10203,7 +10218,7 @@ function lcrOpenDetail(id, ev){
   document.getElementById('lcrDetPrice').textContent = _lcrWon(o.price);
   document.getElementById('lcrDetMargin').innerHTML = lcrMarginCell(o);
   document.getElementById('lcrDetMarginRate').innerHTML = lcrMarginRateCell(o);
-  document.getElementById('lcrDetTrack').textContent = o.trackNo || '-';
+  document.getElementById('lcrDetTrack').textContent = o.trackNo ? ((LCR_CARRIERS.find(c=>c[0]===(o.carrier||'04'))||[,'CJ대한통운'])[1]+' '+o.trackNo) : '-';
   document.getElementById('lcrDetTrackSt').innerHTML = o.visitSale ? '-' : lcrTrackBadge(o, true);
   openModal('lcrDetailModal');
 }
@@ -10222,7 +10237,7 @@ function lcrRowHtml(o){
     <td class="lcr-r">${lcrMarginCell(o)}</td>
     <td class="lcr-r">${lcrMarginRateCell(o)}</td>
     <td><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
-    <td>${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" onchange="lcrSetTrack('${o.id}',this.value)">`}</td>
+    <td>${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-trk-wrap"><select class="lcr-car-sel" onchange="lcrSetCarrier('${o.id}',this.value)">${LCR_CARRIERS.map(c=>`<option value="${c[0]}" ${(o.carrier||'04')===c[0]?'selected':''}>${c[1]}</option>`).join('')}</select><input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" onchange="lcrSetTrack('${o.id}',this.value)"></div>`}</td>
     <td>${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-st-cell">${lcrTrackBadge(o)}</div>`}</td>
     <td><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
   </tr>`;

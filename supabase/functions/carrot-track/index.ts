@@ -9,7 +9,7 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-const CJ = '04';                         // 스마트택배 택배사 코드: CJ대한통운
+const CJ = '04';                         // 기본 택배사 코드: CJ대한통운 (주문에 carrier 가 있으면 그 코드를 사용)
 const KEY_ORDERS = 'logi_carrot_orders';
 const KEY_TRACK = 'logi_carrot_track';
 const MAX_AGE_DAYS = 45;                 // 등록 후 45일 지난 미완료 건은 더 이상 조회하지 않음(호출량 보호)
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       if (ids && !ids.includes(o.id)) return false;
       if ((o.createdAt || '') < cutoff) return false;
       const t = track[o.id];
-      if (t && t.no === o.trackNo) {
+      if (t && t.no === o.trackNo && (t.code || CJ) === (o.carrier || CJ)) {
         if (t.status === 'done') return false;                                   // 배송완료는 재조회 안 함
         if (t.checkedAt && now - Date.parse(t.checkedAt) < minGapMs) return false;
       }
@@ -65,27 +65,27 @@ Deno.serve(async (req) => {
     let errors = 0;
     for (const o of targets) {
       const nowIso = new Date().toISOString();
-      const prev = track[o.id] && track[o.id].no === o.trackNo ? track[o.id] : null;
+      const prev = track[o.id] && track[o.id].no === o.trackNo && (track[o.id].code || CJ) === (o.carrier || CJ) ? track[o.id] : null;
       try {
-        const url = `https://info.sweettracker.co.kr/api/v1/trackingInfo?t_key=${encodeURIComponent(apiKey)}&t_code=${CJ}&t_invoice=${encodeURIComponent(o.trackNo)}`;
+        const url = `https://info.sweettracker.co.kr/api/v1/trackingInfo?t_key=${encodeURIComponent(apiKey)}&t_code=${encodeURIComponent(o.carrier || CJ)}&t_invoice=${encodeURIComponent(o.trackNo)}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
         const j = await res.json();
         if (j && j.status === false) {
           // 등록 직후엔 '조회 결과 없음'이 정상 — 이전 상태는 유지하고 사유만 남김
           errors++;
-          updates[o.id] = { no: o.trackNo, status: prev?.status || 'wait', checkedAt: nowIso, err: String(j.msg || j.code || '조회 실패').slice(0, 120),
+          updates[o.id] = { no: o.trackNo, code: o.carrier || CJ, status: prev?.status || 'wait', checkedAt: nowIso, err: String(j.msg || j.code || '조회 실패').slice(0, 120),
             where: prev?.where, kind: prev?.kind, doneAt: prev?.doneAt };
         } else {
           const status = mapLevel(Number(j.level) || 0);
           const last = j.lastDetail || (Array.isArray(j.trackingDetails) ? j.trackingDetails[j.trackingDetails.length - 1] : null) || {};
           const lastIso = last.time ? new Date(Number(last.time)).toISOString() : undefined;
-          updates[o.id] = { no: o.trackNo, status, level: Number(j.level) || 0, checkedAt: nowIso,
+          updates[o.id] = { no: o.trackNo, code: o.carrier || CJ, status, level: Number(j.level) || 0, checkedAt: nowIso,
             where: last.where || '', kind: last.kind || '', lastAt: lastIso,
             doneAt: status === 'done' ? (prev?.doneAt || lastIso || nowIso) : undefined };
         }
       } catch (e) {
         errors++;
-        updates[o.id] = { no: o.trackNo, status: prev?.status || 'wait', checkedAt: nowIso, err: `호출 오류: ${String((e as Error).message).slice(0, 100)}`,
+        updates[o.id] = { no: o.trackNo, code: o.carrier || CJ, status: prev?.status || 'wait', checkedAt: nowIso, err: `호출 오류: ${String((e as Error).message).slice(0, 100)}`,
           where: prev?.where, kind: prev?.kind, doneAt: prev?.doneAt };
       }
       await new Promise((r) => setTimeout(r, 250));   // API 예의상 간격
