@@ -1,7 +1,7 @@
 // 당근 판매 배송 추적 + 송장 단건 조회 — 스마트택배(Sweet Tracker) 조회 API
 //   ① pg_cron 이 하루 3번(한국시간 9·13·16시): 당근 주문(logi_carrot_orders)의 송장번호 상태를 받아 logi_carrot_track 에만 기록
 //   ② 앱의 [지금 조회] 버튼(body: {ids:[주문id]|null, force:true})
-//   ③ 앱 우측하단 🚚 송장조회 팝업(body: {mode:'lookup', invoice, code?}) — 로그인 사용자만, 택배사 자동판별, 주문 데이터에는 쓰기 없음
+//   ③ 앱 우측하단 🚚 송장조회 팝업(body: {mode:'lookup', invoice, code}) — 로그인 사용자만, 택배사 선택 필수(5곳), 주문 데이터에는 쓰기 없음
 //   ④ body: {mode:'usage'} — 이번 이용기간 사용량 조회(API 호출 없음)
 // 무료 이용권(프리): 이용기간 내 조회 100건(택배사+운송장 조합 기준). 사용량은 'sweettracker_usage' 키에 자체 집계한다.
 // 필요한 Secret: SWEETTRACKER_KEY  (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 는 자동 제공)
@@ -26,7 +26,8 @@ function mapLevel(level: number): 'wait' | 'pickup' | 'transit' | 'done' {
   return 'wait';
 }
 const LEVEL_LABEL: Record<number, string> = { 1: '배송준비중', 2: '집화완료(수거)', 3: '배송중', 4: '지점도착', 5: '배송출발(배달중)', 6: '배송완료' };
-const FALLBACK_CARRIERS: string[][] = [['04', 'CJ대한통운'], ['08', '롯데택배'], ['05', '한진택배'], ['06', '로젠택배'], ['01', '우체국택배']];
+// 송장 조회 팝업에서 허용하는 택배사(스마트택배 공식 코드표 기준) — 택배사를 반드시 지정해야 조회 1건만 차감된다
+const ALLOWED_CARRIERS: Record<string, string> = { '08': '롯데택배', '04': 'CJ대한통운', '23': '경동택배', '22': '대신택배', '05': '한진택배' };
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -82,15 +83,6 @@ async function requireLogin(sb: any, req: Request) {
   const { data: ures } = await sb.auth.getUser(token);
   return !!(ures && ures.user);
 }
-// 택배사 후보를 우리가 쓰는 택배사 우선 + 자리수로 정렬 — 틀린 택배사 조회도 사용량이 차감되므로 낭비를 줄인다
-function orderCandidates(invoice: string, cands: { code: string; name?: string }[]) {
-  const pref = invoice.length === 13 ? ['01', '04', '08', '05', '06']
-    : invoice.length === 11 ? ['06', '04', '08', '05', '01']
-    : ['04', '08', '05', '06', '01'];
-  const rank = (c: string) => { const i = pref.indexOf(c); return i < 0 ? 99 : i; };
-  return cands.slice().sort((a, b) => rank(a.code) - rank(b.code));
-}
-
 async function lookupInvoice(sb: any, apiKey: string, req: Request, body: any) {
   if (!(await requireLogin(sb, req))) return json({ error: '로그인이 필요합니다.' }, 401);
   const invoice = String(body?.invoice || '').replace(/[^0-9]/g, '');
@@ -99,20 +91,10 @@ async function lookupInvoice(sb: any, apiKey: string, req: Request, body: any) {
   const usage0 = await loadUsage(sb);
   if (usageSummary(usage0).remaining <= 0) return json({ ok: false, error: '이번 이용기간 무료 조회 한도(100건)를 모두 사용했습니다.', usage: usageSummary(usage0) });
 
+  const code = String(body?.code || '');
+  if (!ALLOWED_CARRIERS[code]) return json({ error: '택배사를 선택하세요.' }, 400);
   const called: string[] = [];
-  let cands: { code: string; name?: string }[] = [];
-  if (body?.code) {
-    cands = [{ code: String(body.code) }];
-  } else {
-    try {
-      const rres = await fetch('https://info.sweettracker.co.kr/api/v1/recommend?t_key=' + encodeURIComponent(apiKey) + '&t_invoice=' + invoice, { signal: AbortSignal.timeout(10000) });
-      const rj = await rres.json();
-      const arr = rj.Recommend || rj.recommend || [];
-      cands = arr.map((x: any) => ({ code: String(x.Code ?? x.code ?? ''), name: x.Name ?? x.name })).filter((x: any) => x.code);
-    } catch (_e) { /* 추천 API 실패 시 아래 기본 후보로 대체 */ }
-    if (!cands.length) cands = FALLBACK_CARRIERS.map(([code, name]) => ({ code, name }));
-    cands = orderCandidates(invoice, cands).slice(0, 4);
-  }
+  const cands: { code: string; name?: string }[] = [{ code, name: ALLOWED_CARRIERS[code] }];
 
   const tried: string[] = [];
   let result: any = null;
@@ -135,7 +117,7 @@ async function lookupInvoice(sb: any, apiKey: string, req: Request, body: any) {
       }
       const level = Number(j.level) || 0;
       result = {
-        ok: true, code: c.code, carrier: c.name || (FALLBACK_CARRIERS.find((f) => f[0] === c.code) || [])[1] || c.code,
+        ok: true, code: c.code, carrier: c.name || c.code,
         invoice, level, status: LEVEL_LABEL[level] || '', complete: !!j.complete,
         sender: j.senderName || '', receiver: j.receiverName || j.recipient || '', receiverAddr: j.receiverAddr || '', item: j.itemName || '', estimate: j.estimate || '',
         where: last ? last.where : '', lastKind: last ? last.kind : '', lastTime: last ? last.timeString : '', lastTel: last ? (last.telno || last.telno2) : '',
@@ -149,7 +131,7 @@ async function lookupInvoice(sb: any, apiKey: string, req: Request, body: any) {
   await recordPairs(sb, called);
   const usage = usageSummary(await loadUsage(sb));
   if (result) return json({ ...result, usage });
-  return json({ ok: false, error: '조회 결과가 없습니다. 송장번호를 확인하거나, 택배사를 직접 선택해 보세요.', tried, usage });
+  return json({ ok: false, error: '조회 결과가 없습니다. 송장번호와 택배사가 맞는지 확인하세요. (이 조회는 1건 차감될 수 있습니다)', tried, usage });
 }
 
 Deno.serve(async (req) => {
