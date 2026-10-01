@@ -564,6 +564,9 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .trk-grid{display:grid;grid-template-columns:78px 1fr;gap:7px 10px;font-size:13.5px;margin-top:4px;}
 .trk-grid .l{color:var(--tx2);font-weight:700;}
 .trk-grid .v{color:var(--tx);word-break:break-all;}
+.trk-recv{margin-top:12px;padding:12px 14px;border-radius:10px;border:1.5px solid var(--bd);background:var(--bg2);}
+.trk-usage{margin-top:12px;padding:8px 12px;border-radius:8px;background:var(--bg2);font-size:12px;color:var(--tx2);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.trk-usage b{color:var(--tx);}
 .trk-driver{margin-top:12px;padding:12px 14px;border-radius:10px;border:1.5px solid #3182F6;background:var(--prl);}
 .trk-tl{margin-top:12px;border-left:2px solid var(--bd);padding-left:14px;max-height:230px;overflow-y:auto;}
 .trk-tl .it{position:relative;padding-bottom:10px;font-size:12.5px;color:var(--tx);}
@@ -2178,10 +2181,12 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="modal" style="max-width:520px;">
     <h3>🚚 송장번호 조회</h3>
     <div style="display:flex;gap:8px;margin-top:6px;">
-      <input class="trk-in" id="trkInvoice" inputmode="numeric" maxlength="24" placeholder="송장번호 입력 (택배사 자동 판별)" onkeydown="if(event.key==='Enter')trkSearch()">
+      <select class="lcr-car-sel" id="trkCarrier" style="width:96px;height:42px;font-size:12.5px;" title="택배사를 알면 직접 선택하세요(조회 1건만 차감). 자동은 후보 택배사를 차례로 조회해 더 차감될 수 있습니다."><option value="">자동 판별</option><option value="04">CJ대한통운</option><option value="08">롯데택배</option><option value="05">한진택배</option><option value="06">로젠택배</option><option value="01">우체국택배</option></select>
+      <input class="trk-in" id="trkInvoice" inputmode="numeric" maxlength="24" placeholder="송장번호 입력" onkeydown="if(event.key==='Enter')trkSearch()">
       <button class="btn btn-pr" id="trkBtn" onclick="trkSearch()" style="height:42px;">조회</button>
     </div>
-    <div id="trkResult" style="margin-top:12px;min-height:40px;font-size:13px;color:var(--tx2);">송장번호를 입력하면 택배사를 자동으로 찾아 현재 위치·수령인·배달 담당 기사를 보여드립니다.</div>
+    <div id="trkResult" style="margin-top:12px;min-height:40px;font-size:13px;color:var(--tx2);">송장번호를 입력하면 현재 위치·받는 분·배달 담당 기사를 보여드립니다. 택배사를 알면 직접 선택하세요(무료 한도 절약).</div>
+    <div class="trk-usage" id="trkUsage">스마트택배 사용량 확인 중...</div>
     <div class="ma"><button class="btn" onclick="closeModal('trkModal')">닫기</button></div>
   </div>
 </div>
@@ -10123,7 +10128,17 @@ async function lcrTrackNow(id, btnEl){
 }
 
 // ══ 🚚 송장번호 조회 (전역) — 서버 함수 carrot-track 의 lookup 모드: 택배사 자동 판별 + 위치·수령인·기사 정보. 저장 없음
-function trkOpen(){ openModal('trkModal'); setTimeout(()=>{ const i=document.getElementById('trkInvoice'); if(i){ i.focus(); i.select(); } },50); }
+function trkOpen(){ openModal('trkModal'); setTimeout(()=>{ const i=document.getElementById('trkInvoice'); if(i){ i.focus(); i.select(); } },50); trkLoadUsage(); }
+// 스마트택배 무료 한도: 서로 다른 유효 운송장번호 100건 (당근 자동조회 + 이 팝업 조회 합산). 서버가 기록·계산해서 내려줌
+function trkShowUsage(u){
+  const el=document.getElementById('trkUsage'); if(!el) return;
+  if(!u){ el.innerHTML='<span>스마트택배 사용량을 불러오지 못했습니다.</span>'; return; }
+  const left=u.remaining, warn = left<=10;
+  el.innerHTML=`<span>📊 이번 이용기간${u.periodEnd?` (~${_lcrEsc(u.periodEnd)})`:''} 조회한 운송장 <b>${u.used}</b> / ${u.limit}건</span><span style="${warn?'color:#DC2626;':''}">잔여 <b style="${warn?'color:#DC2626;':''}">${left}</b>건</span>`;
+}
+async function trkLoadUsage(){
+  try{ const { data } = await sb.functions.invoke('carrot-track', { body:{ mode:'usage' } }); trkShowUsage(data&&data.usage); }catch{ trkShowUsage(null); }
+}
 function _trkTel(t){ return t ? `<a href="tel:${_lcrEsc(String(t).replace(/[^0-9+]/g,''))}" style="color:#3182F6;font-weight:800;text-decoration:none;">📞 ${_lcrEsc(t)}</a>` : '<span style="color:var(--tx2);">—</span>'; }
 async function trkSearch(){
   const inv = String(document.getElementById('trkInvoice').value||'').replace(/[^0-9]/g,'');
@@ -10131,7 +10146,7 @@ async function trkSearch(){
   if(inv.length<9 || inv.length>15){ box.innerHTML='<span style="color:#DC2626;">송장번호는 숫자 9~15자리로 입력하세요.</span>'; return; }
   btn.disabled=true; box.innerHTML='⏳ 택배사를 찾고 조회하는 중...';
   try{
-    const { data, error } = await sb.functions.invoke('carrot-track', { body:{ mode:'lookup', invoice:inv } });
+    const { data, error } = await sb.functions.invoke('carrot-track', { body:{ mode:'lookup', invoice:inv, code:(document.getElementById('trkCarrier').value||undefined) } });
     if(error){
       let msg='조회 중 오류가 발생했습니다.';
       try{ const j=await error.context.json(); if(j&&j.error) msg=j.error; }catch{}
@@ -10141,16 +10156,18 @@ async function trkSearch(){
       box.innerHTML=`<span style="color:#DC2626;">${_lcrEsc((data&&data.error)||'조회 결과가 없습니다.')}</span>`+(data&&data.tried&&data.tried.length?`<div class="lcr-meta">확인한 택배사: ${_lcrEsc(data.tried.join(', '))}</div>`:''); return;
     }
     const d=data, done=d.level>=6, out=d.level===5;
+    trkShowUsage(d.usage);
     const stColor = done?'st-done':(out?'st-pickup':'st-transit');
     const row=(l,v)=>v?`<div class="l">${l}</div><div class="v">${_lcrEsc(v)}</div>`:'';
-    const driver = d.driver ? `<div class="trk-driver"><div style="font-size:12px;font-weight:800;color:var(--tx2);margin-bottom:5px;">🧑‍✈️ ${out?'배달 담당 기사':'최근 담당 기사'}</div>
+    const recv = `<div class="trk-recv"><div style="font-size:12px;font-weight:800;color:var(--tx2);margin-bottom:5px;">👤 받는 분</div>${d.receiver?`<b style="font-size:17px;color:var(--tx);">${_lcrEsc(d.receiver)}</b>${d.receiverAddr?`<div class="lcr-meta" style="font-size:12px;">${_lcrEsc(d.receiverAddr)}</div>`:''}`:`<span style="color:var(--tx2);">${_lcrEsc(d.carrier)}에서 수령인 정보를 제공하지 않습니다.</span>`}</div>`;
+    const driver = (out && d.driver) ? `<div class="trk-driver"><div style="font-size:12px;font-weight:800;color:var(--tx2);margin-bottom:5px;">🧑‍✈️ 배달 담당 기사</div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><b style="font-size:16px;color:var(--tx);">${_lcrEsc(d.driver.name)}</b>${_trkTel(d.driver.tel)}</div>
         <div class="lcr-meta">${_lcrEsc(d.driver.where||'')} ${_lcrEsc(d.driver.time||'')}</div></div>`
       : (out ? `<div class="trk-driver"><div style="font-size:12px;font-weight:800;color:var(--tx2);">배달 담당 기사 정보가 아직 없습니다.</div>${d.lastTel?`<div style="margin-top:4px;">지점 연락처 ${_trkTel(d.lastTel)}</div>`:''}</div>` : '');
     const tl = (d.details||[]).slice().reverse().map(x=>`<div class="it"><div class="t">${_lcrEsc(x.timeString||'')}</div><b>${_lcrEsc(x.where||'-')}</b> · ${_lcrEsc(x.kind||'')}${x.manName?` · 기사 ${_lcrEsc(x.manName)}`:''}${x.telno?` ${_trkTel(x.telno)}`:''}</div>`).join('');
     box.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="lcr-st ${stColor}">${_lcrEsc(d.status||'조회됨')}</span><b style="font-size:14px;color:var(--tx);">${_lcrEsc(d.carrier)}</b><span style="color:var(--tx2);">${_lcrEsc(d.invoice)}</span></div>
-      <div class="trk-grid" style="margin-top:10px;">${row('현재 위치',d.where)}${row('최근 상태',d.lastKind)}${row('최근 시각',d.lastTime)}${row('받는 분',d.receiver)}${row('도착지',d.receiverAddr)}${row('보내는 분',d.sender)}${row('상품',d.item)}${row('도착 예정',d.estimate)}</div>
-      ${driver}${tl?`<div class="trk-tl">${tl}</div>`:''}`;
+      <div class="trk-grid" style="margin-top:10px;">${row('현재 위치',d.where)}${row('최근 상태',d.lastKind)}${row('최근 시각',d.lastTime)}${row('보내는 분',d.sender)}${row('상품',d.item)}${row('도착 예정',d.estimate)}</div>
+      ${recv}${driver}${tl?`<div class="trk-tl">${tl}</div>`:''}`;
   }catch(e){
     console.warn('송장 조회 실패', e);
     box.innerHTML='<span style="color:#DC2626;">조회에 실패했습니다. 잠시 뒤 다시 시도하세요.</span>';
