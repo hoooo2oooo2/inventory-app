@@ -1530,7 +1530,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lso-no{color:var(--tx2);}
 .lso-table input[type=checkbox]{width:18px;height:18px;cursor:pointer;}
 /* 당근 판매 주문 리스트 */
-.lcr-wrap{max-width:1320px;margin:0 auto;padding:16px 18px;height:calc(100vh - 186px);display:flex;flex-direction:column;box-sizing:border-box;}
+.lcr-wrap{max-width:1840px;margin:0 auto;padding:16px 18px;height:calc(100vh - 186px);display:flex;flex-direction:column;box-sizing:border-box;}
 /* 당근 판매 — 기간 필터 + 합계 통합바 / 페이지 넘기기 / 당근 매출 */
 .lcr-topbar{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;border:1px solid var(--bd);border-radius:12px;background:var(--bg2);margin-bottom:10px;flex-shrink:0;overflow:hidden;}
 .lcr-filter{display:flex;align-items:center;gap:8px;padding:10px 14px;border-right:1px solid var(--bd);}
@@ -1576,11 +1576,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
 .lcr-title{font-size:18px;font-weight:800;color:var(--tx);}
 .lcr-table-scroll{flex:1;overflow-y:auto;overflow-x:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
-.lcr-table{width:100%;table-layout:auto;border-collapse:collapse;font-size:13px;}
-.lcr-table thead th{position:sticky;top:0;z-index:1;background:var(--bg2);padding:9px 10px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.lcr-table tbody td{padding:8px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;white-space:nowrap;overflow-wrap:break-word;word-break:break-word;}
+.lcr-table{width:100%;table-layout:auto;border-collapse:collapse;font-size:12.5px;}
+.lcr-table thead th{position:sticky;top:0;z-index:1;background:var(--bg2);padding:9px 6px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11.5px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;}
+.lcr-table tbody td{padding:8px 6px;border-bottom:0.5px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;white-space:nowrap;overflow-wrap:break-word;word-break:break-word;}
 /* 주소는 행 높이가 일정하게 유지되도록 줄바꿈 대신 말줄임(...) 처리 — 전체 주소는 행 클릭 시 상세팝업에서 확인 */
-.lcr-table tbody td:nth-child(4){max-width:150px;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.lcr-table tbody td:nth-child(4){max-width:130px;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
 .lcr-table tbody tr:hover{background:var(--bg2);}
 .lcr-table tbody tr.lcr-row{cursor:pointer;}
 .lcr-table tbody tr:last-child td{border-bottom:none;}
@@ -1589,7 +1589,18 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-table tbody tr.lcr-erp-done{background:rgba(5,192,114,.14);}
 .lcr-table tbody tr.lcr-erp-done:hover{background:rgba(5,192,114,.22);}
 .lcr-table td.lcr-l{text-align:left;}
-.lcr-table td.lcr-prod{white-space:nowrap;}
+.lcr-table td.lcr-prod,.lcr-table td.lcr-nm{white-space:normal;line-height:1.35;}
+.lcr-trk-in{width:116px;height:30px;border:1.5px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font-size:12.5px;padding:0 7px;box-sizing:border-box;text-align:center;font-family:inherit;outline:none;}
+.lcr-trk-in:focus{border-color:#3182F6;}
+.lcr-st{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;}
+.lcr-st.st-wait{background:#F3F4F6;color:#4B5563;}
+.lcr-st.st-delay{background:#FEE2E2;color:#B91C1C;}
+.lcr-st.st-pickup{background:#DBEAFE;color:#1D4ED8;}
+.lcr-st.st-transit{background:#EDE9FE;color:#6D28D9;}
+.lcr-st.st-done{background:#DCFCE7;color:#15803D;}
+.lcr-st-cell{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.lcr-st-cell .lcr-refresh{border:none;background:none;cursor:pointer;font-size:12px;color:var(--tx2);padding:0;}
+.lcr-st-cell .lcr-refresh:hover{color:#3182F6;}
 .lcr-table td.lcr-r{text-align:right;font-family:ui-monospace,monospace;}
 .lcr-meta{font-size:10.5px;color:var(--tx2);margin-top:2px;}
 .lcr-erp-cell{display:flex;flex-direction:column;align-items:center;gap:2px;}
@@ -2159,6 +2170,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="lcr-det-row"><span class="lcr-det-lbl">판매금액</span><span id="lcrDetPrice" class="lcr-det-val"></span></div>
       <div class="lcr-det-row"><span class="lcr-det-lbl">마진</span><span id="lcrDetMargin" class="lcr-det-val"></span></div>
       <div class="lcr-det-row"><span class="lcr-det-lbl">마진율</span><span id="lcrDetMarginRate" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">송장번호</span><span id="lcrDetTrack" class="lcr-det-val"></span></div>
+      <div class="lcr-det-row"><span class="lcr-det-lbl">배송상태</span><span id="lcrDetTrackSt" class="lcr-det-val"></span></div>
     </div>
     <div class="ma">
       <button class="btn" onclick="closeModal('lcrDetailModal')">닫기</button>
@@ -2920,6 +2933,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <span class="lcr-title">🥕 당근 판매 주문 리스트</span>
       <div style="display:flex;gap:8px;align-items:center;">
         <input class="lh2-chk-search" id="lcrSearch" type="text" placeholder="🔍 고객명·연락처·제품명 검색" oninput="lcrFilterChange()" style="max-width:240px;">
+        <button class="lh2-add" style="background:var(--bg2);color:var(--tx);border:1px solid var(--bd);" onclick="lcrTrackNow()" id="lcrTrackAllBtn" title="송장번호가 있는 미완료 주문의 배송상태를 지금 조회합니다">🔄 배송 지금 조회</button>
         <button class="lh2-add" onclick="lcrOpenAdd()">＋ 주문건 등록</button>
       </div>
     </div>
@@ -2934,8 +2948,8 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="lcr-table-scroll">
       <table class="lcr-table">
         <thead><tr>
-          <th style="width:96px;">등록일</th><th>고객명</th><th>연락처</th><th style="width:150px;">주소</th><th>제품명</th>
-          <th style="width:64px;">수량</th><th style="width:100px;">공급가</th><th style="width:100px;">판매금액</th><th style="width:90px;">마진</th><th style="width:70px;">마진율</th><th style="width:110px;">ERP 재고 차감 확인</th><th style="width:80px;">관리</th>
+          <th style="width:84px;">등록일</th><th>고객명</th><th style="width:104px;">연락처</th><th style="width:130px;">주소</th><th>제품명</th>
+          <th style="width:44px;">수량</th><th style="width:84px;">공급가</th><th style="width:84px;">판매금액</th><th style="width:76px;">마진</th><th style="width:58px;">마진율</th><th style="width:84px;">ERP 재고<br>차감 확인</th><th style="width:128px;">송장번호</th><th style="width:92px;">배송상태</th><th style="width:60px;">관리</th>
         </tr></thead>
         <tbody id="lcrBody"></tbody>
       </table>
@@ -9922,6 +9936,7 @@ async function loadLogiCarrot(){
     _lcrLoaded = true;
   }
   lcrRender();
+  lcrLoadTrack();   // 배송상태(서버가 기록하는 별도 저장소) — 주문 목록과 분리돼 있어 따로 읽어 다시 그림
 }
 // ── 기간 필터·합계·페이지 넘기기 (주문 리스트) ──
 // 기준일 = 등록일(createdAt, YYYY-MM-DD). 기본값은 현재 연도·월, '전체' 선택 가능
@@ -9992,7 +10007,7 @@ function lcrRender(){
   if(_lcrPage>pages) _lcrPage = pages;
   const slice = list.slice((_lcrPage-1)*_lcrPageSize, _lcrPage*_lcrPageSize);
   tb.innerHTML = slice.length ? slice.map(lcrRowHtml).join('')
-    : `<tr><td colspan="12" style="text-align:center;padding:28px;color:var(--tx2);">${(q||(_lcrOrders||[]).length)?'조건에 맞는 주문건이 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
+    : `<tr><td colspan="14" style="text-align:center;padding:28px;color:var(--tx2);">${(q||(_lcrOrders||[]).length)?'조건에 맞는 주문건이 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
   // 페이저: 이전/번호(현재 ±2)/다음
   const pg = document.getElementById('lcrPager');
   if(pg){
@@ -10005,6 +10020,66 @@ function lcrRender(){
   }
   if(_lcrSub==='sales') lcsRender();
 }
+// ══ 🚚 배송 추적 — 송장번호(주문건에 수기 입력) + 서버(Edge Function carrot-track)가 스마트택배 API로 조회한 상태
+//   상태는 주문 목록(logi_carrot_orders)이 아니라 별도 키 'logi_carrot_track' {주문id:{no,status,...}} 에만 서버가 기록
+//   → 직원이 주문을 저장하는 동시에 서버가 써도 서로 덮어쓰지 않음. 화면은 읽기만 한다.
+let _lcrTrack = {};
+const LCR_ST = { wait:'수거대기', delay:'수거지연', pickup:'수거완료', transit:'배송중', done:'배송완료' };
+async function lcrLoadTrack(){
+  const d = await cloudKvLoad('logi_carrot_track');
+  _lcrTrack = (d && typeof d==='object' && !Array.isArray(d)) ? d : {};
+  lcrRender();
+}
+function lcrTrackInfo(o){
+  if(!o.trackNo) return null;
+  const t = _lcrTrack[o.id], ok = t && t.no===o.trackNo;   // 송장번호가 바뀐 뒤의 옛 상태는 무시
+  let st = ok ? t.status : 'wait';
+  if(st==='wait' && o.trackNoAt && Date.now()-Date.parse(o.trackNoAt) > 24*3600*1000) st='delay';
+  return { st, t: ok?t:null };
+}
+function lcrTrackBadge(o, plain){
+  const i = lcrTrackInfo(o);
+  if(!i) return '<span style="color:var(--tx2);font-size:11.5px;">송장 미등록</span>';
+  const t = i.t, tip = t ? [t.kind, t.where, t.err&&('⚠ '+t.err)].filter(Boolean).join(' · ') : '';
+  const chk = t&&t.checkedAt ? `<span class="lcr-meta" style="margin:0;">조회 ${_lcrEsc(t.checkedAt.slice(5,16).replace('T',' '))}</span>` : '<span class="lcr-meta" style="margin:0;">미조회</span>';
+  const btn = (i.st!=='done' && !plain) ? `<button class="lcr-refresh" title="지금 조회" onclick="lcrTrackNow('${o.id}',this)">🔄</button>` : '';
+  return `<span class="lcr-st st-${i.st}" title="${_lcrEsc(tip)}">${LCR_ST[i.st]}</span>${plain?'':chk+btn}${t&&t.err?'<span title="'+_lcrEsc(t.err)+'" style="font-size:11px;">⚠</span>':''}`;
+}
+async function lcrSetTrack(id, raw){
+  const no = String(raw||'').replace(/[^0-9]/g,'');
+  if(no && (no.length<9 || no.length>15)){ toast('송장번호는 숫자 9~15자리로 입력하세요.'); lcrRender(); return; }
+  let latest = await cloudKvLoad('logi_carrot_orders');
+  latest = Array.isArray(latest) ? latest : [];
+  const row = latest.find(o=>o.id===id); if(!row) return;
+  if((row.trackNo||'')===no){ _lcrOrders = latest; lcrRender(); return; }
+  row.trackNo = no; row.trackNoAt = no ? new Date().toISOString() : '';
+  _lcrOrders = latest;
+  lcrRender();
+  await cloudKvSave('logi_carrot_orders', latest);
+  toast(no ? '✅ 송장번호가 저장되었습니다. 다음 자동 조회(9·13·16시) 또는 🔄로 상태를 확인하세요.' : '송장번호가 삭제되었습니다.');
+}
+let _lcrTrackBusy = false;
+async function lcrTrackNow(id, btnEl){
+  if(_lcrTrackBusy) return;
+  _lcrTrackBusy = true;
+  const all = document.getElementById('lcrTrackAllBtn');
+  if(btnEl) btnEl.textContent='⏳';
+  if(!id && all){ all.disabled=true; all.textContent='⏳ 조회 중...'; }
+  try{
+    const { data, error } = await sb.functions.invoke('carrot-track', { body: { ids: id?[id]:null, force:true } });
+    if(error) throw error;
+    await lcrLoadTrack();
+    toast(`🚚 배송상태 조회 완료 — ${data?.checked??0}건 조회${data?.errors?`, 오류 ${data.errors}건`:''}`);
+  }catch(e){
+    console.warn('carrot-track 호출 실패', e);
+    toast('배송 조회 실패: 서버 조회 기능이 아직 설정되지 않았거나 응답이 없습니다.');
+    lcrRender();
+  }finally{
+    _lcrTrackBusy = false;
+    if(all){ all.disabled=false; all.textContent='🔄 배송 지금 조회'; }
+  }
+}
+
 function lcrSwitchSub(sub){
   _lcrSub = sub;
   document.getElementById('lcr-view-list').style.display  = sub==='list'  ? '' : 'none';
@@ -10128,6 +10203,8 @@ function lcrOpenDetail(id, ev){
   document.getElementById('lcrDetPrice').textContent = _lcrWon(o.price);
   document.getElementById('lcrDetMargin').innerHTML = lcrMarginCell(o);
   document.getElementById('lcrDetMarginRate').innerHTML = lcrMarginRateCell(o);
+  document.getElementById('lcrDetTrack').textContent = o.trackNo || '-';
+  document.getElementById('lcrDetTrackSt').innerHTML = o.visitSale ? '-' : lcrTrackBadge(o, true);
   openModal('lcrDetailModal');
 }
 function lcrRowHtml(o){
@@ -10135,7 +10212,7 @@ function lcrRowHtml(o){
   const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
   return `<tr data-row="${o.id}" class="lcr-row ${o.erpChecked?'lcr-erp-done':''}" onclick="lcrOpenDetail('${o.id}', event)">
     <td>${_lcrEsc(o.createdAt)}</td>
-    <td class="lcr-l">${_lcrEsc(o.customerName)}</td>
+    <td class="lcr-l lcr-nm">${_lcrEsc(o.customerName)}</td>
     <td>${_lcrEsc(o.phone)}</td>
     <td class="lcr-l" title="${_lcrEsc(o.address)}">${addrDisp}</td>
     <td class="lcr-l lcr-prod">${_lcrEsc(o.productName)}</td>
@@ -10145,6 +10222,8 @@ function lcrRowHtml(o){
     <td class="lcr-r">${lcrMarginCell(o)}</td>
     <td class="lcr-r">${lcrMarginRateCell(o)}</td>
     <td><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
+    <td>${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" onchange="lcrSetTrack('${o.id}',this.value)">`}</td>
+    <td>${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-st-cell">${lcrTrackBadge(o)}</div>`}</td>
     <td><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
   </tr>`;
 }
