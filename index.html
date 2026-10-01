@@ -557,6 +557,19 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .float-card.open{display:block;}
 
 /* CALENDAR FAB & PANEL */
+.trk-fab{position:fixed;bottom:20px;right:18px;z-index:201;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;background:#3182F6;color:#fff;box-shadow:0 4px 16px rgba(49,130,246,.4);transition:transform .15s;}
+.trk-fab:hover{transform:scale(1.07);}
+.trk-in{flex:1;height:42px;border:1.5px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--tx);font-size:15px;padding:0 12px;box-sizing:border-box;outline:none;font-family:inherit;}
+.trk-in:focus{border-color:#3182F6;}
+.trk-grid{display:grid;grid-template-columns:78px 1fr;gap:7px 10px;font-size:13.5px;margin-top:4px;}
+.trk-grid .l{color:var(--tx2);font-weight:700;}
+.trk-grid .v{color:var(--tx);word-break:break-all;}
+.trk-driver{margin-top:12px;padding:12px 14px;border-radius:10px;border:1.5px solid #3182F6;background:var(--prl);}
+.trk-tl{margin-top:12px;border-left:2px solid var(--bd);padding-left:14px;max-height:230px;overflow-y:auto;}
+.trk-tl .it{position:relative;padding-bottom:10px;font-size:12.5px;color:var(--tx);}
+.trk-tl .it:before{content:'';position:absolute;left:-19px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--bd);}
+.trk-tl .it:first-child:before{background:#3182F6;}
+.trk-tl .it .t{color:var(--tx2);font-size:11.5px;}
 .cal-fab{position:fixed;bottom:20px;right:72px;z-index:201;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;background:#059669;color:#fff;box-shadow:0 4px 16px rgba(5,150,105,.35);transition:transform .15s,background .15s;}
 .cal-fab:hover{background:#047857;transform:scale(1.07);}
 .cal-panel{position:fixed;top:0;right:0;width:780px;max-width:100vw;height:100vh;z-index:500;background:#fff;box-shadow:-8px 0 40px rgba(0,0,0,.18);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
@@ -2158,6 +2171,20 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 <div class="arq-prod-drop" id="lcrProdDrop"></div>
+
+<!-- ═══ 🚚 송장번호 조회 (전역 팝업) ═══ -->
+<button class="trk-fab" id="trkFab" onclick="trkOpen()" title="송장번호 조회 (택배사 자동 판별)">🚚</button>
+<div class="modal-overlay" id="trkModal" style="z-index:360;">
+  <div class="modal" style="max-width:520px;">
+    <h3>🚚 송장번호 조회</h3>
+    <div style="display:flex;gap:8px;margin-top:6px;">
+      <input class="trk-in" id="trkInvoice" inputmode="numeric" maxlength="24" placeholder="송장번호 입력 (택배사 자동 판별)" onkeydown="if(event.key==='Enter')trkSearch()">
+      <button class="btn btn-pr" id="trkBtn" onclick="trkSearch()" style="height:42px;">조회</button>
+    </div>
+    <div id="trkResult" style="margin-top:12px;min-height:40px;font-size:13px;color:var(--tx2);">송장번호를 입력하면 택배사를 자동으로 찾아 현재 위치·수령인·배달 담당 기사를 보여드립니다.</div>
+    <div class="ma"><button class="btn" onclick="closeModal('trkModal')">닫기</button></div>
+  </div>
+</div>
 
 <!-- ═══ 당근 판매 주문건 상세보기 ═══ -->
 <div class="modal-overlay" id="lcrDetailModal" style="z-index:340;">
@@ -10093,6 +10120,41 @@ async function lcrTrackNow(id, btnEl){
     _lcrTrackBusy = false;
     if(all){ all.disabled=false; all.textContent='🔄 배송 지금 조회'; }
   }
+}
+
+// ══ 🚚 송장번호 조회 (전역) — 서버 함수 carrot-track 의 lookup 모드: 택배사 자동 판별 + 위치·수령인·기사 정보. 저장 없음
+function trkOpen(){ openModal('trkModal'); setTimeout(()=>{ const i=document.getElementById('trkInvoice'); if(i){ i.focus(); i.select(); } },50); }
+function _trkTel(t){ return t ? `<a href="tel:${_lcrEsc(String(t).replace(/[^0-9+]/g,''))}" style="color:#3182F6;font-weight:800;text-decoration:none;">📞 ${_lcrEsc(t)}</a>` : '<span style="color:var(--tx2);">—</span>'; }
+async function trkSearch(){
+  const inv = String(document.getElementById('trkInvoice').value||'').replace(/[^0-9]/g,'');
+  const box = document.getElementById('trkResult'), btn = document.getElementById('trkBtn');
+  if(inv.length<9 || inv.length>15){ box.innerHTML='<span style="color:#DC2626;">송장번호는 숫자 9~15자리로 입력하세요.</span>'; return; }
+  btn.disabled=true; box.innerHTML='⏳ 택배사를 찾고 조회하는 중...';
+  try{
+    const { data, error } = await sb.functions.invoke('carrot-track', { body:{ mode:'lookup', invoice:inv } });
+    if(error){
+      let msg='조회 중 오류가 발생했습니다.';
+      try{ const j=await error.context.json(); if(j&&j.error) msg=j.error; }catch{}
+      box.innerHTML=`<span style="color:#DC2626;">${_lcrEsc(msg)}</span>`; return;
+    }
+    if(!data || !data.ok){
+      box.innerHTML=`<span style="color:#DC2626;">${_lcrEsc((data&&data.error)||'조회 결과가 없습니다.')}</span>`+(data&&data.tried&&data.tried.length?`<div class="lcr-meta">확인한 택배사: ${_lcrEsc(data.tried.join(', '))}</div>`:''); return;
+    }
+    const d=data, done=d.level>=6, out=d.level===5;
+    const stColor = done?'st-done':(out?'st-pickup':'st-transit');
+    const row=(l,v)=>v?`<div class="l">${l}</div><div class="v">${_lcrEsc(v)}</div>`:'';
+    const driver = d.driver ? `<div class="trk-driver"><div style="font-size:12px;font-weight:800;color:var(--tx2);margin-bottom:5px;">🧑‍✈️ ${out?'배달 담당 기사':'최근 담당 기사'}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><b style="font-size:16px;color:var(--tx);">${_lcrEsc(d.driver.name)}</b>${_trkTel(d.driver.tel)}</div>
+        <div class="lcr-meta">${_lcrEsc(d.driver.where||'')} ${_lcrEsc(d.driver.time||'')}</div></div>`
+      : (out ? `<div class="trk-driver"><div style="font-size:12px;font-weight:800;color:var(--tx2);">배달 담당 기사 정보가 아직 없습니다.</div>${d.lastTel?`<div style="margin-top:4px;">지점 연락처 ${_trkTel(d.lastTel)}</div>`:''}</div>` : '');
+    const tl = (d.details||[]).slice().reverse().map(x=>`<div class="it"><div class="t">${_lcrEsc(x.timeString||'')}</div><b>${_lcrEsc(x.where||'-')}</b> · ${_lcrEsc(x.kind||'')}${x.manName?` · 기사 ${_lcrEsc(x.manName)}`:''}${x.telno?` ${_trkTel(x.telno)}`:''}</div>`).join('');
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="lcr-st ${stColor}">${_lcrEsc(d.status||'조회됨')}</span><b style="font-size:14px;color:var(--tx);">${_lcrEsc(d.carrier)}</b><span style="color:var(--tx2);">${_lcrEsc(d.invoice)}</span></div>
+      <div class="trk-grid" style="margin-top:10px;">${row('현재 위치',d.where)}${row('최근 상태',d.lastKind)}${row('최근 시각',d.lastTime)}${row('받는 분',d.receiver)}${row('도착지',d.receiverAddr)}${row('보내는 분',d.sender)}${row('상품',d.item)}${row('도착 예정',d.estimate)}</div>
+      ${driver}${tl?`<div class="trk-tl">${tl}</div>`:''}`;
+  }catch(e){
+    console.warn('송장 조회 실패', e);
+    box.innerHTML='<span style="color:#DC2626;">조회에 실패했습니다. 잠시 뒤 다시 시도하세요.</span>';
+  }finally{ btn.disabled=false; }
 }
 
 function lcrSwitchSub(sub){

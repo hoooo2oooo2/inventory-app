@@ -2,6 +2,7 @@
 // work_calendar 의 별도 키 'logi_carrot_track' 에만 기록한다. (주문 목록 'logi_carrot_orders' 는 읽기만 함)
 //
 // 호출: ① pg_cron 이 하루 3번(한국시간 9·13·16시) ② 앱의 [지금 조회] 버튼(body: {ids:[주문id]|null, force:true})
+// ③ 앱 우측하단 🚚 송장조회 팝업(body: {mode:'lookup', invoice, code?}) — 로그인 사용자만, DB 쓰기 없음
 // 필요한 Secret: SWEETTRACKER_KEY  (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 는 자동 제공)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -30,6 +31,66 @@ async function readKey(sb: any, kind: string) {
   return data ? data.data : null;
 }
 
+// ── 송장번호 단건 조회 (mode:'lookup') — 택배사 자동 판별 + 현재 위치·수령인·배송기사 정보. DB에는 아무것도 쓰지 않음 ──
+const LEVEL_LABEL: Record<number, string> = { 1: '배송준비중', 2: '집화완료(수거)', 3: '배송중', 4: '지점도착', 5: '배송출발(배달중)', 6: '배송완료' };
+const FALLBACK_CARRIERS = [['04', 'CJ대한통운'], ['08', '롯데택배'], ['05', '한진택배'], ['06', '로젠택배'], ['01', '우체국택배']];
+
+async function lookupInvoice(sb: any, apiKey: string, req: Request, body: any) {
+  // 수령인 이름·주소가 나올 수 있으므로 로그인한 사용자만 허용 (anon 키만으로는 거부)
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  const { data: ures } = await sb.auth.getUser(token);
+  if (!ures || !ures.user) return json({ error: '로그인이 필요합니다.' }, 401);
+
+  const invoice = String(body?.invoice || '').replace(/[^0-9]/g, '');
+  if (invoice.length < 9 || invoice.length > 15) return json({ error: '송장번호는 숫자 9~15자리로 입력하세요.' }, 400);
+
+  let cands: { code: string; name?: string }[] = [];
+  if (body?.code) {
+    cands = [{ code: String(body.code) }];
+  } else {
+    try {
+      const rres = await fetch('https://info.sweettracker.co.kr/api/v1/recommend?t_key=' + encodeURIComponent(apiKey) + '&t_invoice=' + invoice, { signal: AbortSignal.timeout(10000) });
+      const rj = await rres.json();
+      const arr = rj.Recommend || rj.recommend || [];
+      cands = arr.map((x: any) => ({ code: String(x.Code ?? x.code ?? ''), name: x.Name ?? x.name })).filter((x: any) => x.code);
+    } catch (_e) { /* 추천 API 실패 시 아래 기본 후보로 대체 */ }
+    if (!cands.length) cands = FALLBACK_CARRIERS.map(([code, name]) => ({ code, name }));
+    cands = cands.slice(0, 5);
+  }
+
+  const tried: string[] = [];
+  for (const c of cands) {
+    try {
+      const url = 'https://info.sweettracker.co.kr/api/v1/trackingInfo?t_key=' + encodeURIComponent(apiKey) + '&t_code=' + encodeURIComponent(c.code) + '&t_invoice=' + invoice;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const j = await res.json();
+      const hasData = j && j.status !== false && ((Array.isArray(j.trackingDetails) && j.trackingDetails.length) || Number(j.level) > 0);
+      if (!hasData) { tried.push((c.name || c.code) + (j && j.msg ? '(' + String(j.msg).slice(0, 40) + ')' : '')); continue; }
+      const details = (Array.isArray(j.trackingDetails) ? j.trackingDetails : []).map((d: any) => ({
+        time: d.time ? new Date(Number(d.time)).toISOString() : null, timeString: d.timeString || '', where: d.where || '', kind: d.kind || '',
+        level: Number(d.level) || 0, manName: d.manName || '', telno: d.telno || '', telno2: d.telno2 || '',
+      }));
+      const last = details.length ? details[details.length - 1] : null;
+      // 배달 담당 기사: 가장 최근에 기사 이름이 찍힌 이력
+      let driver: any = null;
+      for (let i = details.length - 1; i >= 0; i--) {
+        if (details[i].manName) { driver = { name: details[i].manName, tel: details[i].telno || details[i].telno2 || '', where: details[i].where, time: details[i].timeString }; break; }
+      }
+      const level = Number(j.level) || 0;
+      return json({
+        ok: true, code: c.code, carrier: c.name || (FALLBACK_CARRIERS.find((f) => f[0] === c.code) || [])[1] || c.code,
+        invoice, level, status: LEVEL_LABEL[level] || '', complete: !!j.complete,
+        sender: j.senderName || '', receiver: j.receiverName || j.recipient || '', receiverAddr: j.receiverAddr || '', item: j.itemName || '', estimate: j.estimate || '',
+        where: last ? last.where : '', lastKind: last ? last.kind : '', lastTime: last ? last.timeString : '', lastTel: last ? (last.telno || last.telno2) : '',
+        driver, details,
+      });
+    } catch (e) {
+      tried.push((c.name || c.code) + '(호출 오류)');
+    }
+  }
+  return json({ ok: false, error: '조회 결과가 없습니다. 송장번호를 확인하거나, 등록 직후라면 잠시 뒤 다시 시도하세요.', tried });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   try {
@@ -40,6 +101,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const ids: string[] | null = Array.isArray(body?.ids) ? body.ids : null;
     const force = !!body?.force;
+    if (body?.mode === 'lookup') return await lookupInvoice(sb, apiKey, req, body);   // 송장 단건 조회(앱의 🚚 버튼)
 
     const orders = await readKey(sb, KEY_ORDERS);
     const track0 = await readKey(sb, KEY_TRACK);
