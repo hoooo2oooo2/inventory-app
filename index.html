@@ -19436,6 +19436,38 @@ async function loadRgPackMultiplier(){
   }catch(e){ _rgPackMultiplier={}; }
   _rgPackMultiplierLoaded=true;
 }
+// rg_option_map을 DB의 최신본으로 다시 받아 인메모리 맵을 갱신 (여러 PC/탭이 각자 오래된 맵으로 덮어쓰는 것 방지)
+// 조회 실패(null)면 현재 인메모리 맵을 그대로 쓴다.
+async function _rgFreshOptionMap(){
+  const d=await cloudKvLoad('rg_option_map');
+  if(d && typeof d==='object' && !Array.isArray(d)) _rgOptionMap=d;
+  return _rgOptionMap;
+}
+// 이 백데이터 행(id)에 매칭된 로켓그로스 옵션ID 목록 (인메모리 기준 — 삭제 전 경고용)
+function rgOptionIdsMatchedTo(bdIds){
+  const set=new Set((Array.isArray(bdIds)?bdIds:[bdIds]).map(String));
+  return Object.keys(_rgOptionMap).filter(oid=>set.has(String(_rgOptionMap[oid])));
+}
+// 백데이터 행이 병합/중복정리/삭제로 사라질 때 로켓그로스 매칭을 따라 옮긴다.
+// toId가 있으면 fromIds를 가리키던 매칭을 toId로 이동, null이면 해당 매칭을 제거(=매칭 해제).
+// 백데이터 행은 이미 DB에서 지워진 뒤라 이 정리가 실패해도 치명적이지 않게 예외는 삼킨다.
+async function rgRemapOptionMatches(fromIds, toId){
+  try{
+    if(!_rgOptionMapLoaded) await loadRgOptionMap();
+    const base=await _rgFreshOptionMap();
+    const from=new Set((Array.isArray(fromIds)?fromIds:[fromIds]).map(String));
+    const next={...base}; let changed=0;
+    Object.keys(next).forEach(oid=>{
+      if(!from.has(String(next[oid]))) return;
+      if(toId!=null) next[oid]=String(toId); else delete next[oid];
+      changed++;
+    });
+    if(!changed) return 0;
+    _rgOptionMap=next;
+    await cloudKvSave('rg_option_map', next, {force:true});
+    return changed;
+  }catch(e){ console.warn('로켓그로스 매칭 이관 실패', e); return 0; }
+}
 function rgQtyMultiplier(optionId){
   const n=Number(_rgPackMultiplier[optionId]);
   return (n && n>1) ? n : 1;
@@ -20322,21 +20354,22 @@ function renderRgMatchList(){
     </div>`;
   }).join('') : '<div class="rev-empty" style="padding:16px;">검색 결과가 없습니다</div>';
 }
-// 저장 직전에 다시 불러와서 병합하지 않고, 이미 로드돼있는 인메모리 맵 위에 바로 얹어서 저장한다.
-// (재조회가 실패/지연되면 빈 객체로 덮어써 cloudKvSave의 "급격한 축소" 안전장치에 걸려 저장이 조용히 스킵되는 문제가 있었음 — force로 우회)
+// 저장 직전에 DB 최신본을 다시 받아 그 위에 이번 변경만 얹어 저장한다 (다른 PC가 방금 한 매칭을 오래된 화면이 덮어써 지우는 것 방지).
+// 재조회가 실패(null)하면 인메모리 맵으로 대체하고, force 없이 저장해 cloudKvSave의 "급격한 축소" 안전장치가 빈 맵 덮어쓰기를 막게 한다.
 async function rgSelectMatch(bdId){
   if(!_rgMatchTargetId) return;
-  _rgOptionMap = {..._rgOptionMap, [_rgMatchTargetId]: bdId};
-  await cloudKvSave('rg_option_map', _rgOptionMap, {force:true});
+  const base=await _rgFreshOptionMap();
+  _rgOptionMap = {...base, [_rgMatchTargetId]: bdId};
+  await cloudKvSave('rg_option_map', _rgOptionMap);
   closeModal('rgMatchModal');
   renderRgProdSection();
 }
 async function rgUnmatchOption(){
   if(!_rgMatchTargetId) return;
-  const next={..._rgOptionMap};
+  const next={...(await _rgFreshOptionMap())};
   delete next[_rgMatchTargetId];
   _rgOptionMap=next;
-  await cloudKvSave('rg_option_map', _rgOptionMap, {force:true});
+  await cloudKvSave('rg_option_map', _rgOptionMap);
   closeModal('rgMatchModal');
   renderRgProdSection();
 }
@@ -23167,6 +23200,8 @@ async function bdMergeConfirm(targetId){
   try{
     await saveBdToSupabase(updated,true);
     await deleteBdFromSupabase(tgt.id);
+    // 흡수된 행(tgt)에 걸려있던 로켓그로스 매칭을 대표행(src)으로 이관 — 안 하면 매칭이 끊겨 보임
+    const rgMoved=await rgRemapOptionMatches(tgt.id, src.id);
     const si=_bdData.findIndex(x=>String(x.id)===String(src.id));
     if(si>=0) _bdData[si]=updated;
     _bdData=_bdData.filter(x=>String(x.id)!==String(tgt.id));
@@ -23174,7 +23209,7 @@ async function bdMergeConfirm(targetId){
     bdRenderMergeHeader();
     bdRenderMergeList();
     renderBdTable();
-    if(typeof toast==='function') toast(`"${tgt.code}" 코드를 "${updated.code}"의 별칭으로 합쳤습니다. 계속 다른 코드를 더 합치거나, 상단 별칭 옆 ×로 되돌릴 수 있습니다.`);
+    if(typeof toast==='function') toast(`"${tgt.code}" 코드를 "${updated.code}"의 별칭으로 합쳤습니다.${rgMoved?` (로켓그로스 매칭 ${rgMoved}건 이관)`:''} 계속 다른 코드를 더 합치거나, 상단 별칭 옆 ×로 되돌릴 수 있습니다.`);
   }catch(e){ alert('병합 실패: '+e.message); }
 }
 // 병합/별칭 취소 — 별칭코드를 대표행에서 분리해서 다시 독립된 행으로 되살림
@@ -23290,6 +23325,11 @@ async function bdDeleteRow(id){
   if(usedBy.length){
     warnings.push(`이 코드는 세트상품 ${usedBy.length}개(${usedBy.map(r=>r.code).join(', ')})의 구성품으로 쓰이고 있습니다 — 삭제하면 그 세트들의 단가가 최신화되지 않습니다.`);
   }
+  if(!_rgOptionMapLoaded){ try{ await loadRgOptionMap(); }catch{} }
+  const rgMatched=rgOptionIdsMatchedTo(row.id);
+  if(rgMatched.length){
+    warnings.push(`이 행에 로켓그로스 옵션 ${rgMatched.length}개가 매칭돼 있습니다 — 삭제하면 그 매칭이 해제됩니다. (다른 행으로 합치려면 삭제 대신 '코드 병합'을 쓰세요)`);
+  }
   const activeRes=bdActiveReservationFor(row);
   if(activeRes){
     warnings.push(`이 코드는 재고소진 자동전환 예약이 진행중입니다(잔여 ${Math.max(0,activeRes.oldStockQty-(activeRes.soldSinceStart||0))}개) — 삭제하면 그 예약도 함께 취소됩니다.`);
@@ -23298,6 +23338,7 @@ async function bdDeleteRow(id){
   if(!confirm(msg)) return;
   try{
     await deleteBdFromSupabase(row.id);
+    if(rgMatched.length) await rgRemapOptionMatches(row.id, null);
     _bdData=_bdData.filter(x=>String(x.id)!==String(row.id));
     if(activeRes){
       let latest=await cloudKvLoad('bd_price_reservations'); latest=Array.isArray(latest)?latest:[];
@@ -23371,6 +23412,7 @@ async function bdConfirmDedupe(){
       const updatedKeeper={...keeper, aliasCodes:mergedAliases, aliasNames:mergedNames};
       await saveBdToSupabase(updatedKeeper, true);
       for(const o of others){ await deleteBdFromSupabase(o.id); deleted++; }
+      await rgRemapOptionMatches(others.map(o=>o.id), keeper.id);   // 삭제되는 중복행의 로켓그로스 매칭을 남는 행으로 이관
       const ki=_bdData.findIndex(x=>x.id===keeper.id);
       if(ki>=0) _bdData[ki]=updatedKeeper;
       const otherIds=new Set(others.map(o=>o.id));
