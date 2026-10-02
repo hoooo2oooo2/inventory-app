@@ -26089,6 +26089,52 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 // 배경(어두운 영역) 클릭해도 닫히지 않음 — 실수로 바깥을 눌러 입력 중이던 내용이
 // 날아가는 사고를 막기 위해 모든 모달에서 닫기/취소 버튼으로만 닫도록 통일.
 
+// ── ESC 키로 팝업 닫기 (2026-10-03 사용자 요청: "모든 팝업창은 esc로 끌 수 있게") ──
+// 배경 클릭은 여전히 막혀 있고(위 주석), ESC는 의도적으로 누르는 키라 허용. 화면에 떠 있는 팝업 중 가장 위(z-index 최상,
+// 같으면 DOM상 뒤쪽)의 하나만 닫는다. 각 팝업이 갖고 있는 '닫기/취소' 버튼을 그대로 눌러서 닫는다 —
+// 닫을 때 상태 정리(업무요청 팝업 대기열, 마이페이지 편집상태 등)가 버튼 핸들러에 들어 있어서 클래스만 빼면 어긋난다.
+// 제외: 로그인 화면, 우측 알림 카드(자체 ✕/자동 소멸), 자동완성 드롭다운.
+(function(){
+  const CLOSE_BTN=/^(✕\s*)?(닫기|취소)(\s*✕)?$|^[✕×]$/;
+  const SPECIAL={ myPageModal:()=>closeMyPage(), kbViewModal:()=>kbCloseView() };
+  const clickClose=root=>{
+    const vis=b=>!b.disabled && b.offsetParent!==null && CLOSE_BTN.test((b.textContent||'').trim());
+    const foot=[...root.querySelectorAll('.ma button')].filter(vis);          // 푸터 버튼 우선
+    const any=[...root.querySelectorAll('button')].filter(vis);
+    const b=(foot.length?foot:any).slice(-1)[0];
+    if(b){ b.click(); return true; }
+    return false;
+  };
+  const topPopup=()=>{
+    const list=[];
+    const add=(el,close)=>{ list.push({el, z:parseInt(getComputedStyle(el).zIndex,10)||0, i:list.length, close}); };
+    document.querySelectorAll('.modal-overlay.open').forEach(el=>add(el,()=>{
+      if(SPECIAL[el.id]) SPECIAL[el.id](); else if(!clickClose(el)) closeModal(el.id); }));
+    document.querySelectorAll('.pc-modal-bg').forEach(el=>{
+      if(getComputedStyle(el).display!=='none') add(el,()=>{ if(!clickClose(el)) el.style.display='none'; }); });
+    document.querySelectorAll('.kb-lightbox.open').forEach(el=>add(el,()=>kbCloseLightbox()));
+    [['rgnModal',()=>rgnCloseDetail()],['ssaModal',()=>ssaCloseDetail()]].forEach(([id,fn])=>{
+      const el=document.getElementById(id); if(el && getComputedStyle(el).display!=='none') add(el,fn); });
+    // 코드로 만들어 body에 붙이는 전체화면 팝업(업로드 완료 안내, 패밀리오더 상세 등)
+    document.querySelectorAll('body > div').forEach(el=>{
+      if(el.id==='loginOverlay' || el.matches('.modal-overlay,.pc-modal-bg,.kb-lightbox,.cal-overlay')) return;
+      if(el.style.position!=='fixed' || !/inset:\s*0/.test(el.style.cssText) || el.style.display==='none') return;
+      add(el,()=>{ if(!clickClose(el)){ if(el.id) el.style.display='none'; else el.remove(); } });
+    });
+    const fc=document.getElementById('floatCard');
+    if(fc && fc.classList.contains('open')) add(fc,()=>toggleFloat());
+    list.sort((a,b)=>(a.z-b.z)||(a.i-b.i));
+    return list.pop()||null;
+  };
+  document.addEventListener('keydown', e=>{
+    if(e.key!=='Escape' || e.isComposing) return;
+    let t=null; try{ t=topPopup(); }catch(err){ console.warn('ESC 팝업 닫기 실패', err); }
+    if(!t) return;
+    e.preventDefault(); e.stopPropagation();
+    try{ t.close(); }catch(err){ console.warn('ESC 팝업 닫기 실패', err); }
+  }, true);
+})();
+
 // ══════════════════════════════════════════════
 // GROQ AI 채팅
 // ══════════════════════════════════════════════
