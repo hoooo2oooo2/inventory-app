@@ -14071,17 +14071,29 @@ function insightDemandFromSeries(series){
 //       ③ 급증 방어: 최근 30일 판매속도로 같은 기간을 계산한 값보다 목표가 작으면 그 값을 목표로 한다(진짜 급증을 놓쳐 품절되지 않도록).
 //       ④ 권장발주 = 목표 확보량 − 리드타임 동안 팔릴 양 − 도착시점 재고. (기존 방식 값은 계산 근거 팝업에 참고로 남긴다)
 // 재고관리에서 월소진 고정값을 수동 설정한 상품은 기존대로 그 값을 따른다.
+// 월 판매가 그 상품 월 판매 중앙값의 4배(최소 10개)를 넘는 달은 그 값으로 제한한다 — 월별 컬럼에 섞이는 일회성 대량 건(예: 일별 판매엔 5개뿐인데
+// 월합계가 158개)이 월평균·예측을 부풀려 판매가 3개뿐인 상품에 105개를 권하던 문제(2026-10-03 점검에서 발견). 백테스트(401건): 정확도 동일
+// (오차 29.9%→30.0%), 편향 +3.4%→−0.5%, 제한되는 달은 3.7%뿐. 월 판매 수준별 보정 배수도 이 기준으로 다시 측정했다.
+function _insightMonthCap(p){
+  const vals=[];
+  getTotalM(p,CUR_YEAR-1).forEach(v=>{ if(v>0) vals.push(v); });
+  getTotalM(p,CUR_YEAR).forEach((v,i)=>{ if(i<MONTH && v>0) vals.push(v); });
+  if(vals.length<4) return Infinity;
+  const s=vals.slice().sort((a,b)=>a-b), k=s.length, med=k%2?s[(k-1)/2]:(s[k/2-1]+s[k/2])/2;
+  return Math.max(4*med,10);
+}
 function insightDemandRates(p, avg30, c, seasonIndex, nDays){
   const DAY=86400000;
   const today=new Date(); today.setHours(0,0,0,0);
   const dayAt=i=>new Date(today.getFullYear(),today.getMonth(),today.getDate()+i);
   const key=(y,m)=>y+'-'+m;
   const firstSale=_insightFirstSaleDate(p);
+  const cap=_insightMonthCap(p);   // 일회성 대량 건 제한
   const idxArr=insightSeasonIndexFor(seasonIndex, p.type);
   let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null;
   for(let k=3;k>=1;k--){
     let m=MONTH-k, y=CUR_YEAR; if(m<0){ m+=12; y--; }
-    lvSum+=getTotalM(p,y)[m]||0; gPrev+=getTotalM(p,y-1)[m]||0; idxSum+=Math.max(idxArr[m]||1,0.3);
+    lvSum+=Math.min(getTotalM(p,y)[m]||0,cap); gPrev+=Math.min(getTotalM(p,y-1)[m]||0,cap); idxSum+=Math.max(idxArr[m]||1,0.3);
     if(k===3){ lvFirst=new Date(y,m,1); gFirst=new Date(y-1,m,1); }
   }
   const lvOk=!!firstSale && firstSale<=lvFirst;
@@ -14096,7 +14108,7 @@ function insightDemandRates(p, avg30, c, seasonIndex, nDays){
   // ① 작년 같은 달 × 올해 흐름
   const refComplete=!!firstSale && firstSale<=new Date(months[0].y-1,months[0].m,1);
   const refMap={}; let refTot=0;
-  months.forEach(h=>{ const v=_insightDeOutlierMonth(p.code,h.y-1,h.m,getTotalM(p,h.y-1)[h.m]||0); refMap[key(h.y,h.m)]=v*growth; refTot+=v; });
+  months.forEach(h=>{ const v=Math.min(_insightDeOutlierMonth(p.code,h.y-1,h.m,getTotalM(p,h.y-1)[h.m]||0),cap); refMap[key(h.y,h.m)]=v*growth; refTot+=v; });
   const useRef=refComplete && refTot>0;
   if(useRef) maps.push(refMap);
   // ② 같은 구분 계절패턴 × 현재 수준 (총량은 평균유지의 0.5~2배로 제한)
@@ -14424,10 +14436,10 @@ const INSIGHT_COVER_ACTIVE_TO=10;     // 운영 끝: 11월(0-idx) — 11월 30�
 function insightCoverActive(){ return MONTH>=INSIGHT_COVER_ACTIVE_FROM && MONTH<=INSIGHT_COVER_ACTIVE_TO; }
 // 월 판매 수준별 "실제÷예측" 분위수(백테스트 실측, 3개월 앞 예측). 수준: 월 판매 20 미만 / 20~67 / 67~200 / 200 이상
 const INSIGHT_COVER_CALIB=[
-  {max:20,       q10:0.30, q70:1.46, q80:1.72, q90:2.31},
-  {max:67,       q10:0.49, q70:1.32, q80:1.53, q90:1.81},
-  {max:200,      q10:0.45, q70:1.12, q80:1.26, q90:1.79},
-  {max:Infinity, q10:0.58, q70:1.02, q80:1.15, q90:1.43}
+  {max:20,       q10:0.35, q70:1.54, q80:1.72, q90:2.31},
+  {max:67,       q10:0.54, q70:1.35, q80:1.58, q90:1.89},
+  {max:200,      q10:0.40, q70:1.14, q80:1.26, q90:1.63},
+  {max:Infinity, q10:0.64, q70:1.05, q80:1.18, q90:1.44}
 ];
 function _insightCalibFor(monthly){ return INSIGHT_COVER_CALIB.find(c=>monthly<c.max); }
 // 과거 입고 완료 기록(주문일→완료일)의 실제 리드타임 분포 — 건수가 바뀔 때만 다시 계산
@@ -14466,12 +14478,13 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   const hm=[]; for(let d=new Date(today.getFullYear(),today.getMonth(),1); d<windowEnd; d=new Date(d.getFullYear(),d.getMonth()+1,1)) hm.push({y:d.getFullYear(),m:d.getMonth()});
   const key=(y,m)=>y+'-'+m;
   const firstSale=_insightFirstSaleDate(p);
+  const cap=_insightMonthCap(p);   // 일회성 대량 건 제한
   const idxArr=insightSeasonIndexFor(seasonIndex, p.type);
   // 현재 수준 — 최근 완결 3개월 월평균(전 기간 판매 이력이 있을 때), 아니면 최근 30일 속도
   let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null; const lvLbl=[];
   for(let k=3;k>=1;k--){
     let m=MONTH-k, y=CUR_YEAR; if(m<0){ m+=12; y--; }
-    lvSum+=getTotalM(p,y)[m]||0; gPrev+=getTotalM(p,y-1)[m]||0; idxSum+=Math.max(idxArr[m]||1,0.3);
+    lvSum+=Math.min(getTotalM(p,y)[m]||0,cap); gPrev+=Math.min(getTotalM(p,y-1)[m]||0,cap); idxSum+=Math.max(idxArr[m]||1,0.3);
     lvLbl.push((m+1)+'월'); if(k===3){ lvFirst=new Date(y,m,1); gFirst=new Date(y-1,m,1); }
   }
   const lvOk=!!firstSale && firstSale<=lvFirst;
@@ -14483,13 +14496,13 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   const growthRaw=gOk?lvSum/gPrev:null;
   const growth=gOk?Math.min(INSIGHT_COVER_GROWTH_MAX,Math.max(INSIGHT_COVER_GROWTH_MIN,growthRaw)):1;
   // 작년 같은 구간(12월~4월) 실제 판매 — 표시용 근거
-  const refWinVals=[11,0,1,2,3].map(mi=>{ const yy=mi>=11?Y-1:Y; return _insightDeOutlierMonth(p.code, yy, mi, getTotalM(p,yy)[mi]||0); });
+  const refWinVals=[11,0,1,2,3].map(mi=>{ const yy=mi>=11?Y-1:Y; return Math.min(_insightDeOutlierMonth(p.code, yy, mi, getTotalM(p,yy)[mi]||0),cap); });
   const refWinTotal=refWinVals.reduce((a,b)=>a+b,0);
   const refComplete=!!firstSale && firstSale<=new Date(hm[0].y-1,hm[0].m,1);
   // ── 추정 방법별 월 예상 판매 ──
   const methods=[];
   const refMap={}; let refTot=0;
-  hm.forEach(h=>{ const v=_insightDeOutlierMonth(p.code,h.y-1,h.m,getTotalM(p,h.y-1)[h.m]||0); refMap[key(h.y,h.m)]=v*growth; refTot+=v; });
+  hm.forEach(h=>{ const v=Math.min(_insightDeOutlierMonth(p.code,h.y-1,h.m,getTotalM(p,h.y-1)[h.m]||0),cap); refMap[key(h.y,h.m)]=v*growth; refTot+=v; });
   const useRef=refComplete && refTot>0;
   if(useRef) methods.push({id:'lastyear', label:'작년 같은 달 실적 × 올해 흐름', map:refMap, primary:true});
   { const L0=level/levelIdx, mp={}; let tot=0;
@@ -14716,7 +14729,18 @@ function insightBuildRows(){
     // 구정 커버 계산에서 예외가 나도 발주 인사이트 화면 전체가 멈추지 않게 보호
     let winterCover; try{ winterCover=insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, grade); }catch(e){ console.warn('구정 커버 계산 실패', p.code, e); winterCover={status:'error'}; }
     const seasonPre=insightSeasonalPreorderInfo(p, c, pending, season, netNeeded, seasonIndex, winterCover);
-    return {winterCover,p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue,recent,seasonPre};
+    // ★ 최종 주문 수량 — 평상시 권장발주와 구정 준비 필요량(운영 기간 9~11월) 중 큰 값. 구정 준비량은 12/1 전에 들어와야 하는 4/30까지의 총 필요량이라
+    //   평상시 권장(리드타임+주기 구간)을 이미 포함하므로 더하지 않고 큰 쪽을 쓴다.
+    const regQty=netNeeded||0;
+    const coverQty=(winterCover&&winterCover.status==='ok'&&winterCover.active)?(winterCover.shortQty||0):0;
+    const finalQty=(p.disc||c.noData)?0:Math.max(regQty,coverQty);
+    const finalBoxes=Math.ceil(finalQty/(p.boxQty||1));
+    const finalBasis=coverQty>regQty?'cover':'regular';
+    // ★ 재고 과잉 — (현재고+진행중 발주)가 앞으로 예상 판매의 몇 개월분인지. 평소 6개월, 구정 준비 기간(9~11월)엔 마감 구간까지 쟁여두는 게 정상이라 9개월 초과부터.
+    const fm=(c.expert&&c.expert.monthly)||(winterCover&&winterCover.level)||0;
+    const stockMonths=fm>0?(p.stock+pending)/fm:null;
+    const overstock=!p.disc && !c.noData && stockMonths!=null && stockMonths>(insightCoverActive()?9:6);
+    return {finalQty,finalBoxes,finalBasis,regQty,coverQty,stockMonths,overstock,winterCover,p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue,recent,seasonPre};
   });
 }
 
@@ -14993,10 +15017,11 @@ function insightRowHtml(r){
     ? `<div class="ins-sub" title="${`전문가 방식: 앞으로 ${Math.round((r.c.expert.L+r.c.expert.R)/30*10)/10}개월 예상 판매 ${Math.round(r.c.expert.dLR).toLocaleString()}개 × 안전배수 ${r.c.expert.k.toFixed(2)} = 목표 확보량 ${Math.round(r.c.expert.targetLR).toLocaleString()}개에서 리드타임 판매·도착시점 재고를 반영 → 권장 ${r.c.needed.toLocaleString()}개 (기존 방식 ${(r.c.neededOld||0).toLocaleString()}개)`}">${r.grade}등급 서비스 ${r.c.expert.pct}${r.c.expert.usedRecent?' · 최근판매 반영':''}</div>`
     : (r.c.corrLabel&&r.c.corrLabel!=='보정없음'&&r.c.corrLabel!=='작년 데이터 없음'?`<div class="ins-sub" style="color:${r.c.corrLabel.startsWith('성수기')?'#EA580C':'var(--tx2)'};">${r.c.corrLabel}</div>`:'');
   const suspectBadge=r.c.suspect?`<div class="ins-sub" style="color:#DC2626;font-weight:700;" title="최근 데이터가 적은데(30일 중 10일 미만) 발주시점 대비 계산값이 2.5배 넘게 커서 배치 오염·이상치 등으로 부풀려졌을 수 있습니다. 출고 추이 그래프로 직접 확인해보세요.">⚠ 데이터 의심</div>`:'';
+  const overBadge=r.overstock?`<div class="ins-sub" style="color:#2563EB;font-weight:700;" title="현재고+진행중 발주가 앞으로 예상 판매의 ${r.stockMonths.toFixed(1)}개월분입니다. 더 사지 말고 소진을 기다리세요(저회전·과잉 재고 — 현금·창고가 묶임).">🧊 재고 ${r.stockMonths>=100?'100+':r.stockMonths.toFixed(1)}개월분 — 발주 보류</div>`:'';
   if(r.p.disc) orderCell='<span class="ins-sub">단종 — 발주 불필요</span>';
   else if(r.c.noData) orderCell='<span class="ins-sub">산출불가</span>';
-  else if(r.covered) orderCell=`<span class="ins-tag" style="background:#ECFDF5;color:#059669;">✓ 발주 진행중(충분)</span>${corrBadge}${suspectBadge}`;
-  else orderCell=`<div class="ins-num">${r.netBoxes.toLocaleString()}박스</div><div class="ins-sub">(${(r.netNeeded||0).toLocaleString()}개)</div>${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}${corrBadge}${suspectBadge}`;
+  else if(r.finalQty<=0 && r.covered) orderCell=`<span class="ins-tag" style="background:#ECFDF5;color:#059669;">✓ 발주 진행중(충분)</span>${overBadge}${corrBadge}${suspectBadge}`;
+  else orderCell=`<div class="ins-num">${r.finalBoxes.toLocaleString()}박스</div><div class="ins-sub">(${r.finalQty.toLocaleString()}개)</div>${r.finalBasis==='cover'?`<div class="ins-sub" style="color:#92400E;font-weight:700;" title="구정(12~4월) 생산 중단 전에 들어와야 하는 물량까지 포함한 주문 수량입니다. 평상시 권장은 ${r.regQty.toLocaleString()}개이고, 12/1 전 입고분으로 4/30까지 버티려면 ${r.coverQty.toLocaleString()}개가 필요합니다(상품명을 클릭하면 근거).">❄ 구정 준비 포함 (평상시 ${r.regQty.toLocaleString()}개)</div>`:''}${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}${overBadge}${corrBadge}${suspectBadge}`;
   const confirmed=insightIsConfirmedToday(r.p.id);
   return `<tr class="${confirmed?'ins-row-confirmed':''}">
     <td style="text-align:center;"><input type="checkbox" ${confirmed?'checked':''} onchange="insightToggleOrderConfirm(${r.p.id}, this.checked)" title="오늘 발주 처리 확인"></td>
@@ -15034,9 +15059,10 @@ async function insightDiscProd(id){
 function renderInsightKpi(rows){
   const el=document.getElementById('insightKpi'); if(!el) return;
   const cnt={부족:0,긴급:0,임박:0,정상:0};
-  let seasonCnt=0, volatileCnt=0, winterCareCnt=0, seasonCareCnt=0, seasonReadyCnt=0, coverShortCnt=0;
+  let seasonCnt=0, volatileCnt=0, winterCareCnt=0, seasonCareCnt=0, seasonReadyCnt=0, coverShortCnt=0, overstockCnt=0;
   rows.forEach(r=>{
     if(cnt[r.status]!=null) cnt[r.status]++;
+    if(r.overstock) overstockCnt++;
     if(r.winterCover&&r.winterCover.status==='ok'&&r.winterCover.active&&r.winterCover.verdict==='short') coverShortCnt++;
     if(r.season.status==='ok'&&r.season.upcoming) seasonCnt++;
     if(r.surge||r.drop) volatileCnt++;
@@ -15058,7 +15084,8 @@ function renderInsightKpi(rows){
     card('wintercare','❄ 구정재고 대비',winterCareCnt,'마감(10~3월) 대비 아직 발주 필요')+
     card('seasoncare','☀ 계절성수기 대비',seasonCareCnt,'2.5개월분 아직 발주 필요')+
     card('seasonready','✅ 계절대비 준비완료',seasonReadyCnt,'재고 여유 또는 발주 처리완료')+
-    (insightCoverActive()?card('covershort','🔴 구정 커버 부족',coverShortCnt,'현재고+진행중 발주로 마감기간 부족'):'');
+    (insightCoverActive()?card('covershort','🔴 구정 커버 부족',coverShortCnt,'현재고+진행중 발주로 마감기간 부족'):'')+
+    card('overstock','🧊 재고과잉',overstockCnt,'재고 '+(insightCoverActive()?9:6)+'개월분 초과 — 발주 보류');
 }
 
 // 검색·구분·등급·상태 필터 + 정렬까지 적용한 최종 목록 — 화면 렌더링과 엑셀 내보내기가 같은 결과를
@@ -15076,13 +15103,14 @@ function insightVisibleRows(){
   else if(insightStatusF==='seasoncare') rows=rows.filter(r=>r.seasonPre&&r.seasonPre.status==='flag'&&r.seasonPre.neededQty>0&&r.seasonPre.kind==='other'&&!insightIsSeasonalChecked(r.p.id));
   else if(insightStatusF==='seasonready') rows=rows.filter(r=>r.seasonPre&&r.seasonPre.status==='flag'&&(r.seasonPre.neededQty<=0||insightIsSeasonalChecked(r.p.id)));
   else if(insightStatusF==='covershort') rows=rows.filter(r=>r.winterCover&&r.winterCover.status==='ok'&&r.winterCover.active&&r.winterCover.verdict==='short');
+  else if(insightStatusF==='overstock') rows=rows.filter(r=>r.overstock);
   else if(insightStatusF==='volatile') rows=rows.filter(r=>r.surge||r.drop);
   else if(insightStatusF) rows=rows.filter(r=>r.status===insightStatusF);
   const rank={부족:0,긴급:1,임박:2,정상:3,단종:4};
   rows=[...rows].sort((a,b)=>{
     if(insightSort==='cover_prio'){ const pr=r=>{ const w=r.winterCover; return (w&&w.status==='ok'&&w.active&&w.verdict==='short')?w.level:-1; }; return pr(b)-pr(a); }
     if(insightSort==='days_asc') return (a.daysLeft==null?Infinity:a.daysLeft)-(b.daysLeft==null?Infinity:b.daysLeft);
-    if(insightSort==='boxes_desc') return (b.netBoxes||0)-(a.netBoxes||0);
+    if(insightSort==='boxes_desc') return (b.finalBoxes||0)-(a.finalBoxes||0);
     if(insightSort==='stock_asc') return a.p.stock-b.p.stock;
     if(insightSort==='rg_desc') return (b.rgQty||0)-(a.rgQty||0);
     if(insightSort==='name') return a.p.name.localeCompare(b.p.name);
@@ -15149,7 +15177,7 @@ function insightExportXlsx(){
       r.status, r.p.code, r.p.name, r.p.type||'기타', r.grade, r.p.stock,
       r.avgDay>0?r.avgDay:'', r.c.noData?'':r.c.expM, r.exhaustDate?fmtDate(r.exhaustDate):'', r.reorderByDate?fmtDate(r.reorderByDate):'',
       r.recent.last7, r.recent.last30,
-      r.c.noData||r.p.disc?'':r.netBoxes, r.c.noData||r.p.disc?'':r.netNeeded,
+      r.c.noData||r.p.disc?'':r.finalBoxes, r.c.noData||r.p.disc?'':r.finalQty,
       r.pending, r.rgQty||'', r.famProd?r.famProd.vendor:'', r.famProd?r.famProd.code:'',
       r.famProd&&!r.c.noData?r.famBoxes:'',
       r.season.status==='ok'?`${r.season.peakMonth}(+${r.season.peakPct}%)`:'',
@@ -15567,6 +15595,7 @@ function insightRenderCalcDetail(code){
   }
   if(r.pending>0) html+=row2('진행중 발주 차감', `−${r.pending.toLocaleString()}개`, '발주관리 미입고 + 패밀리오더 미입고 합산');
   html+=row2('최종 권장 발주', r.netBoxes!=null?`${r.netBoxes.toLocaleString()}박스(${(r.netNeeded||0).toLocaleString()}개)`:'-');
+  if(r.coverQty>0) html+=row2('❄ 구정 준비 필요량', `${r.coverQty.toLocaleString()}개`, `12/1 전 입고분으로 4/30까지 버티는 데 필요한 양. 평상시 권장 ${(r.regQty||0).toLocaleString()}개와 비교해 큰 값이 최종 주문 수량(${r.finalQty.toLocaleString()}개)입니다`);
   if(c.suspect) html+='<div class="ins-calc-note" style="color:#DC2626;">⚠ 최근 데이터가 적은데(30일 중 10일 미만) 계산값이 발주시점 역산치의 2.5배를 넘습니다. 배치 입력 오류나 일시적 이상치가 섞였을 수 있으니 위 출고 추이 그래프로 직접 확인해보세요.</div>';
   body.innerHTML=html;
 }
