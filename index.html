@@ -2139,7 +2139,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       </div>
       <div>
         <div class="cl-lbl">연락처</div>
-        <input id="lcrPhone" placeholder="010-0000-0000" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
+        <input id="lcrPhone" placeholder="010-0000-0000" inputmode="tel" oninput="_lcrPhoneInput(this)" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
       <div>
         <div class="cl-lbl" style="display:flex;align-items:center;justify-content:space-between;">
@@ -9956,6 +9956,28 @@ async function lsoApply(){
 let _lcrOrders = null;
 let _lcrLoaded = false;
 
+// 연락처 하이픈 자동 포맷 (000-0000-0000). 숫자·구분기호만으로 된 값이면서 자리수가 표준일 때만 변환하고, 그 외(메모 등 섞인 값)는 그대로 둔다.
+// 저장값은 건드리지 않고 표시/입력/저장 시에만 적용 — 기존에 하이픈 없이 저장된 주문건도 화면에선 포맷돼 보인다.
+function _lcrFmtPhone(s){
+  const raw=String(s==null?'':s).trim();
+  if(!raw || /[^\d\s\-.()+]/.test(raw)) return raw;
+  let d=raw.replace(/\D/g,'');
+  if(d.startsWith('82') && d.length>=11 && raw.startsWith('+')) d='0'+d.slice(2);
+  if(d.length===11) return d.replace(/^(\d{3})(\d{4})(\d{4})$/,'$1-$2-$3');
+  if(d.length===10) return d.startsWith('02') ? d.replace(/^(\d{2})(\d{4})(\d{4})$/,'$1-$2-$3') : d.replace(/^(\d{3})(\d{3})(\d{4})$/,'$1-$2-$3');
+  if(d.length===9 && d.startsWith('02')) return d.replace(/^(\d{2})(\d{3})(\d{4})$/,'$1-$2-$3');
+  return raw;
+}
+// 입력 중 실시간 포맷 — 자리수가 아직 모자란 중간 상태에선 하이픈을 억지로 넣지 않고 숫자만 정리
+function _lcrPhoneInput(el){
+  const v=el.value;
+  if(/[^\d\s\-.()+]/.test(v)) return;
+  const d=v.replace(/\D/g,'').slice(0,11);
+  let out=d;
+  if(d.length>3 && !d.startsWith('02')) out=d.slice(0,3)+'-'+(d.length>7 ? d.slice(3,7)+'-'+d.slice(7) : d.slice(3));
+  else if(d.startsWith('02') && d.length>2) out=d.slice(0,2)+'-'+(d.length>6 ? d.slice(2,d.length-4)+'-'+d.slice(-4) : d.slice(2));
+  el.value=out;
+}
 function _lcrEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function _lcrId(){ return 'lcr_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function _lcrToday(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
@@ -10029,7 +10051,7 @@ function lcrRender(){
   _lcrFillSelects('lcrFy','lcrFm',_lcrFy,_lcrFm);
   const q = (document.getElementById('lcrSearch')?.value||'').trim().toLowerCase();
   let list = (_lcrOrders || []).filter(o=>_lcrInRange(o,_lcrFy,_lcrFm));
-  if(q) list = list.filter(o=>[o.customerName,o.phone,o.productName].some(v=>(v||'').toLowerCase().includes(q)));
+  if(q) list = list.filter(o=>[o.customerName,o.phone,_lcrFmtPhone(o.phone),o.productName].some(v=>(v||'').toLowerCase().includes(q)));
   list = list.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')||String(b.id||'').localeCompare(String(a.id||'')));
   // 합계는 페이지가 아니라 필터된 전체 기준
   const agg = _lcrAgg(list);
@@ -10292,7 +10314,7 @@ function lcrOpenDetail(id, ev){
   if(ev && ev.target.closest('button, input')) return;
   const o = (_lcrOrders||[]).find(x=>x.id===id); if(!o) return;
   document.getElementById('lcrDetName').textContent = o.customerName || '-';
-  document.getElementById('lcrDetPhone').textContent = o.phone || '-';
+  document.getElementById('lcrDetPhone').textContent = _lcrFmtPhone(o.phone) || '-';
   document.getElementById('lcrDetAddr').textContent = o.visitSale ? '🚶 방문판매' : (o.address || '-');
   document.getElementById('lcrDetProd').textContent = o.productName || '-';
   document.getElementById('lcrDetQty').textContent = _lbxNum(o.qty);
@@ -10309,7 +10331,7 @@ function lcrRowHtml(o){
   return `<tr data-row="${o.id}" class="lcr-row ${o.erpChecked?'lcr-erp-done':''}" onclick="lcrOpenDetail('${o.id}', event)">
     <td>${_lcrEsc(o.createdAt)}</td>
     <td class="lcr-l lcr-nm">${_lcrEsc(o.customerName)}</td>
-    <td>${_lcrEsc(o.phone)}</td>
+    <td>${_lcrEsc(_lcrFmtPhone(o.phone))}</td>
     <td class="lcr-l" title="${_lcrEsc(o.address)}">${addrDisp}</td>
     <td class="lcr-l lcr-prod">${_lcrEsc(o.productName)}</td>
     <td>${_lbxNum(o.qty)}</td>
@@ -10348,7 +10370,7 @@ function lcrOpenEdit(id){
   document.getElementById('lcrModalTitle').textContent = '✎ 당근 판매 주문건 수정';
   document.getElementById('lcrEditId').value = o.id;
   document.getElementById('lcrName').value = o.customerName||'';
-  document.getElementById('lcrPhone').value = o.phone||'';
+  document.getElementById('lcrPhone').value = _lcrFmtPhone(o.phone);
   document.getElementById('lcrVisit').checked = !!o.visitSale;
   document.getElementById('lcrAddr').disabled = !!o.visitSale;
   document.getElementById('lcrAddr').placeholder = o.visitSale ? '방문판매 (주소 불필요)' : '배송지 주소';
@@ -10362,7 +10384,7 @@ function lcrOpenEdit(id){
 async function lcrSave(){
   const editId = (document.getElementById('lcrEditId').value||'').trim();
   const name = (document.getElementById('lcrName').value||'').trim();
-  const phone = (document.getElementById('lcrPhone').value||'').trim();
+  const phone = _lcrFmtPhone(document.getElementById('lcrPhone').value);
   const visitSale = document.getElementById('lcrVisit').checked;
   const addr = visitSale ? '' : (document.getElementById('lcrAddr').value||'').trim();
   const productName = (document.getElementById('lcrProdName').value||'').trim();
