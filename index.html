@@ -3491,7 +3491,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 <div id="qtSaveModal" class="pc-modal-bg">
   <div style="background:var(--bg);border-radius:14px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
     <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:16px;" id="qtSaveTitle">💾 견적서 저장</div>
-    <div class="pc-lbl" style="margin-bottom:6px;">견적명</div>
+    <div class="pc-lbl" style="margin-bottom:6px;">저장명 <span style="font-weight:400;color:var(--tx2);">(저장 목록에 표시 · 견적서의 견적명은 바뀌지 않아요)</span></div>
     <input type="text" id="qt-save-name" placeholder="예: OO업체 정원등 견적" class="pc-inp" style="margin-bottom:14px;"/>
     <div class="pc-lbl" style="margin-bottom:6px;">담당자</div>
     <select id="qt-save-manager" class="pc-inp" style="margin-bottom:18px;cursor:pointer;">
@@ -12951,13 +12951,16 @@ function qtOpenSaveModal(){
 function qtConfirmSave(){
   const name=document.getElementById('qt-save-name').value.trim();
   const manager=document.getElementById('qt-save-manager').value;
-  if(!name){ alert('견적명을 입력하세요.'); return; }
-  // 문서에도 반영
-  document.getElementById('qt-name').value=name;
+  if(!name){ alert('저장명을 입력하세요.'); return; }
+  // 문서의 견적명(qt-name)은 사용자가 직접 적은 값을 그대로 유지한다 — 저장창의 저장명으로 덮어쓰면 안 됨(2026-10-03 사용자 리포트).
+  // 견적명이 비어 있을 때만 저장명으로 채워 넣는다. 저장명(name)은 저장 목록에 표시되는 이름이고, 문서 견적명은 docName으로 따로 보관.
+  const nameEl=document.getElementById('qt-name');
+  if(!nameEl.value.trim()) nameEl.value=name;
+  const docName=nameEl.value.trim();
   document.getElementById('qt-manager').value=manager;
   const now=new Date();
   const data={
-    name, manager,
+    name, docName, manager,
     tradeDate:_qtDate,
     docTitle:(document.getElementById('qt-title')?.innerText||'견적서').trim()||'견적서',
     docPhrase:(document.getElementById('qt-phrase')?.innerText||'아래와 같이 거래합니다.').trim(),
@@ -13036,7 +13039,7 @@ function qtLoadSaved(id){
   _qtEditId=id;
   const titleEl=document.getElementById('qt-title'); if(titleEl) titleEl.innerText=e.docTitle||'견적서';
   const phraseEl=document.getElementById('qt-phrase'); if(phraseEl) phraseEl.innerText=e.docPhrase||'아래와 같이 거래합니다.';
-  document.getElementById('qt-name').value=e.name||'';
+  document.getElementById('qt-name').value=(e.docName!==undefined?e.docName:e.name)||'';
   document.getElementById('qt-company').value=e.company||'';
   document.getElementById('qt-contact').value=e.contact||'';
   document.getElementById('qt-fax').value=e.fax||'';
@@ -26093,7 +26096,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 // 배경 클릭은 여전히 막혀 있고(위 주석), ESC는 의도적으로 누르는 키라 허용. 화면에 떠 있는 팝업 중 가장 위(z-index 최상,
 // 같으면 DOM상 뒤쪽)의 하나만 닫는다. 각 팝업이 갖고 있는 '닫기/취소' 버튼을 그대로 눌러서 닫는다 —
 // 닫을 때 상태 정리(업무요청 팝업 대기열, 마이페이지 편집상태 등)가 버튼 핸들러에 들어 있어서 클래스만 빼면 어긋난다.
-// 제외: 로그인 화면, 우측 알림 카드(자체 ✕/자동 소멸), 자동완성 드롭다운.
+// 제외: 로그인 화면, 자동완성 드롭다운. 우측 알림 카드는 열린 팝업이 없을 때 ESC로 하나씩 닫는다(2026-10-03 요청).
 (function(){
   const CLOSE_BTN=/^(✕\s*)?(닫기|취소)(\s*✕)?$|^[✕×]$/;
   const SPECIAL={ myPageModal:()=>closeMyPage(), kbViewModal:()=>kbCloseView() };
@@ -26124,7 +26127,13 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
     const fc=document.getElementById('floatCard');
     if(fc && fc.classList.contains('open')) add(fc,()=>toggleFloat());
     list.sort((a,b)=>(a.z-b.z)||(a.i-b.i));
-    return list.pop()||null;
+    // 우측 알림 카드(ntf-card)는 모달이 하나도 없을 때만 대상 — 화면 구석 카드가 떠 있다고 모달보다 먼저 닫히면 어색해서
+    // 가장 낮은 우선순위로 둔다. 여러 장이면 가장 최근에 뜬 것(맨 위)부터 ✕ 버튼으로 하나씩 닫는다.
+    const cards=[...document.querySelectorAll('.ntf-card')];
+    const top=list.pop()||null;
+    if(top) return top;
+    const card=cards.pop();
+    return card ? {el:card, close:()=>{ const x=card.querySelector('.ntf-card-close'); if(x) x.click(); else card.remove(); }} : null;
   };
   document.addEventListener('keydown', e=>{
     if(e.key!=='Escape' || e.isComposing) return;
