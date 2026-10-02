@@ -4973,7 +4973,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <select class="sel" id="insightTypeSel" onchange="insightSetType(this.value)"><option value="">전체 구분</option></select>
       <select class="sel" id="insightGradeSel" onchange="insightSetGrade(this.value)"><option value="">전체 등급</option><option value="A">A등급</option><option value="B">B등급</option><option value="C">C등급</option></select>
       <select class="sortsel" id="insightSortSel" onchange="insightSetSort(this.value)">
-        <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="rg_desc">로켓그로스판매량순</option><option value="name">상품명순</option>
+        <option value="urgency">긴급도순</option><option value="days_asc">소진임박순</option><option value="boxes_desc">필요박스많은순</option><option value="stock_asc">현재고적은순</option><option value="cover_prio">구정커버 발주우선순위(판매량순)</option><option value="rg_desc">로켓그로스판매량순</option><option value="name">상품명순</option>
       </select>
       <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--tx2);cursor:pointer;margin-left:auto;"><input type="checkbox" id="insightDiscChk" onchange="insightToggleDisc(this.checked)"> 단종 포함</label>
       <span style="font-size:13px;color:var(--tx2);" id="insightCount"></span>
@@ -14060,7 +14060,80 @@ function insightDemandFromSeries(series){
 // calcNeeded()와 동일한 이상치 제거·트렌드 감지·월별 검증·시즌 보정·목표재고 공식을 쓰되, 판매량
 // 기준을 정규채널+로켓그로스 매출 합산 시리즈로 바꾸고 최근 30일/7일 창을 "오늘" 기준으로 계산한다.
 // (2026-09 전체 점검: 재고관리 calcNeeded()는 그대로 두고 발주 인사이트 전용으로 안전장치를 이식함)
-function insightCalcNeeded(p, mergedSeries){
+// ── 평상시 권장발주: 서비스 수준 기반 "전문가 방식" (2026-10-03 사용자 요청: 구정 커버에 적용한 재고관리 전문가 방식을
+// 평상시 권장발주에도) ──────────────────────────────────────────────────────────────────────────────
+// 기존: 권장발주 = 월소진(expM) × (발주주기 + 등급별 안전월수) − 도착시점 재고. expM은 최근 추세·가속도로 부풀 수 있고(예: 최근 7일
+//       급증+성수기 보정으로 실제 월 9~19개 상품이 57개로 계산됨), 안전재고는 "몇 개월분"이라는 경험값이라 예측이 얼마나 빗나가는지가 반영되지 않는다.
+// 변경: ① 앞으로 (리드타임+발주주기) 동안의 예상 판매 = 검증된 방법들의 평균(작년 같은 달×올해 흐름 / 구분 계절패턴×현재 수준 /
+//          최근 3개월 평균 유지) — 구정 커버와 같은 기준 예상(백테스트 평균 오차 30%).
+//       ② 안전재고 = 등급별 서비스 수준(A 약 90% · B 약 80% · C 약 70%)에 해당하는 실측 오차 배수 k(월 판매 수준별, 구정 커버와 같은 보정표).
+//          이 앱 실제 판매로 3개월 앞을 예측해 본 오차 분포이고, 평상시 발주 구간(리드타임 1.5개월+주기 1개월 ≈ 2.5개월)과 비슷한 길이라 그대로 쓴다.
+//       ③ 급증 방어: 최근 30일 판매속도로 같은 기간을 계산한 값보다 목표가 작으면 그 값을 목표로 한다(진짜 급증을 놓쳐 품절되지 않도록).
+//       ④ 권장발주 = 목표 확보량 − 리드타임 동안 팔릴 양 − 도착시점 재고. (기존 방식 값은 계산 근거 팝업에 참고로 남긴다)
+// 재고관리에서 월소진 고정값을 수동 설정한 상품은 기존대로 그 값을 따른다.
+function insightDemandRates(p, avg30, c, seasonIndex, nDays){
+  const DAY=86400000;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dayAt=i=>new Date(today.getFullYear(),today.getMonth(),today.getDate()+i);
+  const key=(y,m)=>y+'-'+m;
+  const firstSale=_insightFirstSaleDate(p);
+  const idxArr=insightSeasonIndexFor(seasonIndex, p.type);
+  let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null;
+  for(let k=3;k>=1;k--){
+    let m=MONTH-k, y=CUR_YEAR; if(m<0){ m+=12; y--; }
+    lvSum+=getTotalM(p,y)[m]||0; gPrev+=getTotalM(p,y-1)[m]||0; idxSum+=Math.max(idxArr[m]||1,0.3);
+    if(k===3){ lvFirst=new Date(y,m,1); gFirst=new Date(y-1,m,1); }
+  }
+  const lvOk=!!firstSale && firstSale<=lvFirst;
+  const level=lvOk ? lvSum/3 : (avg30>0 ? avg30*30 : c.expM);
+  const levelIdx=lvOk ? idxSum/3 : Math.max(idxArr[MONTH]||1,0.3);
+  const gOk=!!firstSale && !!gFirst && firstSale<=gFirst && gPrev>=30;
+  const growth=gOk?Math.min(INSIGHT_COVER_GROWTH_MAX,Math.max(INSIGHT_COVER_GROWTH_MIN,lvSum/gPrev)):1;
+  // 구간에 걸치는 달 목록
+  const months=[]; const seen={};
+  for(let i=0;i<nDays;i++){ const d=dayAt(i); const k=key(d.getFullYear(),d.getMonth()); if(!seen[k]){ seen[k]=1; months.push({y:d.getFullYear(),m:d.getMonth()}); } }
+  const maps=[];
+  // ① 작년 같은 달 × 올해 흐름
+  const refComplete=!!firstSale && firstSale<=new Date(months[0].y-1,months[0].m,1);
+  const refMap={}; let refTot=0;
+  months.forEach(h=>{ const v=_insightDeOutlierMonth(p.code,h.y-1,h.m,getTotalM(p,h.y-1)[h.m]||0); refMap[key(h.y,h.m)]=v*growth; refTot+=v; });
+  const useRef=refComplete && refTot>0;
+  if(useRef) maps.push(refMap);
+  // ② 같은 구분 계절패턴 × 현재 수준 (총량은 평균유지의 0.5~2배로 제한)
+  { const L0=level/levelIdx, mp={}; let tot=0;
+    months.forEach(h=>{ const v=L0*(idxArr[h.m]||1); mp[key(h.y,h.m)]=v; tot+=v; });
+    const flat=level*months.length;
+    if(tot>0 && flat>0){ const cl=Math.min(Math.max(tot,flat*0.5),flat*2); Object.keys(mp).forEach(k=>{ mp[k]*=cl/tot; }); }
+    maps.push(mp); }
+  // ③ 최근 3개월 평균 유지
+  { const mp={}; months.forEach(h=>{ mp[key(h.y,h.m)]=level; }); maps.push(mp); }
+  const rates=[];
+  for(let i=0;i<nDays;i++){
+    const d=dayAt(i); const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); const k=key(d.getFullYear(),d.getMonth());
+    rates.push(maps.reduce((s,mp)=>s+(mp[k]||0),0)/maps.length/dim);
+  }
+  return {rates, level, useRef, growth, nMethods:maps.length};
+}
+function insightExpertNeeded(p, avg30, c, seasonIndex){
+  const L=Math.max(0,(p.leadTime>0?p.leadTime:1.5))*30;     // 리드타임(일)
+  const R=Math.max(0,getOrderCycle())*30;                    // 발주주기(일)
+  const H=L+R;
+  const dr=insightDemandRates(p, avg30, c, seasonIndex, Math.ceil(H)+1);
+  const sum=n=>{ let s=0; const w=Math.floor(n); for(let i=0;i<w&&i<dr.rates.length;i++) s+=dr.rates[i]; if(w<dr.rates.length) s+=(n-w)*dr.rates[w]; return s; };
+  const dL=sum(L), dLR=sum(H);
+  const g=getAbcGrade(p);
+  const cal=_insightCalibFor(dLR/Math.max(H/30,0.1));
+  const k=g==='A'?cal.q90:g==='B'?cal.q80:cal.q70;
+  const pct=g==='A'?'약 90%':g==='B'?'약 80%':'약 70%';
+  const rec=avg30>0?avg30:0;                                  // 최근 30일 일평균(이상치 제외)
+  const recL=rec*L, recLR=rec*H;
+  const dLused=Math.max(dL, recL);
+  const targetLR=Math.max(k*dLR, recLR);
+  const stockAtDelivery=Math.max(0, p.stock-dLused);
+  const needed=Math.max(0, Math.round(targetLR-dLused-stockAtDelivery));
+  return {needed, grade:g, k, pct, dL, dLR, targetLR, stockAtDelivery, monthly:dLR/Math.max(H/30,0.1), usedRecent:recLR>k*dLR, L, R, level:dr.level, useRef:dr.useRef, nMethods:dr.nMethods, growth:dr.growth};
+}
+function insightCalcNeeded(p, mergedSeries, seasonIndex){
   // 재고관리에서 수동으로 "월소진 고정값"을 설정해둔 상품은 그 값을 그대로 따른다. 이미 자동계산
   // 오류를 재고관리 화면에서 직접 바로잡아둔 상품인데 발주 인사이트가 이를 무시하고 독자적으로
   // 재계산하면, 같은 상품인데 두 화면이 서로 다른 권장 수량을 보여주는 모순이 생긴다.
@@ -14104,11 +14177,16 @@ function insightCalcNeeded(p, mergedSeries){
   const safetyM=safetyMonthsFor(p);
   const needed=Math.max(0, Math.round(expM*(orderCycle+safetyM)-stockAtDelivery));
   const boxes=Math.ceil(needed/(p.boxQty||1));
+  // 평상시 권장발주를 전문가 방식(서비스 수준 기반)으로 대체 — 계산 실패 시에만 기존 값 유지. 기존 값은 neededOld로 남겨 근거 팝업에서 비교.
+  let expert=null;
+  try{ expert=insightExpertNeeded(p, dem.avg30, {expM}, seasonIndex); }catch(e){ console.warn('전문가 방식 권장발주 계산 실패', p.code, e); }
+  const neededOld=needed, boxesOld=boxes;
   // 의심 플래그(calcNeeded와 동일) — 최근 30일 데이터가 적은데(10일 미만) 발주시점(재고회전 기준
   // 역산치)보다 2.5배 넘게 크면 배치 오염·이상치 등으로 부풀려졌을 가능성 경고
   const impliedExpM=p.reorderPoint>0?p.reorderPoint/Math.max(p.leadTime+0.5,1):0;
   const suspect=dem.dataPoints<10 && impliedExpM>0 && expM>impliedExpM*2.5;
-  return {needed, boxes, expM, base, avgDay:dem.avgDay, noData:false, corrLabel, dataPoints30:dem.dataPoints,
+  const finalNeeded=expert?expert.needed:needed;
+  return {needed:finalNeeded, boxes:Math.ceil(finalNeeded/(p.boxQty||1)), neededOld, boxesOld, expert, expM, base, avgDay:dem.avgDay, noData:false, corrLabel, dataPoints30:dem.dataPoints,
     safetyM, suspect, orderCycle, stockAtDelivery, sr, rawSr, accel:dem.accel, isTrendUp:dem.isTrendUp, prev14:dem.prev14, avg30:dem.avg30};
 }
 function insightEffectiveReorder(p, ic){
@@ -14346,10 +14424,10 @@ const INSIGHT_COVER_ACTIVE_TO=10;     // 운영 끝: 11월(0-idx) — 11월 30�
 function insightCoverActive(){ return MONTH>=INSIGHT_COVER_ACTIVE_FROM && MONTH<=INSIGHT_COVER_ACTIVE_TO; }
 // 월 판매 수준별 "실제÷예측" 분위수(백테스트 실측, 3개월 앞 예측). 수준: 월 판매 20 미만 / 20~67 / 67~200 / 200 이상
 const INSIGHT_COVER_CALIB=[
-  {max:20,       q10:0.30, q80:1.72, q90:2.31},
-  {max:67,       q10:0.49, q80:1.53, q90:1.81},
-  {max:200,      q10:0.45, q80:1.26, q90:1.79},
-  {max:Infinity, q10:0.58, q80:1.15, q90:1.43}
+  {max:20,       q10:0.30, q70:1.46, q80:1.72, q90:2.31},
+  {max:67,       q10:0.49, q70:1.32, q80:1.53, q90:1.81},
+  {max:200,      q10:0.45, q70:1.12, q80:1.26, q90:1.79},
+  {max:Infinity, q10:0.58, q70:1.02, q80:1.15, q90:1.43}
 ];
 function _insightCalibFor(monthly){ return INSIGHT_COVER_CALIB.find(c=>monthly<c.max); }
 // 과거 입고 완료 기록(주문일→완료일)의 실제 리드타임 분포 — 건수가 바뀔 때만 다시 계산
@@ -14600,7 +14678,7 @@ function insightBuildRows(){
     const bdId=insightBdIdFor(p);
     const mergedSeries=insightMergedSeriesFor(p, rgQtyById, bdId);
     const recent=insightRecentTotals(mergedSeries);
-    const c=insightCalcNeeded(p, mergedSeries);
+    const c=insightCalcNeeded(p, mergedSeries, seasonIndex);
     const grade=getAbcGrade(p);
     const er=insightEffectiveReorder(p, c);
     // 패밀리 오더(타업체 사입) 매칭 — pending 계산에 먼저 반영해야 발주마감일·권장발주 등이 전부 정확해진다
@@ -14863,7 +14941,7 @@ function insightRenderCoverSummary(){
   const later=all.filter(r=>r.winterCover.status==='later').length;
   // 부족: 추가 발주 마감이 가장 임박한(이미 늦은 것 포함) 순 → 같으면 부족분 큰 순
   const ob=r=>{ const s=r.winterCover.scenarios.base; return s.orderBy?s.daysToOrderBy:99999; };
-  const short=ok.filter(r=>r.winterCover.verdict==='short').sort((a,b)=>(ob(a)-ob(b))||(b.winterCover.shortQty-a.winterCover.shortQty));
+  const short=ok.filter(r=>r.winterCover.verdict==='short').sort((a,b)=>(b.winterCover.level-a.winterCover.level)||(b.winterCover.shortQty-a.winterCover.shortQty));   // 발주 우선순위 = 판매량(최근 3개월 월평균) 많은 순
   const tight=ok.filter(r=>r.winterCover.verdict==='tight').sort((a,b)=>a.winterCover.ratio-b.winterCover.ratio);
   const enough=ok.filter(r=>r.winterCover.verdict==='ok').sort((a,b)=>a.p.name.localeCompare(b.p.name));
   const noData=all.filter(r=>r.winterCover.status==='nodata').length;
@@ -14875,11 +14953,11 @@ function insightRenderCoverSummary(){
     const otNote=(wc0&&wc0.onTimePct!=null)?`과거 입고 기록 기준 오늘 발주 시 ${startTxt} 전 도착 가능성은 약 ${wc0.onTimePct}%입니다. `:'';
     const lateNote=later?` · 구간 시작까지 아직 멀어 점검 대상 아님 ${later}개`:'';
     bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;">🧮 지금 확보분(현재고+진행중 발주)으로 ${startTxt}~${endTxt}를 버틸 수 있는지 전 제품 점검 (리드타임 2개월 반영)</div>
-      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">🔴 부족 <b>${short.length}</b>개 · ⚠ 빠듯 ${tight.length}개 · ✅ 충분 ${enough.length}개${noData?` · 판매데이터 부족으로 판정 불가 ${noData}개`:''}${lateNote} — 예상 판매는 여러 방법의 평균(기준)에 실제 판매로 검증한 오차를 반영해 낙관/기준/보수로 계산합니다. 판정은 <b>등급별 안전 목표</b>(A 약 90% · B 약 80% · C 기준 수준) 충족 여부예요 — 충분=목표 충족, 빠듯=기준은 버티나 목표 미달, 부족=기준 예상에도 모자람. 부족 목록은 <b>추가 발주 마감이 임박한 순</b>(마감 = min(재고 소진일, 생산 중단 12/1) − 리드타임 2개월)입니다. ${otNote}상품명을 클릭하면 근거를 볼 수 있어요.</div>`;
+      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">🔴 부족 <b>${short.length}</b>개 · ⚠ 빠듯 ${tight.length}개 · ✅ 충분 ${enough.length}개${noData?` · 판매데이터 부족으로 판정 불가 ${noData}개`:''}${lateNote} — 예상 판매는 여러 방법의 평균(기준)에 실제 판매로 검증한 오차를 반영해 낙관/기준/보수로 계산합니다. 판정은 <b>등급별 안전 목표</b>(A 약 90% · B 약 80% · C 기준 수준) 충족 여부예요 — 충분=목표 충족, 빠듯=기준은 버티나 목표 미달, 부족=기준 예상에도 모자람. 부족 목록은 <b>판매량(최근 3개월 월평균)이 많은 순</b>으로 정렬한 발주 우선순위입니다(많이 팔리는 상품부터). 추가 발주 마감일은 각 행에 표시돼요(마감 = min(재고 소진일, 생산 중단 12/1) − 리드타임 2개월). ${otNote}상품명을 클릭하면 근거를 볼 수 있어요.</div>`;
   }
   const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
   const n=v=>Math.round(v).toLocaleString();
-  const rowHtml=r=>{
+  const rowHtml=(r,rank)=>{
     const wc=r.winterCover, st=_INS_COVER_STYLE[wc.verdict], sc=wc.scenarios;
     const pct=wc.ratio!=null?Math.round(wc.ratio*100):0;
     const body = wc.verdict==='short'
@@ -14891,16 +14969,16 @@ function insightRenderCoverSummary(){
     return `<div class="iss-row">
       <div style="flex:1;min-width:0;">
         <div class="iss-name" onclick="closeModal('insightSeasSummaryModal');insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이·발주 근거를 자세히 볼 수 있어요">${r.p.name}</div>
-        <div class="iss-code">${r.p.code} · ${wc.mode==='lastyear'?'작년 실적 포함':'작년 실적 없음(추정)'} · ${wc.methods.length}가지 방법</div>
+        <div class="iss-code">${rank?`<b style="color:var(--pr);">우선순위 #${rank}</b> · `:''}월 판매 약 ${n(wc.level)}개 · ${r.p.code} · ${wc.mode==='lastyear'?'작년 실적 포함':'작년 실적 없음(추정)'} · ${wc.methods.length}가지 방법</div>
         <div style="font-size:12.5px;margin-top:4px;color:${st.fg};font-weight:600;">${st.icon} ${body}</div>
         <div class="iss-breakdown">확보분 ${n(wc.supply)}개(현재고 ${n(wc.stock)} + 진행중 ${n(wc.pending)}) · 기준 예상 판매 ${n(wc.totalDemand)}개${timing}</div>
       </div>
     </div>`;
   };
   let html='';
-  if(short.length) html+=`<div class="iss-group">🔴 부족 — 추가 발주 검토 (${short.length})</div>`+short.map(rowHtml).join('');
-  if(tight.length) html+=`<div class="iss-group">⚠ 빠듯 (${tight.length})</div>`+tight.map(rowHtml).join('');
-  if(enough.length) html+=`<div class="iss-group">✅ 충분 (${enough.length})</div>`+enough.map(rowHtml).join('');
+  if(short.length) html+=`<div class="iss-group">🔴 부족 — 발주 우선순위: 판매량 많은 순 (${short.length})</div>`+short.map((r,i)=>rowHtml(r,i+1)).join('');
+  if(tight.length) html+=`<div class="iss-group">⚠ 빠듯 (${tight.length})</div>`+tight.map(r=>rowHtml(r)).join('');
+  if(enough.length) html+=`<div class="iss-group">✅ 충분 (${enough.length})</div>`+enough.map(r=>rowHtml(r)).join('');
   const listEl=document.getElementById('insightSeasSummaryList');
   if(listEl) listEl.innerHTML=html||'<div class="ins-empty">해당 상품이 없습니다.</div>';
 }
@@ -14911,7 +14989,9 @@ function insightRowHtml(r){
   const gradeColor={A:'#DC2626',B:'#D97706',C:'#6B7280'}[r.grade]||'#6B7280';
   const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
   let orderCell;
-  const corrBadge=r.c.corrLabel&&r.c.corrLabel!=='보정없음'&&r.c.corrLabel!=='작년 데이터 없음'?`<div class="ins-sub" style="color:${r.c.corrLabel.startsWith('성수기')?'#EA580C':'var(--tx2)'};">${r.c.corrLabel}</div>`:'';
+  const corrBadge=r.c.expert
+    ? `<div class="ins-sub" title="${`전문가 방식: 앞으로 ${Math.round((r.c.expert.L+r.c.expert.R)/30*10)/10}개월 예상 판매 ${Math.round(r.c.expert.dLR).toLocaleString()}개 × 안전배수 ${r.c.expert.k.toFixed(2)} = 목표 확보량 ${Math.round(r.c.expert.targetLR).toLocaleString()}개에서 리드타임 판매·도착시점 재고를 반영 → 권장 ${r.c.needed.toLocaleString()}개 (기존 방식 ${(r.c.neededOld||0).toLocaleString()}개)`}">${r.grade}등급 서비스 ${r.c.expert.pct}${r.c.expert.usedRecent?' · 최근판매 반영':''}</div>`
+    : (r.c.corrLabel&&r.c.corrLabel!=='보정없음'&&r.c.corrLabel!=='작년 데이터 없음'?`<div class="ins-sub" style="color:${r.c.corrLabel.startsWith('성수기')?'#EA580C':'var(--tx2)'};">${r.c.corrLabel}</div>`:'');
   const suspectBadge=r.c.suspect?`<div class="ins-sub" style="color:#DC2626;font-weight:700;" title="최근 데이터가 적은데(30일 중 10일 미만) 발주시점 대비 계산값이 2.5배 넘게 커서 배치 오염·이상치 등으로 부풀려졌을 수 있습니다. 출고 추이 그래프로 직접 확인해보세요.">⚠ 데이터 의심</div>`:'';
   if(r.p.disc) orderCell='<span class="ins-sub">단종 — 발주 불필요</span>';
   else if(r.c.noData) orderCell='<span class="ins-sub">산출불가</span>';
@@ -15000,6 +15080,7 @@ function insightVisibleRows(){
   else if(insightStatusF) rows=rows.filter(r=>r.status===insightStatusF);
   const rank={부족:0,긴급:1,임박:2,정상:3,단종:4};
   rows=[...rows].sort((a,b)=>{
+    if(insightSort==='cover_prio'){ const pr=r=>{ const w=r.winterCover; return (w&&w.status==='ok'&&w.active&&w.verdict==='short')?w.level:-1; }; return pr(b)-pr(a); }
     if(insightSort==='days_asc') return (a.daysLeft==null?Infinity:a.daysLeft)-(b.daysLeft==null?Infinity:b.daysLeft);
     if(insightSort==='boxes_desc') return (b.netBoxes||0)-(a.netBoxes||0);
     if(insightSort==='stock_asc') return a.p.stock-b.p.stock;
@@ -15470,9 +15551,20 @@ function insightRenderCalcDetail(code){
   html+=row2('월 소진량(보정 전 base)', `${c.base.toLocaleString()}개/월`, `일평균 ${(c.base/30).toFixed(1)}개`);
   html+=row2('성수기·비수기 보정', srTxt);
   html+=row2('최종 월 소진량(expM)', `${c.expM.toLocaleString()}개/월`, `일평균판매로 표시되는 값(${c.avgDay}개/일)`);
-  html+=row2('목표 커버리지', `${(c.orderCycle+c.safetyM).toFixed(2)}개월`, `주문주기 ${c.orderCycle}개월 + 안전재고 ${c.safetyM}개월(${r.grade}등급)`);
-  html+=row2('도착시점 예상재고', `${Math.round(c.stockAtDelivery).toLocaleString()}개`, `현재고 ${p.stock.toLocaleString()} − 월소진×리드타임(${Math.round(p.leadTime*30)}일)`);
-  html+=row2('필요수량(needed)', `${c.needed.toLocaleString()}개`, '목표 커버리지 − 도착시점 예상재고');
+  if(c.expert){
+    const e=c.expert;
+    html+=row2('🧮 전문가 방식 — 예상 판매', `${Math.round(e.dLR).toLocaleString()}개`, `앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 동안, ${e.nMethods}가지 방법의 평균 (월 ${Math.round(e.monthly).toLocaleString()}개 수준)`);
+    html+=row2('등급별 안전 배수 k', `×${e.k.toFixed(2)}`, `${e.grade}등급 서비스 수준 ${e.pct} — 이 앱 실제 판매로 검증한 예측 오차 기준(판매 규모가 작을수록 큼)`);
+    html+=row2('목표 확보량', `${Math.round(e.targetLR).toLocaleString()}개`, e.usedRecent?'최근 30일 판매속도로 계산한 값이 더 커서 그 값을 목표로 사용(급증 방어)':'예상 판매 × 안전 배수');
+    html+=row2('리드타임 동안 팔릴 양', `${Math.round(e.dL).toLocaleString()}개`, '이 기간 판매는 이번 발주분으로 못 채우고 현재고에서 나갑니다');
+    html+=row2('도착시점 예상재고', `${Math.round(e.stockAtDelivery).toLocaleString()}개`, `현재고 ${p.stock.toLocaleString()} − 리드타임 판매`);
+    html+=row2('필요수량(needed)', `${c.needed.toLocaleString()}개`, '목표 확보량 − 리드타임 판매 − 도착시점 재고');
+    html+=row2('참고 — 기존 방식', `${(c.neededOld||0).toLocaleString()}개`, `월소진(expM) ${c.expM.toLocaleString()}개 × (주문주기+안전재고 ${(c.orderCycle+c.safetyM).toFixed(2)}개월) − 도착시점 재고. 최근 추세·성수기 보정으로 월소진이 실제와 어긋날 수 있어 더 이상 쓰지 않습니다`);
+  } else {
+    html+=row2('목표 커버리지', `${(c.orderCycle+c.safetyM).toFixed(2)}개월`, `주문주기 ${c.orderCycle}개월 + 안전재고 ${c.safetyM}개월(${r.grade}등급)`);
+    html+=row2('도착시점 예상재고', `${Math.round(c.stockAtDelivery).toLocaleString()}개`, `현재고 ${p.stock.toLocaleString()} − 월소진×리드타임(${Math.round(p.leadTime*30)}일)`);
+    html+=row2('필요수량(needed)', `${c.needed.toLocaleString()}개`, '목표 커버리지 − 도착시점 예상재고');
+  }
   if(r.pending>0) html+=row2('진행중 발주 차감', `−${r.pending.toLocaleString()}개`, '발주관리 미입고 + 패밀리오더 미입고 합산');
   html+=row2('최종 권장 발주', r.netBoxes!=null?`${r.netBoxes.toLocaleString()}박스(${(r.netNeeded||0).toLocaleString()}개)`:'-');
   if(c.suspect) html+='<div class="ins-calc-note" style="color:#DC2626;">⚠ 최근 데이터가 적은데(30일 중 10일 미만) 계산값이 발주시점 역산치의 2.5배를 넘습니다. 배치 입력 오류나 일시적 이상치가 섞였을 수 있으니 위 출고 추이 그래프로 직접 확인해보세요.</div>';
