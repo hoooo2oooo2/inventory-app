@@ -14214,7 +14214,7 @@ function insightRampStartMonth(season){
   }
   return rampStart;
 }
-function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, seasonIndex){
+function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, seasonIndex, cover){
   if(p.disc) return {status:'excluded'};
   if(c.noData) return {status:'nodata'};
   const expM=c.expM;
@@ -14294,16 +14294,23 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
     reason='new';
   }
 
+  // 올해 판매 흐름 반영 — 작년 실적만으로 예상하지 않는다(2026-10-03 사용자 지적: "작년 실적 기준이라는데 올해는 어떻게 될지
+  // 모르잖아, 작년 실적과 현재 판매량을 분석해서"). 구정 커버 점검(insightWinterCoverInfo)이 계산한 기준 시나리오 —
+  // 작년 같은 달 실적×올해 흐름 / 같은 구분 계절패턴 / 최근 수준·최근 30일 속도 중 중간값 — 의 12월~4월 예상 판매를
+  // 예상 필요량으로 쓰고, 낙관~보수 범위도 함께 보여준다. 커버 점검이 불가한 경우(판매데이터 부족 등)에만 위의 기존 계산을 쓴다.
+  let coverBase=null;
+  if(cover && cover.status==='ok'){ coverBase=cover.scenarios.base; forecastTotal=coverBase.win; }
   const daysToClose=Math.round((closeStart-today)/86400000);
   const consumeBeforeClose=Math.max(0,daysToClose)*expM/30;
-  const stockAtStart=Math.max(0, p.stock-consumeBeforeClose);
+  const stockAtStart=coverBase ? Math.max(0, p.stock-coverBase.pre) : Math.max(0, p.stock-consumeBeforeClose);
   const neededQty=Math.max(0, Math.round(forecastTotal-stockAtStart-(pending||0)-(normalNetNeeded||0)));
   const boxes=Math.ceil(neededQty/(p.boxQty||1));
   const deadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
   const daysToDeadline=Math.round((deadline-today)/86400000);
   return {status:'flag', kind:'winter', reason, windowMonths, startDate:closeStart, forecastTotal, stockAtStart, neededQty, boxes,
     deadline, daysToDeadline, overdue:daysToDeadline<0, monthsAway, typeUsed:p.type||'기타',
-    pendingUsed:pending||0, normalNetNeededUsed:normalNetNeeded||0};
+    pendingUsed:pending||0, normalNetNeededUsed:normalNetNeeded||0,
+    coverUsed:!!coverBase, rangeLow:coverBase?cover.scenarios.low.win:null, rangeHigh:coverBase?cover.scenarios.high.win:null};
 }
 // ── 구정 마감 커버 점검 (전 제품) ───────────────────────────────────────
 // "지금 들어가 있는 발주량(현재고+진행중 발주)으로 12월~4월(재발주가 어려운 구간)을 버틸 수 있나?"에 답한다
@@ -14578,8 +14585,8 @@ function insightBuildRows(){
     const hasReliableAccel=!c.noData && c.prev14>0 && c.dataPoints30>=5;
     const surge=hasReliableAccel && c.accel>=1.6;
     const drop=hasReliableAccel && c.accel<=0.5 && p.stock>0;
-    const seasonPre=insightSeasonalPreorderInfo(p, c, pending, season, netNeeded, seasonIndex);
     const winterCover=insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate);
+    const seasonPre=insightSeasonalPreorderInfo(p, c, pending, season, netNeeded, seasonIndex, winterCover);
     return {winterCover,p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue,recent,seasonPre};
   });
 }
@@ -14638,8 +14645,11 @@ function insightSeasonCellHtml(season){
 // 부족한지 한눈에 확인 가능하게(2026-09-30 사용자 요청: "기존 주문이 있는데 부족할 경우 왜 더
 // 추가발주를 해야하는지 분석해서 이유까지 알려달라").
 function insightSeasonalBreakdownText(sp){
-  const lines=[`예상 필요량 ${Math.round(sp.forecastTotal).toLocaleString()}개`,
-    `− 도착시점 예상재고 ${Math.round(sp.stockAtStart).toLocaleString()}개`];
+  const lines=sp.coverUsed
+    ? [`12월~4월 예상 필요량 ${Math.round(sp.forecastTotal).toLocaleString()}개 (낙관 ${Math.round(sp.rangeLow).toLocaleString()} ~ 보수 ${Math.round(sp.rangeHigh).toLocaleString()}개, 작년 실적+올해 판매 흐름 분석)`,
+      `− 12월 시작 시점 예상재고 ${Math.round(sp.stockAtStart).toLocaleString()}개`]
+    : [`예상 필요량 ${Math.round(sp.forecastTotal).toLocaleString()}개`,
+      `− 도착시점 예상재고 ${Math.round(sp.stockAtStart).toLocaleString()}개`];
   if(sp.pendingUsed>0) lines.push(`− 진행중 발주(미입고) ${sp.pendingUsed.toLocaleString()}개`);
   if(sp.normalNetNeededUsed>0) lines.push(`− "권장 발주" 칸의 예정 발주량 ${sp.normalNetNeededUsed.toLocaleString()}개`);
   lines.push(`= 추가로 더 필요한 순수 부족분 ${sp.neededQty.toLocaleString()}개`);
@@ -14656,9 +14666,9 @@ function insightWinterCareCellHtml(sp, pid){
   if(sp.status!=='flag') return '<span class="ins-sub">-</span>';
   const label = sp.reason==='seasonal'?'구정재고 대비(성수기)':sp.reason==='flat'?'구정재고 대비(사계절)':'구정재고 대비(신상품)';
   let closeNote = sp.reason==='seasonal'
-    ? '이 상품은 성수기가 원청 공장 11월~익년3월 마감(생산중단) 기간과 겹칩니다 — 마감 5개월+재개후 리드타임 2개월(총 7개월)치 예상수요, 자체 작년 실적 기준'
+    ? '이 상품은 성수기가 원청 공장 11월~익년3월 마감(생산중단) 기간과 겹칩니다 — 12월~4월 예상 판매를 작년 같은 달 실적과 올해 판매 흐름(최근 3개월 ÷ 작년 같은 달)·최근 판매속도를 함께 분석해 계산했습니다(낙관~보수 범위는 상품명 클릭 시 상세 분석 참고)'
     : sp.reason==='flat'
-      ? '이 상품은 사계절 고르게 팔리지만, 원청 공장 11월~익년3월 마감(생산중단)은 계절과 무관하게 적용됩니다 — 자체 작년 실적 기준 7개월치 예상수요'
+      ? '이 상품은 사계절 고르게 팔리지만, 원청 공장 11월~익년3월 마감(생산중단)은 계절과 무관하게 적용됩니다 — 12월~4월 예상 판매를 작년 실적과 올해 판매 흐름·최근 판매속도를 함께 분석해 계산했습니다'
       : `이 상품은 자체 작년 실적이 없는 신상품입니다. 지금 판매속도를 그대로 미래에 적용하지 않고, 같은 구분(${sp.typeUsed||'기타'}) 상품들이 실제로 겨울철 얼마나 줄고 늘어나는지의 평균 패턴을 반영해 겨울 대비 예상수요를 추정했습니다.`;
   const breakdown=insightSeasonalBreakdownText(sp);
   const dl=`${sp.deadline.getMonth()+1}/${sp.deadline.getDate()}`;
