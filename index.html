@@ -51,6 +51,8 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
 button,input,select,textarea{color:inherit;}
+/* 다크모드 자동완성(autofill) 시 크롬이 밝은 배경을 칠하는 경우 글자가 안 보이는 문제 방지 */
+:root[data-theme="dark"] input:-webkit-autofill,:root[data-theme="dark"] textarea:-webkit-autofill,:root[data-theme="dark"] select:-webkit-autofill{-webkit-text-fill-color:var(--tx) !important;caret-color:var(--tx);box-shadow:0 0 0 1000px var(--bg2) inset !important;}
 select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);}
 select option{background:var(--bg);color:var(--tx);}
 :root{--pr:#3182F6;--prl:#EEF4FF;--bg:#fff;--bg2:#F7F8FA;--bd:rgba(0,0,0,0.08);--tx:#191919;--tx2:#888;}
@@ -1932,6 +1934,17 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lbx-bulk-row input:focus{outline:none;border-color:var(--pr);}
 .lbx-bulk-row input.changed{border-color:var(--pr);background:var(--prl);font-weight:700;}
 .lbx-bulk-empty{text-align:center;color:var(--tx2);padding:30px;font-size:12.5px;}
+.lbx-bulk-hint{font-size:12px;color:var(--tx2);line-height:1.55;margin:2px 0 10px;}
+.lbx-bulk-results{border:1px solid var(--pr);border-radius:10px;margin:-6px 0 12px;overflow:hidden;background:var(--bg);}
+.lbx-bulk-res{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--bd);cursor:pointer;color:var(--tx);}
+.lbx-bulk-res:last-child{border-bottom:none;}
+.lbx-bulk-res:hover,.lbx-bulk-res.first{background:var(--prl);}
+.lbx-bulk-add{font-size:11.5px;font-weight:700;color:var(--pr);flex-shrink:0;}
+.lbx-bulk-sel-head{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--tx);margin:0 0 6px;}
+.lbx-bulk-row-cur{font-size:11.5px;color:var(--tx2);flex-shrink:0;white-space:nowrap;}
+.lbx-bulk-row input{width:96px;}
+.lbx-bulk-x{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;}
+.lbx-bulk-x:hover{color:#DC2626;}
 @media(max-width:1100px){.lbx-wrap3{grid-template-columns:1fr;height:auto;}.lbx-panel{max-height:70vh;}.lbx-stat-kpis{grid-template-columns:repeat(2,1fr);}}
 </style>
 </head>
@@ -2729,7 +2742,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
         <div class="lbx-panel-title">📮 박스 리스트</div>
         <div class="lbx-panel-tools">
           <button class="btn btn-sm" id="lbxHiddenBtn" onclick="lbxToggleShowHidden()">🙈 숨김보기</button>
-          <button class="btn btn-sm" onclick="logiBoxOpenBulkStock()">📋 현재고 일괄입력</button>
+          <button class="btn btn-sm" onclick="logiBoxOpenBulkStock()">📋 현재고 갱신</button>
           <button class="btn btn-pr btn-sm" onclick="logiBoxOpenEdit(null)">＋ 박스 추가</button>
         </div>
       </div>
@@ -2891,15 +2904,18 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   </div>
 </div>
 
-<!-- 택배박스 현재고 일괄입력 모달 -->
+<!-- 택배박스 현재고 갱신 모달 (갱신할 박스만 검색해 담고 새 현재고 입력) -->
 <div class="modal-overlay" id="lbxBulkStockModal">
-  <div class="modal" style="max-width:440px;">
-    <h3>📋 현재고 일괄입력</h3>
-    <div class="lbx-bulk-search"><input type="text" id="lbxBulkSrch" placeholder="박스 검색..." oninput="_lbxBulkListRender()"></div>
+  <div class="modal" style="max-width:560px;">
+    <h3>📋 현재고 갱신</h3>
+    <div class="lbx-bulk-hint">갱신할 박스만 검색해서 담고, 새 현재고를 입력하세요. 담지 않은 박스는 바뀌지 않아요. <span style="white-space:nowrap;">(검색 → Enter → 숫자 입력 → Enter)</span></div>
+    <div class="lbx-bulk-search"><input type="text" id="lbxBulkSrch" placeholder="🔍 박스 검색 (업체·명칭·번호)" oninput="_lbxBulkRender()" onkeydown="_lbxBulkSearchKey(event)" autocomplete="off"></div>
+    <div class="lbx-bulk-results" id="lbxBulkResults" style="display:none;"></div>
+    <div class="lbx-bulk-sel-head"><span>갱신할 박스 <b id="lbxBulkSelCnt">0</b>개</span><button class="btn btn-sm" onclick="_lbxBulkClearSel()">모두 비우기</button></div>
     <div class="lbx-bulk-list" id="lbxBulkList"></div>
     <div class="ma">
       <button class="btn" onclick="closeModal('lbxBulkStockModal')">취소</button>
-      <button class="btn btn-pr" onclick="logiBoxBulkStockSave()">전체 저장</button>
+      <button class="btn btn-pr" id="lbxBulkSaveBtn" onclick="logiBoxBulkStockSave()">저장</button>
     </div>
   </div>
 </div>
@@ -8842,7 +8858,7 @@ function logiBoxRender(){
       <td class="l"><span class="lbx-strong2" ondblclick="lbxBoxDetail(${b.id})" title="더블클릭: 상세보기"><i>📦</i>${_logiEsc(b.name||'-')}</span>${b.hidden?'<span class="lbx-hidebadge">숨김</span>':''}</td>
       <td><span class="lbx-boxno2">${_logiEsc(b.boxNo)||'-'}</span></td>
       <td class="lbx-stockcell2">
-        <span class="lbx-stock-badge2 ${stCls}" data-boxsrch="${_logiEsc(b.name||b.company||'')}" onclick="logiBoxOpenBulkStock(this.dataset.boxsrch)" title="클릭해서 현재고 일괄입력 팝업 열기">${stVal}</span>
+        <span class="lbx-stock-badge2 ${stCls}" data-boxsrch="${_logiEsc(b.name||b.company||'')}" onclick="logiBoxOpenBulkStock(null,${b.id})" title="클릭해서 이 박스의 현재고 갱신 팝업 열기">${stVal}</span>
         <div class="lbx-stockdate2">${lastOrder?`최근주문 ${lastOrder.slice(5)}`:'주문 이력 없음'}${stTag}</div>
         <div class="lbx-stockedit2" onclick="lbxStockHistory(${b.id})" title="클릭: 현재고 수정 이력 보기">${editInfo} 📜</div>
       </td>
@@ -8867,56 +8883,110 @@ function _lbxApplyStock(b, val, who){
   b.stock={};   // 구버전 날짜맵 제거 → 현재고는 stockLog로 일원화
 }
 
-// ── 현재고 일괄입력 팝업 — 리스트 안에서 직접 수정하던 걸(스크롤 중 실수로 값이 바뀌기 쉬웠음)
-// 검색 가능한 팝업으로 분리했다. 입력한 값들을 모아뒀다가 "전체 저장"을 눌러야 한 번에 저장된다.
-let _lbxBulkChanges={};   // { boxId: 입력값(문자열) } — 실제로 건드린 박스만 담김
-function logiBoxOpenBulkStock(presetSearch){
-  _lbxBulkChanges={};
-  const s=document.getElementById('lbxBulkSrch'); if(s) s.value=presetSearch||'';
-  _lbxBulkListRender();
+// ── 현재고 갱신 팝업 (2026-10-03 개편) ──
+// 이전엔 팝업이 전체 박스를 한 줄씩 다 보여주고 거기서 찾아 입력하는 방식이라 불편했다. 이제 "갱신할 박스만"
+// 검색해서 담고(Enter로 첫 결과 추가), 담은 박스에만 새 현재고를 입력한다. 담지 않은 박스는 그대로이며,
+// 값을 입력한 박스만 "저장"을 눌러야 한 번에 저장된다(저장 직전 최신본 재로드로 다른 PC 수정 보호).
+let _lbxBulkSel=[];       // 갱신 대상으로 담은 박스 id (담은 순서)
+let _lbxBulkChanges={};   // { boxId: 입력한 새 현재고(문자열) }
+function logiBoxOpenBulkStock(presetSearch, presetId){
+  _lbxBulkSel=[]; _lbxBulkChanges={};
+  const s=document.getElementById('lbxBulkSrch'); if(s) s.value=(presetId==null && presetSearch)?presetSearch:'';
+  if(presetId!=null && (_logiBoxes||[]).some(b=>b.id===presetId)) _lbxBulkSel.push(presetId);
+  _lbxBulkRender();
   openModal('lbxBulkStockModal');
+  setTimeout(()=>{ const first=document.querySelector('#lbxBulkList input'); (presetId!=null&&first?first:s)?.focus(); },60);
 }
-function _lbxBulkListRender(){
-  const wrap=document.getElementById('lbxBulkList'); if(!wrap) return;
+function _lbxBulkMatches(){
   const srch=(document.getElementById('lbxBulkSrch')?.value||'').toLowerCase().trim();
-  let list=(_logiBoxes||[]).filter(b=>!b.hidden);
-  if(srch) list=list.filter(b=>(b.name||'').toLowerCase().includes(srch)||(b.company||'').toLowerCase().includes(srch)||String(b.boxNo||'').toLowerCase().includes(srch));
-  if(!list.length){ wrap.innerHTML=`<div class="lbx-bulk-empty">${srch?'검색 결과가 없습니다.':'등록된 택배박스가 없습니다.'}</div>`; return; }
-  wrap.innerHTML=list.map(b=>{
+  if(!srch) return [];
+  return (_logiBoxes||[]).filter(b=>!b.hidden && !_lbxBulkSel.includes(b.id) &&
+    ((b.name||'').toLowerCase().includes(srch)||(b.company||'').toLowerCase().includes(srch)||String(b.boxNo||'').toLowerCase().includes(srch)))
+    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ko')).slice(0,8);
+}
+function _lbxBulkRender(){
+  // 1) 검색 결과(담기 전 후보)
+  const res=document.getElementById('lbxBulkResults');
+  if(res){
+    const srch=(document.getElementById('lbxBulkSrch')?.value||'').trim();
+    const m=_lbxBulkMatches();
+    if(!srch){ res.style.display='none'; res.innerHTML=''; }
+    else {
+      res.style.display='block';
+      res.innerHTML=m.length ? m.map((b,i)=>{
+        const ls=_lbxLatestStock(b);
+        return `<div class="lbx-bulk-res${i===0?' first':''}" onclick="_lbxBulkAdd(${b.id})" title="클릭하면 갱신할 박스에 담습니다">
+          <span class="lbx-bulk-row-name">${_logiEsc(b.name||'-')}${_lbxNameTag(b)}</span>
+          <span class="lbx-bulk-row-meta">${_logiEsc(b.company||'-')}</span>
+          <span class="lbx-bulk-row-meta">현재 ${ls?ls.qty.toLocaleString():'-'}</span>
+          <span class="lbx-bulk-add">＋ 담기</span></div>`;
+      }).join('') : '<div class="lbx-bulk-empty" style="padding:14px;">검색 결과가 없습니다 (이미 담았거나 숨긴 박스는 제외).</div>';
+    }
+  }
+  // 2) 담은 박스 + 새 현재고 입력
+  const wrap=document.getElementById('lbxBulkList'); if(!wrap) return;
+  const cnt=document.getElementById('lbxBulkSelCnt'); if(cnt) cnt.textContent=_lbxBulkSel.length;
+  const boxes=_lbxBulkSel.map(id=>(_logiBoxes||[]).find(b=>b.id===id)).filter(Boolean);
+  if(!boxes.length){ wrap.innerHTML='<div class="lbx-bulk-empty">위 검색창에서 갱신할 박스를 찾아 담아 주세요.<br><span style="font-size:11px;">담은 박스만 새 현재고를 입력해서 저장됩니다.</span></div>'; return; }
+  wrap.innerHTML=boxes.map(b=>{
     const ls=_lbxLatestStock(b);
-    const cur=ls?ls.qty:'';
-    const changed=Object.prototype.hasOwnProperty.call(_lbxBulkChanges,b.id);
-    const val=changed?_lbxBulkChanges[b.id]:cur;
+    const val=Object.prototype.hasOwnProperty.call(_lbxBulkChanges,b.id)?_lbxBulkChanges[b.id]:'';
     return `<div class="lbx-bulk-row">
       <span class="lbx-bulk-row-name" title="${_logiEsc(b.name||'-')}">${_logiEsc(b.name||'-')}${_lbxNameTag(b)}</span>
       <span class="lbx-bulk-row-meta">${_logiEsc(b.company||'-')}</span>
-      <input type="number" value="${val}" placeholder="-" class="${changed?'changed':''}" oninput="_lbxBulkSetChange(${b.id},this)">
+      <span class="lbx-bulk-row-cur" title="지금 저장된 현재고">현재 ${ls?ls.qty.toLocaleString():'-'} →</span>
+      <input type="number" min="0" value="${_logiEsc(String(val))}" placeholder="새 현재고" class="${val!==''?'changed':''}" oninput="_lbxBulkSetChange(${b.id},this)" onkeydown="_lbxBulkQtyKey(event)">
+      <button class="lbx-bulk-x" onclick="_lbxBulkRemove(${b.id})" title="목록에서 빼기">✕</button>
     </div>`;
   }).join('');
 }
+function _lbxBulkAdd(id){
+  if(!_lbxBulkSel.includes(id)) _lbxBulkSel.push(id);
+  const s=document.getElementById('lbxBulkSrch'); if(s) s.value='';
+  _lbxBulkRender();
+  // 방금 담은 박스의 입력칸으로 바로 이동 → 숫자 입력 → Enter → 다시 검색창
+  const inputs=document.querySelectorAll('#lbxBulkList input'); const last=inputs[inputs.length-1]; if(last) last.focus();
+}
+function _lbxBulkRemove(id){
+  _lbxBulkSel=_lbxBulkSel.filter(x=>x!==id); delete _lbxBulkChanges[id]; _lbxBulkRender();
+}
+function _lbxBulkClearSel(){ _lbxBulkSel=[]; _lbxBulkChanges={}; _lbxBulkRender(); document.getElementById('lbxBulkSrch')?.focus(); }
 function _lbxBulkSetChange(id, el){
   _lbxBulkChanges[id]=el.value;
-  el.classList.add('changed');
+  el.classList.toggle('changed', el.value!=='');
+}
+function _lbxBulkSearchKey(e){
+  if(e.key==='Enter'){ e.preventDefault(); const m=_lbxBulkMatches(); if(m.length) _lbxBulkAdd(m[0].id); }
+}
+function _lbxBulkQtyKey(e){
+  if(e.key==='Enter'){ e.preventDefault(); const s=document.getElementById('lbxBulkSrch'); if(s){ s.focus(); s.select(); } }
 }
 async function logiBoxBulkStockSave(){
-  const ids=Object.keys(_lbxBulkChanges);
-  if(!ids.length){ toast('변경된 값이 없습니다.'); return; }
-  // 저장 직전 최신본을 재로드해 다른 PC의 동시 수정을 덮어쓰지 않도록 한다(여러 박스를 한 번에 저장하는
-  // 만큼 충돌 시 영향 범위가 커서, 인라인 입력 때보다 이 안전장치가 더 중요하다).
-  const fresh=(await cloudKvLoad('logi_boxes'))||[];
-  const u=window.__CURRENT_USER; const who=u?(u.name||u.username||''):'';
-  let applied=0;
-  ids.forEach(idStr=>{
-    const id=parseInt(idStr);
-    const b=fresh.find(x=>x.id===id); if(!b) return;
-    _lbxApplyStock(b, _lbxBulkChanges[idStr], who);
-    applied++;
-  });
-  _logiBoxes=fresh;
-  await cloudKvSave('logi_boxes', _logiBoxes);
-  closeModal('lbxBulkStockModal');
-  toast(`${applied}개 박스의 현재고가 저장되었습니다.`);
-  logiBoxRender();
+  // 값을 입력한 박스만 저장 대상 — 담았지만 비워둔 박스는 건드리지 않는다
+  const ids=_lbxBulkSel.filter(id=>_lbxBulkChanges[id]!==undefined && String(_lbxBulkChanges[id]).trim()!=='');
+  const emptyCnt=_lbxBulkSel.length-ids.length;
+  if(!_lbxBulkSel.length){ toast('갱신할 박스를 먼저 담아 주세요.'); document.getElementById('lbxBulkSrch')?.focus(); return; }
+  if(!ids.length){ toast('새 현재고를 입력한 박스가 없습니다.'); return; }
+  const bad=ids.find(id=>{ const n=Number(_lbxBulkChanges[id]); return isNaN(n) || n<0; });
+  if(bad!==undefined){ toast('현재고는 0 이상의 숫자로 입력해 주세요.'); return; }
+  const btn=document.getElementById('lbxBulkSaveBtn'); if(btn) btn.disabled=true;
+  try{
+    // 저장 직전 최신본을 재로드해 다른 PC의 동시 수정을 덮어쓰지 않도록 한다
+    const fresh=(await cloudKvLoad('logi_boxes'))||[];
+    const u=window.__CURRENT_USER; const who=u?(u.name||u.username||''):'';
+    let applied=0;
+    ids.forEach(id=>{
+      const b=fresh.find(x=>x.id===id); if(!b) return;
+      _lbxApplyStock(b, _lbxBulkChanges[id], who);
+      applied++;
+    });
+    if(!applied){ toast('저장할 박스를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.'); return; }
+    _logiBoxes=fresh;
+    await cloudKvSave('logi_boxes', _logiBoxes);
+    closeModal('lbxBulkStockModal');
+    toast(`${applied}개 박스의 현재고가 저장되었습니다.${emptyCnt?` (값을 비워둔 ${emptyCnt}개는 제외)`:''}`);
+    logiBoxRender();
+  } finally { if(btn) btn.disabled=false; }
 }
 function logiBoxOpenEdit(id){
   const b=id!=null?(_logiBoxes||[]).find(x=>x.id===id):null;
@@ -14312,6 +14382,11 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate){
     methods.push({id:'category', label:`같은 구분(${p.type||'기타'}) 평균 계절패턴 × 현재 수준`, map:mp}); }
   { const mp={}; hm.forEach(h=>{ mp[key(h.y,h.m)]=level; });
     methods.push({id:'flat', label:'최근 수준 그대로 유지(계절 무시)', map:mp}); }
+  // ④ 최근 30일 판매속도 유지 — 3개월 평균과 15% 넘게 다르면(최근 급증·급감이 3개월 평균에 묻히는 경우) 별도 방법으로 추가해
+  //    낙관~보수 범위가 최근 흐름을 반영하게 한다(2026-10-03: 울트론 가로등처럼 최근 한 달 판매가 3개월 평균의 2배인 신상품).
+  { const r30=(c.avg30>0?c.avg30*30:0);
+    if(r30>0 && Math.abs(r30-level)>level*0.15){ const mp={}; hm.forEach(h=>{ mp[key(h.y,h.m)]=r30; });
+      methods.push({id:'recent30', label:'최근 30일 판매속도 유지', map:mp}); } }
   // ── 입고 예상일: 가장 오래된 미입고 주문일 + 리드타임(2개월). 이미 지났으면 곧 입고로 간주 ──
   let eta=null;
   if(pending>0){
@@ -14352,7 +14427,8 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate){
   let low, base, high;
   if(sims.length>=3){
     low=mk('low','낙관(수요 적게)',sims[0].sim,sims[0].label);
-    base=mk('base','기준',sims[1].sim,sims[1].label);
+    const mid=sims[Math.floor(sims.length/2)];   // 3개면 가운데, 4개면 위쪽 가운데(보수 쪽으로 치우치게)
+    base=mk('base','기준',mid.sim,mid.label);
     high=mk('high','보수(수요 많게)',sims[sims.length-1].sim,sims[sims.length-1].label);
   } else {
     const avgMap={}; Object.keys(sims[0].map).forEach(k=>{ avgMap[k]=(sims[0].map[k]+sims[1].map[k])/2; });
@@ -14434,7 +14510,7 @@ function insightCoverDetailHtml(wc, p){
   }).join('');
   // 근거
   const why=[];
-  why.push(`<b>예상 판매는 서로 다른 ${wc.methods.length}가지 방법</b>으로 따로 추정해 가장 적은 값=낙관, 중간=기준, 가장 많은 값=보수로 봤습니다${wc.methods.length<3?' (이 상품은 작년 실적이 없어 2가지)':''}:`);
+  why.push(`<b>예상 판매는 서로 다른 ${wc.methods.length}가지 방법</b>으로 따로 추정해 가장 적은 값=낙관, 중간=기준, 가장 많은 값=보수로 봤습니다${wc.mode==='estimate'?' (이 상품은 작년 실적이 없어 작년 기반 방법은 제외)':''}:`);
   wc.methods.slice().sort((a,b)=>a.total-b.total).forEach(m=>why.push(`　${m.label}: ${endTxt}까지 ${n(m.total)}개`));
   if(wc.mode==='lastyear'){
     why.push(`참고 — 작년 같은 구간(${wc.refStartLbl}~${wc.refEndLbl}) 실제 판매 ${n(wc.refWinTotal)}개 (월평균 ${n(wc.refWinTotal/5)}개). 월별 흐름은 아래 월별 표를 참고하세요.`);
@@ -14747,7 +14823,7 @@ function insightRenderCoverSummary(){
     return `<div class="iss-row">
       <div style="flex:1;min-width:0;">
         <div class="iss-name" onclick="closeModal('insightSeasSummaryModal');insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이·발주 근거를 자세히 볼 수 있어요">${r.p.name}</div>
-        <div class="iss-code">${r.p.code} · ${wc.mode==='lastyear'?'작년 실적 포함 3가지 방법':'신상품 추정(2가지 방법)'}</div>
+        <div class="iss-code">${r.p.code} · ${wc.mode==='lastyear'?'작년 실적 포함':'작년 실적 없음(추정)'} · ${wc.methods.length}가지 방법</div>
         <div style="font-size:12.5px;margin-top:4px;color:${st.fg};font-weight:600;">${st.icon} ${body}</div>
         <div class="iss-breakdown">확보분 ${n(wc.supply)}개(현재고 ${n(wc.stock)} + 진행중 ${n(wc.pending)}) · 기준 예상 판매 ${n(wc.totalDemand)}개${timing}</div>
       </div>
@@ -26232,6 +26308,39 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
     e.preventDefault(); e.stopPropagation();
     try{ t.close(); }catch(err){ console.warn('ESC 팝업 닫기 실패', err); }
   }, true);
+})();
+
+// ── 다크모드 입력창 가독성 안전장치 (2026-10-03 사용자 리포트: 다크모드에서 숫자 입력하면 흰 바탕에 흰 글씨) ──
+// 입력창 글자색은 대부분 var(--tx)(다크모드에선 밝은색)를 따라가는데, 일부 입력창은 배경이 밝은 고정색이라
+// 글자가 안 보인다. 어느 입력창이든(코드로 만든 것 포함) 입력하거나 포커스될 때 글자색과 실제 배경색의 대비가 낮으면
+// 글자색을 어둡게/밝게 자동으로 바로잡는다. 다크모드가 아니면 아무것도 하지 않고, 라이트 전환 시 원래대로 되돌린다.
+(function(){
+  const SKIP=['checkbox','radio','hidden','file','range','color','button','submit','reset','image'];
+  const parse=c=>{ const m=String(c).match(/[\d.]+/g); return (m&&m.length>=3)?{r:+m[0],g:+m[1],b:+m[2],a:m.length>3?+m[3]:1}:null; };
+  const lum=({r,g,b})=>{ const f=v=>{ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }; return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b); };
+  const effBg=el=>{ for(let e=el;e&&e.nodeType===1;e=e.parentElement){ const p=parse(getComputedStyle(e).backgroundColor); if(p&&p.a>0.5) return p; } return {r:255,g:255,b:255,a:1}; };
+  const isDark=()=>document.documentElement.getAttribute('data-theme')==='dark';
+  const restore=el=>{
+    if(el.dataset.cfix===undefined) return;
+    const o=el.dataset.cfixOrig||''; if(o) el.style.setProperty('color',o); else el.style.removeProperty('color');
+    delete el.dataset.cfix; delete el.dataset.cfixOrig;
+  };
+  const fix=el=>{
+    if(!el || !el.tagName || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || SKIP.includes(el.type)) return;
+    restore(el);                       // 이전에 우리가 바꾼 값은 되돌리고 다시 판단
+    if(!isDark()) return;
+    const fg=parse(getComputedStyle(el).color); if(!fg) return;
+    const bg=effBg(el), L1=lum(fg), L2=lum(bg);
+    const ratio=(Math.max(L1,L2)+0.05)/(Math.min(L1,L2)+0.05);
+    if(ratio>=3) return;
+    el.dataset.cfixOrig=el.style.getPropertyValue('color')||'';
+    el.dataset.cfix='1';
+    el.style.setProperty('color', L2>0.4?'#191919':'#EDEDED', 'important');
+  };
+  ['focusin','input','change'].forEach(ev=>document.addEventListener(ev, e=>fix(e.target), true));
+  // 다크↔라이트 전환 시 화면에 보이는 입력창 일괄 재판정
+  new MutationObserver(()=>{ document.querySelectorAll('input,textarea,select').forEach(el=>{ if(el.offsetParent!==null || el.dataset.cfix!==undefined) fix(el); }); })
+    .observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 })();
 
 // ══════════════════════════════════════════════
