@@ -14406,7 +14406,7 @@ function insightCoverDetailHtml(wc, p){
     }</tbody></table>`:'';
   // 월별 표 (예상 판매는 낙관~보수 범위, 월말 재고는 기준)
   const mRows=base.months.map((m,i)=>{
-    const lo=low.months[i].demand, hi=high.months[i].demand;
+    const ds=[low,base,high].map(s=>s.months[i].demand), lo=Math.min(...ds), hi=Math.max(...ds);   // 월별 최소~최대(시나리오 합계 순서와 월별 순서는 다를 수 있음)
     const out=m.endStock<=0;
     return `<tr><td>${m.m+1}월${m.partial?' <span style="color:var(--tx2);">(남은 기간)</span>':''}</td><td style="text-align:right;">${n(lo)}~${n(hi)}개</td><td style="text-align:right;">${n(m.demand)}개</td><td style="text-align:right;${out?'color:#B91C1C;font-weight:700;':''}">${out?'소진':n(m.endStock)+'개'}</td></tr>`;
   }).join('');
