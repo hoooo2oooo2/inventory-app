@@ -14214,20 +14214,27 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
     pendingUsed:pending||0, normalNetNeededUsed:normalNetNeeded||0};
 }
 // ── 구정 마감 커버 점검 (전 제품) ───────────────────────────────────────
-// "지금 들어가 있는 발주량(현재고+진행중 발주)으로 원청 공장 마감 기간을 버틸 수 있나?"에 답한다
+// "지금 들어가 있는 발주량(현재고+진행중 발주)으로 12월~4월(재발주가 어려운 구간)을 버틸 수 있나?"에 답한다
 // (2026-10-02 사용자 요청: 항아리 정원등-노란빛에 1200개 주문이 들어가 있는데 작년 구정 판매량·현재
-// 판매량과 비교해 충분한지 분석, 전 제품에 적용). 기존 구정재고 대비(insightSeasonalPreorderInfo)는
-// 비겨울 성수기 상품에 계산을 생략하고 "권장 발주"까지 차감한 추가 필요량만 보여주므로, 이 점검은
-// 그와 별개로 모든 상품에 대해 "현재 확보분 vs 마감~재개 후 첫 입고 가능 시점(5/31)까지의 예상 판매"를 비교한다.
-//  · 마감 전(오늘~10/31): 현재 판매속도(expM)
-//  · 마감 구간(11/1~5/31, 마감5개월+재개후 리드타임2개월=7개월): 작년 같은 구간 월별 실적 × 올해 흐름 배율
-//    (최근 3개월 실적 / 작년 같은 3개월, 0.5~2배로 제한). 작년 실적이 없으면 구분별 계절지수로 추정.
-//  · 진행중 발주는 가장 오래된 주문일 + 리드타임에 전량 입고된다고 가정(지났으면 곧 입고로 간주).
-// 계산은 읽기 전용 — 화면 표시용이며 저장되는 값은 없다.
+// 판매량과 비교해 충분한지 분석, 전 제품에 적용 → 같은 날 "기준 구간을 12월~4월로", "리드타임 2개월을
+// 감안한 발주 시점", "낙관·기준·보수 범위와 어느 시점까지 커버되는지"로 재설계). 기존 구정재고 대비
+// (insightSeasonalPreorderInfo, 11월~5월 기준)는 그대로 두고, 이 점검만 별개로 모든 상품을 본다.
+//
+// 예상 판매는 서로 다른 세 가지 방법으로 각각 추정해 낙관(가장 적은 값)·기준(중간)·보수(가장 많은 값)로 보여준다
+// (한 가지 숫자로 단정하면 불확실성이 가려진다는 지적 — 특히 작년 한 해 데이터만으론 계절과 하락 추세를 못 가른다):
+//  ① 작년 같은 달 실적 × 올해 흐름 배율(최근 3개월 ÷ 작년 같은 3개월, 0.5~2배)  — 자체 작년 실적 있을 때만
+//  ② 같은 구분 상품군의 평균 월별 계절패턴 × 현재 수준(계절 영향을 걷어낸 최근 3개월 평균)
+//  ③ 최근 3개월 평균 그대로 유지(계절 무시)
+// 두 가지만 가능하면(신상품) 기준 = 두 방법의 평균.
+// 리드타임은 2개월(SEASONAL_LEAD_MONTHS)로 본다: 진행중 발주는 가장 오래된 주문일+2개월에 전량 입고,
+// 추가 발주 마감일 = 재고 소진 예상일 − 2개월. 계산은 읽기 전용 — 화면 표시용이며 저장되는 값은 없다.
 const INSIGHT_COVER_GROWTH_MIN=0.5;
 const INSIGHT_COVER_GROWTH_MAX=2.0;
-const INSIGHT_COVER_OK_RATIO=1.1;     // 확보분이 예상 판매의 110% 이상이면 충분
+const INSIGHT_COVER_OK_RATIO=1.1;     // 기준 시나리오에서 확보분이 예상 판매의 110% 이상이면 충분
 const INSIGHT_COVER_TIGHT_RATIO=0.95; // 95~110%는 빠듯, 미만은 부족
+const INSIGHT_COVER_START_MONTH=11;   // 12월(0-idx) — 구간 시작
+const INSIGHT_COVER_END_MONTH=3;      // 4월(0-idx) — 구간 끝(그 달 말일까지)
+const INSIGHT_COVER_SHOW_DAYS=150;    // 구간 시작까지 이보다 많이 남았으면 아직 재발주 가능한 시기라 점검 대상 아님
 function _insightFirstSaleDate(p){
   let e=null;
   [CUR_YEAR-2, CUR_YEAR-1, CUR_YEAR].forEach(y=>getTotalM(p,y).forEach((v,i)=>{ if(v>0){ const d=new Date(y,i,1); if(!e||d<e) e=d; } }));
@@ -14236,74 +14243,109 @@ function _insightFirstSaleDate(p){
 function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate){
   if(p.disc) return {status:'excluded'};
   if(c.noData || !(c.expM>0)) return {status:'nodata'};
+  const DAY=86400000;
   const today=new Date(); today.setHours(0,0,0,0);
-  // 대상 마감 사이클: 6~12월이면 올해 11월 시작, 1~5월이면(이미 마감 중) 작년 11월 시작
-  const Y = MONTH<=4 ? CUR_YEAR-1 : CUR_YEAR;
-  const closeStart=new Date(Y,10,1), windowEnd=new Date(Y+1,5,1); // 6/1 미만까지(=5/31)
-  const winIdx=[10,11,0,1,2,3,4];
+  const nextDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+  // 대상 사이클: 5~12월이면 올해 12월 시작, 1~4월이면(이미 구간 중) 작년 12월 시작
+  const Y = MONTH<=INSIGHT_COVER_END_MONTH ? CUR_YEAR-1 : CUR_YEAR;
+  const closeStart=new Date(Y,INSIGHT_COVER_START_MONTH,1);
+  const windowEnd=new Date(Y+1,INSIGHT_COVER_END_MONTH+1,1); // 5/1 미만까지(=4/30)
+  const daysToClose=Math.round((closeStart-today)/DAY);
+  if(daysToClose>INSIGHT_COVER_SHOW_DAYS) return {status:'later', daysToClose, closeStart};
+  const leadDays=SEASONAL_LEAD_MONTHS*30;
+  // 오늘이 속한 달부터 구간 끝까지의 달 목록
+  const hm=[]; for(let d=new Date(today.getFullYear(),today.getMonth(),1); d<windowEnd; d=new Date(d.getFullYear(),d.getMonth()+1,1)) hm.push({y:d.getFullYear(),m:d.getMonth()});
+  const key=(y,m)=>y+'-'+m;
   const firstSale=_insightFirstSaleDate(p);
-  // 1) 작년 같은 구간 월별 실적(1회성 대량주문 제거 반영)
-  const refYm=winIdx.map(mi=>[mi>=10?Y-1:Y, mi]);
-  const refVals=refYm.map(([yy,mm])=>_insightDeOutlierMonth(p.code, yy, mm, getTotalM(p,yy)[mm]||0));
-  const refTotal=refVals.reduce((a,b)=>a+b,0);
-  const refComplete=!!firstSale && firstSale<=new Date(Y-1,10,1);
-  const useRef=refComplete && refTotal>0;
-  // 2) 올해 흐름 배율 — 최근 완결 3개월 vs 작년 같은 3개월(같은 달끼리 비교해 계절 영향 제거)
-  let gCur=0, gPrev=0, gFirst=null; const gLbl=[];
+  const idxArr=insightSeasonIndexFor(seasonIndex, p.type);
+  // 현재 수준 — 최근 완결 3개월 월평균(전 기간 판매 이력이 있을 때), 아니면 최근 30일 속도
+  let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null; const lvLbl=[];
   for(let k=3;k>=1;k--){
     let m=MONTH-k, y=CUR_YEAR; if(m<0){ m+=12; y--; }
-    gCur+=getTotalM(p,y)[m]||0; gPrev+=getTotalM(p,y-1)[m]||0;
-    gLbl.push((m+1)+'월'); if(k===3) gFirst=new Date(y-1,m,1);
+    lvSum+=getTotalM(p,y)[m]||0; gPrev+=getTotalM(p,y-1)[m]||0; idxSum+=Math.max(idxArr[m]||1,0.3);
+    lvLbl.push((m+1)+'월'); if(k===3){ lvFirst=new Date(y,m,1); gFirst=new Date(y-1,m,1); }
   }
+  const lvOk=!!firstSale && firstSale<=lvFirst;
+  const level=lvOk ? lvSum/3 : (c.avg30>0 ? c.avg30*30 : c.expM);
+  const levelIdx=lvOk ? idxSum/3 : Math.max(idxArr[MONTH]||1,0.3);
+  const levelNote=lvOk ? `최근 3개월(${lvLbl.join('·')}) 월평균` : '최근 30일 판매속도';
+  // 올해 흐름 배율
   const gOk=!!firstSale && !!gFirst && firstSale<=gFirst && gPrev>=30;
-  const growthRaw=gOk?gCur/gPrev:null;
+  const growthRaw=gOk?lvSum/gPrev:null;
   const growth=gOk?Math.min(INSIGHT_COVER_GROWTH_MAX,Math.max(INSIGHT_COVER_GROWTH_MIN,growthRaw)):1;
-  // 3) 마감 구간 월별 예상 판매
-  const monthDemand={};
-  if(useRef){
-    winIdx.forEach((mi,j)=>{ monthDemand[mi]=refVals[j]*growth; });
-  } else {
-    // 자체 작년 실적이 없는 신상품 — 최근 30일 속도를 구분별 계절지수로 재분배(0.5~2배 안전판, 신상품 겨울마감 계산과 동일 방식)
-    const baseRate=(c.avg30>0 ? c.avg30*30 : c.expM);
-    const idx=insightSeasonIndexFor(seasonIndex, p.type);
-    const impliedAvg=baseRate/Math.max(idx[MONTH]||1,0.3);
-    let tot=0; winIdx.forEach(mi=>{ monthDemand[mi]=impliedAvg*(idx[mi]||1); tot+=monthDemand[mi]; });
-    const flat=baseRate*winIdx.length;
-    if(tot>0 && flat>0){ const clamped=Math.min(Math.max(tot,flat*0.5),flat*2); winIdx.forEach(mi=>{ monthDemand[mi]*=clamped/tot; }); }
-  }
-  // 4) 입고 예상일 — 가장 오래된 미입고 주문일 + 리드타임(없으면 지금 즉시 입고로 간주)
-  const lead=(p.leadTime>0?p.leadTime:1.5);
+  // 작년 같은 구간(12월~4월) 실제 판매 — 표시용 근거
+  const refWinVals=[11,0,1,2,3].map(mi=>{ const yy=mi>=11?Y-1:Y; return _insightDeOutlierMonth(p.code, yy, mi, getTotalM(p,yy)[mi]||0); });
+  const refWinTotal=refWinVals.reduce((a,b)=>a+b,0);
+  const refComplete=!!firstSale && firstSale<=new Date(hm[0].y-1,hm[0].m,1);
+  // ── 세 가지 추정 방법별 월 예상 판매 ──
+  const methods=[];
+  const refMap={}; let refTot=0;
+  hm.forEach(h=>{ const v=_insightDeOutlierMonth(p.code,h.y-1,h.m,getTotalM(p,h.y-1)[h.m]||0); refMap[key(h.y,h.m)]=v*growth; refTot+=v; });
+  const useRef=refComplete && refTot>0;
+  if(useRef) methods.push({id:'lastyear', label:'작년 같은 달 실적 × 올해 흐름', map:refMap});
+  { const L0=level/levelIdx, mp={}; let tot=0;
+    hm.forEach(h=>{ const v=L0*(idxArr[h.m]||1); mp[key(h.y,h.m)]=v; tot+=v; });
+    const flat=level*hm.length;
+    if(tot>0 && flat>0){ const cl=Math.min(Math.max(tot,flat*0.5),flat*2); Object.keys(mp).forEach(k=>{ mp[k]*=cl/tot; }); }
+    methods.push({id:'category', label:`같은 구분(${p.type||'기타'}) 평균 계절패턴 × 현재 수준`, map:mp}); }
+  { const mp={}; hm.forEach(h=>{ mp[key(h.y,h.m)]=level; });
+    methods.push({id:'flat', label:'최근 수준 그대로 유지(계절 무시)', map:mp}); }
+  // ── 입고 예상일: 가장 오래된 미입고 주문일 + 리드타임(2개월). 이미 지났으면 곧 입고로 간주 ──
   let eta=null;
   if(pending>0){
-    eta = pendingOldestDate ? new Date(new Date(pendingOldestDate+'T00:00:00').getTime()+lead*30*86400000) : new Date(today);
+    eta=pendingOldestDate ? new Date(new Date(pendingOldestDate+'T00:00:00').getTime()+leadDays*DAY) : new Date(today);
     if(isNaN(eta.getTime()) || eta<today) eta=new Date(today);
   }
-  // 5) 일 단위 재고 시뮬레이션: 오늘 ~ 5/31
-  let stock=p.stock, arrived=false, totalDemand=0, preDemand=0, winDemand=0, preOut=null, runout=null;
-  const months=[]; let curKey=null, curRow=null;
-  for(let d=new Date(today); d<windowEnd; d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)){
-    if(!arrived && pending>0 && d>=eta){ stock+=pending; arrived=true; }
-    const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
-    const inWin=d>=closeStart;
-    const rate=inWin ? (monthDemand[d.getMonth()]||0)/dim : c.expM/30;
-    totalDemand+=rate; if(inWin) winDemand+=rate; else preDemand+=rate;
-    if(stock>=rate) stock-=rate;
-    else { stock=0; if(pending>0 && !arrived){ if(!preOut) preOut=new Date(d); } else if(!runout) runout=new Date(d); }
-    const key=d.getFullYear()+'-'+d.getMonth();
-    if(key!==curKey){ curKey=key; curRow={y:d.getFullYear(), m:d.getMonth(), demand:0, endStock:0, partial:months.length===0 && d.getDate()>1}; months.push(curRow); }
-    curRow.demand+=rate; curRow.endStock=stock;
-  }
+  const arriveIfOrderNow=new Date(today.getTime()+leadDays*DAY);
+  const cpDefs=[[Y,11,31,'12/31'],[Y+1,2,0,null],[Y+1,4,0,'4/30']]
+    .map(([yy,mm,dd,lb])=>{ const dt=new Date(yy,mm,dd); return {date:dt, label:lb||`${dt.getMonth()+1}/${dt.getDate()}`}; })
+    .filter(cp=>cp.date>=today);
   const supply=p.stock+(pending||0);
-  const ratio=totalDemand>0?supply/totalDemand:null;
-  const verdict = ratio==null?'ok' : ratio>=INSIGHT_COVER_OK_RATIO?'ok' : ratio>=INSIGHT_COVER_TIGHT_RATIO?'tight':'short';
-  const shortQty=Math.max(0,Math.round(totalDemand-supply));
-  const surplus=Math.max(0,Math.round(supply-totalDemand));
-  const flatAll=c.expM/30*Math.round((windowEnd-today)/86400000);
-  return {status:'ok', mode:useRef?'lastyear':'estimate', verdict, ratio, supply, stock:p.stock, pending:pending||0,
-    totalDemand, preDemand, winDemand, shortQty, surplus, boxes:Math.ceil(shortQty/(p.boxQty||1)),
-    runout, preOut, eta, etaLate:!!eta && eta>=closeStart, closeStart, windowEnd, daysToClose:Math.round((closeStart-today)/86400000),
-    refTotal, refVals, refComplete, refStartLbl:`${(Y-1)%100}.11`, refEndLbl:`${Y%100}.5`,
-    growth, growthRaw, growthOk:gOk, gCur, gPrev, gLbl, flatAll, months, expM:c.expM};
+  const simulate=map=>{
+    let stock=p.stock, arrived=false, total=0, pre=0, win=0, preOut=null, runout=null, cum=0;
+    const months=[]; let curKey=null, curRow=null; const cps=[];
+    for(let d=new Date(today); d<windowEnd; d=nextDay(d)){
+      if(!arrived && pending>0 && d>=eta){ stock+=pending; arrived=true; }
+      const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+      const rate=(map[key(d.getFullYear(),d.getMonth())]||0)/dim;
+      total+=rate; cum+=rate; if(d>=closeStart) win+=rate; else pre+=rate;
+      if(stock>=rate) stock-=rate;
+      else { stock=0; if(pending>0 && !arrived){ if(!preOut) preOut=new Date(d); } else if(!runout) runout=new Date(d); }
+      const k=key(d.getFullYear(),d.getMonth());
+      if(k!==curKey){ curKey=k; curRow={y:d.getFullYear(), m:d.getMonth(), demand:0, endStock:0, partial:months.length===0 && d.getDate()>1}; months.push(curRow); }
+      curRow.demand+=rate; curRow.endStock=stock;
+      cpDefs.forEach(cp=>{ if(cp.date.getTime()===d.getTime()) cps.push({label:cp.label, date:cp.date, cum, need:Math.max(0,Math.round(cum-supply))}); });
+    }
+    // 추가 발주 마감일 = 소진 예상일 − 리드타임. 이미 지났으면 지금 발주해도 소진 후 도착해서 공백 발생
+    const orderBy=runout?new Date(runout.getTime()-leadDays*DAY):null;
+    const orderOverdue=!!orderBy && orderBy<today;
+    const gapDays=(runout && arriveIfOrderNow>runout) ? Math.ceil((arriveIfOrderNow-runout)/DAY) : 0;
+    return {total, pre, win, preOut, runout, months, cps, orderBy, orderOverdue, gapDays,
+      daysToOrderBy:orderBy?Math.round((orderBy-today)/DAY):null,
+      preOutDays:(preOut && eta)?Math.max(1,Math.round((eta-preOut)/DAY)):0,
+      ratio:total>0?supply/total:null, shortQty:Math.max(0,Math.round(total-supply)), surplus:Math.max(0,Math.round(supply-total))};
+  };
+  const sims=methods.map(m=>({id:m.id,label:m.label,map:m.map,sim:simulate(m.map)})).sort((a,b)=>a.sim.total-b.sim.total);
+  const mk=(id,name,s,label)=>Object.assign({id,name,label},s);
+  let low, base, high;
+  if(sims.length>=3){
+    low=mk('low','낙관(수요 적게)',sims[0].sim,sims[0].label);
+    base=mk('base','기준',sims[1].sim,sims[1].label);
+    high=mk('high','보수(수요 많게)',sims[sims.length-1].sim,sims[sims.length-1].label);
+  } else {
+    const avgMap={}; Object.keys(sims[0].map).forEach(k=>{ avgMap[k]=(sims[0].map[k]+sims[1].map[k])/2; });
+    low=mk('low','낙관(수요 적게)',sims[0].sim,sims[0].label);
+    base=mk('base','기준',simulate(avgMap),'두 방법의 평균');
+    high=mk('high','보수(수요 많게)',sims[1].sim,sims[1].label);
+  }
+  const verdict=base.ratio==null?'ok':base.ratio>=INSIGHT_COVER_OK_RATIO?'ok':base.ratio>=INSIGHT_COVER_TIGHT_RATIO?'tight':'short';
+  return {status:'ok', mode:useRef?'lastyear':'estimate', verdict, scenarios:{low,base,high}, methods:sims.map(s=>({id:s.id,label:s.label,total:s.sim.total})),
+    ratio:base.ratio, supply, stock:p.stock, pending:pending||0, totalDemand:base.total, preDemand:base.pre, winDemand:base.win,
+    shortQty:base.shortQty, surplus:base.surplus, boxes:Math.ceil(base.shortQty/(p.boxQty||1)),
+    runout:base.runout, preOut:base.preOut, eta, etaLate:!!eta && eta>=closeStart, leadDays, arriveIfOrderNow,
+    closeStart, windowEnd, daysToClose, months:base.months,
+    refWinTotal, refStartLbl:`${(Y-1)%100}.12`, refEndLbl:`${Y%100}.4`, refComplete,
+    growth, growthRaw, growthOk:gOk, gCur:lvSum, gPrev, gLbl:lvLbl, level, levelNote, expM:c.expM};
 }
 const _INS_COVER_STYLE={
   ok:{bg:'#E1F5EE',fg:'#0F6E56',icon:'✅',label:'충분'},
@@ -14311,71 +14353,87 @@ const _INS_COVER_STYLE={
   short:{bg:'#FEF2F2',fg:'#B91C1C',icon:'🔴',label:'부족'}
 };
 function _insFmtMD(d){ return d?`${d.getMonth()+1}/${d.getDate()}`:'-'; }
+function _insFmtOrderBy(sc){
+  if(!sc.orderBy) return '필요 없음';
+  if(sc.orderOverdue) return `🚨 이미 늦음(마감 ${_insFmtMD(sc.orderBy)})`;
+  return `${_insFmtMD(sc.orderBy)} (D-${sc.daysToOrderBy})`;
+}
 // 표(진행중 발주 칸) 안에 들어가는 한 줄 칩
 function insightCoverChipHtml(wc){
   if(!wc || wc.status!=='ok') return '';
   const st=_INS_COVER_STYLE[wc.verdict];
   const pct=wc.ratio!=null?Math.round(wc.ratio*100):0;
-  const tip=`구정 마감 커버 점검 (오늘~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})\n확보분 ${Math.round(wc.supply).toLocaleString()}개(현재고 ${Math.round(wc.stock).toLocaleString()} + 진행중 ${Math.round(wc.pending).toLocaleString()}) / 예상 판매 ${Math.round(wc.totalDemand).toLocaleString()}개 = ${pct}%\n상품명을 클릭하면 자세한 분석을 볼 수 있어요.`;
-  const sub = wc.verdict==='short' ? `−${wc.shortQty.toLocaleString()}개`
-    : wc.runout ? `~${_insFmtMD(wc.runout)}` : `${pct}%`;
-  return `<div style="margin-top:3px;"><span class="ins-tag" style="background:${st.bg};color:${st.fg};font-size:10.5px;padding:1px 6px;" title="${tip}">❄구정커버 ${st.icon}${st.label}${wc.verdict==='ok'?'':' '+sub}</span></div>`;
+  const endTxt=_insFmtMD(new Date(wc.windowEnd.getTime()-86400000));
+  const {low,base,high}=wc.scenarios;
+  const tip=`구정 커버 점검 (오늘~${endTxt}, 리드타임 2개월 반영)\n확보분 ${Math.round(wc.supply).toLocaleString()}개(현재고 ${Math.round(wc.stock).toLocaleString()} + 진행중 ${Math.round(wc.pending).toLocaleString()})\n예상 판매 ${Math.round(low.total).toLocaleString()}(낙관) / ${Math.round(base.total).toLocaleString()}(기준) / ${Math.round(high.total).toLocaleString()}(보수)개\n기준 소진 ${base.runout?_insFmtMD(base.runout)+'경':'없음'} · 추가 발주 마감 ${_insFmtOrderBy(base)}\n상품명을 클릭하면 자세한 분석을 볼 수 있어요.`;
+  const sub = wc.verdict==='ok' ? '' : base.runout ? ' '+(base.orderOverdue?'발주늦음':'발주 '+_insFmtMD(base.orderBy)+'까지') : ` ${pct}%`;
+  return `<div style="margin-top:3px;"><span class="ins-tag" style="background:${st.bg};color:${st.fg};font-size:10.5px;padding:1px 6px;" title="${tip}">❄구정커버 ${st.icon}${st.label}${sub}</span></div>`;
 }
 // 출고 추이 팝업의 "구정 마감 대비" 상세 분석 블록
 function insightCoverDetailHtml(wc, p){
-  if(!wc || wc.status==='excluded') return '';
-  if(wc.status==='nodata') return '';
+  if(!wc || wc.status!=='ok') return '';
   const st=_INS_COVER_STYLE[wc.verdict];
   const n=v=>Math.round(v).toLocaleString();
   const endTxt=_insFmtMD(new Date(wc.windowEnd.getTime()-86400000));
+  const startTxt=_insFmtMD(wc.closeStart);
+  const {low,base,high}=wc.scenarios;
   const pct=wc.ratio!=null?Math.round(wc.ratio*100):0;
-  // 결론 한 줄
+  const ymd=d=>`${d.getMonth()+1}/${d.getDate()}`;
+  // 결론
   let headline;
-  if(wc.verdict==='short') headline=`현재 주문분으로는 <b>부족</b>합니다 — 확보분 ${n(wc.supply)}개로 ${endTxt}까지 예상 판매 ${n(wc.totalDemand)}개 중 약 <b>${n(wc.shortQty)}개(${wc.boxes.toLocaleString()}박스)</b>가 모자랄 것으로 예상됩니다 (커버율 ${pct}%).`;
-  else if(wc.verdict==='tight') headline=`확보분이 예상 판매와 <b>거의 비슷해 빠듯</b>합니다 — ${n(wc.supply)}개 vs 예상 ${n(wc.totalDemand)}개 (커버율 ${pct}%). 판매가 조금만 늘어도 ${endTxt} 전에 소진될 수 있어요.`;
-  else headline=`현재 주문분으로 <b>충분</b>합니다 — 확보분 ${n(wc.supply)}개가 ${endTxt}까지 예상 판매 ${n(wc.totalDemand)}개의 ${pct}%이고, 약 ${n(wc.surplus)}개 여유가 있습니다.`;
+  if(wc.verdict==='short') headline=`현재 주문분으로는 <b>부족</b>합니다 — 기준 시나리오로 확보분 ${n(wc.supply)}개가 ${endTxt}까지 예상 판매 ${n(wc.totalDemand)}개의 ${pct}%예요. 약 <b>${n(wc.shortQty)}개(${wc.boxes.toLocaleString()}박스)</b>가 모자라고, 낙관으로 봐도 ${low.shortQty>0?`${n(low.shortQty)}개 부족`:'충분'}, 보수로 보면 ${n(high.shortQty)}개 부족입니다.`;
+  else if(wc.verdict==='tight') headline=`확보분이 예상 판매와 <b>거의 비슷해 빠듯</b>합니다 — ${n(wc.supply)}개 vs 기준 ${n(wc.totalDemand)}개 (커버율 ${pct}%). 보수 시나리오에선 ${high.shortQty>0?n(high.shortQty)+'개 부족':'버팁니다'}.`;
+  else headline=`현재 주문분으로 <b>충분</b>합니다 — 확보분 ${n(wc.supply)}개가 기준 예상 판매 ${n(wc.totalDemand)}개의 ${pct}%이고 약 ${n(wc.surplus)}개 여유가 있습니다. 보수 시나리오에서도 ${high.shortQty>0?n(high.shortQty)+'개 부족':'버팁니다'}.`;
   const lines=[];
-  if(wc.runout) lines.push(`📉 재고는 입고분을 포함해도 약 <b>${wc.runout.getFullYear()}-${String(wc.runout.getMonth()+1).padStart(2,'0')}-${String(wc.runout.getDate()).padStart(2,'0')}</b>경 소진되고, 그 뒤 ${endTxt}까지는 재발주 물량이 도착하기 어렵습니다(마감 5개월 + 재개 후 리드타임 2개월).`);
-  if(wc.preOut) lines.push(`⚠ 진행중 발주가 들어오기 전인 <b>${_insFmtMD(wc.preOut)}경 현재고가 먼저 바닥날</b> 수 있습니다 (입고 예상 ${_insFmtMD(wc.eta)}).`);
-  if(wc.etaLate) lines.push(`🚨 진행중 발주의 입고 예상일(${_insFmtMD(wc.eta)})이 원청 공장 마감(11/1) 이후입니다 — 선적이 늦어지지 않는지 확인이 필요해요.`);
-  // 근거(작년 구정 실적 / 올해 흐름 / 현재 속도)
-  const why=[];
-  if(wc.mode==='lastyear'){
-    why.push(`<b>작년 구정 구간(${wc.refStartLbl}~${wc.refEndLbl}) 실제 판매</b>: ${n(wc.refTotal)}개 (월평균 ${n(wc.refTotal/7)}개)`);
-    if(wc.growthOk){
-      const clamped=Math.abs(wc.growth-wc.growthRaw)>0.001;
-      why.push(`<b>올해 흐름</b>: 최근 3개월(${wc.gLbl.join('·')}) ${n(wc.gCur)}개 ÷ 작년 같은 달 ${n(wc.gPrev)}개 = ${wc.growthRaw.toFixed(2)}배${clamped?` → 과대·과소 추정을 막기 위해 ${wc.growth.toFixed(1)}배로 제한`:''}`);
-    } else {
-      why.push(`<b>올해 흐름</b>: 작년 같은 달 비교 자료가 부족해 배율 1.0배(작년 그대로)로 봤습니다`);
-    }
-    why.push(`→ 마감 구간(11/1~${endTxt}) 예상 판매 <b>${n(wc.winDemand)}개</b> = 작년 ${n(wc.refTotal)}개 × ${wc.growth.toFixed(2)}배`);
-  } else {
-    why.push(`자체 작년 구정 실적이 없는 상품(출시 1년 미만 등)이라, 최근 30일 판매속도를 같은 구분(${p.type||'기타'}) 상품군의 월별 계절 패턴으로 재분배해 마감 구간 예상 판매 <b>${n(wc.winDemand)}개</b>를 추정했습니다 (정확도 낮음).`);
-  }
-  if(wc.preDemand>0) why.push(`<b>마감 전</b>(오늘~10/31) 예상 판매: 현재 속도 월 ${n(wc.expM)}개 기준 <b>${n(wc.preDemand)}개</b>`);
-  why.push(`<b>교차 확인</b>: 지금 판매속도(월 ${n(wc.expM)}개)가 ${endTxt}까지 그대로 이어지면 ${n(wc.flatAll)}개 — 위 예상(${n(wc.totalDemand)}개)과 ${Math.abs(wc.flatAll-wc.totalDemand)<=wc.totalDemand*0.2?'비슷합니다':(wc.flatAll>wc.totalDemand?'비교해 더 큰 값입니다':'비교해 더 작은 값입니다')}`);
-  // 월별 표
-  const rows=wc.months.map(m=>{
-    const low=m.endStock<=0;
-    return `<tr><td>${m.m+1}월${m.partial?' <span style="color:var(--tx2);">(남은 기간)</span>':''}</td><td style="text-align:right;">${n(m.demand)}개</td><td style="text-align:right;${low?'color:#DC2626;font-weight:700;':''}">${low?'소진':n(m.endStock)+'개'}</td></tr>`;
+  // 발주 시점 — 리드타임 2개월
+  if(base.runout){
+    const od=base.orderOverdue
+      ? `<b style="color:inherit;">이미 늦었습니다</b> — 오늘 발주해도 도착은 ${ymd(wc.arriveIfOrderNow)}경이라 기준 소진일(${ymd(base.runout)})보다 약 <b>${base.gapDays}일</b> 늦어 재고 공백이 생깁니다. 최대한 빨리 발주하고 공급처에 단축을 요청하세요.`
+      : `추가 발주는 늦어도 <b>${ymd(base.orderBy)}까지(D-${base.daysToOrderBy})</b> 해야 소진 예상일(${ymd(base.runout)}) 전에 도착합니다 (리드타임 2개월 — 오늘 발주하면 ${ymd(wc.arriveIfOrderNow)}경 도착).`;
+    lines.push(`🛒 ${od}`);
+  } else lines.push(`🛒 기준 시나리오에선 ${endTxt}까지 재고가 버텨 추가 발주 마감일이 없습니다.`);
+  if(wc.preOut) lines.push(`⚠ 진행중 발주(입고 예상 ${ymd(wc.eta)} = 주문일+2개월)가 들어오기 전인 <b>${ymd(wc.preOut)}경 현재고가 먼저 바닥나 약 ${base.preOutDays}일간 공백</b>이 생길 수 있습니다.`);
+  if(wc.etaLate) lines.push(`🚨 진행중 발주의 입고 예상일(${ymd(wc.eta)})이 구간 시작(${startTxt}) 이후입니다 — 선적이 더 늦어지지 않는지 확인이 필요해요.`);
+  // 시나리오 표
+  const scRow=sc=>{
+    const rr=sc.ratio!=null?Math.round(sc.ratio*100):0;
+    const short=sc.shortQty>0;
+    return `<tr><td>${sc.name}</td><td style="text-align:right;">${n(sc.total)}개</td><td style="text-align:right;${short?'font-weight:700;':''}">${short?'−'+n(sc.shortQty)+'개':'+'+n(sc.surplus)+'개'}<span style="color:var(--tx2);font-weight:400;"> (${rr}%)</span></td><td style="text-align:right;">${sc.runout?ymd(sc.runout)+'경':'<span style="color:#0F6E56;font-weight:700;">'+endTxt+'까지 OK</span>'}</td><td style="text-align:right;">${_insFmtOrderBy(sc)}</td></tr>`;
+  };
+  const cpHead=base.cps.length?`<div style="font-size:11.5px;font-weight:700;margin:8px 0 3px;">이 시점까지 커버하려면 추가로 필요한 수량 (낙관 ~ 보수)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="color:var(--tx2);"><th style="text-align:left;font-weight:600;">시점</th><th style="text-align:right;font-weight:600;">낙관</th><th style="text-align:right;font-weight:600;">기준</th><th style="text-align:right;font-weight:600;">보수</th></tr></thead><tbody>${
+      base.cps.map((cp,i)=>`<tr><td>${cp.label}까지</td><td style="text-align:right;">${low.cps[i].need?'+':''}${n(low.cps[i].need)}개</td><td style="text-align:right;font-weight:700;">${cp.need?'+':''}${n(cp.need)}개</td><td style="text-align:right;">${high.cps[i].need?'+':''}${n(high.cps[i].need)}개</td></tr>`).join('')
+    }</tbody></table>`:'';
+  // 월별 표 (예상 판매는 낙관~보수 범위, 월말 재고는 기준)
+  const mRows=base.months.map((m,i)=>{
+    const lo=low.months[i].demand, hi=high.months[i].demand;
+    const out=m.endStock<=0;
+    return `<tr><td>${m.m+1}월${m.partial?' <span style="color:var(--tx2);">(남은 기간)</span>':''}</td><td style="text-align:right;">${n(lo)}~${n(hi)}개</td><td style="text-align:right;">${n(m.demand)}개</td><td style="text-align:right;${out?'color:#B91C1C;font-weight:700;':''}">${out?'소진':n(m.endStock)+'개'}</td></tr>`;
   }).join('');
+  // 근거
+  const why=[];
+  why.push(`<b>예상 판매는 서로 다른 ${wc.methods.length}가지 방법</b>으로 따로 추정해 가장 적은 값=낙관, 중간=기준, 가장 많은 값=보수로 봤습니다${wc.methods.length<3?' (이 상품은 작년 실적이 없어 2가지)':''}:`);
+  wc.methods.slice().sort((a,b)=>a.total-b.total).forEach(m=>why.push(`　${m.label}: ${endTxt}까지 ${n(m.total)}개`));
+  if(wc.mode==='lastyear'){
+    why.push(`참고 — 작년 같은 구간(${wc.refStartLbl}~${wc.refEndLbl}) 실제 판매 ${n(wc.refWinTotal)}개 (월평균 ${n(wc.refWinTotal/5)}개). 월별 흐름은 아래 월별 표를 참고하세요.`);
+    if(wc.growthOk) why.push(`참고 — 올해 흐름: 최근 3개월(${wc.gLbl.join('·')}) ${n(wc.gCur)}개 ÷ 작년 같은 달 ${n(wc.gPrev)}개 = ${wc.growthRaw.toFixed(2)}배${Math.abs(wc.growth-wc.growthRaw)>0.001?` → ${wc.growth.toFixed(1)}배로 제한 적용`:''}`);
+  } else why.push('참고 — 자체 작년 구정 실적이 없는 상품(출시 1년 미만 등)이라 정확도가 낮습니다.');
+  why.push(`현재 수준: ${wc.levelNote} ${n(wc.level)}개/월`);
   return `<div style="margin-bottom:12px;">
-    <div style="font-size:12px;font-weight:700;margin-bottom:6px;"><span class="ins-tag" style="background:${st.bg};color:${st.fg};">${st.icon} ❄ 구정 마감 커버 ${st.label}</span> <span style="font-weight:500;color:var(--tx2);">— 지금 주문분으로 마감 구간을 버틸 수 있을까?</span></div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px;"><span class="ins-tag" style="background:${st.bg};color:${st.fg};">${st.icon} ❄ 구정 커버 ${st.label}</span> <span style="font-weight:500;color:var(--tx2);">— 지금 주문분으로 ${startTxt}~${endTxt}를 버틸 수 있을까? (리드타임 2개월 반영)</span></div>
     <div style="padding:9px 11px;background:${st.bg};color:${st.fg};border-radius:8px;font-size:12.5px;line-height:1.6;">${headline}${lines.map(l=>`<div style="margin-top:5px;">${l}</div>`).join('')}</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12px;">
-      <div style="flex:1;min-width:200px;">
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--tx2);">현재고</span><b>${n(wc.stock)}개</b></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--tx2);">+ 진행중 발주${wc.eta?` (입고 예상 ${_insFmtMD(wc.eta)})`:''}</span><b>${n(wc.pending)}개</b></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;border-top:0.5px solid var(--bd);"><span style="font-weight:700;">= 확보분</span><b>${n(wc.supply)}개</b></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--tx2);">${endTxt}까지 예상 판매</span><b>${n(wc.totalDemand)}개</b></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;border-top:0.5px solid var(--bd);"><span style="font-weight:700;">${wc.shortQty>0?'부족분':'여유분'}</span><b style="color:${st.fg};">${n(wc.shortQty>0?wc.shortQty:wc.surplus)}개</b></div>
-      </div>
-      <div style="flex:1;min-width:200px;">
-        <table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="color:var(--tx2);"><th style="text-align:left;font-weight:600;">월</th><th style="text-align:right;font-weight:600;">예상 판매</th><th style="text-align:right;font-weight:600;">월말 재고</th></tr></thead><tbody>${rows}</tbody></table>
-      </div>
+    <div style="margin-top:8px;font-size:12px;">
+      <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--tx2);">현재고</span><b>${n(wc.stock)}개</b></div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--tx2);">+ 진행중 발주${wc.eta?` (입고 예상 ${ymd(wc.eta)})`:''}</span><b>${n(wc.pending)}개</b></div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0;border-top:0.5px solid var(--bd);"><span style="font-weight:700;">= 확보분</span><b>${n(wc.supply)}개</b></div>
     </div>
-    <div style="margin-top:8px;font-size:11.5px;color:var(--tx2);line-height:1.6;">${why.map(w=>`<div>· ${w}</div>`).join('')}</div>
-    <div style="margin-top:4px;font-size:10.5px;color:var(--tx2);">※ 확보분은 현재고+진행중 발주만이며 "권장 발주" 칸의 정기 발주 예정량은 포함하지 않았습니다. 진행중 발주는 위 입고 예상일에 전량 들어온다고 가정했습니다.</div>
+    <div style="font-size:11.5px;font-weight:700;margin:8px 0 3px;">시나리오별 결과 (오늘~${endTxt})</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="color:var(--tx2);"><th style="text-align:left;font-weight:600;">시나리오</th><th style="text-align:right;font-weight:600;">예상 판매</th><th style="text-align:right;font-weight:600;">확보분 대비</th><th style="text-align:right;font-weight:600;">재고 소진</th><th style="text-align:right;font-weight:600;">추가 발주 마감</th></tr></thead><tbody>${scRow(low)}${scRow(base)}${scRow(high)}</tbody></table>
+    ${cpHead}
+    <div style="font-size:11.5px;font-weight:700;margin:8px 0 3px;">월별 예상 (판매는 낙관~보수 범위, 월말 재고는 기준)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;"><thead><tr style="color:var(--tx2);"><th style="text-align:left;font-weight:600;">월</th><th style="text-align:right;font-weight:600;">예상 판매(범위)</th><th style="text-align:right;font-weight:600;">기준</th><th style="text-align:right;font-weight:600;">월말 재고</th></tr></thead><tbody>${mRows}</tbody></table>
+    <div style="margin-top:8px;font-size:11.5px;color:var(--tx2);line-height:1.6;">${why.map(w=>`<div>${w.startsWith('　')?w:'· '+w}</div>`).join('')}</div>
+    <div style="margin-top:4px;font-size:10.5px;color:var(--tx2);">※ 확보분은 현재고+진행중 발주만이며 "권장 발주" 칸의 정기 발주 예정량은 포함하지 않았습니다. 진행중 발주는 가장 오래된 주문일+2개월에 전량 들어온다고 가정했고, 추가 발주 마감일 = 재고 소진 예상일 − 2개월입니다.</div>
   </div>`;
 }
 function insightBuildRows(){
@@ -14631,31 +14689,39 @@ function insightRenderSeasonalSummary(){
 function insightRenderCoverSummary(){
   const all=insightBuildRows().filter(r=>r.winterCover);
   const ok=all.filter(r=>r.winterCover.status==='ok');
-  const short=ok.filter(r=>r.winterCover.verdict==='short').sort((a,b)=>b.winterCover.shortQty-a.winterCover.shortQty);
+  const later=all.filter(r=>r.winterCover.status==='later').length;
+  // 부족: 추가 발주 마감이 가장 임박한(이미 늦은 것 포함) 순 → 같으면 부족분 큰 순
+  const ob=r=>{ const s=r.winterCover.scenarios.base; return s.orderBy?s.daysToOrderBy:99999; };
+  const short=ok.filter(r=>r.winterCover.verdict==='short').sort((a,b)=>(ob(a)-ob(b))||(b.winterCover.shortQty-a.winterCover.shortQty));
   const tight=ok.filter(r=>r.winterCover.verdict==='tight').sort((a,b)=>a.winterCover.ratio-b.winterCover.ratio);
   const enough=ok.filter(r=>r.winterCover.verdict==='ok').sort((a,b)=>a.p.name.localeCompare(b.p.name));
   const noData=all.filter(r=>r.winterCover.status==='nodata').length;
   const bannerEl=document.getElementById('insightSeasSummaryBanner');
   if(bannerEl){
     const wc0=ok[0]&&ok[0].winterCover;
-    const endTxt=wc0?_insFmtMD(new Date(wc0.windowEnd.getTime()-86400000)):'5/31';
-    bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;">🧮 지금 확보분(현재고+진행중 발주)으로 오늘~${endTxt}(원청 마감 5개월+재개 후 리드타임 2개월)를 버틸 수 있는지 전 제품 점검</div>
-      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">🔴 부족 <b>${short.length}</b>개 · ⚠ 빠듯 ${tight.length}개 · ✅ 충분 ${enough.length}개${noData?` · 판매데이터 부족으로 판정 불가 ${noData}개`:''} — 예상 판매 = 마감 전은 현재 속도, 마감 구간은 작년 같은 구간 실적 × 올해 흐름(최근 3개월 대비 작년 같은 달). 상품명을 클릭하면 근거를 볼 수 있어요.</div>`;
+    const endTxt=wc0?_insFmtMD(new Date(wc0.windowEnd.getTime()-86400000)):'4/30';
+    const startTxt=wc0?_insFmtMD(wc0.closeStart):'12/1';
+    const lateNote=later?` · 구간 시작까지 아직 멀어 점검 대상 아님 ${later}개`:'';
+    bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;">🧮 지금 확보분(현재고+진행중 발주)으로 ${startTxt}~${endTxt}를 버틸 수 있는지 전 제품 점검 (리드타임 2개월 반영)</div>
+      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">🔴 부족 <b>${short.length}</b>개 · ⚠ 빠듯 ${tight.length}개 · ✅ 충분 ${enough.length}개${noData?` · 판매데이터 부족으로 판정 불가 ${noData}개`:''}${lateNote} — 예상 판매는 3가지 방법의 낙관/기준/보수 범위로 계산하고 판정은 기준 시나리오 기준입니다. 부족 목록은 <b>추가 발주 마감이 임박한 순</b>(마감 = 재고 소진 예상일 − 2개월)입니다. 상품명을 클릭하면 근거를 볼 수 있어요.</div>`;
   }
   const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
   const n=v=>Math.round(v).toLocaleString();
   const rowHtml=r=>{
-    const wc=r.winterCover, st=_INS_COVER_STYLE[wc.verdict];
+    const wc=r.winterCover, st=_INS_COVER_STYLE[wc.verdict], sc=wc.scenarios;
     const pct=wc.ratio!=null?Math.round(wc.ratio*100):0;
     const body = wc.verdict==='short'
-      ? `<b>${wc.boxes.toLocaleString()}박스(${n(wc.shortQty)}개)</b> 부족 예상`
+      ? `<b>${wc.boxes.toLocaleString()}박스(${n(wc.shortQty)}개)</b> 부족 예상 <span style="font-weight:400;">(낙관 ${n(sc.low.shortQty)} ~ 보수 ${n(sc.high.shortQty)}개)</span>`
       : wc.verdict==='tight' ? `빠듯 (커버율 ${pct}%)` : `여유 ${n(wc.surplus)}개 (커버율 ${pct}%)`;
+    const timing = sc.base.runout
+      ? ` · 소진 ${_insFmtMD(sc.base.runout)}경 · <b>추가 발주 ${sc.base.orderOverdue?'🚨 이미 늦음':'~'+_insFmtMD(sc.base.orderBy)+'(D-'+sc.base.daysToOrderBy+')'}</b>${sc.base.gapDays?` · 지금 발주해도 ${sc.base.gapDays}일 공백`:''}`
+      : '';
     return `<div class="iss-row">
       <div style="flex:1;min-width:0;">
         <div class="iss-name" onclick="closeModal('insightSeasSummaryModal');insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이·발주 근거를 자세히 볼 수 있어요">${r.p.name}</div>
-        <div class="iss-code">${r.p.code} · ${wc.mode==='lastyear'?'작년 구정 실적 기준':'신상품 추정'}</div>
+        <div class="iss-code">${r.p.code} · ${wc.mode==='lastyear'?'작년 실적 포함 3가지 방법':'신상품 추정(2가지 방법)'}</div>
         <div style="font-size:12.5px;margin-top:4px;color:${st.fg};font-weight:600;">${st.icon} ${body}</div>
-        <div class="iss-breakdown">확보분 ${n(wc.supply)}개(현재고 ${n(wc.stock)} + 진행중 ${n(wc.pending)}) · 예상 판매 ${n(wc.totalDemand)}개${wc.runout?` · 약 ${_insFmtMD(wc.runout)}경 소진`:''}</div>
+        <div class="iss-breakdown">확보분 ${n(wc.supply)}개(현재고 ${n(wc.stock)} + 진행중 ${n(wc.pending)}) · 기준 예상 판매 ${n(wc.totalDemand)}개${timing}</div>
       </div>
     </div>`;
   };
