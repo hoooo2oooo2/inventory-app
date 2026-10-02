@@ -14568,6 +14568,9 @@ function insightWinterCareCellHtml(sp, pid){
   const breakdown=insightSeasonalBreakdownText(sp);
   const dl=`${sp.deadline.getMonth()+1}/${sp.deadline.getDate()}`;
   if(sp.neededQty<=0){
+    // 이 '여유'는 아직 주문하지 않은 "권장 발주" 칸의 예정량까지 넣는다는 전제로 계산된 값 — 그 경우엔 조건부임을 명시
+    // (2026-10-03 사용자 리포트: 권장발주 74개가 뜨는데 구정재고 대비는 '재고여유'라고 떠서 서로 모순돼 보임)
+    if(sp.normalNetNeededUsed>0) return `<span class="ins-tag" style="background:#FFFBEB;color:#92400E;" title="${closeNote}\n\n${breakdown}">❄ ${label}·권장발주 전제</span><div class="ins-sub" title="${breakdown}">현재고·진행중발주만으론 부족 — 권장 발주 ${sp.normalNetNeededUsed.toLocaleString()}개를 넣는다는 전제로 충분</div>`;
     return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">❄ ${label}·재고여유</span><div class="ins-sub" title="${closeNote}\n\n${breakdown}">현재고·진행중발주로 충분</div>`;
   }
   if(insightIsSeasonalChecked(pid)){
@@ -14593,6 +14596,7 @@ function insightSeasonCareCellHtml(sp, pid){
   const breakdown=insightSeasonalBreakdownText(sp);
   const dl=`${sp.deadline.getMonth()+1}/${sp.deadline.getDate()}`;
   if(sp.neededQty<=0){
+    if(sp.normalNetNeededUsed>0) return `<span class="ins-tag" style="background:#FFFBEB;color:#92400E;" title="${closeNote}\n\n${breakdown}">☀ ${label}·권장발주 전제</span><div class="ins-sub" title="${breakdown}">현재고·진행중발주만으론 부족 — 권장 발주 ${sp.normalNetNeededUsed.toLocaleString()}개를 넣는다는 전제로 충분</div>`;
     return `<span class="ins-tag" style="background:#E1F5EE;color:#0F6E56;">☀ ${label}·재고여유</span><div class="ins-sub" title="${closeNote}\n\n${breakdown}">현재고·진행중발주로 충분</div>`;
   }
   if(insightIsSeasonalChecked(pid)){
@@ -14667,7 +14671,9 @@ function insightRenderSeasonalSummary(){
     const body = sp.neededQty>0
       ? `<div style="font-size:12.5px;margin-top:4px;"><b>${sp.boxes.toLocaleString()}박스</b> (${sp.neededQty.toLocaleString()}개) 추가 필요 · <span style="${sp.overdue?'color:#DC2626;font-weight:700;':''}">${sp.overdue?'🚨마감지남 '+fmtDate(sp.deadline):'마감 '+fmtDate(sp.deadline)+'(D-'+sp.daysToDeadline+')'}</span></div>
          <div class="iss-breakdown">${insightSeasonalBreakdownText(sp)}</div>`
-      : `<div style="font-size:12.5px;margin-top:4px;color:#0F6E56;font-weight:700;">✅ 현재고·진행중발주로 충분(추가 발주 불필요)</div>`;
+      : sp.normalNetNeededUsed>0
+        ? `<div style="font-size:12.5px;margin-top:4px;color:#92400E;font-weight:700;">⚠ 권장 발주 ${sp.normalNetNeededUsed.toLocaleString()}개를 넣는다는 전제로 충분 — 현재고·진행중발주만으론 부족</div>`
+        : `<div style="font-size:12.5px;margin-top:4px;color:#0F6E56;font-weight:700;">✅ 현재고·진행중발주로 충분(추가 발주 불필요)</div>`;
     return `<div class="iss-row" style="${checked?'opacity:.5;':''}">
       <input type="checkbox" style="margin-top:3px;" ${checked?'checked':''} onchange="insightToggleSeasonalCheck(${r.p.id}, this.checked)" title="발주 처리 완료 체크(팀 공유, 이번 시즌 동안 유지됩니다)">
       <div style="flex:1;min-width:0;">
