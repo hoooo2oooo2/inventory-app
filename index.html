@@ -4847,6 +4847,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div class="ch">
       <div><div class="ct">발주 입고 체크</div><div class="cs">수정 후 확인 — 완전입고 시 완료탭 이동</div></div>
       <div style="display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-pr btn-sm" onclick="openRecvAdd()" title="발주한 건을 하나씩 직접 등록합니다 (엑셀 업로드 없이)">+ 건별 등록</button>
         <div class="search-box"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="recvSrch" placeholder="상품명, 코드..." oninput="renderRecv()" style="width:110px;"></div>
         <select class="sel" id="recvFilter" onchange="renderRecv()"><option value="">전체</option><option value="대기">대기</option><option value="부분입고">부분입고</option></select>
         <select class="sortsel" id="recvSortSel" onchange="onRecvSort(this.value)" title="정렬">
@@ -6593,6 +6594,24 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <div class="field"><label>2차 입고</label><input type="number" id="in2" placeholder="0"></div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('inModal')">취소</button><button class="btn btn-pr" onclick="saveIn()">등록</button></div>
+  </div>
+</div>
+
+<!-- 발주 입고 체크 — 건별 등록 -->
+<div class="modal-overlay" id="recvAddModal">
+  <div class="modal" style="max-width:480px;">
+    <h3>발주 입고 체크 — 건별 등록</h3>
+    <div class="field" style="margin-bottom:8px;"><label>상품 검색 (상품명·코드)</label>
+      <input type="text" id="recvAddSearch" placeholder="상품명 또는 코드를 입력하세요" oninput="recvAddRenderList()" autocomplete="off"></div>
+    <div id="recvAddList" style="max-height:190px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;margin-bottom:10px;"></div>
+    <div id="recvAddPicked" style="margin-bottom:10px;"></div>
+    <div class="field-grid">
+      <div class="field"><label>주문날짜</label><input type="date" id="recvAddDate"></div>
+      <div class="field"><label>주문수량</label><input type="number" id="recvAddQty" min="1" placeholder="0"></div>
+      <div class="field"><label>1차 입고 (선택)</label><input type="number" id="recvAdd1" min="0" placeholder="0"></div>
+      <div class="field"><label>2차 입고 (선택)</label><input type="number" id="recvAdd2" min="0" placeholder="0"></div>
+    </div>
+    <div class="ma"><button class="btn" onclick="closeModal('recvAddModal')">취소</button><button class="btn btn-pr" id="recvAddSaveBtn" onclick="recvAddSave()">등록</button></div>
   </div>
 </div>
 
@@ -25052,6 +25071,71 @@ async function saveIn(){
   if(data?.[0])receiveList.unshift(mapRecv(data[0]));
   await addHistory({menu:'발주관리',type:'order',code:p.code,name:p.name,desc:'입고등록',before:'-',after:`${qty}개`,user:'수동'});
   closeModal('inModal');renderRecv();
+}
+// ── 발주 입고 체크: 건별 등록 (2026-10-03 요청) ──
+// 지금까지 입고 체크 목록은 엑셀 업로드이거나 "발주 필요 목록"에 뜬 상품의 입고등록 버튼으로만 만들 수 있었다.
+// 목록에 안 뜨는 상품도 상품을 검색해서 한 건씩 직접 등록할 수 있게 한다. 저장 방식은 saveIn과 동일
+// (receive_list insert, 같은 상품·주문일·수량이 이미 있으면 중복 안내).
+let _recvAddPick=null;
+function openRecvAdd(){
+  _recvAddPick=null;
+  document.getElementById('recvAddSearch').value='';
+  document.getElementById('recvAddDate').value=fmtDate(new Date());
+  ['recvAddQty','recvAdd1','recvAdd2'].forEach(id=>{ document.getElementById(id).value=''; });
+  recvAddRenderPicked();
+  recvAddRenderList();
+  openModal('recvAddModal');
+  setTimeout(()=>document.getElementById('recvAddSearch')?.focus(),60);
+}
+function recvAddRenderList(){
+  const box=document.getElementById('recvAddList'); if(!box) return;
+  const q=(document.getElementById('recvAddSearch').value||'').toLowerCase().trim();
+  if(!q){ box.innerHTML='<div class="ins-sub" style="padding:12px;">상품명이나 코드를 입력하면 여기에 검색 결과가 나옵니다.</div>'; return; }
+  const list=products.filter(p=>!p.hidden && (String(p.name||'').toLowerCase().includes(q)||String(p.code||'').toLowerCase().includes(q))).slice(0,30);
+  box.innerHTML=list.length ? list.map(p=>`<div onclick="recvAddPick(${p.id})" style="padding:8px 12px;border-bottom:0.5px solid var(--bd);cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;${_recvAddPick&&_recvAddPick.id===p.id?'background:var(--prl);':''}">
+      <div style="min-width:0;"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(String(p.name||''))}${p.disc?' <span style="font-size:10.5px;color:var(--tx2);">(단종)</span>':''}</div><div style="font-size:11px;color:var(--tx2);">${_esc(String(p.code||''))}</div></div>
+      <div style="font-size:11px;color:var(--tx2);white-space:nowrap;">현재고 ${(p.stock||0).toLocaleString()}</div></div>`).join('')
+    : '<div class="ins-sub" style="padding:12px;">검색 결과가 없습니다.</div>';
+}
+function recvAddPick(id){
+  _recvAddPick=products.find(x=>x.id===id)||null;
+  recvAddRenderPicked(); recvAddRenderList();
+  document.getElementById('recvAddQty')?.focus();
+}
+function recvAddRenderPicked(){
+  const el=document.getElementById('recvAddPicked'); if(!el) return;
+  const p=_recvAddPick;
+  el.innerHTML=p ? `<div style="padding:8px 12px;background:var(--prl);border-radius:8px;font-size:12.5px;">선택: <b>${_esc(String(p.name||''))}</b> <span style="color:var(--tx2);">(${_esc(String(p.code||''))})</span></div>`
+    : '<div style="padding:8px 12px;background:var(--bg2);border-radius:8px;font-size:12.5px;color:var(--tx2);">위에서 상품을 선택해 주세요.</div>';
+}
+async function recvAddSave(){
+  const p=_recvAddPick;
+  if(!p){ toast('상품을 먼저 선택해 주세요.'); document.getElementById('recvAddSearch')?.focus(); return; }
+  const dateVal=document.getElementById('recvAddDate').value;
+  const qty=parseInt(document.getElementById('recvAddQty').value)||0;
+  const in1=Math.max(0,parseInt(document.getElementById('recvAdd1').value)||0), in2=Math.max(0,parseInt(document.getElementById('recvAdd2').value)||0);
+  if(!dateVal){ toast('주문날짜를 입력해 주세요.'); return; }
+  if(qty<=0){ toast('주문수량을 1 이상으로 입력해 주세요.'); document.getElementById('recvAddQty')?.focus(); return; }
+  if(isDup({code:p.code,name:p.name,orderDate:dateVal,orderQty:qty})){
+    document.getElementById('dupMsg').innerHTML=`<strong>${_esc(String(p.name))}</strong> (${_esc(String(p.code))})<br>주문날짜: ${dateVal} | 수량: ${qty}개<br><br>동일한 데이터가 이미 존재합니다.`;
+    closeModal('recvAddModal'); openModal('dupModal'); return;
+  }
+  const btn=document.getElementById('recvAddSaveBtn'); if(btn) btn.disabled=true;
+  try{
+    const {data,error}=await sb.from('receive_list').insert({code:p.code,name:p.name,order_date:dateVal,upload_time:fmtFull(new Date()),order_qty:qty,in1,in2,memos:[],done:false}).select();
+    if(error) throw error;
+    _bumpReceive();
+    if(data?.[0]) receiveList.unshift(mapRecv(data[0]));
+    await addHistory({menu:'발주관리',type:'order',code:p.code,name:p.name,desc:'입고체크 건별 등록',before:'-',after:`${qty}개`,user:'수동'});
+    closeModal('recvAddModal');
+    if(typeof switchRecvTab==='function') switchRecvTab('a');
+    renderRecv();
+    toast(`"${p.name}" ${qty}개를 입고 체크에 등록했어요.`);
+  }catch(e){
+    alert('등록 실패: '+(e.message||e)+'\n잠시 후 다시 시도해 주세요.');
+  }finally{
+    if(btn) btn.disabled=false;
+  }
 }
 function sortRecv(col){ recvSort===col ? recvDir*=-1 : (recvSort=col, recvDir=-1); renderRecv(); }
 function isDup(item){return[...receiveList,...doneList].some(r=>r.orderDate===item.orderDate&&r.code===item.code&&r.name===item.name&&r.orderQty===item.orderQty);}
