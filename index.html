@@ -9985,7 +9985,8 @@ function _lcrActor(){ const u=window.__CURRENT_USER; return u ? (u.name||u.usern
 function _lcrWon(n){ return n!=null ? Math.round(Number(n)||0).toLocaleString('ko-KR')+'원' : '—'; }
 
 async function loadLogiCarrot(){
-  if(!_bdLoaded){ loadBackdata().catch(()=>{}); }   // 제품명 검색(백데이터)에 필요
+  // 제품명 검색·공급가 조회에 백데이터가 필요 — 로드 전에 그리면 공급가가 '—'로 보이므로 기다린다
+  if(!_bdLoaded){ try{ await pcEnsureBackdata(); }catch{} }
   if(!_lcrLoaded){
     const d = await cloudKvLoad('logi_carrot_orders');
     _lcrOrders = Array.isArray(d) ? d : [];
@@ -10023,7 +10024,8 @@ function _lcrAgg(rows){
   rows.forEach(o=>{
     const q=Number(o.qty)||0, p=Number(o.price)||0;
     cnt++; qty+=q; price+=p;
-    if(o.unitCost!=null){ cost+=Number(o.unitCost)*q; mPrice+=p; } else noCost++;
+    const u=_lcrUnit(o);
+    if(u!=null){ cost+=u*q; mPrice+=p; } else noCost++;
   });
   const hasM = cnt-noCost>0;
   return { cnt, qty, price, settle:price, cost:hasM?cost:null,
@@ -10278,8 +10280,14 @@ function lcrUnitCost(productName){
 }
 // 공급가는 주문 등록/수정 시점에 백데이터에서 스냅샷으로 떠서 o.unitCost에 저장해둔 값을 그대로 씀
 // (백데이터 단가가 나중에 바뀌어도 이미 등록된 주문건의 공급가는 그대로 유지되어야 마진이 안 틀어짐)
+// 스냅샷(o.unitCost)이 있으면 그대로, 없을 때(주문 등록 당시 백데이터에 제품이 없었거나 백데이터 로드 전이었던 경우)만
+// 현재 백데이터에서 제품명으로 조회해 보완한다. 저장된 값은 건드리지 않고 표시·집계에만 쓴다.
+function _lcrUnit(o){
+  if(o.unitCost!=null) return Number(o.unitCost);
+  return lcrUnitCost(o.productName);
+}
 function lcrCostCell(o){
-  const unit=o.unitCost;
+  const unit=_lcrUnit(o);
   if(unit==null) return '<span style="color:var(--tx2);">—</span>';
   const qty=Number(o.qty)||0;
   if(qty>1){
@@ -10289,7 +10297,7 @@ function lcrCostCell(o){
 }
 // 마진 = 판매금액(o.price, 행 전체 합산액) - 공급가(o.unitCost × 수량). 공급가 스냅샷이 없으면 계산 불가
 function lcrMargin(o){
-  const unit=o.unitCost;
+  const unit=_lcrUnit(o);
   if(unit==null || o.price==null) return null;
   const qty=Number(o.qty)||0;
   const margin=Number(o.price)-(unit*qty);
@@ -10391,6 +10399,7 @@ async function lcrSave(){
   const qty = _lbxNum(document.getElementById('lcrQty').value);
   const price = _lbxNum(document.getElementById('lcrPrice').value);
   if(!productName){ toast('제품명을 입력하세요.'); document.getElementById('lcrProdName').focus(); return; }
+  if(!_bdLoaded){ try{ await pcEnsureBackdata(); }catch{} }   // 공급가 스냅샷은 백데이터 기준 — 로드 전이면 빈 값으로 저장되므로 대기
   let latest = await cloudKvLoad('logi_carrot_orders');
   latest = Array.isArray(latest) ? latest : [];
   if(editId){
