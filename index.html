@@ -13891,13 +13891,24 @@ function insightRgYms(){
 }
 // 재고관리 상품(code/name) → 백데이터(_bdData) 고유 id. 코드가 있으면 코드로, 'ss소장'처럼 코드가
 // 여러 상품에 공유되거나 코드로 못 찾으면 상품명으로 보조 매칭(_lodMatchType과 동일한 규칙).
+// 대표코드뿐 아니라 별칭코드(aliasCodes — 운영관리 백데이터에서 코드 병합으로 흡수된 코드)로도 매칭한다.
+// (2026-10-06: 별칭으로 들어간 재고관리 상품코드는 대표코드가 아니라 못 찾아 "매칭없음"으로 뜨던 버그 수정)
+// 같은 코드가 여러 백데이터 행에 걸려 있으면 상품명이 같은 행을 우선 고른다.
 function insightBdIdFor(p){
-  const code=String(p.code||'').trim();
-  if(code && code.toLowerCase()!=='ss소장'){
-    const m=_bdData.find(b=>String(b.code||'').trim().toLowerCase()===code.toLowerCase());
-    if(m) return m.id;
+  const code=String(p.code||'').trim().toLowerCase();
+  const pn=normName(p.name);
+  if(code && code!=='ss소장'){
+    const cands=_bdData.filter(b=>
+      String(b.code||'').trim().toLowerCase()===code ||
+      (b.aliasCodes||[]).some(ac=>String(ac||'').trim().toLowerCase()===code));
+    if(cands.length===1) return cands[0].id;
+    if(cands.length>1){
+      const byName=cands.find(b=>normName(b.name)===pn);
+      return (byName||cands[0]).id;
+    }
   }
-  const mn=_bdData.find(b=>String(b.name||'').trim()===String(p.name||'').trim());
+  const mn=_bdData.find(b=>normName(b.name)===pn)
+    || _bdData.find(b=>(b.aliasNames||[]).some(n=>normName(n)===pn));
   return mn ? mn.id : null;
 }
 // 백데이터 id별 {날짜: 판매량} — 세트상품 개입수(rgQtyMultiplier) 반영, 로켓그로스 매출 화면의 '판매량' 컬럼과 동일 기준
