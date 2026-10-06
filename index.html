@@ -560,12 +560,14 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 /* 사이렌(발주 임박 알림) 버튼은 숨김 — 같은 자리에 발주 시뮬레이터(🧮)를 둠(2026-10-06 요청). 발주관리 메뉴의 빨간 배지·펄스 알림은 그대로 동작 */
 #floatWrap{display:none!important;}
 /* 🧮 발주 시뮬레이터(미니 팝업) */
-.sim-fab{position:fixed;bottom:78px;right:18px;z-index:200;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:20px;background:#6D5BD0;color:#fff;box-shadow:0 4px 16px rgba(109,91,208,.45);transition:transform .15s;}
+.sim-fab{position:fixed;bottom:20px;right:74px;z-index:200;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:20px;background:#6D5BD0;color:#fff;box-shadow:0 4px 16px rgba(109,91,208,.45);transition:transform .15s;}
 .sim-fab:hover{transform:scale(1.07);}
-.sim-pop{position:fixed;bottom:134px;right:16px;width:392px;max-width:calc(100vw - 24px);max-height:calc(100vh - 160px);z-index:210;display:none;flex-direction:column;background:var(--bg);border:1.5px solid #6D5BD0;border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.28);overflow:hidden;}
+.sim-pop{position:fixed;bottom:76px;right:16px;width:392px;max-width:calc(100vw - 24px);max-height:calc(100vh - 160px);z-index:210;display:none;flex-direction:column;background:var(--bg);border:1.5px solid #6D5BD0;border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.28);overflow:hidden;}
 .sim-pop.open{display:flex;}
 .sim-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#6D5BD0;color:#fff;font-size:14px;flex-shrink:0;}
 .sim-hd button{border:none;background:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;}
+.sim-hd{cursor:move;user-select:none;}
+.sim-fab,.trk-fab{touch-action:none;}
 .sim-body{padding:12px 14px 14px;overflow-y:auto;overscroll-behavior:contain;}
 .sim-in{width:100%;height:40px;border:1.5px solid var(--bd);border-radius:9px;padding:0 11px;font-size:14px;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
 .sim-in:focus{border-color:#6D5BD0;background:var(--bg);}
@@ -587,7 +589,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .sim-why .ln b{color:var(--tx);}
 .sim-why .ln span{color:var(--tx2);}
 .sim-note{margin-top:10px;font-size:12px;color:var(--tx2);line-height:1.6;}
-html.mob-native .sim-fab{bottom:86px;}
+html.mob-native .sim-fab{bottom:20px;right:74px;}
 html.mob-native .sim-pop{bottom:0;right:0;left:0;width:auto;max-width:none;max-height:88vh;border-radius:16px 16px 0 0;}
 html.mob-native .sim-in{font-size:16px;height:46px;}
 
@@ -6740,7 +6742,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 <!-- ═══ 🧮 발주 시뮬레이터 — 사이렌 자리 ═══ -->
 <button class="sim-fab" id="simFab" onclick="simToggle()" title="발주 시뮬레이터 — 주문할 수량이 충분한지 확인">🧮</button>
 <div class="sim-pop" id="simPop">
-  <div class="sim-hd"><b>🧮 발주 시뮬레이터</b><button onclick="simToggle()" aria-label="닫기">✕</button></div>
+  <div class="sim-hd"><b>🧮 발주 시뮬레이터</b><span style="display:flex;align-items:center;gap:6px;"><button onclick="floatResetPositions()" title="버튼·팝업 위치를 처음 자리로" aria-label="위치 초기화" style="font-size:15px;">↺</button><button onclick="simToggle()" aria-label="닫기">✕</button></span></div>
   <div class="sim-body">
     <input class="sim-in" id="simSearch" placeholder="🔍 상품명·코드로 제품 선택" oninput="simSearch()" onkeydown="if(event.key==='Escape')simToggle()" autocomplete="off">
     <div id="simList"></div>
@@ -26546,6 +26548,56 @@ function updateFloat(){
 //   판정 = 인사이트의 "최종 주문 수량"(평상시 권장 vs 구정 준비 중 큰 값, 진행중 발주 차감 후)과 내 주문량 비교.
 // ══════════════════════════════════════════════
 let _simRows=null, _simRowsAt=0, _simRow=null, _simBusy=false;
+// ── 떠 있는 버튼·팝업 위치 이동(드래그) — 통합 데이터 등 화면 오른쪽 아래의 버튼을 가리지 않게. 위치는 이 브라우저에 저장 ──
+//  · 🧮 계산기 버튼 / 🚚 송장조회 버튼: 끌어서 이동(짧게 눌러 클릭하면 기존처럼 열림)
+//  · 계산기 팝업: 위쪽 제목줄을 끌어서 이동. ↺ 버튼으로 모두 처음 자리로
+function _floatPlace(el, x, y){
+  const w=el.offsetWidth||46, h=el.offsetHeight||46;
+  x=Math.min(Math.max(0,x), Math.max(0,innerWidth-w)); y=Math.min(Math.max(0,y), Math.max(0,innerHeight-h));
+  el.style.left=x+'px'; el.style.top=y+'px'; el.style.right='auto'; el.style.bottom='auto';
+}
+function _floatRestore(el, id){
+  try{ const v=JSON.parse(localStorage.getItem('floatpos_'+id)||'null'); if(v&&isFinite(v.x)&&isFinite(v.y)) _floatPlace(el,v.x,v.y); }catch(e){}
+}
+function floatDraggable(el, id, handle, opts){
+  if(!el || el._floatDrag) return; el._floatDrag=true;
+  handle=handle||el; opts=opts||{};
+  _floatRestore(el,id);
+  let sx=0, sy=0, ox=0, oy=0, down=false, moved=false;
+  handle.addEventListener('pointerdown', e=>{
+    if(e.button!==undefined && e.button!==0) return;
+    if(handle!==el && e.target.closest('button')) return;                       // 제목줄의 닫기·초기화 버튼은 제외
+    if(opts.skip && opts.skip()) return;                                        // 모바일 전용 레이아웃의 바닥 시트 등은 이동 안 함
+    const r=el.getBoundingClientRect(); sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top; down=true; moved=false;
+    try{ handle.setPointerCapture(e.pointerId); }catch(_){}
+  });
+  handle.addEventListener('pointermove', e=>{
+    if(!down) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    if(!moved && Math.hypot(dx,dy)<6) return;
+    moved=true; _floatPlace(el, ox+dx, oy+dy); e.preventDefault();
+  });
+  const end=()=>{
+    if(!down) return; down=false;
+    if(moved){
+      try{ const r=el.getBoundingClientRect(); localStorage.setItem('floatpos_'+id, JSON.stringify({x:Math.round(r.left), y:Math.round(r.top)})); }catch(_){}
+      el._floatJustDragged=true; setTimeout(()=>{ el._floatJustDragged=false; },0);
+    }
+  };
+  handle.addEventListener('pointerup', end); handle.addEventListener('pointercancel', end);
+  el.addEventListener('click', e=>{ if(el._floatJustDragged){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // 끌고 놓을 때 버튼이 눌리지 않게
+  window.addEventListener('resize', ()=>_floatRestore(el,id));
+}
+function floatResetPositions(){
+  ['sim_fab','trk_fab','sim_pop'].forEach(id=>{ try{ localStorage.removeItem('floatpos_'+id); }catch(_){} });
+  [['simFab'],['trkFab'],['simPop']].forEach(([i])=>{ const el=document.getElementById(i); if(el){ el.style.left=''; el.style.top=''; el.style.right=''; el.style.bottom=''; } });
+  toast('버튼·팝업 위치를 처음 자리로 되돌렸어요.');
+}
+function floatInitDrag(){
+  floatDraggable(document.getElementById('simFab'),'sim_fab');
+  floatDraggable(document.getElementById('trkFab'),'trk_fab');
+  floatDraggable(document.getElementById('simPop'),'sim_pop', document.querySelector('#simPop .sim-hd'), {skip:()=>document.documentElement.classList.contains('mob-native')});
+}
 function simFabSync(){
   const b=document.getElementById('simFab'); if(!b) return;
   const ok=!!window.__CURRENT_USER && _menuPerm('insight')!=='none';
@@ -26556,6 +26608,7 @@ function simToggle(){
   const pop=document.getElementById('simPop'); if(!pop) return;
   const open=!pop.classList.contains('open');
   pop.classList.toggle('open',open);
+  if(open) _floatRestore(pop,'sim_pop');
   if(open) setTimeout(()=>{ const i=document.getElementById(_simRow?'simQty':'simSearch'); if(i) i.focus(); },50);
 }
 // 인사이트 화면과 동일한 선행 데이터(일별판매·로켓그로스 매출·백데이터)를 읽은 뒤 행을 계산 — 3분간 캐시
@@ -26790,6 +26843,8 @@ function simRender(){
     </div>
     <div class="sim-note">※ 발주 인사이트와 같은 계산(일평균·성수기 보정·등급별 안전배수·구정 커버)을 사용하며 저장되는 값은 없어요. 주문일을 오늘로 가정합니다.</div>`;
 }
+try{ floatInitDrag(); }catch(e){ console.warn('floatInitDrag', e); }
+window.addEventListener('load', ()=>{ try{ floatInitDrag(); }catch(e){} });
 function toggleFloat(){floatOpen=!floatOpen;document.getElementById('floatCard').classList.toggle('open',floatOpen);}
 
 // ══════════════════════════════════════════════
