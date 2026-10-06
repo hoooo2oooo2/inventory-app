@@ -2017,6 +2017,157 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .navstar{font-size:11px;color:#cbd2dc;cursor:pointer;margin-left:2px;vertical-align:middle;transition:transform .1s;}
 .navstar:hover{transform:scale(1.3);}
 #deptNav .ni{font-weight:700;font-size:14px;}
+
+/* ═══ 상품 검색 팝업 (단가계산기 상품코드 · 모바일 당근 제품명) — 큰 글씨, 모바일은 전체화면 ═══ */
+.bdp-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:420;display:none;align-items:center;justify-content:center;padding:16px;}
+.bdp-box{background:var(--bg);border-radius:16px;width:min(640px,100%);height:min(720px,86vh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.3);}
+.bdp-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;font-size:17px;font-weight:700;color:var(--tx);flex-shrink:0;}
+.bdp-x{border:none;background:none;font-size:26px;color:var(--tx2);cursor:pointer;padding:0 6px;line-height:1;}
+.bdp-in{display:block;margin:0 16px 8px;width:calc(100% - 32px);height:50px;border:2px solid var(--pr);border-radius:12px;padding:0 14px;font-size:17px;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;flex-shrink:0;}
+.bdp-meta{padding:0 18px 8px;font-size:13px;color:var(--tx2);flex-shrink:0;}
+.bdp-list{flex:1;overflow-y:auto;border-top:1px solid var(--bd);overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+.bdp-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--bd);cursor:pointer;}
+.bdp-row:hover,.bdp-row:active{background:var(--bg2);}
+.bdp-row.bdp-free{background:var(--prl);}
+.bdp-code{font-size:15px;font-weight:800;color:var(--tx);}
+.bdp-name{font-size:15px;color:var(--tx);margin-top:3px;line-height:1.35;word-break:break-all;}
+.bdp-sub{font-size:12px;color:var(--tx2);margin-top:2px;}
+.bdp-price{font-size:16px;font-weight:800;color:var(--pr);white-space:nowrap;}
+.bdp-empty{padding:30px 18px;text-align:center;color:var(--tx2);font-size:14px;line-height:1.6;}
+
+/* ═══ 모바일 전용 레이아웃 (단가계산기 · 당근 판매) — 폰에서 이 두 메뉴에 들어오면 JS(_mobViewportSync)가
+   html.mob-native 를 붙이고 뷰포트를 기기 폭으로 바꿈. 다른 메뉴는 기존대로 1400px 축소 표시. ═══ */
+html.mob-native body{overflow-x:hidden;}
+html.mob-native .topbar{padding:0 10px;}
+html.mob-native .topbar-title{font-size:14px;white-space:nowrap;}
+html.mob-native .topbar-time,html.mob-native #buildVer,html.mob-native #uploadTopBtn,html.mob-native #addTopBtn,html.mob-native #tgBtn{display:none!important;}
+html.mob-native #whoami{max-width:72px;overflow:hidden;text-overflow:ellipsis;}
+html.mob-native .ni{padding:13px 14px;font-size:15px;}
+html.mob-native #deptNav .ni{font-size:15px;}
+html.mob-native .pc-subtab-bar{overflow-x:auto;padding:8px 10px 0;}
+html.mob-native .pc-subtab{padding:12px 16px;font-size:15px;white-space:nowrap;}
+html.mob-native .btn{padding:9px 13px;font-size:13px;}
+html.mob-native .modal input:not([type=checkbox]):not([type=radio]),html.mob-native .modal select,html.mob-native .modal textarea,
+html.mob-native .pc-modal-bg input:not([type=checkbox]):not([type=radio]),html.mob-native .pc-modal-bg select{font-size:16px!important;height:46px!important;}
+html.mob-native .modal .btn{padding:12px 16px;font-size:15px;}
+html.mob-native .pc-modal-bg>div{width:min(360px,94vw)!important;}
+html.mob-native .bdp-bg{padding:0;align-items:stretch;}
+html.mob-native .bdp-box{width:100%;height:100%;height:100dvh;border-radius:0;}
+html.mob-native .bdp-in{height:54px;font-size:18px;}
+html.mob-native .bdp-row{padding:16px 16px;}
+html.mob-native .bdp-code,html.mob-native .bdp-name{font-size:16px;}
+html.mob-native .bdp-price{font-size:17px;}
+/* 단가계산기 */
+html.mob-native .pc-layout{display:block!important;height:auto!important;overflow:visible!important;}
+html.mob-native #pc-left-panel{width:100%!important;border-right:none!important;padding:12px 12px 16px!important;overflow:visible!important;}
+html.mob-native .pc-right{padding:0 12px 90px!important;overflow:visible!important;}
+html.mob-native #pc-left-panel>div:first-child{font-size:18px!important;}
+html.mob-native .pc-ct{font-size:15px!important;margin-bottom:12px!important;}
+html.mob-native .pc-lbl{font-size:13px;margin-bottom:6px;}
+html.mob-native .pc-inp{font-size:16px;padding:12px;min-height:48px;}
+html.mob-native .pc-res{font-size:17px;min-height:48px;padding:12px;}
+html.mob-native #pc-unit-note,html.mob-native #pc-sale-note,html.mob-native #pc-disc-unit{font-size:12px!important;}
+html.mob-native .pc-mk{font-size:12px!important;}
+html.mob-native .pc-mv{font-size:14px!important;}
+html.mob-native .pc-mbig{font-size:26px!important;}
+html.mob-native .pc-mrate{font-size:21px!important;}
+html.mob-native .pc-btn-reset{padding:13px 16px!important;font-size:14px!important;}
+html.mob-native .pc-btn-add{padding:15px!important;font-size:16px!important;}
+html.mob-native .pc-btn-save{padding:14px 18px!important;font-size:15px!important;width:100%;}
+html.mob-native .pc-tl{font-size:12px!important;}
+html.mob-native .pc-tv{font-size:16px!important;}
+html.mob-native #pc-totals>div{flex-direction:column;align-items:stretch!important;}
+html.mob-native #pc-totals>div>div:first-child{display:grid!important;grid-template-columns:1fr 1fr;gap:12px!important;}
+html.mob-native .pc-row-btn{padding:9px 14px!important;font-size:13px!important;}
+html.mob-native .pc-est-row{flex-wrap:wrap!important;padding:14px!important;}
+html.mob-native .pc-est-row>div{width:100%;}
+html.mob-native .pc-est-row>div:first-child span:nth-child(3){white-space:normal!important;}
+html.mob-native .pc-est-row>div:last-child{justify-content:space-between;flex-shrink:1!important;}
+html.mob-native .pc-est-row>div:last-child>div>div:first-child{font-size:12px!important;}
+html.mob-native .pc-est-row>div:last-child>div>div:last-child{font-size:15px!important;}
+html.mob-native #pc-est-list{max-height:none!important;}
+html.mob-native #pc-tbl{min-width:0!important;display:block!important;}
+html.mob-native #pc-tbl thead{display:none;}
+html.mob-native #pc-tbl tbody{display:block;}
+html.mob-native #pc-tbl tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;padding:14px;border-bottom:1px solid var(--bd)!important;}
+html.mob-native #pc-tbl tbody td{display:block;padding:0!important;text-align:left!important;font-size:15px;max-width:none!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;}
+html.mob-native #pc-tbl tbody td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--tx2);font-weight:500;margin-bottom:1px;}
+html.mob-native #pc-tbl tbody td:nth-child(1){display:none;}
+html.mob-native #pc-tbl tbody td:nth-child(2){grid-column:1/-1;font-size:16px;font-weight:700;color:var(--tx);}
+html.mob-native #pc-tbl tbody td:nth-child(12){grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;}
+/* 조합 계산기 */
+html.mob-native .cmb-wrap{display:block;height:auto;overflow:visible;padding:10px;}
+html.mob-native .cmb-left,html.mob-native .cmb-sel,html.mob-native .cmb-saved{margin-bottom:12px;overflow:visible;}
+html.mob-native .cmb-table-wrap{max-height:60vh;overflow:auto;}
+html.mob-native .cmb-sel-body{max-height:55vh;}
+html.mob-native .cmb-saved-body{max-height:60vh;}
+html.mob-native .cmb-cbtn{padding:14px 4px;font-size:15px;}
+html.mob-native .cmb-cbtn span{font-size:12px;}
+html.mob-native .cmb-title{font-size:16px;}
+html.mob-native .cmb-left-meta{font-size:13px;}
+html.mob-native .cmb-table{font-size:14px;min-width:660px;}
+html.mob-native .cmb-table tbody td.cmb-nm{min-width:190px;word-break:keep-all;overflow-wrap:anywhere;}
+html.mob-native .cmb-sel-table{min-width:520px;}
+html.mob-native #cmbSearch,html.mob-native #cmbSetSearch{font-size:16px!important;padding:12px!important;}
+html.mob-native .cmb-table thead th{font-size:12px;}
+html.mob-native .cmb-table tbody td{padding:9px 6px;}
+html.mob-native .cmb-table tbody td.cmb-cd{font-size:12px;}
+html.mob-native .cmb-qty-inp,html.mob-native .cmb-price-inp{font-size:16px;padding:8px 6px;width:64px;}
+html.mob-native .cmb-sel-table{font-size:14px;}
+html.mob-native .cmb-sel-total{font-size:20px;}
+html.mob-native .cmb-card-head{font-size:15px;}
+html.mob-native .cmb-mini-btn{padding:9px 13px;font-size:13px;}
+html.mob-native .cmb-set-nm{font-size:15px;}
+html.mob-native .cmb-set-meta{font-size:12px;}
+html.mob-native .cmb-set-amt{font-size:16px;}
+html.mob-native .cmb-cat-chip{padding:8px 13px;font-size:13px;}
+/* 당근 판매 */
+html.mob-native .lcr-wrap{height:auto;padding:10px 10px 40px;max-width:none;}
+html.mob-native .lcr-title{font-size:17px;}
+html.mob-native .lcr-toolbar{flex-direction:column;align-items:stretch;gap:10px;}
+html.mob-native .lcr-tools{flex-wrap:wrap;}
+html.mob-native .lcr-tools .lh2-chk-search{flex:1 1 100%;max-width:none!important;height:46px;font-size:16px;}
+html.mob-native .lcr-tools .lh2-add{flex:1 1 auto;padding:13px 12px;font-size:14px;}
+html.mob-native .lcr-topbar{flex-direction:column;}
+html.mob-native .lcr-filter{border-right:none;border-bottom:1px solid var(--bd);}
+html.mob-native .lcr-filter select{height:42px;font-size:15px;}
+html.mob-native .lcr-sum{display:grid;grid-template-columns:1fr 1fr;}
+html.mob-native .lcr-kpi{min-width:0;border-right:none;border-bottom:1px solid var(--bd);padding:10px 14px;}
+html.mob-native .lcr-kpi .k-l{font-size:12px;}
+html.mob-native .lcr-kpi .k-v{font-size:18px;}
+html.mob-native .lcr-nocost{font-size:12px;}
+html.mob-native .lcr-table-scroll{overflow:visible;border:none;background:transparent;}
+html.mob-native .lcr-table{display:block;font-size:14px;}
+html.mob-native .lcr-table thead{display:none;}
+html.mob-native .lcr-table tbody{display:block;}
+html.mob-native .lcr-table tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:14px;margin-bottom:10px;border:1px solid var(--bd);border-radius:12px;}
+html.mob-native .lcr-table tbody tr:not(.lcr-erp-done){background:var(--bg);}
+html.mob-native .lcr-table tbody td{display:block;padding:0;border:none;text-align:left!important;white-space:normal;font-size:15px;max-width:none!important;overflow:visible!important;text-overflow:clip!important;}
+html.mob-native .lcr-table tbody td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--tx2);font-weight:500;margin-bottom:2px;}
+html.mob-native .lcr-table tbody td.lcr-prod{grid-column:1/-1;order:-2;font-size:16px;font-weight:700;}
+html.mob-native .lcr-table tbody td.lcr-prod::before{display:none;}
+html.mob-native .lcr-table tbody td[data-l="주소"],html.mob-native .lcr-table tbody td[data-l="ERP 재고차감 확인"],html.mob-native .lcr-table tbody td[data-l="송장번호"]{grid-column:1/-1;}
+html.mob-native .lcr-table tbody td[data-l="관리"]{grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end;}
+html.mob-native .lcr-table tbody td[data-l="관리"]::before{display:none;}
+html.mob-native .lcr-table tbody td:only-child{grid-column:1/-1;text-align:center!important;}
+html.mob-native .lcr-erp-cell{flex-direction:row;align-items:center;gap:10px;}
+html.mob-native .lcr-erp-cell input[type=checkbox]{width:26px;height:26px;}
+html.mob-native .lcr-trk-wrap{justify-content:flex-start;}
+html.mob-native .lcr-trk-in{width:100%;height:46px;font-size:16px;text-align:left;}
+html.mob-native .lcr-st-cell{align-items:flex-start;}
+html.mob-native .lcr-st{font-size:13px;padding:5px 12px;}
+html.mob-native .lcr-del-btn{font-size:20px;padding:8px 16px;border:1px solid var(--bd);border-radius:8px;}
+html.mob-native .lcr-meta{font-size:12px;}
+html.mob-native .lcr-pager button{min-width:42px;height:42px;font-size:14px;}
+html.mob-native .lcr-pager select{height:42px;font-size:14px;}
+html.mob-native .lcs-wrap{padding:10px 10px 40px;}
+html.mob-native .lcs-tbl{font-size:13.5px;}
+html.mob-native .lcs-tbl th{padding:10px 10px;font-size:12px;}
+html.mob-native .lcs-tbl td{padding:11px 10px;}
+html.mob-native .lcs-sort{flex-wrap:wrap;}
+html.mob-native .lcs-sort button{padding:8px 13px;font-size:13px;}
+html.mob-native .lcr-det-lbl{font-size:13px;}
+html.mob-native .lcr-det-val{font-size:15px;}
 </style>
 
 <div class="app" id="appRoot">
@@ -2981,7 +3132,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
   <div class="lcr-wrap">
     <div class="lcr-toolbar">
       <span class="lcr-title">🥕 당근 판매 주문 리스트</span>
-      <div style="display:flex;gap:8px;align-items:center;">
+      <div class="lcr-tools" style="display:flex;gap:8px;align-items:center;">
         <input class="lh2-chk-search" id="lcrSearch" type="text" placeholder="🔍 고객명·연락처·제품명 검색" oninput="lcrFilterChange()" style="max-width:240px;">
         <button class="lh2-add" style="background:var(--bg2);color:var(--tx);border:1px solid var(--bd);" onclick="lcrTrackNow()" id="lcrTrackAllBtn" title="송장번호가 있는 미완료 주문의 배송상태를 지금 조회합니다">🔄 배송 지금 조회</button>
         <button class="lh2-add" onclick="lcrOpenAdd()">＋ 주문건 등록</button>
@@ -3019,7 +3170,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
 <!-- ─── 단가 계산기(기존) ─── -->
 <div id="pc-view-single">
-<div style="display:flex;height:calc(100vh - 142px);overflow:hidden;">
+<div class="pc-layout" style="display:flex;height:calc(100vh - 142px);overflow:hidden;">
 
   <!-- ─── 좌측: 계산기 ─── -->
   <div id="pc-left-panel" style="width:460px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--bd);padding:12px 14px 80px;">
@@ -3027,11 +3178,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- 상품 정보 -->
     <div class="card" style="padding:13px;margin-bottom:9px;">
-      <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">📦 상품 정보</div>
+      <div class="pc-ct" style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">📦 상품 정보</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div style="position:relative;">
           <div class="pc-lbl">상품코드</div>
-          <input type="text" id="pc-code" placeholder="코드/상품명 검색" oninput="pcSearchCode(this.value)" autocomplete="off" class="pc-inp"/>
+          <input type="text" id="pc-code" placeholder="🔍 눌러서 검색" readonly onclick="pcOpenPicker()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pcOpenPicker();}" autocomplete="off" class="pc-inp" style="cursor:pointer;"/>
           <div id="pc-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--bd);border-top:none;border-radius:0 0 8px 8px;z-index:60;max-height:200px;overflow-y:auto;box-shadow:0 6px 16px rgba(0,0,0,.12);"></div>
         </div>
         <div>
@@ -3052,7 +3203,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- 수량 & 판매가 -->
     <div class="card" style="padding:13px;margin-bottom:9px;">
-      <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">💰 수량 &amp; 판매가</div>
+      <div class="pc-ct" style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">💰 수량 &amp; 판매가</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
           <div class="pc-lbl">수량</div>
@@ -3080,7 +3231,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- 배송비 -->
     <div class="card" style="padding:13px;margin-bottom:9px;">
-      <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">🚚 배송비</div>
+      <div class="pc-ct" style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:9px;">🚚 배송비</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div style="grid-column:1/-1;">
           <div class="pc-lbl">규격 선택</div>
@@ -3107,42 +3258,42 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 
     <!-- 마진 -->
     <div class="card" style="padding:13px;border:1.5px solid var(--pr);background:var(--prl);margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:600;color:var(--pr);margin-bottom:9px;">📊 마진 분석</div>
+      <div class="pc-ct" style="font-size:12px;font-weight:600;color:var(--pr);margin-bottom:9px;">📊 마진 분석</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
         <div style="background:var(--bg);border-radius:7px;padding:8px;">
-          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">단가합계</div>
-          <div id="pc-m-cost" style="font-size:12px;font-weight:600;color:var(--tx);">—</div>
+          <div class="pc-mk" style="font-size:10px;color:var(--tx2);margin-bottom:2px;">단가합계</div>
+          <div id="pc-m-cost" class="pc-mv" style="font-size:12px;font-weight:600;color:var(--tx);">—</div>
         </div>
         <div style="background:var(--bg);border-radius:7px;padding:8px;">
-          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">판매가합계</div>
-          <div id="pc-m-sale" style="font-size:12px;font-weight:600;color:var(--pr);">—</div>
+          <div class="pc-mk" style="font-size:10px;color:var(--tx2);margin-bottom:2px;">판매가합계</div>
+          <div id="pc-m-sale" class="pc-mv" style="font-size:12px;font-weight:600;color:var(--pr);">—</div>
         </div>
         <div style="background:var(--bg);border-radius:7px;padding:8px;">
-          <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">배송비합계</div>
-          <div id="pc-m-ship" style="font-size:12px;font-weight:600;color:#D97706;">—</div>
+          <div class="pc-mk" style="font-size:10px;color:var(--tx2);margin-bottom:2px;">배송비합계</div>
+          <div id="pc-m-ship" class="pc-mv" style="font-size:12px;font-weight:600;color:#D97706;">—</div>
         </div>
       </div>
       <div style="background:var(--bg);border-radius:7px;padding:11px;display:flex;justify-content:space-between;align-items:center;">
         <div>
           <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">마진 (판매−단가−배송)</div>
-          <div id="pc-m-margin" style="font-size:20px;font-weight:700;color:var(--tx);">—</div>
+          <div id="pc-m-margin" class="pc-mbig" style="font-size:20px;font-weight:700;color:var(--tx);">—</div>
         </div>
         <div style="text-align:right;">
           <div style="font-size:10px;color:var(--tx2);margin-bottom:2px;">마진율</div>
-          <div id="pc-m-rate" style="font-size:17px;font-weight:700;color:var(--tx);">—</div>
+          <div id="pc-m-rate" class="pc-mrate" style="font-size:17px;font-weight:700;color:var(--tx);">—</div>
         </div>
       </div>
     </div>
 
     <!-- 버튼 -->
     <div style="display:flex;gap:8px;">
-      <button onclick="pcReset()" style="padding:8px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:11px;cursor:pointer;flex-shrink:0;">초기화</button>
-      <button id="pc-add-btn" onclick="pcAddOrUpdate()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#3182F6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">➕ 추가하기</button>
+      <button class="pc-btn-reset" onclick="pcReset()" style="padding:8px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:11px;cursor:pointer;flex-shrink:0;">초기화</button>
+      <button class="pc-btn-add" id="pc-add-btn" onclick="pcAddOrUpdate()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#3182F6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">➕ 추가하기</button>
     </div>
   </div>
 
   <!-- ─── 우측: 견적 목록 ─── -->
-  <div style="flex:1;min-width:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;">
+  <div class="pc-right" style="flex:1;min-width:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;">
 
     <!-- 항목 목록 카드 -->
     <div class="card" style="overflow:hidden;">
@@ -3178,13 +3329,13 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
     <div id="pc-totals" class="card" style="display:none;padding:12px 14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
         <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
-          <div><div style="font-size:10px;color:var(--tx2);">단가합계 합산</div><div id="pc-tot-cost" style="font-size:13px;font-weight:700;color:var(--tx);">—</div></div>
-          <div><div style="font-size:10px;color:var(--tx2);">판매가합계 합산</div><div id="pc-tot-sale" style="font-size:13px;font-weight:700;color:#3182F6;">—</div></div>
-          <div><div style="font-size:10px;color:var(--tx2);">배송비 합산</div><div id="pc-tot-ship" style="font-size:13px;font-weight:700;color:#D97706;">—</div></div>
-          <div><div style="font-size:10px;color:var(--tx2);">마진 합계</div><div id="pc-tot-margin" style="font-size:13px;font-weight:700;">—</div></div>
-          <div><div style="font-size:10px;color:var(--tx2);">마진율</div><div id="pc-tot-rate" style="font-size:13px;font-weight:700;">—</div></div>
+          <div><div class="pc-tl" style="font-size:10px;color:var(--tx2);">단가합계 합산</div><div id="pc-tot-cost" class="pc-tv" style="font-size:13px;font-weight:700;color:var(--tx);">—</div></div>
+          <div><div class="pc-tl" style="font-size:10px;color:var(--tx2);">판매가합계 합산</div><div id="pc-tot-sale" class="pc-tv" style="font-size:13px;font-weight:700;color:#3182F6;">—</div></div>
+          <div><div class="pc-tl" style="font-size:10px;color:var(--tx2);">배송비 합산</div><div id="pc-tot-ship" class="pc-tv" style="font-size:13px;font-weight:700;color:#D97706;">—</div></div>
+          <div><div class="pc-tl" style="font-size:10px;color:var(--tx2);">마진 합계</div><div id="pc-tot-margin" class="pc-tv" style="font-size:13px;font-weight:700;">—</div></div>
+          <div><div class="pc-tl" style="font-size:10px;color:var(--tx2);">마진율</div><div id="pc-tot-rate" class="pc-tv" style="font-size:13px;font-weight:700;">—</div></div>
         </div>
-        <button onclick="pcOpenSaveModal()" style="padding:9px 16px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 견적 저장하기</button>
+        <button class="pc-btn-save" onclick="pcOpenSaveModal()" style="padding:9px 16px;border:none;border-radius:8px;background:#059669;color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 견적 저장하기</button>
       </div>
     </div>
 
@@ -3363,6 +3514,16 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
       <button onclick="document.getElementById('cmbDetailModal').style.display='none'" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--tx2);line-height:1;padding:0 4px;flex-shrink:0;">✕</button>
     </div>
     <div id="cmbDetailContent" style="overflow:auto;padding:14px;flex:1;"></div>
+  </div>
+</div>
+
+<!-- ═══ 상품 검색 팝업 (단가계산기 상품코드 / 모바일 당근 제품명 공용) ═══ -->
+<div class="bdp-bg" id="bdpModal" onmousedown="if(event.target===this)bdPickerClose()">
+  <div class="bdp-box">
+    <div class="bdp-head"><span id="bdpTitle">🔍 상품 검색</span><button class="bdp-x" onclick="bdPickerClose()" aria-label="닫기">✕</button></div>
+    <input class="bdp-in" id="bdpInput" type="text" placeholder="코드 또는 상품명 (띄어쓰기로 여러 단어 검색)" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="bdpRender()" onkeydown="bdpKey(event)">
+    <div class="bdp-meta" id="bdpMeta"></div>
+    <div class="bdp-list" id="bdpList"></div>
   </div>
 </div>
 
@@ -10427,20 +10588,20 @@ function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
   const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
   return `<tr data-row="${o.id}" class="lcr-row ${o.erpChecked?'lcr-erp-done':''}" onclick="lcrOpenDetail('${o.id}', event)">
-    <td>${_lcrEsc(o.createdAt)}</td>
-    <td class="lcr-l lcr-nm">${_lcrEsc(o.customerName)}</td>
-    <td>${_lcrEsc(_lcrFmtPhone(o.phone))}</td>
-    <td class="lcr-l" title="${_lcrEsc(o.address)}">${addrDisp}</td>
-    <td class="lcr-l lcr-prod">${_lcrEsc(o.productName)}</td>
-    <td>${_lbxNum(o.qty)}</td>
-    <td class="lcr-r">${lcrCostCell(o)}</td>
-    <td class="lcr-r">${_lcrWon(o.price)}</td>
-    <td class="lcr-r">${lcrMarginCell(o)}</td>
-    <td class="lcr-r">${lcrMarginRateCell(o)}</td>
-    <td><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
-    <td>${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-trk-wrap"><input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" onchange="lcrSetTrack('${o.id}',this.value)"></div>`}</td>
-    <td>${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-st-cell">${lcrTrackBadge(o)}</div>`}</td>
-    <td><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
+    <td data-l="등록일">${_lcrEsc(o.createdAt)}</td>
+    <td data-l="고객명" class="lcr-l lcr-nm">${_lcrEsc(o.customerName)}</td>
+    <td data-l="연락처">${_lcrEsc(_lcrFmtPhone(o.phone))}</td>
+    <td data-l="주소" class="lcr-l" title="${_lcrEsc(o.address)}">${addrDisp}</td>
+    <td data-l="제품명" class="lcr-l lcr-prod">${_lcrEsc(o.productName)}</td>
+    <td data-l="수량">${_lbxNum(o.qty)}</td>
+    <td data-l="공급가" class="lcr-r">${lcrCostCell(o)}</td>
+    <td data-l="판매금액" class="lcr-r">${_lcrWon(o.price)}</td>
+    <td data-l="마진" class="lcr-r">${lcrMarginCell(o)}</td>
+    <td data-l="마진율" class="lcr-r">${lcrMarginRateCell(o)}</td>
+    <td data-l="ERP 재고차감 확인"><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
+    <td data-l="송장번호">${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-trk-wrap"><input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" onchange="lcrSetTrack('${o.id}',this.value)"></div>`}</td>
+    <td data-l="배송상태">${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-st-cell">${lcrTrackBadge(o)}</div>`}</td>
+    <td data-l="관리"><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
   </tr>`;
 }
 function lcrToggleVisit(cb){
@@ -10539,6 +10700,16 @@ async function lcrDelete(id){
 // ── 제품명: 매출관리 백데이터(_bdData) 검색 드롭다운 (당근 판매 등록) ──
 let _lcrProdPicking = false;
 function lcrProdInput(inputEl){
+  // 모바일 전용 레이아웃에서는 작은 드롭다운 대신 큰 검색 팝업을 쓴다(키보드에 가려지는 문제도 없음)
+  if(_mobIsNative()){
+    inputEl.blur();
+    if(document.getElementById('bdpModal').style.display==='flex') return;
+    bdPickerOpen({title:'🔍 제품명 검색', initial:inputEl.value, allowFree:true, onPick:r=>{
+      if(r.free){ inputEl.value=r.name; const q=document.getElementById('lcrQty'); if(q) q.focus(); }
+      else lcrPickProd(r.id);
+    }});
+    return;
+  }
   const q = (inputEl.value||'').trim().toLowerCase();
   if(!q){ lcrHideProdDrop(); return; }
   const seen = new Set();
@@ -11480,7 +11651,23 @@ async function lodDeleteFile(id){
   toast('🗑️ 삭제되었습니다.');
 }
 
+// 폰에서 단가계산기·당근 판매 메뉴에 들어오면 뷰포트를 기기 폭으로(모바일 전용 레이아웃), 그 외 메뉴는 기존대로 1400px 축소 표시.
+// 폰 판별은 화면 크기(screen) 기준 — innerWidth는 뷰포트를 바꾸면 같이 변해서 쓸 수 없음. PC 브라우저는 영향 없음.
+const MOB_NATIVE_PAGES=['price','logicarrot'];
+function _mobViewportSync(p){
+  try{
+    const sz=Math.min(screen.width||innerWidth,screen.height||innerWidth);
+    const phone=sz>0 && sz<=820;
+    const native=phone && MOB_NATIVE_PAGES.includes(p);
+    document.documentElement.classList.toggle('mob-native', native);
+    if(!phone) return;
+    const vp=document.querySelector('meta[name="viewport"]');
+    if(vp) vp.setAttribute('content', native?'width=device-width, initial-scale=1':'width=1400');
+  }catch(e){}
+}
+function _mobIsNative(){ return document.documentElement.classList.contains('mob-native'); }
 function goPage(p){
+  _mobViewportSync(p);
   // 권한 없는 메뉴 접근 차단 (매출관리는 로켓그로스 매출 권한만 있어도 진입 허용 — 로켓그로스 부서 딥링크용)
   if(window.__CURRENT_USER && _menuPerm(p)==='none' && !(p==='revenue' && _permOf('revenue.rocket')!=='none')){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   // 리뷰관리 화면을 벗어나면 실시간 폴링 중단(다른 화면에서 불필요한 egress 방지) — 'review'로
@@ -12518,6 +12705,72 @@ function pcSelectBd(code,name,price){
   pcApplySur();
 }
 
+// ── 상품 검색 팝업 — 단가계산기 상품코드 입력창 / 모바일 당근 제품명 공용 ──
+//  · 입력창은 작은 드롭다운 대신 큰 글씨 팝업(모바일은 전체화면)에서 검색 → 항목 탭하면 채워짐
+//  · 코드·상품명·별칭코드를 띄어쓰기 단위로 모두 포함하는 항목을 찾음 (대소문자 무시)
+let _bdpOnPick=null, _bdpShown=[], _bdpAllowFree=false;
+function bdPickerOpen(opt){
+  _bdpOnPick=opt.onPick; _bdpAllowFree=!!opt.allowFree;
+  document.getElementById('bdpTitle').textContent=opt.title||'🔍 상품 검색';
+  const inp=document.getElementById('bdpInput');
+  inp.value=opt.initial||'';
+  document.getElementById('bdpModal').style.display='flex';
+  inp.focus();   // 클릭 제스처 안에서 바로 포커스해야 모바일 키보드가 같이 올라옴
+  bdpRender();
+  if(!_bdData.length && !_bdLoaded) pcEnsureBackdata().then(()=>bdpRender());
+}
+function bdPickerClose(){
+  document.getElementById('bdpModal').style.display='none';
+  _bdpOnPick=null;
+}
+function bdpKey(e){
+  if(e.key==='Escape'){ bdPickerClose(); return; }
+  if(e.key!=='Enter') return;
+  e.preventDefault();
+  if(_bdpShown.length) bdpPick(0);
+  else if(_bdpAllowFree && document.getElementById('bdpInput').value.trim()) bdpPickFree();
+}
+function bdpRender(){
+  const list=document.getElementById('bdpList'), meta=document.getElementById('bdpMeta');
+  const raw=document.getElementById('bdpInput').value.trim();
+  const toks=raw.toLowerCase().split(/\s+/).filter(Boolean);
+  _bdpShown=[];
+  if(!_bdData.length && !_bdLoaded){ meta.textContent=''; list.innerHTML='<div class="bdp-empty">상품 목록 불러오는 중…</div>'; return; }
+  if(!toks.length){ meta.textContent=''; list.innerHTML='<div class="bdp-empty">코드나 상품명을 입력하세요.<br>띄어쓰기로 여러 단어를 넣으면 모두 포함된 상품만 나옵니다.</div>'; return; }
+  const all=(_bdData||[]).filter(r=>{
+    const hay=[r.code,r.name,...(r.aliasCodes||[])].join(' ').toLowerCase();
+    return toks.every(t=>hay.includes(t));
+  });
+  _bdpShown=all.slice(0,100);
+  meta.textContent=`검색 결과 ${all.length.toLocaleString('ko-KR')}건`+(all.length>_bdpShown.length?` (상위 ${_bdpShown.length}건만 표시 — 검색어를 더 구체적으로 입력하세요)`:'');
+  const free=_bdpAllowFree?`<div class="bdp-row bdp-free" onclick="bdpPickFree()"><div style="min-width:0;"><div class="bdp-code">✏️ "${_bdEscHtml(raw)}" 그대로 입력</div><div class="bdp-sub">목록에 없는 코드/상품일 때 (단가는 직접 입력)</div></div></div>`:'';
+  list.innerHTML=free+(_bdpShown.length?_bdpShown.map((r,i)=>{
+    const al=(r.aliasCodes||[]).filter(a=>toks.some(t=>String(a).toLowerCase().includes(t)));
+    const hitAlias=al.length && !toks.every(t=>String(r.code||'').toLowerCase().includes(t));
+    return `<div class="bdp-row" onclick="bdpPick(${i})"><div style="min-width:0;"><div class="bdp-code">${_bdEscHtml(r.code||'(코드없음)')}</div><div class="bdp-name">${_bdEscHtml(r.name||'')}</div>${hitAlias?`<div class="bdp-sub">별칭코드: ${_bdEscHtml(al.join(', '))}</div>`:''}</div><div class="bdp-price">${r.price!=null?Number(r.price).toLocaleString('ko-KR')+'원':'단가없음'}</div></div>`;
+  }).join(''):(_bdpAllowFree?'':'<div class="bdp-empty">일치하는 상품이 없습니다.</div>'));
+}
+function bdpPick(i){
+  const r=_bdpShown[i], cb=_bdpOnPick; if(!r||!cb) return;
+  bdPickerClose(); cb(r);
+}
+function bdpPickFree(){
+  const cb=_bdpOnPick, txt=document.getElementById('bdpInput').value.trim(); if(!cb||!txt) return;
+  bdPickerClose(); cb({free:true, code:txt, name:txt});
+}
+function pcOpenPicker(){
+  bdPickerOpen({title:'🔍 상품 검색 (코드·상품명)', allowFree:true, onPick:r=>{
+    if(r.free){
+      document.getElementById('pc-code').value=r.code;
+      _pcRawPrice=null;
+      pcApplySur();
+    } else {
+      pcSelectBd(r.code||'', r.name||'', r.price!=null?r.price:null);
+    }
+    const q=document.getElementById('pc-qty'); if(q && !q.value) q.focus();
+  }});
+}
+
 function pcApplySur(){
   const sur=parseFloat(document.getElementById('pc-sur').value)||0;
   const note=document.getElementById('pc-unit-note');
@@ -12651,18 +12904,18 @@ function pcRenderList(){
     <tr style="border-bottom:0.5px solid var(--bd);${_pcEditId===it.id?'background:#FFF7ED;':''}">
       <td style="padding:7px 10px;text-align:center;color:var(--tx2);font-size:11px;">${i+1}</td>
       <td style="padding:7px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${it.name||it.code||''}">${it.name||it.code||'—'}</td>
-      <td style="padding:7px 10px;text-align:right;white-space:nowrap;">${it.unit>0?fmt(it.unit):'—'}</td>
-      <td style="padding:7px 10px;text-align:right;">${it.qty}</td>
-      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;">${it.costTotal>0?fmt(it.costTotal):'—'}</td>
-      <td style="padding:7px 10px;text-align:right;white-space:nowrap;">${it.sale>0?fmt(it.sale):'—'}${it.disc>0?`<div style="font-size:10px;color:#D97706;">-${it.disc}%</div>`:''}</td>
-      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:#3182F6;">${it.saleTotal>0?fmt(it.saleTotal):'—'}</td>
-      <td style="padding:7px 10px;text-align:right;">${it.shipQty>0?it.shipQty:'—'}</td>
-      <td style="padding:7px 10px;text-align:right;white-space:nowrap;color:#D97706;">${it.shipTotal>0?fmt(it.shipTotal):'—'}</td>
-      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:${mc(it.margin)};">${fmt(it.margin)}</td>
-      <td style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:${mc(it.marginRate)};">${it.marginRate.toFixed(1)}%</td>
+      <td data-l="개당단가" style="padding:7px 10px;text-align:right;white-space:nowrap;">${it.unit>0?fmt(it.unit):'—'}</td>
+      <td data-l="수량" style="padding:7px 10px;text-align:right;">${it.qty}</td>
+      <td data-l="단가합계" style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;">${it.costTotal>0?fmt(it.costTotal):'—'}</td>
+      <td data-l="판매가" style="padding:7px 10px;text-align:right;white-space:nowrap;">${it.sale>0?fmt(it.sale):'—'}${it.disc>0?`<div style="font-size:10px;color:#D97706;">-${it.disc}%</div>`:''}</td>
+      <td data-l="판매가합계" style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:#3182F6;">${it.saleTotal>0?fmt(it.saleTotal):'—'}</td>
+      <td data-l="배송수량" style="padding:7px 10px;text-align:right;">${it.shipQty>0?it.shipQty:'—'}</td>
+      <td data-l="배송비" style="padding:7px 10px;text-align:right;white-space:nowrap;color:#D97706;">${it.shipTotal>0?fmt(it.shipTotal):'—'}</td>
+      <td data-l="마진" style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:${mc(it.margin)};">${fmt(it.margin)}</td>
+      <td data-l="마진율" style="padding:7px 10px;text-align:right;white-space:nowrap;font-weight:600;color:${mc(it.marginRate)};">${it.marginRate.toFixed(1)}%</td>
       <td style="padding:7px 10px;text-align:center;white-space:nowrap;">
-        <button onclick="pcEditItem(${it.id})" style="padding:3px 7px;border:1px solid #3182F6;border-radius:5px;background:transparent;color:#3182F6;font-size:10px;cursor:pointer;margin-right:3px;">수정</button>
-        <button onclick="pcDeleteItem(${it.id})" style="padding:3px 7px;border:1px solid #DC2626;border-radius:5px;background:transparent;color:#DC2626;font-size:10px;cursor:pointer;">삭제</button>
+        <button class="pc-row-btn" onclick="pcEditItem(${it.id})" style="padding:3px 7px;border:1px solid #3182F6;border-radius:5px;background:transparent;color:#3182F6;font-size:10px;cursor:pointer;margin-right:3px;">수정</button>
+        <button class="pc-row-btn" onclick="pcDeleteItem(${it.id})" style="padding:3px 7px;border:1px solid #DC2626;border-radius:5px;background:transparent;color:#DC2626;font-size:10px;cursor:pointer;">삭제</button>
       </td>
     </tr>`).join('');
   const tC=_pcItems.reduce((s,x)=>s+x.costTotal,0);
@@ -12779,7 +13032,7 @@ function pcRenderEstimates(){
   const fmt=n=>n.toLocaleString('ko-KR');
   const mc=v=>v>=0?'#16A34A':'#DC2626';
   listEl.innerHTML=_pcEstimates.map((e,idx)=>`
-    <div onclick="pcViewEstimate(${e.id})"
+    <div class="pc-est-row" onclick="pcViewEstimate(${e.id})"
       style="padding:10px 14px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"
       onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
       <div style="display:flex;align-items:center;gap:8px;min-width:0;">
@@ -12797,8 +13050,8 @@ function pcRenderEstimates(){
           <div style="font-size:10px;color:var(--tx2);">마진율</div>
           <div style="font-size:12px;font-weight:600;color:${mc(e.totals.tR)};">${e.totals.tR.toFixed(1)}%</div>
         </div>
-        <button onclick="event.stopPropagation();pcLoadEstimateForEdit(${e.id})" style="padding:3px 8px;border:1px solid #D97706;border-radius:5px;background:transparent;color:#D97706;font-size:10px;cursor:pointer;margin-right:4px;">수정</button>
-        <button onclick="event.stopPropagation();pcDeleteEstimate(${e.id})" style="padding:3px 8px;border:1px solid #DC2626;border-radius:5px;background:transparent;color:#DC2626;font-size:10px;cursor:pointer;">삭제</button>
+        <button class="pc-row-btn" onclick="event.stopPropagation();pcLoadEstimateForEdit(${e.id})" style="padding:3px 8px;border:1px solid #D97706;border-radius:5px;background:transparent;color:#D97706;font-size:10px;cursor:pointer;margin-right:4px;">수정</button>
+        <button class="pc-row-btn" onclick="event.stopPropagation();pcDeleteEstimate(${e.id})" style="padding:3px 8px;border:1px solid #DC2626;border-radius:5px;background:transparent;color:#DC2626;font-size:10px;cursor:pointer;">삭제</button>
       </div>
     </div>`).join('');
 }
