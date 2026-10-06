@@ -4618,7 +4618,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       </div>
       <div class="rvw-filter-bar" style="margin-top:16px;">
         <select class="rvw-sel" id="rvwDataMonthSel" onchange="rvwLoadDataMonth()"></select>
-        <input class="rvw-search" id="rvwSearchInput" placeholder="상품명·리뷰내용·리뷰글번호·고객명 검색" oninput="rvwRenderData()">
+        <input class="rvw-search" id="rvwSearchInput" placeholder="상품명·리뷰내용·리뷰글번호·상품주문번호·고객명 검색" oninput="rvwRenderData()">
         <button class="rvw-chip rvw-changed-only-btn" onclick="rvwToggleChangedOnly()">⚠️ 변경이력만</button>
         <div id="rvwRatingChips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
         <div id="rvwStatusChips" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
@@ -4646,7 +4646,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <select class="rvw-sel" id="rvwDoneMonthSel" onchange="rvwRenderDone()">
           <option value="ALL">전체 기간</option>
         </select>
-        <input class="rvw-search" id="rvwDoneSearchInput" placeholder="상품명·리뷰내용·리뷰글번호·고객명 검색" oninput="rvwRenderDone()">
+        <input class="rvw-search" id="rvwDoneSearchInput" placeholder="상품명·리뷰내용·리뷰글번호·상품주문번호·고객명 검색" oninput="rvwRenderDone()">
         <button class="rvw-chip rvw-changed-only-btn" onclick="rvwToggleChangedOnly()">⚠️ 변경이력만</button>
       </div>
       <div style="font-size:12px;color:var(--tx2);margin-bottom:8px;" id="rvwDoneCount"></div>
@@ -4671,7 +4671,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <select class="rvw-sel" id="rvwBlindMonthSel" onchange="rvwRenderBlind()">
           <option value="ALL">전체 기간</option>
         </select>
-        <input class="rvw-search" id="rvwBlindSearchInput" placeholder="상품명·리뷰내용·리뷰글번호·고객명 검색" oninput="rvwRenderBlind()">
+        <input class="rvw-search" id="rvwBlindSearchInput" placeholder="상품명·리뷰내용·리뷰글번호·상품주문번호·고객명 검색" oninput="rvwRenderBlind()">
         <button class="rvw-chip rvw-changed-only-btn" onclick="rvwToggleChangedOnly()">⚠️ 변경이력만</button>
       </div>
       <div style="font-size:12px;color:var(--tx2);margin-bottom:8px;" id="rvwBlindCount"></div>
@@ -12051,7 +12051,7 @@ function rvwPassesCommonFilter(r, kw){
   if(_rvwChangedOnlyFilter && !rvwHasChangeLog(r)) return false;
   if(kw){
     const hit = (r.productName||'').toLowerCase().includes(kw) || (r.content||'').toLowerCase().includes(kw)
-      || String(r.reviewId||'').toLowerCase().includes(kw) || (r.displayName||'').toLowerCase().includes(kw);
+      || String(r.reviewId||'').toLowerCase().includes(kw) || String(r.orderNo||'').toLowerCase().includes(kw) || (r.displayName||'').toLowerCase().includes(kw);
     if(!hit) return false;
   }
   return true;
@@ -12260,7 +12260,7 @@ async function rvwRenderBlind(){
     if(_rvwChangedOnlyFilter && !rvwHasChangeLog(er)) return false;
     if(kw){
       const hit = (er.productName||'').toLowerCase().includes(kw) || (er.content||'').toLowerCase().includes(kw)
-        || String(er.reviewId||'').toLowerCase().includes(kw) || (er.displayName||'').toLowerCase().includes(kw);
+        || String(er.reviewId||'').toLowerCase().includes(kw) || String(er.orderNo||'').toLowerCase().includes(kw) || (er.displayName||'').toLowerCase().includes(kw);
       if(!hit) return false;
     }
     return true;
