@@ -1617,6 +1617,7 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .lcr-trk-in:focus{border-color:#3182F6;}
 .lcr-st{display:inline-block;font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;white-space:nowrap;}
 .lcr-st.st-wait{background:#F3F4F6;color:#4B5563;}
+.lcr-st.st-none{background:transparent;color:var(--tx2);border:1px dashed var(--bd);}
 .lcr-st.st-delay{background:#FEE2E2;color:#B91C1C;}
 .lcr-st.st-pickup{background:#DBEAFE;color:#1D4ED8;}
 .lcr-st.st-transit{background:#EDE9FE;color:#6D28D9;}
@@ -10342,7 +10343,7 @@ function lcrRender(){
 let _lcrTrack = {};
 // 스마트택배 택배사 코드 (기본 CJ대한통운 — 당근 바로구매 전담)
 const LCR_CARRIERS = [['04','CJ대한통운'],['08','롯데'],['05','한진'],['06','로젠'],['01','우체국']];
-const LCR_ST = { wait:'수거대기', delay:'수거지연', pickup:'수거완료', transit:'배송중', done:'배송완료' };
+const LCR_ST = { none:'조회 전', wait:'수거대기', delay:'수거지연', pickup:'수거완료', transit:'배송중', done:'배송완료' };
 async function lcrLoadTrack(){
   const d = await cloudKvLoad('logi_carrot_track');
   _lcrTrack = (d && typeof d==='object' && !Array.isArray(d)) ? d : {};
@@ -10351,7 +10352,7 @@ async function lcrLoadTrack(){
 function lcrTrackInfo(o){
   if(!o.trackNo) return null;
   const t = _lcrTrack[o.id], ok = t && t.no===o.trackNo && (t.code||'04')===(o.carrier||'04');   // 송장번호가 바뀐 뒤의 옛 상태는 무시
-  let st = ok ? t.status : 'wait';
+  let st = ok ? t.status : 'none';   // 아직 택배사에 조회한 적 없으면 '조회 전'(수거대기로 단정하지 않음 — 이미 배송 중일 수 있음)
   if(st==='wait' && o.trackNoAt && Date.now()-Date.parse(o.trackNoAt) > 24*3600*1000) st='delay';
   return { st, t: ok?t:null };
 }
@@ -10403,7 +10404,11 @@ async function lcrTrkSave(id, btnEl){
   lcrRender();
   const cn = (LCR_CARRIERS.find(c=>c[0]===car)||[,'CJ대한통운'])[1];
   if(!ok) toast('⚠ 저장 확인에 실패했습니다. 잠시 후 새로고침해서 확인해 주세요.');
-  else toast(no ? `✅ ${cn} ${no} 저장 완료 — 배송상태는 🔄로 조회하세요(자동 조회: 9·13·16시).` : '송장번호가 삭제되었습니다.');
+  else if(!no) toast('송장번호가 삭제되었습니다.');
+  else {
+    toast(`✅ ${cn} ${no} 저장 완료 — 배송상태를 조회합니다…`);
+    if(changed) lcrTrackNow(id);   // 저장 직후 1건 조회 → 이미 배송 중인 건도 바로 실제 상태로 표시
+  }
 }
 let _lcrTrackBusy = false;
 async function lcrTrackNow(id, btnEl){
