@@ -14605,9 +14605,8 @@ function insightDemandRates(p, avg30, c, seasonIndex, nDays){
   // ③ 최근 3개월 평균 유지
   { const mp={}; months.forEach(h=>{ mp[key(h.y,h.m)]=level; }); maps.push(mp); }
   // 본인 작년 실적을 쓸 수 있으면(maps[0]) 80% + 같은 구분 패턴 20%(계절 무시 방법 제외) — 아니면 동일 비중
-  // 1년 이상 판매 이력(본인 월별 실적)이 있으면 그 계절 모양 × 올해 흐름이 기본. 흐름 배율을 못 쓰는 경우(비교 시기가 출시 직후 등)엔 지금 속도 유지와 반반.
-  // 같은 구분 평균 패턴은 이 제품 고유의 계절과 다를 수 있어(예: 여름 제품이 구분 평균상 겨울에도 팔리는 것으로 계산) 본인 이력이 있으면 쓰지 않는다. 이력이 없는 신제품만 구분 패턴+지금 속도 반반.
-  const wts=maps.map((_,i)=>useRef?((gOk||flow.peakR>=1.8)?(i===0?1:0):(i===0?0.5:(i===2?0.5:0))):1);
+  // 과거 판매 검증(2026-03 말→4~9월 예측)으로 정한 규칙: 계절 제품은 본인 월별 모양×올해 흐름, 꾸준한 제품은 작년 실적·지금 속도 반반, 신제품(1년 미만)은 지금 속도 유지만. 같은 구분 평균 패턴은 쓰지 않음.
+  const wts=maps.map((_,i)=>useRef?(flow.peakR>=1.8?(i===0?1:0):(i===0?0.5:(i===2?0.5:0))):(i===(maps.length-1)?1:0));
   const wTot=wts.reduce((a,b)=>a+b,0);
   const rates=[];
   for(let i=0;i<nDays;i++){
@@ -15047,8 +15046,9 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   // 기준 = 검증된 방법들의 평균
   const primary=methods.filter(m=>m.primary);
   // 본인 작년 실적을 쓸 수 있으면(1년 이상 판매 이력) 본인 작년 실적 80% + 같은 구분 패턴 20%(계절 무시 방법 제외), 아니면 동일 비중
-  // 본인 월별 실적(1년 이상)이 있으면 그 계절 모양 × 올해 흐름이 기본, 흐름 배율을 못 쓰면 계절형은 본인 모양만·꾸준형은 지금 속도 유지와 반반, 구분 패턴은 쓰지 않음. 신제품만 구분 패턴+지금 속도 반반.
-  const wOf=m=>useRef?((gOk||flow.peakR>=1.8)?(m.id==='lastyear'?1:0):(m.id==='lastyear'?0.5:(m.id==='flat'?0.5:0))):1;
+  // 과거 판매 검증(2026-03 말→4~9월 예측, 제품 94개)으로 정한 규칙: 계절을 타는 제품(피크÷평균 1.8 이상)은 본인 월별 모양×올해 흐름만(오차 26% vs 지금 속도 39%),
+  // 꾸준한 제품은 본인 작년 실적과 지금 속도 반반(오차 24% vs 작년만 35%), 판매 이력 1년 미만 신제품은 지금 속도 유지만(오차 43% vs 구분 패턴 55%·과대예측 +25%). 같은 구분 평균 패턴은 쓰지 않음.
+  const wOf=m=>useRef?(flow.peakR>=1.8?(m.id==='lastyear'?1:0):(m.id==='lastyear'?0.5:(m.id==='flat'?0.5:0))):(m.id==='flat'?1:0);
   const wSum=primary.reduce((s,m)=>s+wOf(m),0);
   const baseMap={}; Object.keys(primary[0].map).forEach(k=>{ baseMap[k]=primary.reduce((s,m)=>s+m.map[k]*wOf(m),0)/wSum; });
   const baseSim=simulate(baseMap);
@@ -15154,7 +15154,7 @@ function insightCoverDetailHtml(wc, p){
   }).join('');
   // 근거
   const why=[];
-  why.push(`<b>기준 예상 = 서로 다른 방법의 ${wc.weighted?'가중 ':''}평균</b>${wc.mode==='estimate'?' (이 상품은 작년 실적이 없어 작년 기반 방법은 제외)':''}${wc.weighted?(wc.growthOk?' — 1년 이상 판매 이력이 있어 본인 작년 월별 모양에 지금 판매 흐름(작년 같은 30일 대비 ×'+wc.growth.toFixed(2)+')을 곱해 계산했어요(같은 구분 평균 패턴은 쓰지 않음)':' — 1년 이상 판매 이력이 있지만 작년 같은 시기와 비교가 어려워(판매 없는 달이 끼었거나 너무 적음), 계절을 타는 제품이면 작년 월별 모양만, 꾸준한 제품이면 작년 월별 모양과 지금 속도 유지를 반반 섞었어요'):''}:`);
+  why.push(`<b>기준 예상 = 서로 다른 방법의 ${wc.weighted?'가중 ':''}평균</b>${wc.mode==='estimate'?' (판매 이력이 1년 미만이라 작년 기반·같은 구분 패턴 방법은 쓰지 않고 지금 속도(최근 30일)를 유지한다고 예상 — 과거 검증에서 신제품엔 이 방법이 가장 정확했어요)':''}${wc.weighted?(wc.growthOk?' — 1년 이상 판매 이력이 있어 본인 작년 월별 모양에 지금 판매 흐름(작년 같은 30일 대비 ×'+wc.growth.toFixed(2)+')을 곱해 계산했어요(같은 구분 평균 패턴은 쓰지 않음)':' — 1년 이상 판매 이력이 있지만 작년 같은 시기와 비교가 어려워(판매 없는 달이 끼었거나 너무 적음), 계절을 타는 제품이면 작년 월별 모양만, 꾸준한 제품이면 작년 월별 모양과 지금 속도 유지를 반반 섞었어요'):''}:`);
   wc.methods.slice().sort((a,b)=>a.total-b.total).forEach(m=>why.push(`　${m.label}: ${endTxt}까지 ${n(m.total)}개${m.weight>0&&wc.weighted?` (비중 ${Math.round(m.weight*100)}%)`:(wc.weighted&&m.id==='flat'?' (계절을 무시해 제외)':'')}`));
   why.push(`<b>낙관·보수·안전 목표는 실제 판매로 검증한 오차로 보정</b>했습니다. 이 앱의 실제 판매로 "3개월 앞을 예측했다면"을 403건 돌려 보니 기준 예상의 평균 오차가 약 30%였고, 기준량만 확보하면 실제 판매의 약 56%만 품절 없이 버텼습니다. 그래서 월 판매 수준별 실측 오차로 낙관=×${wc.fLow.toFixed(2)}, 보수=×${wc.fHigh.toFixed(2)}, ${wc.grade}등급 안전 목표=×${wc.fTarget.toFixed(2)}를 적용합니다(판매 규모가 작을수록 오차가 큼).${wc.damped?` 다만 월 판매가 작은 제품은 안전 배수가 과하게 커져 원래 ×${wc.fTargetRaw.toFixed(2)}인 것을 초과분(1을 넘는 부분)의 절반만 반영해 ×${wc.fTarget.toFixed(2)}로 낮췄어요.`:''}`);
   if(wc.mode==='lastyear'){
@@ -26700,7 +26700,7 @@ function simRender(){
     s1+=(wc&&wc.status==='ok')?`→ 그래서 앞으로 월별 예상은 ${wc.growthOk?`작년 월별 모양 × ${wc.growth.toFixed(2)}`:(lw>=1?'작년 월별 모양(배율 없이)':'작년 월별 모양과 지금 속도 유지를 반반 섞은 값')}으로 잡았어요.`:'';
   } else {
     const fm=(e&&e.monthly)||(wc&&wc.level)||0;
-    s1=`판매 이력이 12개월 미만이라 계절 패턴을 알 수 없어요. ${flowTxt()||`현재 평균 월 ${n(fm)}개 수준으로 계속 팔린다고 가정했어요.`}${fl?'→ 최근 30일 속도와 같은 구분의 평균 계절 모양을 반반 섞어 예상했어요.':''}`;
+    s1=`판매 이력이 12개월 미만이라 계절 패턴을 알 수 없어요. ${flowTxt()||`현재 평균 월 ${n(fm)}개 수준으로 계속 팔린다고 가정했어요.`}${fl?'→ 그래서 지금 속도(최근 30일)가 앞으로도 이어진다고 예상했어요. 같은 구분의 평균 계절 모양은 과거 검증에서 신제품엔 오차가 가장 커서(중앙값 55%, 지금 속도 유지는 43%) 쓰지 않았어요 — 겨울에 더 팔릴 수도 있다는 점은 감안해 보세요.':''}`;
   }
   // ── ② 앞으로 예상 판매 ──
   let s2='';
@@ -26716,7 +26716,7 @@ function simRender(){
   let s3='';
   if(coverActive){
     const {target,base}=wc.scenarios;
-    s3+=`11월~3월엔 입고가 막혀서 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 전에 낸 주문과 지금 확보분으로 입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})까지 버텨야 해요. 지금~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))} 예상 판매 <b>${n(base.total)}개</b>(${wc.methods.filter(m=>m.id!=='recent30').map(m=>`${m.label.replace(/ \(계절 무시\)/,'')} ${n(m.total)}${wc.weighted?(m.weight>0?`(비중 ${Math.round(m.weight*100)}%)`:(m.id==='flat'?'(제외: 겨울 비수기를 무시)':'')):''}`).join(' / ')}의 ${wc.weighted?'가중 ':''}평균${fpat.seasonal?`, 참고로 작년 같은 기간 실제 판매는 ${n(D(1,today,wc.windowEnd))}개`:''})에 ${wc.grade}등급 안전 보정 ×${wc.fTarget.toFixed(2)}${wc.damped?`(${wc.targetPct} 기준 원래 ×${wc.fTargetRaw.toFixed(2)}인데 월 판매가 작은 제품이라 초과분의 절반만 반영)`:`(${wc.targetPct})`}를 곱한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
+    s3+=`11월~3월엔 입고가 막혀서 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 전에 낸 주문과 지금 확보분으로 입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})까지 버텨야 해요. 지금~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))} 예상 판매 <b>${n(base.total)}개</b>(${wc.methods.filter(m=>m.id!=='recent30').map(m=>`${m.label.replace(/ \(계절 무시\)/,'')} ${n(m.total)}${m.weight>0?`(비중 ${Math.round(m.weight*100)}%)`:'(사용 안 함)'}`).join(' / ')}의 가중 평균${fpat.seasonal?`, 참고로 작년 같은 기간 실제 판매는 ${n(D(1,today,wc.windowEnd))}개`:''})에 ${wc.grade}등급 안전 보정 ×${wc.fTarget.toFixed(2)}${wc.damped?`(${wc.targetPct} 기준 원래 ×${wc.fTargetRaw.toFixed(2)}인데 월 판매가 작은 제품이라 초과분의 절반만 반영)`:`(${wc.targetPct})`}를 곱한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
   }
   s3+=(e?`평소 기준으로는 리드타임(약 ${L}일)+발주주기 동안 쓸 목표 확보량 ${n(e.targetLR)}개에서 현재고·진행중 발주를 반영하면 <b>${n(reg)}개</b>가 필요해요. `:`평소 기준 권장은 ${n(reg)}개예요. `);
   s3+=`→ 앱 권장 총 주문량은 <b>${n(need)}개(${bx(need)}박스)</b>입니다. `;
