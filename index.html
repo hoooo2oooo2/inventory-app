@@ -14613,7 +14613,7 @@ function insightDemandRates(p, avg30, c, seasonIndex, nDays){
     const d=dayAt(i); const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); const k=key(d.getFullYear(),d.getMonth());
     rates.push(maps.reduce((s,mp,j)=>s+(mp[k]||0)*wts[j],0)/wTot/dim);
   }
-  return {rates, level, useRef, growth, nMethods:maps.length};
+  return {rates, level, useRef, growth, nMethods:maps.length, peakR:flow.peakR};
 }
 function insightExpertNeeded(p, avg30, c, seasonIndex){
   const L=Math.max(0,(p.leadTime>0?p.leadTime:1.5))*30;     // 리드타임(일)
@@ -14627,7 +14627,8 @@ function insightExpertNeeded(p, avg30, c, seasonIndex){
   const cal=_insightCalibFor(monthlyE);
   const kRaw=g==='A'?cal.q90:g==='B'?cal.q80:cal.q70;
   const k=_insightDampSafety(kRaw, monthlyE);   // 소량 제품은 초과분 절반만 반영
-  const pct=g==='A'?'약 90%':g==='B'?'약 80%':'약 70%';
+  const typE=dr.useRef?(dr.peakR>=1.8?'seasonal':'steady'):'new';
+  const pct=`약 ${_insightMeasuredCoverage(typE,k)}%`;   // 적용한 배수가 과거에 실제로 커버한 비율
   const rec=avg30>0?avg30:0;                                  // 최근 30일 일평균(이상치 제외)
   const recL=rec*L, recLR=rec*H;
   const dLused=Math.max(dL, recL);
@@ -14932,6 +14933,20 @@ const INSIGHT_COVER_CALIB=[
   {max:Infinity, q10:0.64, q70:1.05, q80:1.18, q90:1.44}
 ];
 function _insightCalibFor(monthly){ return INSIGHT_COVER_CALIB.find(c=>monthly<c.max); }
+// 새 예측 방법(지금 판매 흐름 기준)으로 다시 검증한 결과(2026-10-06, 2026년 3~6월 4개 시점에서 3개월 앞 예측 762건, 정답=실제÷예측).
+// "서비스 수준 약 80%"라고 써 왔지만 실제로는 유형에 따라 덜 커버한다: 80%를 커버하려면 꾸준한 제품 ×1.33 / 계절 제품 ×1.88 / 신제품 ×2.81 이 필요했다.
+// 그래서 화면 표시는 등급 이름의 "약 80%"가 아니라 적용한 배수가 과거에 실제로 커버한 비율로 보여준다(수량 계산 자체는 바꾸지 않음).
+const INSIGHT_COVERAGE_ANCHORS={
+  steady:[[1,57],[1.03,60],[1.15,70],[1.33,80],[1.52,90]],
+  seasonal:[[1,45],[1.27,60],[1.58,70],[1.88,80],[2.77,90]],
+  new:[[1,44],[1.38,60],[2.0,70],[2.81,80],[3.67,90]]
+};
+function _insightMeasuredCoverage(type, f){
+  const a=INSIGHT_COVERAGE_ANCHORS[type]||INSIGHT_COVERAGE_ANCHORS.new;
+  if(f<=a[0][0]) return Math.max(30,Math.round(a[0][1]*Math.max(f,0.5)/a[0][0]));
+  for(let i=1;i<a.length;i++){ if(f<=a[i][0]){ const [x0,y0]=a[i-1], [x1,y1]=a[i]; return Math.round(y0+(y1-y0)*(f-x0)/(x1-x0)); } }
+  return 90;
+}
 // 판매 규모가 작은(월 67개 미만) 제품은 실측 오차 폭이 넓어 안전 배수가 1.5~2.3배로 크게 나오는데, 월 50개 수준 제품에 6개월 동안 월 100개 수준을 쌓게 되는
 // 부작용이 있어 배수의 "1을 넘는 초과분"을 절반만 반영한다(2026-10-06 사용자 요청: 이동식 UFO 세트 구정물량 556개 지적). 예) B등급 ×1.58 → ×1.29
 const INSIGHT_LOWVOL_MAX_MONTHLY=67, INSIGHT_LOWVOL_KEEP=0.5;
@@ -15064,7 +15079,8 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   const g=(grade||'B');
   const fTargetRaw = g==='A' ? cal.q90 : g==='B' ? cal.q80 : 1.0;
   const fTarget = _insightDampSafety(fTargetRaw, monthly);   // 소량 제품은 초과분 절반만 반영
-  const targetPct = g==='A' ? '약 90%' : g==='B' ? '약 80%' : '기준 수준';
+  const typC=useRef?(flow.peakR>=1.8?'seasonal':'steady'):'new';
+  const targetPct = `약 ${_insightMeasuredCoverage(typC,fTarget)}%`;   // 적용한 배수가 과거에 실제로 커버한 비율(등급 이름의 "약 80%"와 다를 수 있음)
   const mk=(id,name,s)=>Object.assign({id,name},s);
   const low=mk('low','낙관(판매 부진·하위 10%)',simulate(scale(baseMap,fLow)));
   const base=mk('base','기준',baseSim);
@@ -15156,7 +15172,7 @@ function insightCoverDetailHtml(wc, p){
   const why=[];
   why.push(`<b>기준 예상 = 서로 다른 방법의 ${wc.weighted?'가중 ':''}평균</b>${wc.mode==='estimate'?' (판매 이력이 1년 미만이라 작년 기반·같은 구분 패턴 방법은 쓰지 않고 지금 속도(최근 30일)를 유지한다고 예상 — 과거 검증에서 신제품엔 이 방법이 가장 정확했어요)':''}${wc.weighted?(wc.growthOk?' — 1년 이상 판매 이력이 있어 본인 작년 월별 모양에 지금 판매 흐름(작년 같은 30일 대비 ×'+wc.growth.toFixed(2)+')을 곱해 계산했어요(같은 구분 평균 패턴은 쓰지 않음)':' — 1년 이상 판매 이력이 있지만 작년 같은 시기와 비교가 어려워(판매 없는 달이 끼었거나 너무 적음), 계절을 타는 제품이면 작년 월별 모양만, 꾸준한 제품이면 작년 월별 모양과 지금 속도 유지를 반반 섞었어요'):''}:`);
   wc.methods.slice().sort((a,b)=>a.total-b.total).forEach(m=>why.push(`　${m.label}: ${endTxt}까지 ${n(m.total)}개${m.weight>0&&wc.weighted?` (비중 ${Math.round(m.weight*100)}%)`:(wc.weighted&&m.id==='flat'?' (계절을 무시해 제외)':'')}`));
-  why.push(`<b>낙관·보수·안전 목표는 실제 판매로 검증한 오차로 보정</b>했습니다. 이 앱의 실제 판매로 "3개월 앞을 예측했다면"을 403건 돌려 보니 기준 예상의 평균 오차가 약 30%였고, 기준량만 확보하면 실제 판매의 약 56%만 품절 없이 버텼습니다. 그래서 월 판매 수준별 실측 오차로 낙관=×${wc.fLow.toFixed(2)}, 보수=×${wc.fHigh.toFixed(2)}, ${wc.grade}등급 안전 목표=×${wc.fTarget.toFixed(2)}를 적용합니다(판매 규모가 작을수록 오차가 큼).${wc.damped?` 다만 월 판매가 작은 제품은 안전 배수가 과하게 커져 원래 ×${wc.fTargetRaw.toFixed(2)}인 것을 초과분(1을 넘는 부분)의 절반만 반영해 ×${wc.fTarget.toFixed(2)}로 낮췄어요.`:''}`);
+  why.push(`<b>낙관·보수·안전 목표는 실제 판매로 검증한 오차로 보정</b>했습니다. 지금의 예측 방법으로 "3개월 앞을 예측했다면"을 762건 돌려 보니(2026년 3~6월 시점) 기준 예상만 확보하면 실제 판매의 약 44~57%만 품절 없이 버텼습니다. 80%를 커버하려면 꾸준한 제품은 ×1.33, 계절 제품은 ×1.88, 신제품은 ×2.81이 필요했어요(적용 배수가 커버하는 비율은 "안전 목표" 옆 %로 표시). 월 판매 수준별 실측 오차로 낙관=×${wc.fLow.toFixed(2)}, 보수=×${wc.fHigh.toFixed(2)}, ${wc.grade}등급 안전 목표=×${wc.fTarget.toFixed(2)}를 적용합니다(판매 규모가 작을수록 오차가 큼).${wc.damped?` 다만 월 판매가 작은 제품은 안전 배수가 과하게 커져 원래 ×${wc.fTargetRaw.toFixed(2)}인 것을 초과분(1을 넘는 부분)의 절반만 반영해 ×${wc.fTarget.toFixed(2)}로 낮췄어요.`:''}`);
   if(wc.mode==='lastyear'){
     why.push(`참고 — 작년 같은 구간(${wc.refStartLbl}~${wc.refEndLbl}) 실제 판매 ${n(wc.refWinTotal)}개 (월평균 ${n(wc.refWinTotal/5)}개). 월별 흐름은 아래 월별 표를 참고하세요.`);
     if(wc.growthOk) why.push(`참고 — 올해 흐름: 최근 30일 ${n(wc.gCur)}개 ÷ 작년 같은 30일 ${n(wc.gPrev)}개 = ${wc.growthRaw.toFixed(2)}배${Math.abs(wc.growth-wc.growthRaw)>0.001?` → ${wc.growth.toFixed(1)}배로 제한 적용`:''}`);
@@ -26636,12 +26652,14 @@ function simRender(){
     const hi=pat.map(v=>avgP>0&&v/avgP>=1.2);
     let wm=[peakI];
     if(hi[peakI]){ let i=(peakI+11)%12; while(hi[i]&&wm.length<12){ wm.unshift(i); i=(i+11)%12; } let j=(peakI+1)%12; while(hi[j]&&wm.length<12){ wm.push(j); j=(j+1)%12; } }
-    const w=simNextWindow(wm);
+    const w=(avgP>0&&pat[peakI]/avgP>=1.8)?simNextWindow(wm):null;   // 계절을 타는 제품에만 성수기 구간을 따로 본다(꾸준한 제품은 월별 차이가 작아 의미 없음)
     if(w) win={wm, start:w.start, end:w.end, nm: wm.length>1?`${MNAMES[wm[0]]}~${MNAMES[wm[wm.length-1]]}`:MNAMES[wm[0]]};
   }
   // "재주문 없이 성수기 끝까지" 기준 구간 끝 — 성수기가 8개월 안이면 성수기 끝, 아니면 구정 구간 끝/리드타임+발주주기. 구정 구간이 활성이면 최소 그 끝(4/30)까지.
-  let hEnd = (win && (win.end-today)<=240*DAY) ? win.end : (coverActive ? wc.windowEnd : new Date(today.getTime()+(L+(e?e.R:30))*DAY));
-  if(coverActive && wc.windowEnd>hEnd) hEnd=wc.windowEnd;
+  const hasWin=!!(wc&&wc.status==='ok');
+  const hEnd = hasWin ? wc.windowEnd : new Date(today.getTime()+(L+(e?e.R:30))*DAY);
+  const hMD=_insFmtMD(new Date(hEnd.getTime()-DAY));
+  const hLbl=hasWin?`입고 재개(${hMD})`:`${hMD}`;
   const needH=f=>Math.max(0, Math.round(D(f,today,hEnd)-(S+P)));
   const nH1=needH(g), nH2=needH(1), nHlo=Math.min(nH1,nH2), nHhi=Math.max(nH1,nH2);
   const upper=Math.ceil(Math.max(need*1.3, nHhi, need+box)/box)*box;   // 이 이상이면 "오버"
@@ -26664,7 +26682,7 @@ function simRender(){
 
   // ── 결론 문구 ──
   let head='<div class="v2">';
-  if(verdict==='over') head+=`👉 이번 시즌에 필요한 양보다 약 <b>${bx(Q-upper)}박스(${n(Q-upper)}개)</b> 많아요.<br><span style="opacity:.85;">앱 권장 ${bx(need)}박스(${n(need)}개) · 재주문 없이 ${win?win.nm+' 성수기':'기준 구간'} 끝까지 가려 해도 ${rng(nHlo,nHhi)}개면 돼요. 넘는 물량은 다음 시즌으로 이월됩니다(보유 ${n(T)}개 ≈ ${monthsRange}분).</span>`;
+  if(verdict==='over') head+=`👉 이번 시즌에 필요한 양보다 약 <b>${bx(Q-upper)}박스(${n(Q-upper)}개)</b> 많아요.<br><span style="opacity:.85;">앱 권장 ${bx(need)}박스(${n(need)}개) · 재주문 없이 ${hLbl}까지 가려 해도 ${rng(nHlo,nHhi)}개면 돼요. 넘는 물량은 다음 시즌으로 이월됩니다(보유 ${n(T)}개 ≈ ${monthsRange}분).</span>`;
   else if(shortQty>0) head+=`👉 추가로 <b>${bx(shortQty)}박스(${n(shortQty)}개)</b> 더 주문해야 안전합니다.<br><span style="opacity:.85;">앱 권장 총 주문량 ${bx(need)}박스(${n(need)}개) — ${r.finalBasis==='cover'?'구정 준비 기준':'평상시 권장 기준'}</span>`;
   else if(need>0) head+=`👉 추가 주문은 필요 없어요. (앱 권장 ${bx(need)}박스(${n(need)}개) 이상 주문)`;
   else head+=`👉 현재고와 진행중 발주만으로도 충분해서 추가 주문이 필요 없어요.`;
@@ -26705,9 +26723,14 @@ function simRender(){
   // ── ② 앞으로 예상 판매 ──
   let s2='';
   if(win){
-    if(win.start>today) s2+=`지금~성수기 시작(${_insFmtMD(win.start)}) 비수기 동안 <b>${Drng(today,win.start)}개</b>, `;
-    s2+=`성수기(${win.nm}) 동안 <b>${Drng(win.start,win.end)}개</b>가 팔릴 걸로 예상해요.`;
-  } else s2+=`앞으로 1년 예상 판매는 약 <b>${rng(annB,annL)}개</b>예요.`;
+    const monthsOf=(d0,d1)=>Math.max(0.1,(d1-d0)/86400000/30.4);
+    const mAvg=(d0,d1)=>{ const m=monthsOf(d0,d1); return rng(D(g,d0,d1)/m, D(1,d0,d1)/m); };
+    const mMid=(d0,d1)=>((D(g,d0,d1)+D(1,d0,d1))/2)/monthsOf(d0,d1);
+    const offLen=win.start>today?monthsOf(today,win.start):0, pkLen=monthsOf(win.start,win.end);
+    if(win.start>today) s2+=`지금~성수기 시작(${_insFmtMD(win.start)})까지 <b>${Math.round(offLen)}개월</b>의 비수기 동안 총 <b>${Drng(today,win.start)}개</b>(월 평균 ${mAvg(today,win.start)}개), `;
+    s2+=`성수기(${win.nm}, <b>${Math.round(pkLen)}개월</b>) 동안 총 <b>${Drng(win.start,win.end)}개</b>(월 평균 ${mAvg(win.start,win.end)}개)가 팔릴 걸로 예상해요.`;
+    if(win.start>today && offLen>pkLen){ const r=mMid(win.start,win.end)/Math.max(0.01,mMid(today,win.start)); if(isFinite(r)) s2+=` (비수기는 기간이 길어 총량이 더 커 보이지만, 한 달 평균으로 보면 성수기가 비수기의 약 <b>${r.toFixed(1)}배</b>예요.)`; }
+  } else s2+=`계절 편중이 크지 않은 제품이라 성수기를 따로 나누지 않았어요. 앞으로 1년 예상 판매는 약 <b>${rng(annB,annL)}개</b>(월 평균 ${rng(annB/12,annL/12)}개)예요.`;
   if(coverActive){
     const {low,base,high}=wc.scenarios;
     s2+=` 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 이후~입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})엔 <b>${n(base.win)}개</b>(낙관 ${n(low.win)} ~ 보수 ${n(high.win)})가 팔릴 걸로 봐요.`;
@@ -26720,13 +26743,13 @@ function simRender(){
   }
   s3+=(e?`평소 기준으로는 리드타임(약 ${L}일)+발주주기 동안 쓸 목표 확보량 ${n(e.targetLR)}개에서 현재고·진행중 발주를 반영하면 <b>${n(reg)}개</b>가 필요해요. `:`평소 기준 권장은 ${n(reg)}개예요. `);
   s3+=`→ 앱 권장 총 주문량은 <b>${n(need)}개(${bx(need)}박스)</b>입니다. `;
-  s3+=`참고로 재주문 없이 ${win&&(win.end-today)<=240*DAY?win.nm+' 성수기가 끝나는 '+_insFmtMD(new Date(hEnd.getTime()-DAY))+'까지':_insFmtMD(new Date(hEnd.getTime()-DAY))+'까지'} 가려면 예상 판매 ${rng(D(g,today,hEnd),D(1,today,hEnd))}개 − 보유 ${n(S+P)}개 = <b>${rng(nHlo,nHhi)}개</b>가 필요해요.`;
+  s3+=`참고로 재주문 없이 ${hLbl}까지 가려면 예상 판매 ${rng(D(g,today,hEnd),D(1,today,hEnd))}개 − 보유 ${n(S+P)}개 = <b>${rng(nHlo,nHhi)}개</b>가 필요해요.`;
   // ── ④ 요청 수량 평가 ──
   let s4=`요청 ${n(Q)}개 → 보유 합계 ${n(T)}개(현재고 ${n(S)} + 진행중 ${n(P)} + 이번 주문 ${n(Q)}). `;
-  s4+=`앱 권장(${n(need)}개) 대비 ${Q>=need?'<b>+'+n(Q-need)+'개</b>':'<b>'+n(Q-need)+'개</b>'}, 성수기까지 재주문 없는 경우의 필요량(${rng(nHlo,nHhi)}개) 대비 ${Q>=nHhi?'<b>+'+n(Q-nHhi)+'개</b>':(Q>=nHlo?'범위 안':'<b>'+n(Q-nHlo)+'개</b>')}예요. `;
+  s4+=`앱 권장(${n(need)}개) 대비 ${Q>=need?'<b>+'+n(Q-need)+'개</b>':'<b>'+n(Q-need)+'개</b>'}, ${hLbl}까지 재주문 없는 경우의 필요량(${rng(nHlo,nHhi)}개) 대비 ${Q>=nHhi?'<b>+'+n(Q-nHhi)+'개</b>':(Q>=nHlo?'범위 안':'<b>'+n(Q-nHlo)+'개</b>')}예요. `;
   if(verdict==='over'){
     const left=[T-D(g,today,hEnd), T-D(1,today,hEnd)];
-    s4+=`→ <b>오버</b>: ${win?win.nm+' 성수기':'기준 구간'}가 끝나는 시점에도 약 ${rng(left[0],left[1])}개가 남아 다음 비수기·성수기로 이월돼요. `;
+    s4+=`→ <b>오버</b>: ${hLbl} 시점에도 약 ${rng(left[0],left[1])}개가 남아 다음 시즌으로 이월돼요. `;
     if(fpat.seasonal) s4+=`보유 ${n(T)}개가 <b>${monthsRange}분</b>인 이유: 1년 예상 판매 ${rng(annB,annL)}개를 다 쓰고도 1년 뒤에 ${rng(T-annB,T-annL)}개가 남고, 그 재고가 다음 비수기·성수기를 지나며 소진되기 때문이에요.`;
   } else if(verdict==='ok') s4+=`→ <b>적정</b>: 필요량을 채우면서 과하지 않아요(주문 후 약 ${monthsRange}분).`;
   else s4+=`→ <b>${verdict==='tight'?'빠듯':'부족'}</b>: ${n(shortQty)}개가 더 있어야 안전해요.`;
