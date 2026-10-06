@@ -2152,7 +2152,8 @@ html.mob-native .lcr-table tbody td[data-l="관리"]::before{display:none;}
 html.mob-native .lcr-table tbody td:only-child{grid-column:1/-1;text-align:center!important;}
 html.mob-native .lcr-erp-cell{flex-direction:row;align-items:center;gap:10px;}
 html.mob-native .lcr-erp-cell input[type=checkbox]{width:26px;height:26px;}
-html.mob-native .lcr-trk-wrap{justify-content:flex-start;}
+html.mob-native .lcr-trk-wrap{justify-content:flex-start;gap:8px;}
+html.mob-native .lcr-car-sel{width:88px;height:46px;font-size:16px;}
 html.mob-native .lcr-trk-in{width:100%;height:46px;font-size:16px;text-align:left;}
 html.mob-native .lcr-st-cell{align-items:flex-start;}
 html.mob-native .lcr-st{font-size:13px;padding:5px 12px;}
@@ -3150,7 +3151,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <table class="lcr-table">
         <thead><tr>
           <th style="width:84px;">등록일</th><th>고객명</th><th style="width:104px;">연락처</th><th style="width:130px;">주소</th><th>제품명</th>
-          <th style="width:44px;">수량</th><th style="width:84px;">공급가</th><th style="width:84px;">판매금액</th><th style="width:76px;">마진</th><th style="width:58px;">마진율</th><th style="width:84px;">ERP 재고<br>차감 확인</th><th style="width:128px;">송장번호<br>(CJ대한통운)</th><th style="width:92px;">배송상태</th><th style="width:60px;">관리</th>
+          <th style="width:44px;">수량</th><th style="width:84px;">공급가</th><th style="width:84px;">판매금액</th><th style="width:76px;">마진</th><th style="width:58px;">마진율</th><th style="width:84px;">ERP 재고<br>차감 확인</th><th style="width:176px;">송장번호<br>(택배사 선택)</th><th style="width:92px;">배송상태</th><th style="width:60px;">관리</th>
         </tr></thead>
         <tbody id="lcrBody"></tbody>
       </table>
@@ -10570,7 +10571,7 @@ function lcrMarginRateCell(o){
 }
 // 행 클릭(수정·삭제·ERP 체크박스 제외) 시 주문건 상세 팝업
 function lcrOpenDetail(id, ev){
-  if(ev && ev.target.closest('button, input')) return;
+  if(ev && ev.target.closest('button, input, select')) return;
   const o = (_lcrOrders||[]).find(x=>x.id===id); if(!o) return;
   document.getElementById('lcrDetName').textContent = o.customerName || '-';
   document.getElementById('lcrDetPhone').textContent = _lcrFmtPhone(o.phone) || '-';
@@ -10583,6 +10584,12 @@ function lcrOpenDetail(id, ev){
   document.getElementById('lcrDetTrack').textContent = o.trackNo ? ((LCR_CARRIERS.find(c=>c[0]===(o.carrier||'04'))||[,'CJ대한통운'])[1]+' '+o.trackNo) : '-';
   document.getElementById('lcrDetTrackSt').innerHTML = o.visitSale ? '-' : lcrTrackBadge(o, true);
   openModal('lcrDetailModal');
+}
+// 송장번호 입력 옆 택배사 선택(CJ대한통운/롯데) — 기존 주문에 다른 택배사 코드가 저장돼 있으면 그 항목도 함께 보여줌
+function lcrCarrierSel(o){
+  const cur=o.carrier||'04';
+  const opts=LCR_CARRIERS.filter(c=>c[0]==='04'||c[0]==='08'||c[0]===cur);
+  return `<select class="lcr-car-sel" title="택배사 선택" onchange="lcrSetCarrier('${o.id}',this.value)">${opts.map(c=>`<option value="${c[0]}" ${c[0]===cur?'selected':''}>${c[1]==='CJ대한통운'?'CJ':c[1]}</option>`).join('')}</select>`;
 }
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
@@ -10599,7 +10606,7 @@ function lcrRowHtml(o){
     <td data-l="마진" class="lcr-r">${lcrMarginCell(o)}</td>
     <td data-l="마진율" class="lcr-r">${lcrMarginRateCell(o)}</td>
     <td data-l="ERP 재고차감 확인"><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
-    <td data-l="송장번호">${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-trk-wrap"><input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" onchange="lcrSetTrack('${o.id}',this.value)"></div>`}</td>
+    <td data-l="송장번호">${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-trk-wrap">${lcrCarrierSel(o)}<input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" onchange="lcrSetTrack('${o.id}',this.value)"></div>`}</td>
     <td data-l="배송상태">${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-st-cell">${lcrTrackBadge(o)}</div>`}</td>
     <td data-l="관리"><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
   </tr>`;
