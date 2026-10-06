@@ -5017,6 +5017,11 @@ html.mob-native .lcr-det-val{font-size:15px;}
 #page-order .stat b{font-size:14px;font-weight:800;color:var(--tx);letter-spacing:-.3px;line-height:1;}
 #page-order .rc-nums .inp{width:58px;}
 #page-order .rc-actbtn,#page-order .oc-actbtn{margin-left:auto;align-self:center;}
+/* 1·2차 입고일 */
+#page-order .rc-dates{display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;margin-top:6px;font-size:11px;color:var(--tx2);}
+#page-order .rc-dates label{display:flex;align-items:center;gap:4px;font-weight:600;}
+#page-order .rc-dates .inp{width:128px;font-size:11.5px;padding:3px 5px;}
+#page-order .rc-dates .rd-lt{color:#185FA5;font-weight:700;}
 /* 메모 */
 #page-order .rc-memo{margin-top:7px;padding-top:6px;border-top:1px dashed var(--bd);}
 #page-order .rc-memo .memo-add{padding:4px 0 0;border-top:none;}
@@ -6775,8 +6780,10 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="field-grid">
       <div class="field"><label>주문날짜</label><input type="date" id="inDate"></div>
       <div class="field"><label>주문수량</label><input type="number" id="inQty" placeholder="0"></div>
-      <div class="field"><label>1차 입고</label><input type="number" id="in1" placeholder="0"></div>
-      <div class="field"><label>2차 입고</label><input type="number" id="in2" placeholder="0"></div>
+      <div class="field"><label>1차 입고</label><input type="number" id="in1" placeholder="0" onchange="recvAutoDate('in1','inD1')"></div>
+      <div class="field"><label>2차 입고</label><input type="number" id="in2" placeholder="0" onchange="recvAutoDate('in2','inD2')"></div>
+      <div class="field"><label>1차 입고일</label><input type="date" id="inD1"></div>
+      <div class="field"><label>2차 입고일</label><input type="date" id="inD2"></div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('inModal')">취소</button><button class="btn btn-pr" onclick="saveIn()">등록</button></div>
   </div>
@@ -6793,8 +6800,10 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="field-grid">
       <div class="field"><label>주문날짜</label><input type="date" id="recvAddDate"></div>
       <div class="field"><label>주문수량</label><input type="number" id="recvAddQty" min="1" placeholder="0"></div>
-      <div class="field"><label>1차 입고 (선택)</label><input type="number" id="recvAdd1" min="0" placeholder="0"></div>
-      <div class="field"><label>2차 입고 (선택)</label><input type="number" id="recvAdd2" min="0" placeholder="0"></div>
+      <div class="field"><label>1차 입고 (선택)</label><input type="number" id="recvAdd1" min="0" placeholder="0" onchange="recvAutoDate('recvAdd1','recvAddD1')"></div>
+      <div class="field"><label>2차 입고 (선택)</label><input type="number" id="recvAdd2" min="0" placeholder="0" onchange="recvAutoDate('recvAdd2','recvAddD2')"></div>
+      <div class="field"><label>1차 입고일</label><input type="date" id="recvAddD1"></div>
+      <div class="field"><label>2차 입고일</label><input type="date" id="recvAddD2"></div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('recvAddModal')">취소</button><button class="btn btn-pr" id="recvAddSaveBtn" onclick="recvAddSave()">등록</button></div>
   </div>
@@ -11032,6 +11041,7 @@ async function loadProducts(force){
   if(data){ products=data.map(mapProd); if(ver) _idbSet('products_all',{ver,rows:data}); }
 }
 async function loadReceive(force){
+  await loadRecvDates();   // 1·2차 입고일 — receive_list 테이블 구조를 바꾸지 않고 별도 키(recv_in_dates)에 입고 건별로 저장
   const ver=await _receiveVer();
   if(!force && ver){
     const c=await _idbGet('receive_all');
@@ -11047,7 +11057,43 @@ async function loadReceive(force){
   receiveList=data.filter(r=>!r.done).map(mapRecv);
   doneList=data.filter(r=>r.done).map(mapRecv);
 }
-function mapRecv(r){ return {id:r.id,code:r.code,name:r.name,orderDate:r.order_date,uploadTime:r.upload_time,orderQty:r.order_qty||0,in1:r.in1||0,in2:r.in2||0,memos:r.memos||[],doneTime:r.done_time||''}; }
+// ── 입고일(1차/2차) — {입고건id:{d1:'YYYY-MM-DD',d2:'YYYY-MM-DD'}} 를 cloudKv 'recv_in_dates'에 보관 ──
+//   발주 인사이트의 "주문→입고 평균 소요일" 계산에 쓰임. 저장 시 항상 최신본을 다시 읽어 그 건만 갈아끼움(다른 PC 입력분 보존)
+var _recvDates = {};
+async function loadRecvDates(){
+  const d = await cloudKvLoad('recv_in_dates');
+  if(d && typeof d==='object' && !Array.isArray(d)) _recvDates = d;
+}
+async function saveRecvDates(id, d1, d2){
+  const loaded = await cloudKvLoad('recv_in_dates');
+  const base = (loaded && typeof loaded==='object' && !Array.isArray(loaded)) ? {...loaded} : {..._recvDates};   // 읽기 실패 시 메모리본 기준(전체 덮어쓰기 방지)
+  if(d1||d2) base[id] = {d1:d1||'', d2:d2||''}; else delete base[id];
+  await cloudKvSave('recv_in_dates', base);
+  _recvDates = base;
+}
+// 주문일 → 입고일 경과일(일). 날짜가 없거나 해석 불가면 null
+function recvDays(orderDate, d){
+  if(!orderDate || !d) return null;
+  const a=Date.parse(String(orderDate).slice(0,10)), b=Date.parse(String(d).slice(0,10));
+  return (isNaN(a)||isNaN(b)) ? null : Math.round((b-a)/86400000);
+}
+// 상품코드별 입고 소요일 통계 — 진행중+완료 입고건 중 입고일이 기록된 건만(1차·2차 따로 평균)
+function recvLeadStats(code){
+  const s1=[], s2=[];
+  [...receiveList, ...doneList].filter(r=>r.code===code).forEach(r=>{
+    const a=r.in1>0?recvDays(r.orderDate,r.in1Date):null, b=r.in2>0?recvDays(r.orderDate,r.in2Date):null;
+    if(a!=null && a>=0) s1.push(a);
+    if(b!=null && b>=0) s2.push(b);
+  });
+  if(!s1.length && !s2.length) return null;
+  const avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
+  return {a1:avg(s1), a2:avg(s2), n:Math.max(s1.length,s2.length)};
+}
+function _recvLtText(r, n){
+  const d=recvDays(r.orderDate, n===1?r.in1Date:r.in2Date);
+  return d==null ? '' : (d<0 ? '⚠ 주문일보다 빠름' : `주문 후 ${d}일`);
+}
+function mapRecv(r){ const dt=(_recvDates&&_recvDates[r.id])||{}; return {id:r.id,code:r.code,name:r.name,orderDate:r.order_date,uploadTime:r.upload_time,orderQty:r.order_qty||0,in1:r.in1||0,in2:r.in2||0,in1Date:dt.d1||'',in2Date:dt.d2||'',memos:r.memos||[],doneTime:r.done_time||''}; }
 async function loadRg(){
   const {data}=await sb.from('rg_products').select('*').order('created_at');
   if(data) rgProducts=data.map(r=>({
@@ -15020,6 +15066,7 @@ function insightBuildRows(){
     const pendingOldestDate=pending>0?insightOldestPendingDate(p, famProd):null;
     const pendingDays=pendingOldestDate?Math.floor((Date.now()-new Date(pendingOldestDate).getTime())/86400000):null;
     const pendingOverdue=pendingDays!=null && pendingDays>=30;
+    const leadStats=recvLeadStats(p.code);   // 발주관리에 입력한 1·2차 입고일 기준 주문→입고 평균 소요일
     // 급변 감지 — 최근 14일 판매가 그 이전 14일 대비 뚜렷이 늘거나(품절 위험) 줄었으면(재고 과잉 위험)
     // 표시한다. prev14가 실제로 있을 때만(데이터가 있어야 비교가 의미있음) 판단하고, 데이터가 너무
     // 적으면(30일 중 5일 미만) 노이즈일 수 있어 제외한다.
@@ -15040,7 +15087,7 @@ function insightBuildRows(){
     const fm=(c.expert&&c.expert.monthly)||(winterCover&&winterCover.level)||0;
     const stockMonths=fm>0?(p.stock+pending)/fm:null;
     const overstock=!p.disc && !c.noData && stockMonths!=null && stockMonths>(insightCoverActive()?9:6);
-    return {finalQty,finalBoxes,finalBasis,regQty,coverQty,stockMonths,overstock,winterCover,p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue,recent,seasonPre};
+    return {finalQty,finalBoxes,finalBasis,regQty,coverQty,stockMonths,overstock,winterCover,p,c,grade,status,er,pending,effStock,avgDay,daysLeft,daysToReorder,exhaustDate,reorderByDate,netNeeded,netBoxes,covered,season,rgQty,famProd,famBoxes,famLatest,surge,drop,pendingDays,pendingOverdue,leadStats,recent,seasonPre};
   });
 }
 
@@ -15337,7 +15384,7 @@ function insightRowHtml(r){
     <td style="text-align:right;" class="ins-num" title="정규채널+로켓그로스 합산, 오늘 포함 최근 7일 실제 판매량">${r.recent.last7.toLocaleString()}개</td>
     <td style="text-align:right;" class="ins-num" title="정규채널+로켓그로스 합산, 오늘 포함 최근 30일 실제 판매량">${r.recent.last30.toLocaleString()}개</td>
     <td style="text-align:right;" class="ins-td-wrap">${orderCell}</td>
-    <td class="ins-td-wrap">${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>${r.pendingDays!=null?`<div class="ins-sub" ${r.pendingOverdue?'style="color:#DC2626;font-weight:700;"':''} title="가장 오래된 미입고 주문일로부터 경과일">${r.pendingDays}일째${r.pendingOverdue?' 🚨선적독촉':''}</div>`:''}`:'<span class="ins-sub">-</span>'}${insightCoverChipHtml(r.winterCover)}</td>
+    <td class="ins-td-wrap">${r.pending>0?`<span class="ins-tag" style="background:#EEF4FF;color:#185FA5;">${r.pending.toLocaleString()}개 입고중</span>${r.pendingDays!=null?`<div class="ins-sub" ${r.pendingOverdue?'style="color:#DC2626;font-weight:700;"':''} title="가장 오래된 미입고 주문일로부터 경과일">${r.pendingDays}일째${r.pendingOverdue?' 🚨선적독촉':''}</div>`:''}`:'<span class="ins-sub">-</span>'}${r.leadStats?`<div class="ins-sub" title="발주관리에 입력한 입고일 기준 — 주문일부터 입고일까지 평균 소요일 (${r.leadStats.n}건)">⏱ 입고 평균 ${r.leadStats.a1!=null?`1차 ${r.leadStats.a1}일`:''}${r.leadStats.a1!=null&&r.leadStats.a2!=null?' · ':''}${r.leadStats.a2!=null?`2차 ${r.leadStats.a2}일`:''}</div>`:''}${insightCoverChipHtml(r.winterCover)}</td>
     <td style="text-align:right;">${r.rgQty>0?`<div class="ins-num">${Math.round(r.rgQty).toLocaleString()}개</div><div class="ins-sub">최근 2개월</div>`:'<span class="ins-sub">매칭없음</span>'}</td>
     <td class="ins-td-wrap">${insightFamCellHtml(r)}</td>
     <td class="ins-td-wrap">${insightSeasonCellHtml(r.season)}</td>
@@ -25623,17 +25670,18 @@ ${_buildOrderBriefContext()}`;
     box.innerHTML=`<div class="brief-box warn">❌ 브리핑 생성 실패: ${_esc(err.message)}<br><button class="brief-re" onclick="generateOrderBriefing()" style="margin-top:8px;">↻ 다시 시도</button></div>`;
   }
 }
-function openInReg(pid){inTarget=pid;const p=products.find(x=>x.id===pid);document.getElementById('inTitle').textContent=`입고등록 — ${p?.name||''}`;openModal('inModal');}
+function openInReg(pid){inTarget=pid;['inD1','inD2'].forEach(i=>{const e=document.getElementById(i);if(e)e.value='';});const p=products.find(x=>x.id===pid);document.getElementById('inTitle').textContent=`입고등록 — ${p?.name||''}`;openModal('inModal');}
 async function saveIn(){
   if(!inTarget)return;
   const p=products.find(x=>x.id===inTarget);if(!p)return;
   const qty=parseInt(document.getElementById('inQty').value)||0;
   const in1=parseInt(document.getElementById('in1').value)||0,in2=parseInt(document.getElementById('in2').value)||0;
   const dateVal=document.getElementById('inDate').value;
+  const inD1=in1>0?(document.getElementById('inD1').value||fmtDate(new Date())):'', inD2=in2>0?(document.getElementById('inD2').value||fmtDate(new Date())):'';
   if(isDup({code:p.code,name:p.name,orderDate:dateVal,orderQty:qty})){document.getElementById('dupMsg').innerHTML=`<strong>${p.name}</strong> (${p.code})<br>주문날짜: ${dateVal} | 수량: ${qty}개<br><br>동일한 데이터가 이미 존재합니다.`;closeModal('inModal');openModal('dupModal');return;}
   const {data}=await sb.from('receive_list').insert({code:p.code,name:p.name,order_date:dateVal,upload_time:fmtFull(new Date()),order_qty:qty,in1,in2,memos:[],done:false}).select();
   _bumpReceive();
-  if(data?.[0])receiveList.unshift(mapRecv(data[0]));
+  if(data?.[0]){ if(inD1||inD2) await saveRecvDates(data[0].id,inD1,inD2); receiveList.unshift(mapRecv(data[0])); }
   await addHistory({menu:'발주관리',type:'order',code:p.code,name:p.name,desc:'입고등록',before:'-',after:`${qty}개`,user:'수동'});
   closeModal('inModal');renderRecv();
 }
@@ -25646,7 +25694,7 @@ function openRecvAdd(){
   _recvAddPick=null;
   document.getElementById('recvAddSearch').value='';
   document.getElementById('recvAddDate').value=fmtDate(new Date());
-  ['recvAddQty','recvAdd1','recvAdd2'].forEach(id=>{ document.getElementById(id).value=''; });
+  ['recvAddQty','recvAdd1','recvAdd2','recvAddD1','recvAddD2'].forEach(id=>{ document.getElementById(id).value=''; });
   recvAddRenderPicked();
   recvAddRenderList();
   openModal('recvAddModal');
@@ -25679,6 +25727,7 @@ async function recvAddSave(){
   const dateVal=document.getElementById('recvAddDate').value;
   const qty=parseInt(document.getElementById('recvAddQty').value)||0;
   const in1=Math.max(0,parseInt(document.getElementById('recvAdd1').value)||0), in2=Math.max(0,parseInt(document.getElementById('recvAdd2').value)||0);
+  const d1=in1>0?(document.getElementById('recvAddD1').value||fmtDate(new Date())):'', d2=in2>0?(document.getElementById('recvAddD2').value||fmtDate(new Date())):'';
   if(!dateVal){ toast('주문날짜를 입력해 주세요.'); return; }
   if(qty<=0){ toast('주문수량을 1 이상으로 입력해 주세요.'); document.getElementById('recvAddQty')?.focus(); return; }
   if(isDup({code:p.code,name:p.name,orderDate:dateVal,orderQty:qty})){
@@ -25690,7 +25739,7 @@ async function recvAddSave(){
     const {data,error}=await sb.from('receive_list').insert({code:p.code,name:p.name,order_date:dateVal,upload_time:fmtFull(new Date()),order_qty:qty,in1,in2,memos:[],done:false}).select();
     if(error) throw error;
     _bumpReceive();
-    if(data?.[0]) receiveList.unshift(mapRecv(data[0]));
+    if(data?.[0]){ if(d1||d2) await saveRecvDates(data[0].id,d1,d2); receiveList.unshift(mapRecv(data[0])); }
     await addHistory({menu:'발주관리',type:'order',code:p.code,name:p.name,desc:'입고체크 건별 등록',before:'-',after:`${qty}개`,user:'수동'});
     closeModal('recvAddModal');
     if(typeof switchRecvTab==='function') switchRecvTab('a');
@@ -25747,6 +25796,10 @@ function renderRecv(){
         <div class="stat"><label>미입고</label><b id="mis-${r.id}" style="color:${miss>0?'#DC2626':'#059669'};">${miss.toLocaleString()}개</b></div>
         <button class="btn btn-sm rc-actbtn" id="cb-${r.id}" onclick="confirmRecv(${r.id})" style="background:${st.l==='입고완료'?'#ECFDF5':'var(--bg)'};color:${st.l==='입고완료'?'#059669':'var(--tx)'};">확인</button>
       </div>
+      <div class="rc-dates"><span>📅 입고일</span>
+        <label>1차 <input class="inp" type="date" id="d1-${r.id}" value="${r.in1Date||''}" onchange="recvDateChange(${r.id})"></label><span class="rd-lt" id="lt1-${r.id}">${_recvLtText(r,1)}</span>
+        <label>2차 <input class="inp" type="date" id="d2-${r.id}" value="${r.in2Date||''}" onchange="recvDateChange(${r.id})"></label><span class="rd-lt" id="lt2-${r.id}">${_recvLtText(r,2)}</span>
+      </div>
       <div class="rc-memo"><div class="memo-list">${ml}</div><div class="memo-add"><input type="text" id="mi-${r.id}" placeholder="메모..." onkeydown="if(event.key==='Enter')addMemo(${r.id})"><button onclick="addMemo(${r.id})">+</button></div></div>
     </div>`;
   }).join(''):`<div class="rc-empty">${srch?'검색 결과 없음':'진행중 발주가 없습니다'}</div>`;
@@ -25757,7 +25810,7 @@ function renderRecv(){
     const ml=r.memos?.length?r.memos.map(m=>`<div class="memo-item"><span class="memo-date">${m.date}</span>${m.text}</div>`).join(''):'';
     return `<div class="rc-card st-입고완료">
       <div class="rc-top"><span class="rc-name">${r.name}</span><span class="badge b-su">완료</span></div>
-      <div class="rc-meta"><span class="code-chip">${r.code}</span><span>📅 ${r.orderDate}</span><span>✅ ${r.doneTime}</span></div>
+      <div class="rc-meta"><span class="code-chip">${r.code}</span><span>📅 ${r.orderDate}</span><span>✅ ${r.doneTime}</span>${[1,2].map(n=>{const d=n===1?r.in1Date:r.in2Date, q=n===1?r.in1:r.in2; return (d&&q>0)?`<span>📦 ${n}차 ${d.slice(5)}${_recvLtText(r,n)?` (${_recvLtText(r,n).replace('주문 후 ','+')})`:''}</span>`:'';}).join('')}</div>
       <div class="rc-nums">
         <div class="stat"><label>주문수량</label><b>${r.orderQty.toLocaleString()}개</b></div>
         <div class="stat"><label>최종입고</label><b style="color:#059669;">${(r.in1+r.in2).toLocaleString()}개</b></div>
@@ -25798,12 +25851,34 @@ function liveCalc(id){
   r.orderQty=parseInt(document.getElementById('ord-'+id)?.value)||r.orderQty;
   r.in1=parseInt(document.getElementById('i1-'+id)?.value)||0;
   r.in2=parseInt(document.getElementById('i2-'+id)?.value)||0;
+  // 입고 수량을 넣으면 입고일을 오늘로 채우고(직접 바꿀 수 있음), 수량이 0이면 입고일도 비움
+  [[1,r.in1],[2,r.in2]].forEach(([n,q])=>{
+    const de=document.getElementById('d'+n+'-'+id); if(!de) return;
+    if(q>0 && !de.value) de.value=fmtDate(new Date());
+    if(q<=0) de.value='';
+    r['in'+n+'Date']=de.value;
+    const lt=document.getElementById('lt'+n+'-'+id); if(lt) lt.textContent=_recvLtText(r,n);
+  });
   const tot=r.in1+r.in2,miss=Math.max(0,r.orderQty-tot),st=getRecvSt(r);
   const te=document.getElementById('tot-'+id),me=document.getElementById('mis-'+id),se=document.getElementById('st-'+id),cb=document.getElementById('cb-'+id);
   if(te)te.textContent=tot.toLocaleString()+'개';
   if(me){me.textContent=miss.toLocaleString()+'개';me.style.color=miss>0?'#DC2626':'#059669';}
   if(se){se.textContent=st.l;se.className=`badge ${st.c}`;}
   if(cb){cb.style.background=st.l==='입고완료'?'#ECFDF5':'var(--bg)';cb.style.color=st.l==='입고완료'?'#059669':'var(--tx)';}
+}
+function recvDateChange(id){
+  const r=receiveList.find(x=>x.id===id); if(!r) return;
+  [1,2].forEach(n=>{
+    const de=document.getElementById('d'+n+'-'+id); if(!de) return;
+    r['in'+n+'Date']=de.value;
+    const lt=document.getElementById('lt'+n+'-'+id); if(lt) lt.textContent=_recvLtText(r,n);
+  });
+}
+// 입고 수량 입력칸 → 입고일 칸 자동 채움(팝업용): 수량>0이고 비어 있으면 오늘, 수량 0이면 비움
+function recvAutoDate(qtyId, dateId){
+  const q=parseInt(document.getElementById(qtyId)?.value)||0, de=document.getElementById(dateId); if(!de) return;
+  if(q>0 && !de.value) de.value=fmtDate(new Date());
+  if(q<=0) de.value='';
 }
 async function confirmRecv(id){
   const r=receiveList.find(x=>x.id===id);if(!r)return;
@@ -25813,6 +25888,12 @@ async function confirmRecv(id){
   r.orderQty=parseInt(document.getElementById('ord-'+id)?.value)||r.orderQty;
   r.in1=parseInt(document.getElementById('i1-'+id)?.value)||0;
   r.in2=parseInt(document.getElementById('i2-'+id)?.value)||0;
+  // 입고일: 수량이 있으면 필수(비어 있으면 오늘), 주문일보다 빠르면 저장하지 않음
+  const dd=[1,2].map(n=>{ const q=r['in'+n]; const v=document.getElementById('d'+n+'-'+id)?.value||''; return q>0 ? (v||fmtDate(new Date())) : ''; });
+  for(let i=0;i<2;i++){ const d=recvDays(r.orderDate, dd[i]); if(dd[i] && d!=null && d<0){ toast(`${i+1}차 입고일이 주문일(${r.orderDate})보다 빠릅니다. 날짜를 확인해 주세요.`); return; } }
+  r.in1Date=dd[0]; r.in2Date=dd[1];
+  const curD=_recvDates[id]||{};
+  if((curD.d1||'')!==dd[0] || (curD.d2||'')!==dd[1]) await saveRecvDates(id, dd[0], dd[1]);
   await sb.from('receive_list').update({code:r.code,name:r.name,order_qty:r.orderQty,in1:r.in1,in2:r.in2}).eq('id',id);
   _bumpReceive();
   const miss=Math.max(0,r.orderQty-r.in1-r.in2);
