@@ -14169,7 +14169,7 @@ async function insightToggleSeasonalCheck(id, checked){
 // 빼는 방식이라 상품마다 다르지 않고 전부 동일하다 — 요약 화면 상단 배너에 개별 상품과 무관하게
 // 바로 보여줄 수 있게 별도 헬퍼로 분리(insightSeasonalPreorderInfo의 계산과 반드시 같은 공식 유지).
 function insightWinterDeadlineInfo(){
-  const closeStart=new Date(CUR_YEAR,10,1);
+  const closeStart=new Date(CUR_YEAR,INSIGHT_COVER_START_MONTH,1);   // 12/1 — 구정 커버 점검과 같은 기준(2026-10-06: 이 칸만 11/1이라 마감일이 9/2로 따로 놀던 것 정합)
   const deadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
   const today=new Date(); today.setHours(0,0,0,0);
   const daysToDeadline=Math.round((deadline-today)/86400000);
@@ -14606,15 +14606,15 @@ function insightEffectiveReorder(p, ic){
 // 대표님 피드백(2026-09): "여름철 피크 제품은 겨울부터, 겨울철 피크 제품은 여름부터" 미리 준비해둬야
 // 한다 — 성수기가 오기 최소 반년 전부터 대비해야 한다는 경험칙. 리드타임(2개월)만 보고 성수기 임박
 // 직전에야 발주하면 목표 재고를 다 쌓기엔 항상 늦으므로 타당한 경험칙이라 판단해 "6개월 전 알림"
-// 기준으로 반영했다. 원청 공장(중국)이 매년 11월~익년3월 마감(연말 동종업체 주문 폭주 + 구정 연휴)에
+// 기준으로 반영했다. 원청 공장(중국)이 매년 12/1~4/30 생산중단(연말 동종업체 주문 폭주 + 구정 연휴)에
 // 들어가 그 기간엔 생산·입고가 사실상 불가능한 건 별개 사실(2026-09 확인) — 성수기가 이 구간과
 // 겹치는 상품(연초 성수기 상품)은 일반 규칙 대신 마감을 감안한 전용 계산(아래 겨울철 분기)을 쓴다.
 const SEASONAL_LEAD_MONTHS=2;      // 리드타임(넉넉히 2개월)
 const SEASONAL_PREP_MONTHS=6;      // 성수기 시작 몇 개월 전부터 "미리 준비" 알림을 띄울지
 const SEASONAL_TARGET_MONTHS=2.5;  // 평상시(비겨울) 성수기 대비 목표재고 — 2~3개월치(2026-09-30 사용자 확정)
-const WINTER_CLOSE_MONTHS=5;       // 원청 공장 마감기간(11~익년3월)
+const WINTER_CLOSE_MONTHS=5;       // 원청 공장 생산중단 기간(12/1~4/30, 5개월)
 const WINTER_COVER_MONTHS=WINTER_CLOSE_MONTHS+SEASONAL_LEAD_MONTHS; // 마감중 재발주 불가 총 기간(7개월)
-const _WINTER_MONTH_SET=new Set([9,10,11,0,1,2]); // 10,11,12,1,2,3월(0-idx)
+const _WINTER_MONTH_SET=new Set([11,0,1,2,3]); // 12,1,2,3,4월(0-idx) — 신규 입고가 막히는 12/1~4/30
 
 // insightSeasonInfo가 계산한 기준연도 실적(cleanMonths/avg/peakI)을 바탕으로, 평균 대비 1.2배 이상
 // 튀는 구간을 peak월 중심으로 좌우로 넓혀 "성수기 구간"(월 인덱스 배열, 연도 경계 넘으면 순환)을
@@ -14741,12 +14741,14 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
   // 겨울마감 대비(공통) — 겨울과 겹치는 확정 성수기든, 사계절 균등이든, 자체 판정이 안 되는 신상품
   // 이든 전부 이 경로. 마감(11월)부터 재개후 첫 발주 도착까지(11,12,1,2,3,4,5월=7개월)는 최소
   // 보장으로 확보하고, 실제 감지된 성수기 구간이 이보다 더 길면 그만큼 더 늘린다.
-  const closeStart=new Date(CUR_YEAR,10,1);
+  const closeStart=new Date(CUR_YEAR,INSIGHT_COVER_START_MONTH,1);   // 12/1 생산중단 시작(구정 커버 점검과 동일)
   const monthsAway=Math.round((closeStart-today)/(30*86400000));
   const _winterDeadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
   if(monthsAway>SEASONAL_PREP_MONTHS) return {status:'later', kind:'winter', monthsAway, startDate:closeStart, deadline:_winterDeadline, daysToDeadline:Math.round((_winterDeadline-today)/86400000)};
-  const closureMinMonths=[10,11,0,1,2,3,4]; // 11,12,1,2,3,4,5월(0-idx) — 마감+재개리드타임 최소 보장 구간
-  const coverMonths = hasWindow ? [...new Set([...windowMonths, ...closureMinMonths])] : closureMinMonths;
+  // 신규 입고가 막히는 12/1~4/30(12,1,2,3,4월)만 대상 — 실제 입고 기록상 겨울 이후 첫 입고가 4/21~4/30이라 구간 끝은 4/30(4월)
+  // 이전엔 11~5월에 성수기 구간까지 합쳤는데, 11월 이전은 지금 재고로 소진되는 기간이고 5월은 2~3월에 낸 재주문이 이미 들어오는 시기라 이중 계산이었다.
+  const closureMinMonths=[11,0,1,2,3];
+  const coverMonths = closureMinMonths;
 
   let forecastTotal, reason;
   if(season.status==='ok'){
@@ -15247,14 +15249,14 @@ function insightWinterCareCellHtml(sp, pid){
   if(!sp || sp.kind!=='winter') return '<span class="ins-sub">-</span>';
   if(sp.status==='later'){
     const dl0=fmtDate(sp.deadline);
-    return `<div class="ins-sub" title="원청 공장 11월~익년3월 마감(생산중단) 대비 발주 마감일. 아직 ${sp.monthsAway}개월 남아 지금은 알림 대상이 아닙니다.">마감 ${dl0}<br>(${sp.monthsAway}개월 후)</div>`;
+    return `<div class="ins-sub" title="원청 공장 12/1~4/30 생산중단 대비 발주 마감일. 아직 ${sp.monthsAway}개월 남아 지금은 알림 대상이 아닙니다.">마감 ${dl0}<br>(${sp.monthsAway}개월 후)</div>`;
   }
   if(sp.status!=='flag') return '<span class="ins-sub">-</span>';
   const label = sp.reason==='seasonal'?'구정재고 대비(성수기)':sp.reason==='flat'?'구정재고 대비(사계절)':'구정재고 대비(신상품)';
   let closeNote = sp.reason==='seasonal'
-    ? '이 상품은 성수기가 원청 공장 11월~익년3월 마감(생산중단) 기간과 겹칩니다 — 12월~4월 예상 판매를 작년 같은 달 실적과 올해 판매 흐름(최근 3개월 ÷ 작년 같은 달)·최근 판매속도를 함께 분석해 계산했습니다(낙관~보수 범위는 상품명 클릭 시 상세 분석 참고)'
+    ? '이 상품은 성수기가 원청 공장 12/1~4/30 생산중단 기간과 겹칩니다 — 12월~4월 예상 판매를 작년 같은 달 실적과 올해 판매 흐름(최근 3개월 ÷ 작년 같은 달)·최근 판매속도를 함께 분석해 계산했습니다(낙관~보수 범위는 상품명 클릭 시 상세 분석 참고)'
     : sp.reason==='flat'
-      ? '이 상품은 사계절 고르게 팔리지만, 원청 공장 11월~익년3월 마감(생산중단)은 계절과 무관하게 적용됩니다 — 12월~4월 예상 판매를 작년 실적과 올해 판매 흐름·최근 판매속도를 함께 분석해 계산했습니다'
+      ? '이 상품은 사계절 고르게 팔리지만, 원청 공장 12/1~4/30 생산중단은 계절과 무관하게 적용됩니다 — 12월~4월 예상 판매를 작년 실적과 올해 판매 흐름·최근 판매속도를 함께 분석해 계산했습니다'
       : `이 상품은 자체 작년 실적이 없는 신상품입니다. 지금 판매속도를 그대로 미래에 적용하지 않고, 같은 구분(${sp.typeUsed||'기타'}) 상품들이 실제로 겨울철 얼마나 줄고 늘어나는지의 평균 패턴을 반영해 겨울 대비 예상수요를 추정했습니다.`;
   const breakdown=insightSeasonalBreakdownText(sp);
   const dl=`${sp.deadline.getMonth()+1}/${sp.deadline.getDate()}`;
@@ -15342,8 +15344,8 @@ function insightRenderSeasonalSummary(){
   if(tab==='winter'){
     const {deadline, daysToDeadline}=insightWinterDeadlineInfo();
     const overdue=daysToDeadline<0;
-    bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;color:${overdue?'#DC2626':'var(--tx)'};">❄ 원청 공장 마감(11월~익년3월) 대비 발주 마감일 — ${fmtDate(deadline)} ${overdue?`(🚨 마감 ${Math.abs(daysToDeadline)}일 지남)`:`(D-${daysToDeadline})`}</div>
-      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">이 마감일은 원청 공장이 매년 같은 시기(11월)에 문을 닫아 전 상품이 동일합니다. 전체 ${totalCnt}개 중 미처리 <b>${needRows.length}</b>개 · 처리완료 ${doneRows.length}개 · 재고여유 ${readyRows.length}개${laterNote}</div>`;
+    bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;color:${overdue?'#DC2626':'var(--tx)'};">❄ 원청 공장 생산중단(12/1~4/30) 대비 발주 마감일 — ${fmtDate(deadline)} ${overdue?`(🚨 마감 ${Math.abs(daysToDeadline)}일 지남)`:`(D-${daysToDeadline})`}</div>
+      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">이 마감일은 원청 공장이 매년 같은 시기(12/1)에 생산을 멈추고 리드타임(2개월)이 같아 전 상품이 동일합니다. 전체 ${totalCnt}개 중 미처리 <b>${needRows.length}</b>개 · 처리완료 ${doneRows.length}개 · 재고여유 ${readyRows.length}개${laterNote}</div>`;
   } else {
     const soonest=needRows.length?needRows.reduce((a,b)=>a.seasonPre.daysToDeadline<b.seasonPre.daysToDeadline?a:b):null;
     bannerEl.innerHTML = soonest
@@ -26481,10 +26483,24 @@ function simChange(){
   document.getElementById('simInputRow').style.display='none';
   const s=document.getElementById('simSearch'); s.value=''; s.focus();
 }
+// 오늘 이후 처음 오는 성수기 구간(월 인덱스 배열) → {start,end}. 이미 성수기 중이면 start=오늘
+function simNextWindow(wm){
+  const today=new Date(); today.setHours(0,0,0,0);
+  let y=today.getFullYear(), m=today.getMonth(), start=null, end=null;
+  for(let i=0;i<26;i++){
+    const inW=wm.includes(m);
+    if(inW && !start) start=(i===0)?new Date(today):new Date(y,m,1);
+    if(start && !inW){ end=new Date(y,m,1); break; }
+    m++; if(m>11){ m=0; y++; }
+  }
+  if(!start) return null;
+  if(!end) end=new Date(start.getFullYear()+1,start.getMonth(),1);
+  return {start,end};
+}
 function simRender(){
   const res=document.getElementById('simResult'); if(!res) return;
   const r=_simRow; if(!r){ res.innerHTML=''; return; }
-  const p=r.p, c=r.c, wc=r.winterCover, e=c.expert;
+  const p=r.p, c=r.c, wc=r.winterCover, e=c.expert, se=r.season;
   if(c.noData){ res.innerHTML='<div class="sim-note">최근 판매 데이터가 부족해(30일 중 3일 미만 등) 이 제품은 분석할 수 없습니다.</div>'; return; }
   const qv=document.getElementById('simQty').value;
   if(qv===''||!(parseFloat(qv)>=0)){ res.innerHTML='<div class="sim-note">주문할 수량을 넣으면 충분한지, 얼마나 더 필요한지 알려드려요.</div>'; return; }
@@ -26492,87 +26508,119 @@ function simRender(){
   const Q=Math.round(unit==='box'?parseFloat(qv)*box:parseFloat(qv));
   const n=v=>Math.round(v).toLocaleString('ko-KR');
   const bx=v=>Math.ceil(v/box).toLocaleString('ko-KR');
-  const S=p.stock||0, P=r.pending||0;
+  const rng=(a,b)=>{ const lo=Math.round(Math.min(a,b)), hi=Math.round(Math.max(a,b)); return lo===hi?lo.toLocaleString('ko-KR'):lo.toLocaleString('ko-KR')+'~'+hi.toLocaleString('ko-KR'); };
+  const S=p.stock||0, P=r.pending||0, T=S+P+Q;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const DAY=86400000;
   const coverActive=!!(wc&&wc.status==='ok'&&wc.active);
   const reg=r.regQty||0, cov=r.coverQty||0, need=r.finalQty||0;
   const shortQty=Math.max(0,need-Q);
-  // 판정 — 평상시 권장(reg)과 구정 준비(cov) 둘 다 만족해야 충분. 빠듯 = 평상시 80% 이상 & 구정은 기준 예상의 95% 이상
+  // ── 예상 판매 재료: 작년 월별 패턴 × 올해 흐름 배율(g) / 작년 패턴 그대로(×1) ──
+  const fpat=insightForwardPattern(c, se, wc);
+  const pat=fpat.pattern, g=fpat.g;
+  const D=(f,d0,d1)=>insightDemandBetween(pat,f,d0,d1);
+  const Drng=(d0,d1)=>rng(D(g,d0,d1), D(1,d0,d1));
+  const L=e?e.L:Math.round((p.leadTime||2)*30);
+  // 성수기
+  let win=null;
+  if(fpat.seasonal){
+    let wm=insightSeasonWindowMonths(se); if(!wm.length) wm=[se.peakI];
+    const w=simNextWindow(wm);
+    if(w) win={wm, start:w.start, end:w.end, nm: wm.length>1?`${MNAMES[wm[0]]}~${MNAMES[wm[wm.length-1]]}`:MNAMES[wm[0]]};
+  }
+  // "재주문 없이 성수기 끝까지" 기준 구간 끝 — 성수기가 8개월 안이면 성수기 끝, 아니면 구정 구간 끝/리드타임+발주주기. 구정 구간이 활성이면 최소 그 끝(4/30)까지.
+  let hEnd = (win && (win.end-today)<=240*DAY) ? win.end : (coverActive ? wc.windowEnd : new Date(today.getTime()+(L+(e?e.R:30))*DAY));
+  if(coverActive && wc.windowEnd>hEnd) hEnd=wc.windowEnd;
+  const needH=f=>Math.max(0, Math.round(D(f,today,hEnd)-(S+P)));
+  const nH1=needH(g), nH2=needH(1), nHlo=Math.min(nH1,nH2), nHhi=Math.max(nH1,nH2);
+  const upper=Math.ceil(Math.max(need*1.3, nHhi, need+box)/box)*box;   // 이 이상이면 "오버"
+  // ── 판정: 부족/빠듯/적정/오버 ──
   const regOk=Q>=reg, regTight=Q>=reg*0.8;
   let covOk=true, covTight=true;
   if(coverActive){ covOk=Q>=cov; covTight=(wc.supply+Q)>=wc.scenarios.base.total*INSIGHT_COVER_TIGHT_RATIO; }
-  const verdict=(regOk&&covOk)?'ok':((regTight&&covTight)?'tight':'short');
-  const st=_INS_COVER_STYLE[verdict];
-  const vText={ok:'충분해요',tight:'빠듯해요',short:'부족해요'}[verdict];
-  // 과잉 점검 — 이 주문까지 넣었을 때 보유량이 몇 개월치 판매인지
-  // 보유량이 몇 개월치 판매인지 — 작년 월별 패턴(성수기 편중 반영)×올해 흐름 배율 / 작년 패턴 그대로, 두 시나리오로 범위 계산
-  const fpat=insightForwardPattern(c, r.season, wc);
-  const T=S+P+Q;
-  const cB=insightCoverMonths(fpat.pattern, fpat.g, T);
-  const cL=fpat.seasonal ? insightCoverMonths(fpat.pattern, 1, T) : cB;
+  let verdict=(regOk&&covOk)?'ok':((regTight&&covTight)?'tight':'short');
+  if(verdict==='ok' && Q>upper) verdict='over';
+  const STY=Object.assign({}, _INS_COVER_STYLE, {over:{bg:'#EFF6FF',fg:'#185FA5',icon:'🧊',label:'오버'}});
+  const st=STY[verdict];
+  const vText={ok:'적정해요',tight:'빠듯해요',short:'부족해요',over:'필요보다 많아요(오버)'}[verdict];
+  // 보유량이 몇 개월치 판매인지
+  const cB=insightCoverMonths(pat, g, T), cL=fpat.seasonal?insightCoverMonths(pat,1,T):cB;
   const cLo=Math.min(cB,cL), cHi=Math.max(cB,cL);
-  const annB=fpat.pattern.reduce((a,b)=>a+b,0)*fpat.g, annL=fpat.pattern.reduce((a,b)=>a+b,0);
+  const annB=pat.reduce((a,b)=>a+b,0)*g, annL=pat.reduce((a,b)=>a+b,0);
   const mTxt=v=>v>=48?'48개월+':(Math.round(v*10)/10)+'개월';
   const monthsRange=(cHi-cLo>=1)?`${Math.round(cLo)}~${Math.round(cHi)}개월`:mTxt(cB);
-  const overLimit=coverActive?9:6;
-  const over=cLo>overLimit;   // 두 시나리오 모두 한도를 넘을 때만 과잉으로 본다
-  const monthsAfter=T>0?cB:null;
-  const L=e?e.L:Math.round((p.leadTime||2)*30);
-  const today=new Date(); today.setHours(0,0,0,0);
-  const arrive=new Date(today.getTime()+L*86400000);
   const ls=r.leadStats;
-  let head=`<div class="v2">`;
-  if(shortQty>0) head+=`👉 추가로 <b>${bx(shortQty)}박스(${n(shortQty)}개)</b> 더 주문해야 안전합니다.<br><span style="opacity:.85;">앱 권장 총 주문량 ${bx(need)}박스(${n(need)}개) — ${r.finalBasis==='cover'?'구정 준비 기준':'평상시 권장 기준'}</span>`;
+
+  // ── 결론 문구 ──
+  let head='<div class="v2">';
+  if(verdict==='over') head+=`👉 이번 시즌에 필요한 양보다 약 <b>${bx(Q-upper)}박스(${n(Q-upper)}개)</b> 많아요.<br><span style="opacity:.85;">앱 권장 ${bx(need)}박스(${n(need)}개) · 재주문 없이 ${win?win.nm+' 성수기':'기준 구간'} 끝까지 가려 해도 ${rng(nHlo,nHhi)}개면 돼요. 넘는 물량은 다음 시즌으로 이월됩니다(보유 ${n(T)}개 ≈ ${monthsRange}분).</span>`;
+  else if(shortQty>0) head+=`👉 추가로 <b>${bx(shortQty)}박스(${n(shortQty)}개)</b> 더 주문해야 안전합니다.<br><span style="opacity:.85;">앱 권장 총 주문량 ${bx(need)}박스(${n(need)}개) — ${r.finalBasis==='cover'?'구정 준비 기준':'평상시 권장 기준'}</span>`;
   else if(need>0) head+=`👉 추가 주문은 필요 없어요. (앱 권장 ${bx(need)}박스(${n(need)}개) 이상 주문)`;
   else head+=`👉 현재고와 진행중 발주만으로도 충분해서 추가 주문이 필요 없어요.`;
-  if(over) head+=`<br>🧊 이 주문까지 합치면 약 <b>${monthsRange}분</b>(계절 패턴 반영) 재고라 <b>${overLimit}개월을 넘어 많은 편</b>이에요.`;
   head+='</div>';
+
   const ln=(lbl,txt)=>`<div class="ln"><b>${lbl}</b> <span>${txt}</span></div>`;
-  let why='';
-  // ① 현재 상황
-  why+=ln('① 지금 재고',`현재고 ${n(S)}개 + 진행중 발주 ${n(P)}개 = ${n(S+P)}개 · 일평균 판매 ${c.avgDay}개 → 현재고만으론 ${r.daysLeft!=null?`약 ${r.daysLeft}일 뒤(${_insFmtMD(r.exhaustDate)}경) 소진`:'소진 시점 산출 불가'}`);
-  // ② 리드타임
-  let gap='';
-  if(r.daysLeft!=null && r.daysLeft<L) gap=` ⚠ 주문이 도착하기 전에 현재고가 먼저 바닥날 수 있어요(약 ${L-r.daysLeft}일 공백${P>0?' — 진행중 발주가 먼저 들어오면 완화':''}).`;
-  why+=ln('② 도착 시점',`리드타임 약 ${L}일 → 오늘 주문하면 ${_insFmtMD(arrive)}경 도착${ls&&ls.a1!=null?` (이 제품 입고 실적 평균 1차 ${ls.a1}일${ls.a2!=null?` · 2차 ${ls.a2}일`:''})`:''}. 도착 시점 예상 재고 ${n(e?e.stockAtDelivery:c.stockAtDelivery)}개.${gap}`);
-  // ③ 평상시 권장
-  if(e) why+=ln('③ 평상시 권장',`앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 예상 판매 ${n(e.dLR)}개 × 안전배수 ×${e.k.toFixed(2)}(${e.grade}등급 ${e.pct}) = 목표 확보량 <b>${n(e.targetLR)}개</b>${e.usedRecent?'(최근 30일 판매속도가 더 커서 그 값 사용)':''} − 현재고(리드타임 중 판매 반영) = 필요 ${n(c.needed)}개${P>0?` → 진행중 발주 ${n(P)}개 차감 →`:' →'} <b>평상시 권장 ${n(reg)}개</b> ${regOk?'(✅ 이 주문으로 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
-  else why+=ln('③ 평상시 권장',`필요수량 ${n(c.needed)}개${P>0?` − 진행중 ${n(P)}개`:''} = <b>${n(reg)}개</b> ${regOk?'(✅ 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
-  // ④ 구정 준비
+  // ── ① 판매 패턴 ──
+  let s1='';
+  if(fpat.seasonal){
+    const cm=se.cleanMonths, wm=win?win.wm:[se.peakI];
+    const lyWin=wm.reduce((a,mi)=>a+cm[mi],0), lyAvg=lyWin/wm.length;
+    const lyNow=cm[today.getMonth()], rec30=(c.avg30||0)*30;
+    const nowTag=lyNow>=lyAvg*0.6?'성수기에 가까운 시기':'비수기';
+    s1=`작년 실적 기준 이 제품의 피크는 <b>${MNAMES[se.peakI]}</b>이고 성수기는 <b>${win?win.nm:MNAMES[se.peakI]}</b>예요. 작년 성수기에 <b>${n(lyWin)}개</b>(월 평균 ${n(lyAvg)}개) 팔렸어요. 지금(${today.getMonth()+1}월)은 <b>${nowTag}</b>라 작년 같은 달 ${n(lyNow)}개, 최근 30일 ${n(rec30)}개 수준이에요. `;
+    s1+=(wc&&wc.status==='ok'&&wc.growthOk)
+      ? `올해 흐름은 작년의 <b>×${g.toFixed(2)}</b>배예요(최근 3개월 ${wc.gLbl.join('·')} ${n(wc.gCur)}개 vs 작년 같은 3개월 ${n(wc.gPrev)}개). 그래서 올해 성수기는 작년 ${n(lyWin)}개의 ${n(lyWin*g)}개 정도로 봤어요(작년 그대로면 ${n(lyWin)}개).`
+      : `작년과 비교할 최근 실적이 부족해 올해 흐름 보정은 하지 않았어요.`;
+  } else {
+    const fm=(e&&e.monthly)||(wc&&wc.level)||0;
+    s1=`자체 12개월 판매 실적이 없어 계절 패턴을 알 수 없어요. 현재 평균 월 ${n(fm)}개 수준으로 계속 팔린다고 가정했어요.`;
+  }
+  // ── ② 앞으로 예상 판매 ──
+  let s2='';
+  if(win){
+    if(win.start>today) s2+=`지금~성수기 시작(${_insFmtMD(win.start)}) 비수기 동안 <b>${Drng(today,win.start)}개</b>, `;
+    s2+=`성수기(${win.nm}) 동안 <b>${Drng(win.start,win.end)}개</b>가 팔릴 걸로 예상해요.`;
+  } else s2+=`앞으로 1년 예상 판매는 약 <b>${rng(annB,annL)}개</b>예요.`;
   if(coverActive){
-    const {low,base,high,target}=wc.scenarios, sup=wc.supply+Q, diff=sup-target.total;
-    const endTxt=_insFmtMD(new Date(wc.windowEnd.getTime()-86400000));
-    const late=wc.arriveIfOrderNow>wc.closeStart;
-    why+=ln('④ ❄ 구정 준비',`공장이 쉬는 12/1~${endTxt}엔 재발주가 안 돼 12/1 전 입고분으로 버텨야 해요. 예상 판매 ${n(base.total)}개(낙관 ${n(low.total)} ~ 보수 ${n(high.total)}) → 안전 목표 <b>${n(target.total)}개</b>(${wc.grade}등급 ${wc.targetPct}). 확보분 ${n(wc.supply)}개 + 이번 주문 ${n(Q)}개 = ${n(sup)}개 → 목표 대비 <b>${diff>=0?'여유 '+n(diff)+'개':'부족 '+n(-diff)+'개'}</b>.${late?` 🚨 구정 점검은 리드타임을 넉넉히 2개월로 봐서 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착 → 12/1 이후일 수 있어요${wc.onTimePct!=null?`(과거 입고 기록상 12/1 전 도착 가능성 약 ${wc.onTimePct}%)`:''}.`:` 구정 점검 기준(리드타임 2개월) 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착${wc.onTimePct!=null?`(12/1 전 도착 가능성 약 ${wc.onTimePct}%)`:''}.`}`);
-  } else if(wc && wc.status==='ok'){
-    why+=ln('④ ❄ 구정 준비','구정 커버 점검은 9~11월에만 운영해 지금은 반영하지 않았어요.');
+    const {low,base,high}=wc.scenarios;
+    s2+=` 공장이 쉬는 <b>12/1~4/30</b>엔 <b>${n(base.win)}개</b>(낙관 ${n(low.win)} ~ 보수 ${n(high.win)})가 팔릴 걸로 봐요.`;
   }
-  // ⑤ 계절 대비 참고
+  // ── ③ 필요한 재고 ──
+  let s3='';
+  if(coverActive){
+    const {target,base}=wc.scenarios;
+    s3+=`12/1~4/30엔 신규 입고가 안 돼서(실제 입고 기록: 2~3월에 낸 주문이 4/21~4/30에 도착) 이 구간은 지금 확보한 물량으로 버텨야 해요. 지금~4/30 예상 판매 ${n(base.total)}개에 ${wc.grade}등급 안전 보정(${wc.targetPct})을 더한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
+  }
+  s3+=(e?`평소 기준으로는 리드타임(약 ${L}일)+발주주기 동안 쓸 목표 확보량 ${n(e.targetLR)}개에서 현재고·진행중 발주를 반영하면 <b>${n(reg)}개</b>가 필요해요. `:`평소 기준 권장은 ${n(reg)}개예요. `);
+  s3+=`→ 앱 권장 총 주문량은 <b>${n(need)}개(${bx(need)}박스)</b>입니다. `;
+  s3+=`참고로 재주문 없이 ${win&&(win.end-today)<=240*DAY?win.nm+' 성수기가 끝나는 '+_insFmtMD(new Date(hEnd.getTime()-DAY))+'까지':_insFmtMD(new Date(hEnd.getTime()-DAY))+'까지'} 가려면 예상 판매 ${rng(D(g,today,hEnd),D(1,today,hEnd))}개 − 보유 ${n(S+P)}개 = <b>${rng(nHlo,nHhi)}개</b>가 필요해요.`;
+  // ── ④ 요청 수량 평가 ──
+  let s4=`요청 ${n(Q)}개 → 보유 합계 ${n(T)}개(현재고 ${n(S)} + 진행중 ${n(P)} + 이번 주문 ${n(Q)}). `;
+  s4+=`앱 권장(${n(need)}개) 대비 ${Q>=need?'<b>+'+n(Q-need)+'개</b>':'<b>'+n(Q-need)+'개</b>'}, 성수기까지 재주문 없는 경우의 필요량(${rng(nHlo,nHhi)}개) 대비 ${Q>=nHhi?'<b>+'+n(Q-nHhi)+'개</b>':(Q>=nHlo?'범위 안':'<b>'+n(Q-nHlo)+'개</b>')}예요. `;
+  if(verdict==='over'){
+    const left=[T-D(g,today,hEnd), T-D(1,today,hEnd)];
+    s4+=`→ <b>오버</b>: ${win?win.nm+' 성수기':'기준 구간'}가 끝나는 시점에도 약 ${rng(left[0],left[1])}개가 남아 다음 비수기·성수기로 이월돼요. `;
+    if(fpat.seasonal) s4+=`보유 ${n(T)}개가 <b>${monthsRange}분</b>인 이유: 1년 예상 판매 ${rng(annB,annL)}개를 다 쓰고도 1년 뒤에 ${rng(T-annB,T-annL)}개가 남고, 그 재고가 다음 비수기·성수기를 지나며 소진되기 때문이에요.`;
+  } else if(verdict==='ok') s4+=`→ <b>적정</b>: 필요량을 채우면서 과하지 않아요(주문 후 약 ${monthsRange}분).`;
+  else s4+=`→ <b>${verdict==='tight'?'빠듯':'부족'}</b>: ${n(shortQty)}개가 더 있어야 안전해요.`;
+  // ── 상세 계산(접기) ──
+  let det='';
+  det+=ln('현재 재고',`현재고 ${n(S)}개 + 진행중 ${n(P)}개 = ${n(S+P)}개 · 일평균 ${c.avgDay}개 → 현재고만으론 ${r.daysLeft!=null?`약 ${r.daysLeft}일 뒤(${_insFmtMD(r.exhaustDate)}경) 소진`:'소진 시점 산출 불가'}`);
+  let gap=''; if(r.daysLeft!=null && r.daysLeft<L) gap=` ⚠ 주문이 도착하기 전에 현재고가 먼저 바닥날 수 있어요(약 ${L-r.daysLeft}일 공백${P>0?' — 진행중 발주가 먼저 들어오면 완화':''}).`;
+  det+=ln('도착 시점',`리드타임 약 ${L}일 → 오늘 주문하면 ${_insFmtMD(new Date(today.getTime()+L*DAY))}경 도착${ls&&ls.a1!=null?` (이 제품 입고 실적 평균 1차 ${ls.a1}일${ls.a2!=null?` · 2차 ${ls.a2}일`:''})`:''}. 도착 시점 예상 재고 ${n(e?e.stockAtDelivery:c.stockAtDelivery)}개.${gap}`);
+  if(e) det+=ln('평상시 권장',`앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 예상 판매 ${n(e.dLR)}개 × 안전배수 ×${e.k.toFixed(2)}(${e.grade}등급 ${e.pct}) = 목표 확보량 ${n(e.targetLR)}개${e.usedRecent?'(최근 30일 판매속도가 더 커서 그 값 사용)':''} − 현재고(리드타임 중 판매 반영) = 필요 ${n(c.needed)}개${P>0?` → 진행중 ${n(P)}개 차감 →`:' →'} 평상시 권장 ${n(reg)}개 ${regOk?'(✅ 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
+  if(coverActive){
+    const {low,base,high,target}=wc.scenarios, sup=wc.supply+Q, diff=sup-target.total, late=wc.arriveIfOrderNow>wc.closeStart;
+    det+=ln('구정 준비',`예상 판매(오늘~4/30) ${n(base.total)}개(낙관 ${n(low.total)} ~ 보수 ${n(high.total)}) → 안전 목표 ${n(target.total)}개. 확보분 ${n(wc.supply)} + 이번 주문 ${n(Q)} = ${n(sup)}개 → 목표 대비 ${diff>=0?'여유 '+n(diff):'부족 '+n(-diff)}개. 구정 점검은 리드타임을 2개월로 보고, 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착${late?' → 12/1 이후일 수 있어요(🚨)':''}${wc.onTimePct!=null?` (과거 입고 기록상 12/1 전 도착 가능성 약 ${wc.onTimePct}%)`:''}.`);
+  } else if(wc && wc.status==='ok') det+=ln('구정 준비','구정 커버 점검은 9~11월에만 운영해 지금은 반영하지 않았어요.');
   const sp=r.seasonPre;
-  if(sp && sp.status==='flag' && sp.neededQty>0){
-    why+=ln('⑤ 계절 대비 참고',`${sp.kind==='winter'?'구정재고 대비':'계절성수기 대비'} 칸 기준으로는 추가 ${sp.boxes.toLocaleString()}박스(${n(sp.neededQty)}개)가 더 필요하다고 나옵니다(마감 ${fmtDate(sp.deadline)}${sp.overdue?' · 🚨지남':''}). 위 판정과는 별개의 참고 정보예요.`);
-  }
-  if(monthsAfter!=null){
-    const flatM=(e&&e.monthly)||(wc&&wc.level)||0;
-    why+=ln('⑥ 주문 후 재고',`이 주문까지 도착하면 보유 ${n(T)}개 ≈ <b>약 ${monthsRange}분</b> 판매량이에요. `+(fpat.seasonal
-      ? `작년 월별 판매 패턴(성수기 편중)에 올해 흐름 ×${fpat.g.toFixed(2)}를 곱한 시나리오(연간 약 ${n(annB)}개)와, 작년 패턴 그대로인 시나리오(연간 약 ${n(annL)}개)로 계산했어요.${flatM>0?` ※ 지금 속도(월 ${n(flatM)}개)를 1년 내내 유지한다고 단순 계산하면 ${mTxt(T/flatM)}으로 나오지만, 성수기·비수기 차이가 큰 제품은 그렇게 보지 않아요.`:''}`
-      : `이 제품은 자체 1년치 판매 실적이 없어 현재 평균 속도(월 ${n(flatM)}개)가 계속된다고 가정했어요.`));
-    // 다음 성수기 커버 — 보유량이 비수기 동안 얼마나 줄고, 성수기 예상 판매를 채우는지
-    const wm=fpat.seasonal?insightSeasonWindowMonths(r.season):[];
-    if(wm.length){
-      const startDate=insightNextMonthDate(wm[0]);
-      const endDate=new Date(startDate.getFullYear(), startDate.getMonth()+wm.length, 1);
-      const winD=f=>wm.reduce((a,mi)=>a+(fpat.pattern[mi]||0)*f,0);
-      const toStart=f=>startDate>today?insightDemandBetween(fpat.pattern,f,today,startDate):0;
-      const atStart=f=>Math.max(0,T-toStart(f));
-      const nm=`${wm[0]+1}~${wm[wm.length-1]+1}월`;
-      const dB=winD(fpat.g), dL=winD(1);
-      const sB=atStart(fpat.g), sL=atStart(1);
-      const okB=sB>=dB, okL=sL>=dL;
-      why+=ln('⑦ 다음 성수기',`이 제품의 성수기는 <b>${nm}</b>(작년 ${n(winD(1))}개 판매)로 보여요. 성수기 시작(${_insFmtMD(startDate)}) 때 보유량은 비수기 판매를 빼면 약 ${n(Math.min(sB,sL))}~${n(Math.max(sB,sL))}개이고, 성수기 예상 판매는 ${n(Math.min(dB,dL))}~${n(Math.max(dB,dL))}개 → ${okB&&okL?'✅ <b>성수기를 이 물량으로 충분히 커버</b>해요.':(!okB&&!okL?'❌ <b>성수기 물량이 모자라요.</b>':'⚠ 시나리오에 따라 <b>빠듯할 수 있어요.</b>')}`);
-    }
-  }
+  if(sp && sp.status==='flag' && sp.neededQty>0) det+=ln('계절 대비 칸',`${sp.kind==='winter'?'구정재고 대비':'계절성수기 대비'} 칸 기준으로는 추가 ${sp.boxes.toLocaleString()}박스(${n(sp.neededQty)}개)가 필요하다고 나옵니다(마감 ${fmtDate(sp.deadline)}${sp.overdue?' · 🚨지남':''}).`);
+  det+=ln('주문 후 재고',`보유 ${n(T)}개 ≈ 약 ${monthsRange}분(작년 월별 패턴 × 올해 흐름 ×${g.toFixed(2)} / 작년 그대로 두 시나리오). 지금 속도(월 ${n((e&&e.monthly)||(wc&&wc.level)||0)}개)를 1년 내내 단순 적용하면 훨씬 길게 나오지만 계절 편중 제품엔 맞지 않아 쓰지 않았어요.`);
   res.innerHTML=`<div class="sim-verdict" style="background:${st.bg};color:${st.fg};"><div class="v1">${st.icon} ${n(Q)}개(${bx(Q)}박스) 주문 → ${vText}</div>${head.replace('class="v2"','class="v2" style="color:'+st.fg+';"')}</div>
-    <div class="sim-why"><div style="font-weight:800;margin-bottom:2px;">📋 분석 근거</div>${why}</div>
+    <div class="sim-why"><div style="font-weight:800;margin-bottom:2px;">📋 분석 근거</div>
+      ${ln('① 판매 패턴(작년+올해)',s1)}${ln('② 앞으로 예상 판매',s2)}${ln('③ 필요한 재고',s3)}${ln('④ 요청 수량 평가',s4)}
+      <details class="ln"><summary style="cursor:pointer;font-weight:700;">🔧 상세 계산 보기</summary>${det}</details>
+    </div>
     <div class="sim-note">※ 발주 인사이트와 같은 계산(일평균·성수기 보정·등급별 안전배수·구정 커버)을 사용하며 저장되는 값은 없어요. 주문일을 오늘로 가정합니다.</div>`;
 }
 function toggleFloat(){floatOpen=!floatOpen;document.getElementById('floatCard').classList.toggle('open',floatOpen);}
