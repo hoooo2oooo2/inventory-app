@@ -14543,16 +14543,18 @@ function insightDemandRates(p, avg30, c, seasonIndex, nDays){
   const firstSale=_insightFirstSaleDate(p);
   const cap=_insightMonthCap(p);   // 일회성 대량 건 제한
   const idxArr=insightSeasonIndexFor(seasonIndex, p.type);
-  let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null;
+  let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null, gZero=false;
   for(let k=3;k>=1;k--){
     let m=MONTH-k, y=CUR_YEAR; if(m<0){ m+=12; y--; }
-    lvSum+=Math.min(getTotalM(p,y)[m]||0,cap); gPrev+=Math.min(getTotalM(p,y-1)[m]||0,cap); idxSum+=Math.max(idxArr[m]||1,0.3);
+    lvSum+=Math.min(getTotalM(p,y)[m]||0,cap); { const pv=Math.min(getTotalM(p,y-1)[m]||0,cap); gPrev+=pv; if(pv<=0) gZero=true; } idxSum+=Math.max(idxArr[m]||1,0.3);
     if(k===3){ lvFirst=new Date(y,m,1); gFirst=new Date(y-1,m,1); }
   }
   const lvOk=!!firstSale && firstSale<=lvFirst;
   const level=lvOk ? lvSum/3 : (avg30>0 ? avg30*30 : c.expM);
   const levelIdx=lvOk ? idxSum/3 : Math.max(idxArr[MONTH]||1,0.3);
-  const gOk=!!firstSale && !!gFirst && firstSale<=gFirst && gPrev>=30;
+  // 비교 대상인 작년 같은 3개월이 (a) 출시 후 6개월이 안 된 도입기이거나 (b) 판매 0인 달이 끼어 있으면 올해/작년 배율이 부풀려진다
+  // (2026-10-06 사용자 지적: 출시 1년 된 이동식 UFO 세트가 작년 7~9월(출시 직후, 9월 0개) 대비 3.3배→상한 2배로 계산돼 구정 물량 556개 권장). 이런 경우는 배율을 쓰지 않는다.
+  const gOk=!!firstSale && !!gFirst && firstSale<=new Date(gFirst.getFullYear(),gFirst.getMonth()-6,1) && gPrev>=30 && !gZero;
   const growth=gOk?Math.min(INSIGHT_COVER_GROWTH_MAX,Math.max(INSIGHT_COVER_GROWTH_MIN,lvSum/gPrev)):1;
   // 구간에 걸치는 달 목록
   const months=[]; const seen={};
@@ -14934,10 +14936,10 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   const cap=_insightMonthCap(p);   // 일회성 대량 건 제한
   const idxArr=insightSeasonIndexFor(seasonIndex, p.type);
   // 현재 수준 — 최근 완결 3개월 월평균(전 기간 판매 이력이 있을 때), 아니면 최근 30일 속도
-  let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null; const lvLbl=[];
+  let lvSum=0, gPrev=0, idxSum=0, lvFirst=null, gFirst=null, gZero=false; const lvLbl=[];
   for(let k=3;k>=1;k--){
     let m=MONTH-k, y=CUR_YEAR; if(m<0){ m+=12; y--; }
-    lvSum+=Math.min(getTotalM(p,y)[m]||0,cap); gPrev+=Math.min(getTotalM(p,y-1)[m]||0,cap); idxSum+=Math.max(idxArr[m]||1,0.3);
+    lvSum+=Math.min(getTotalM(p,y)[m]||0,cap); { const pv=Math.min(getTotalM(p,y-1)[m]||0,cap); gPrev+=pv; if(pv<=0) gZero=true; } idxSum+=Math.max(idxArr[m]||1,0.3);
     lvLbl.push((m+1)+'월'); if(k===3){ lvFirst=new Date(y,m,1); gFirst=new Date(y-1,m,1); }
   }
   const lvOk=!!firstSale && firstSale<=lvFirst;
@@ -14945,7 +14947,9 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   const levelIdx=lvOk ? idxSum/3 : Math.max(idxArr[MONTH]||1,0.3);
   const levelNote=lvOk ? `최근 3개월(${lvLbl.join('·')}) 월평균` : '최근 30일 판매속도';
   // 올해 흐름 배율
-  const gOk=!!firstSale && !!gFirst && firstSale<=gFirst && gPrev>=30;
+  // 비교 대상인 작년 같은 3개월이 (a) 출시 후 6개월이 안 된 도입기이거나 (b) 판매 0인 달이 끼어 있으면 올해/작년 배율이 부풀려진다
+  // (2026-10-06 사용자 지적: 출시 1년 된 이동식 UFO 세트가 작년 7~9월(출시 직후, 9월 0개) 대비 3.3배→상한 2배로 계산돼 구정 물량 556개 권장). 이런 경우는 배율을 쓰지 않는다.
+  const gOk=!!firstSale && !!gFirst && firstSale<=new Date(gFirst.getFullYear(),gFirst.getMonth()-6,1) && gPrev>=30 && !gZero;
   const growthRaw=gOk?lvSum/gPrev:null;
   const growth=gOk?Math.min(INSIGHT_COVER_GROWTH_MAX,Math.max(INSIGHT_COVER_GROWTH_MIN,growthRaw)):1;
   // 작년 같은 구간(12월~4월) 실제 판매 — 표시용 근거
@@ -15141,10 +15145,19 @@ function insightCoverDetailHtml(wc, p){
 // 이어지는 것처럼 잡혀 터무니없이 큰 개월 수(예: 36개월)가 나왔다(2026-10-06 사용자 지적). 이제 작년 월별 판매 패턴
 // (자체 12개월 실적이 있을 때)에 올해 흐름 배율(구정 커버 점검과 같은 값)을 곱해 월별 예상 판매를 만들고, 오늘부터 차례로
 // 빼 나가며 보유량이 바닥나는 시점까지의 개월 수를 센다. 자체 12개월 실적이 없으면 예전처럼 평균 속도를 계속 유지한다고 본다.
-function insightForwardPattern(c, season, wc){
-  if(season && season.status==='ok' && Array.isArray(season.cleanMonths) && season.cleanMonths.some(v=>v>0)){
-    const g=(wc && wc.status==='ok' && wc.growth>0) ? wc.growth : 1;
-    return {pattern:season.cleanMonths.slice(), seasonal:true, g};
+function insightForwardPattern(c, season, wc, p){
+  // 월별 패턴 = 가장 최근 12개월 실적(이번 달 이전은 올해, 이번 달 이후는 작년 같은 달) — 출시 전 0인 달이 섞인 옛 달력 패턴(2025년 기준) 대신.
+  // 12개월 판매 이력이 없는 상품(출시 1년 미만)은 계절 패턴을 믿을 수 없어 평균 속도 유지로 본다.
+  if(p){
+    const fs=_insightFirstSaleDate(p);
+    if(fs && fs<=new Date(CUR_YEAR-1,MONTH,1)){
+      const cap=_insightMonthCap(p), pat=[];
+      for(let m=0;m<12;m++){ const yy=m<MONTH?CUR_YEAR:CUR_YEAR-1; pat.push(Math.min(_insightDeOutlierMonth(p.code,yy,m,getTotalM(p,yy)[m]||0),cap)); }
+      if(pat.some(v=>v>0)){
+        const g=(wc && wc.status==='ok' && wc.growth>0) ? wc.growth : 1;
+        return {pattern:pat, seasonal:true, g};
+      }
+    }
   }
   const fm=(c.expert&&c.expert.monthly)||(wc&&wc.level)||0;
   return {pattern:Array(12).fill(fm), seasonal:false, g:1};
@@ -15227,7 +15240,7 @@ function insightBuildRows(){
     const finalBoxes=Math.ceil(finalQty/(p.boxQty||1));
     const finalBasis=coverQty>regQty?'cover':'regular';
     // ★ 재고 과잉 — (현재고+진행중 발주)가 앞으로 예상 판매의 몇 개월분인지. 평소 6개월, 구정 준비 기간(9~11월)엔 마감 구간까지 쟁여두는 게 정상이라 9개월 초과부터.
-    const fpat=insightForwardPattern(c, season, winterCover);
+    const fpat=insightForwardPattern(c, season, winterCover, p);
     const fAnnual=fpat.pattern.reduce((a,b)=>a+b,0)*fpat.g;
     const stockMonths=fAnnual>0?insightCoverMonths(fpat.pattern, fpat.g, p.stock+pending):null;   // 계절 패턴 반영(위 주석 참고)
     const overstock=!p.disc && !c.noData && stockMonths!=null && stockMonths>(insightCoverActive()?9:6);
@@ -26572,15 +26585,18 @@ function simRender(){
   const reg=r.regQty||0, cov=r.coverQty||0, need=r.finalQty||0;
   const shortQty=Math.max(0,need-Q);
   // ── 예상 판매 재료: 작년 월별 패턴 × 올해 흐름 배율(g) / 작년 패턴 그대로(×1) ──
-  const fpat=insightForwardPattern(c, se, wc);
+  const fpat=insightForwardPattern(c, se, wc, p);
   const pat=fpat.pattern, g=fpat.g;
   const D=(f,d0,d1)=>insightDemandBetween(pat,f,d0,d1);
   const Drng=(d0,d1)=>rng(D(g,d0,d1), D(1,d0,d1));
   const L=e?e.L:Math.round((p.leadTime||2)*30);
   // 성수기
-  let win=null;
+  let win=null, peakI=0;
   if(fpat.seasonal){
-    let wm=insightSeasonWindowMonths(se); if(!wm.length) wm=[se.peakI];
+    const avgP=pat.reduce((a,b)=>a+b,0)/12; peakI=pat.indexOf(Math.max(...pat));
+    const hi=pat.map(v=>avgP>0&&v/avgP>=1.2);
+    let wm=[peakI];
+    if(hi[peakI]){ let i=(peakI+11)%12; while(hi[i]&&wm.length<12){ wm.unshift(i); i=(i+11)%12; } let j=(peakI+1)%12; while(hi[j]&&wm.length<12){ wm.push(j); j=(j+1)%12; } }
     const w=simNextWindow(wm);
     if(w) win={wm, start:w.start, end:w.end, nm: wm.length>1?`${MNAMES[wm[0]]}~${MNAMES[wm[wm.length-1]]}`:MNAMES[wm[0]]};
   }
@@ -26619,17 +26635,17 @@ function simRender(){
   // ── ① 판매 패턴 ──
   let s1='';
   if(fpat.seasonal){
-    const cm=se.cleanMonths, wm=win?win.wm:[se.peakI];
+    const cm=pat, wm=win?win.wm:[peakI];
     const lyWin=wm.reduce((a,mi)=>a+cm[mi],0), lyAvg=lyWin/wm.length;
     const lyNow=cm[today.getMonth()], rec30=(c.avg30||0)*30;
     const nowTag=lyNow>=lyAvg*0.6?'성수기에 가까운 시기':'비수기';
-    s1=`작년 실적 기준 이 제품의 피크는 <b>${MNAMES[se.peakI]}</b>이고 성수기는 <b>${win?win.nm:MNAMES[se.peakI]}</b>예요. 작년 성수기에 <b>${n(lyWin)}개</b>(월 평균 ${n(lyAvg)}개) 팔렸어요. 지금(${today.getMonth()+1}월)은 <b>${nowTag}</b>라 작년 같은 달 ${n(lyNow)}개, 최근 30일 ${n(rec30)}개 수준이에요. `;
+    s1=`최근 12개월 실적 기준 이 제품의 피크는 <b>${MNAMES[peakI]}</b>이고 성수기는 <b>${win?win.nm:MNAMES[peakI]}</b>예요. 성수기에 <b>${n(lyWin)}개</b>(월 평균 ${n(lyAvg)}개) 팔렸어요. 지금(${today.getMonth()+1}월)은 <b>${nowTag}</b>라 작년 같은 달 ${n(lyNow)}개, 최근 30일 ${n(rec30)}개 수준이에요. `;
     s1+=(wc&&wc.status==='ok'&&wc.growthOk)
       ? `올해 흐름은 작년의 <b>×${g.toFixed(2)}</b>배예요(최근 3개월 ${wc.gLbl.join('·')} ${n(wc.gCur)}개 vs 작년 같은 3개월 ${n(wc.gPrev)}개). 그래서 올해 성수기는 작년 ${n(lyWin)}개의 ${n(lyWin*g)}개 정도로 봤어요(작년 그대로면 ${n(lyWin)}개).`
-      : `작년과 비교할 최근 실적이 부족해 올해 흐름 보정은 하지 않았어요.`;
+      : `올해 흐름 보정은 하지 않았어요(작년 같은 3개월이 출시 직후 도입기이거나 판매 없는 달이 있어 비교가 부정확해요).`;
   } else {
     const fm=(e&&e.monthly)||(wc&&wc.level)||0;
-    s1=`자체 12개월 판매 실적이 없어 계절 패턴을 알 수 없어요. 현재 평균 월 ${n(fm)}개 수준으로 계속 팔린다고 가정했어요.`;
+    s1=`판매 이력이 12개월 미만이라 계절 패턴을 알 수 없어요. 현재 평균 월 ${n(fm)}개 수준으로 계속 팔린다고 가정했어요.`;
   }
   // ── ② 앞으로 예상 판매 ──
   let s2='';
@@ -26645,7 +26661,7 @@ function simRender(){
   let s3='';
   if(coverActive){
     const {target,base}=wc.scenarios;
-    s3+=`11월~3월엔 입고가 막혀서 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 전에 낸 주문과 지금 확보분으로 입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})까지 버텨야 해요. 지금~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))} 예상 판매 ${n(base.total)}개에 ${wc.grade}등급 안전 보정(${wc.targetPct})을 더한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
+    s3+=`11월~3월엔 입고가 막혀서 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 전에 낸 주문과 지금 확보분으로 입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})까지 버텨야 해요. 지금~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))} 예상 판매 <b>${n(base.total)}개</b>(${wc.methods.filter(m=>m.id!=='recent30').map(m=>`${m.label.replace(/ \(계절 무시\)/,'')} ${n(m.total)}`).join(' / ')}의 평균${fpat.seasonal?`, 참고로 작년 같은 기간 실제 판매는 ${n(D(1,today,wc.windowEnd))}개`:''})에 ${wc.grade}등급 안전 보정 ×${wc.fTarget.toFixed(2)}(${wc.targetPct})를 곱한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
   }
   s3+=(e?`평소 기준으로는 리드타임(약 ${L}일)+발주주기 동안 쓸 목표 확보량 ${n(e.targetLR)}개에서 현재고·진행중 발주를 반영하면 <b>${n(reg)}개</b>가 필요해요. `:`평소 기준 권장은 ${n(reg)}개예요. `);
   s3+=`→ 앱 권장 총 주문량은 <b>${n(need)}개(${bx(need)}박스)</b>입니다. `;
