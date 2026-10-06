@@ -557,6 +557,39 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .float-pulse2{animation-delay:.7s;pointer-events:none;}
 .float-card{position:fixed;bottom:134px;right:16px;width:264px;border-radius:14px;border:1.5px solid #DC2626;background:var(--bg);z-index:200;overflow:hidden;display:none;}
 .float-card.open{display:block;}
+/* 사이렌(발주 임박 알림) 버튼은 숨김 — 같은 자리에 발주 시뮬레이터(🧮)를 둠(2026-10-06 요청). 발주관리 메뉴의 빨간 배지·펄스 알림은 그대로 동작 */
+#floatWrap{display:none!important;}
+/* 🧮 발주 시뮬레이터(미니 팝업) */
+.sim-fab{position:fixed;bottom:78px;right:18px;z-index:200;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:20px;background:#6D5BD0;color:#fff;box-shadow:0 4px 16px rgba(109,91,208,.45);transition:transform .15s;}
+.sim-fab:hover{transform:scale(1.07);}
+.sim-pop{position:fixed;bottom:134px;right:16px;width:392px;max-width:calc(100vw - 24px);max-height:calc(100vh - 160px);z-index:210;display:none;flex-direction:column;background:var(--bg);border:1.5px solid #6D5BD0;border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.28);overflow:hidden;}
+.sim-pop.open{display:flex;}
+.sim-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#6D5BD0;color:#fff;font-size:14px;flex-shrink:0;}
+.sim-hd button{border:none;background:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;}
+.sim-body{padding:12px 14px 14px;overflow-y:auto;overscroll-behavior:contain;}
+.sim-in{width:100%;height:40px;border:1.5px solid var(--bd);border-radius:9px;padding:0 11px;font-size:14px;background:var(--bg2);color:var(--tx);outline:none;font-family:inherit;}
+.sim-in:focus{border-color:#6D5BD0;background:var(--bg);}
+.sim-row{display:flex;gap:8px;margin-top:10px;}
+.sim-row .sim-in{flex:1;min-width:0;}
+.sim-row select.sim-in{flex:0 0 74px;cursor:pointer;}
+.sim-opt{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 10px;border-bottom:0.5px solid var(--bd);cursor:pointer;font-size:13px;}
+.sim-opt:hover,.sim-opt:active{background:var(--bg2);}
+.sim-opt small{color:var(--tx2);font-size:11px;display:block;}
+.sim-card{margin-top:10px;padding:10px 12px;background:var(--bg2);border-radius:10px;font-size:12.5px;line-height:1.55;}
+.sim-card b.sim-nm{font-size:14px;color:var(--tx);}
+.sim-kv{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:4px;color:var(--tx2);font-size:12px;}
+.sim-kv b{color:var(--tx);}
+.sim-verdict{margin-top:10px;padding:11px 12px;border-radius:10px;}
+.sim-verdict .v1{font-size:15px;font-weight:800;}
+.sim-verdict .v2{font-size:13px;margin-top:5px;line-height:1.5;}
+.sim-why{margin-top:10px;font-size:12px;line-height:1.6;color:var(--tx);}
+.sim-why .ln{padding:6px 0;border-top:0.5px solid var(--bd);}
+.sim-why .ln b{color:var(--tx);}
+.sim-why .ln span{color:var(--tx2);}
+.sim-note{margin-top:10px;font-size:12px;color:var(--tx2);line-height:1.6;}
+html.mob-native .sim-fab{bottom:86px;}
+html.mob-native .sim-pop{bottom:0;right:0;left:0;width:auto;max-width:none;max-height:88vh;border-radius:16px 16px 0 0;}
+html.mob-native .sim-in{font-size:16px;height:46px;}
 
 /* CALENDAR FAB & PANEL */
 .trk-fab{position:fixed;bottom:20px;right:18px;z-index:201;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;background:#3182F6;color:#fff;box-shadow:0 4px 16px rgba(49,130,246,.4);transition:transform .15s;}
@@ -6704,6 +6737,22 @@ html.mob-native .lcr-det-val{font-size:15px;}
   </div>
 </div>
 
+<!-- ═══ 🧮 발주 시뮬레이터 — 사이렌 자리 ═══ -->
+<button class="sim-fab" id="simFab" onclick="simToggle()" title="발주 시뮬레이터 — 주문할 수량이 충분한지 확인">🧮</button>
+<div class="sim-pop" id="simPop">
+  <div class="sim-hd"><b>🧮 발주 시뮬레이터</b><button onclick="simToggle()" aria-label="닫기">✕</button></div>
+  <div class="sim-body">
+    <input class="sim-in" id="simSearch" placeholder="🔍 상품명·코드로 제품 선택" oninput="simSearch()" onkeydown="if(event.key==='Escape')simToggle()" autocomplete="off">
+    <div id="simList"></div>
+    <div id="simPicked"></div>
+    <div class="sim-row" id="simInputRow" style="display:none;">
+      <input class="sim-in" id="simQty" type="number" min="0" inputmode="numeric" placeholder="주문할 수량" oninput="simRender()">
+      <select class="sim-in" id="simUnit" onchange="simRender()"><option value="box">박스</option><option value="ea">개</option></select>
+    </div>
+    <div id="simResult"></div>
+  </div>
+</div>
+
 <!-- ═══ 업무 요청하기 (F9 단축키, 어디서든) ═══ -->
 <div class="modal-overlay" id="taskCreateModal">
   <div class="modal" style="max-width:400px;">
@@ -7595,6 +7644,7 @@ function goMenu(menuId){
 }
 function renderFavBar(){ /* 즐겨찾기 기능 비활성화 */ }
 function updateNavVisibility(){
+  simFabSync();
   const u=window.__CURRENT_USER; if(!u) return;
   // 마스터는 빈 부서(디자인팀)도 플레이스홀더로 노출
   const visDepts = DEPTS.filter(d=> u.role==='master' || _deptVisibleMenus(d.id).length>0);
@@ -26326,6 +26376,141 @@ function updateFloat(){
       </div>
     </div>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════
+// 🧮 발주 시뮬레이터 (미니 팝업) — 발주 인사이트 계산(insightBuildRows)을 그대로 재사용
+//   제품을 고르고 "내가 주문할 수량"을 넣으면: 충분/빠듯/부족 판정 + 더 주문할 수량 + 근거. 읽기 전용(저장 없음).
+//   판정 = 인사이트의 "최종 주문 수량"(평상시 권장 vs 구정 준비 중 큰 값, 진행중 발주 차감 후)과 내 주문량 비교.
+// ══════════════════════════════════════════════
+let _simRows=null, _simRowsAt=0, _simRow=null, _simBusy=false;
+function simFabSync(){
+  const b=document.getElementById('simFab'); if(!b) return;
+  const ok=!!window.__CURRENT_USER && _menuPerm('insight')!=='none';
+  b.style.display=ok?'flex':'none';
+  if(!ok) document.getElementById('simPop')?.classList.remove('open');
+}
+function simToggle(){
+  const pop=document.getElementById('simPop'); if(!pop) return;
+  const open=!pop.classList.contains('open');
+  pop.classList.toggle('open',open);
+  if(open) setTimeout(()=>{ const i=document.getElementById(_simRow?'simQty':'simSearch'); if(i) i.focus(); },50);
+}
+// 인사이트 화면과 동일한 선행 데이터(일별판매·로켓그로스 매출·백데이터)를 읽은 뒤 행을 계산 — 3분간 캐시
+async function simEnsureRows(){
+  if(_simRows && Date.now()-_simRowsAt<180000) return _simRows;
+  const ms=insightRgYms();
+  await Promise.all([
+    loadDailyCache(), pcEnsureBackdata(),
+    (_rgOptionMapLoaded?Promise.resolve():loadRgOptionMap()),
+    (_rgPackMultiplierLoaded?Promise.resolve():loadRgPackMultiplier()),
+    rgEnsureProdMonths(ms[ms.length-1], ms[0])
+  ]);
+  _simRows=insightBuildRows(); _simRowsAt=Date.now();
+  return _simRows;
+}
+function simSearch(){
+  const box=document.getElementById('simList');
+  const toks=(document.getElementById('simSearch').value||'').toLowerCase().split(/\s+/).filter(Boolean);
+  if(!toks.length){ box.innerHTML=''; return; }
+  const list=products.filter(p=>!p.hidden && !p.disc && toks.every(t=>(String(p.name||'')+' '+String(p.code||'')).toLowerCase().includes(t))).slice(0,8);
+  box.innerHTML=list.length?list.map(p=>`<div class="sim-opt" onclick="simPick(${p.id})"><div style="min-width:0;"><b>${_esc(String(p.name||''))}</b><small>${_esc(String(p.code||''))}</small></div><small style="white-space:nowrap;">현재고 ${(p.stock||0).toLocaleString()}</small></div>`).join('')
+    :'<div class="sim-note">검색 결과가 없습니다.</div>';
+}
+async function simPick(id){
+  const prod=products.find(x=>x.id===id); if(!prod) return;
+  document.getElementById('simList').innerHTML='';
+  document.getElementById('simSearch').value='';
+  document.getElementById('simPicked').innerHTML='<div class="sim-note">분석 데이터를 불러오는 중… ⏳ (처음 한 번만 몇 초 걸려요)</div>';
+  document.getElementById('simInputRow').style.display='none';
+  document.getElementById('simResult').innerHTML='';
+  _simRow=null;
+  try{
+    const rows=await simEnsureRows();
+    _simRow=rows.find(r=>r.p.id===id)||null;
+  }catch(e){ console.warn('시뮬레이터 데이터 로드 실패', e); }
+  if(!_simRow){ document.getElementById('simPicked').innerHTML='<div class="sim-note">이 제품의 분석 정보를 만들지 못했습니다.</div>'; return; }
+  const r=_simRow, c=r.c, p=r.p;
+  document.getElementById('simPicked').innerHTML=`<div class="sim-card"><b class="sim-nm">${_esc(String(p.name||''))}</b> <small style="color:var(--tx2);">${_esc(String(p.code||''))}</small>
+    <div class="sim-kv"><span>현재고 <b>${(p.stock||0).toLocaleString()}</b>개</span><span>진행중 발주 <b>${r.pending.toLocaleString()}</b>개</span><span>일평균 <b>${c.noData?'-':c.avgDay}</b>개</span><span>박스당 <b>${(p.boxQty||1).toLocaleString()}</b>개</span><span>${r.grade}등급</span></div>
+    <div style="margin-top:6px;"><button class="btn btn-sm" onclick="simChange()">다른 제품 선택</button></div></div>`;
+  document.getElementById('simInputRow').style.display='flex';
+  const q=document.getElementById('simQty'); q.value='';
+  simRender();
+  q.focus();
+}
+function simChange(){
+  _simRow=null;
+  ['simPicked','simResult','simList'].forEach(i=>{ document.getElementById(i).innerHTML=''; });
+  document.getElementById('simInputRow').style.display='none';
+  const s=document.getElementById('simSearch'); s.value=''; s.focus();
+}
+function simRender(){
+  const res=document.getElementById('simResult'); if(!res) return;
+  const r=_simRow; if(!r){ res.innerHTML=''; return; }
+  const p=r.p, c=r.c, wc=r.winterCover, e=c.expert;
+  if(c.noData){ res.innerHTML='<div class="sim-note">최근 판매 데이터가 부족해(30일 중 3일 미만 등) 이 제품은 분석할 수 없습니다.</div>'; return; }
+  const qv=document.getElementById('simQty').value;
+  if(qv===''||!(parseFloat(qv)>=0)){ res.innerHTML='<div class="sim-note">주문할 수량을 넣으면 충분한지, 얼마나 더 필요한지 알려드려요.</div>'; return; }
+  const box=p.boxQty||1, unit=document.getElementById('simUnit').value;
+  const Q=Math.round(unit==='box'?parseFloat(qv)*box:parseFloat(qv));
+  const n=v=>Math.round(v).toLocaleString('ko-KR');
+  const bx=v=>Math.ceil(v/box).toLocaleString('ko-KR');
+  const S=p.stock||0, P=r.pending||0;
+  const coverActive=!!(wc&&wc.status==='ok'&&wc.active);
+  const reg=r.regQty||0, cov=r.coverQty||0, need=r.finalQty||0;
+  const shortQty=Math.max(0,need-Q);
+  // 판정 — 평상시 권장(reg)과 구정 준비(cov) 둘 다 만족해야 충분. 빠듯 = 평상시 80% 이상 & 구정은 기준 예상의 95% 이상
+  const regOk=Q>=reg, regTight=Q>=reg*0.8;
+  let covOk=true, covTight=true;
+  if(coverActive){ covOk=Q>=cov; covTight=(wc.supply+Q)>=wc.scenarios.base.total*INSIGHT_COVER_TIGHT_RATIO; }
+  const verdict=(regOk&&covOk)?'ok':((regTight&&covTight)?'tight':'short');
+  const st=_INS_COVER_STYLE[verdict];
+  const vText={ok:'충분해요',tight:'빠듯해요',short:'부족해요'}[verdict];
+  // 과잉 점검 — 이 주문까지 넣었을 때 보유량이 몇 개월치 판매인지
+  const fm=(e&&e.monthly)||(wc&&wc.level)||0;
+  const monthsAfter=fm>0?(S+P+Q)/fm:null;
+  const overLimit=coverActive?9:6;
+  const over=monthsAfter!=null && monthsAfter>overLimit;
+  const L=e?e.L:Math.round((p.leadTime||2)*30);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const arrive=new Date(today.getTime()+L*86400000);
+  const ls=r.leadStats;
+  let head=`<div class="v2">`;
+  if(shortQty>0) head+=`👉 추가로 <b>${bx(shortQty)}박스(${n(shortQty)}개)</b> 더 주문해야 안전합니다.<br><span style="opacity:.85;">앱 권장 총 주문량 ${bx(need)}박스(${n(need)}개) — ${r.finalBasis==='cover'?'구정 준비 기준':'평상시 권장 기준'}</span>`;
+  else if(need>0) head+=`👉 추가 주문은 필요 없어요. (앱 권장 ${bx(need)}박스(${n(need)}개) 이상 주문)`;
+  else head+=`👉 현재고와 진행중 발주만으로도 충분해서 추가 주문이 필요 없어요.`;
+  if(over) head+=`<br>🧊 이 주문까지 합치면 약 <b>${monthsAfter>=100?'100+':monthsAfter.toFixed(1)}개월분</b> 재고라 <b>과잉(${overLimit}개월 초과)</b>이에요. 줄이는 게 좋아요.`;
+  head+='</div>';
+  const ln=(lbl,txt)=>`<div class="ln"><b>${lbl}</b> <span>${txt}</span></div>`;
+  let why='';
+  // ① 현재 상황
+  why+=ln('① 지금 재고',`현재고 ${n(S)}개 + 진행중 발주 ${n(P)}개 = ${n(S+P)}개 · 일평균 판매 ${c.avgDay}개 → 현재고만으론 ${r.daysLeft!=null?`약 ${r.daysLeft}일 뒤(${_insFmtMD(r.exhaustDate)}경) 소진`:'소진 시점 산출 불가'}`);
+  // ② 리드타임
+  let gap='';
+  if(r.daysLeft!=null && r.daysLeft<L) gap=` ⚠ 주문이 도착하기 전에 현재고가 먼저 바닥날 수 있어요(약 ${L-r.daysLeft}일 공백${P>0?' — 진행중 발주가 먼저 들어오면 완화':''}).`;
+  why+=ln('② 도착 시점',`리드타임 약 ${L}일 → 오늘 주문하면 ${_insFmtMD(arrive)}경 도착${ls&&ls.a1!=null?` (이 제품 입고 실적 평균 1차 ${ls.a1}일${ls.a2!=null?` · 2차 ${ls.a2}일`:''})`:''}. 도착 시점 예상 재고 ${n(e?e.stockAtDelivery:c.stockAtDelivery)}개.${gap}`);
+  // ③ 평상시 권장
+  if(e) why+=ln('③ 평상시 권장',`앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 예상 판매 ${n(e.dLR)}개 × 안전배수 ×${e.k.toFixed(2)}(${e.grade}등급 ${e.pct}) = 목표 확보량 <b>${n(e.targetLR)}개</b>${e.usedRecent?'(최근 30일 판매속도가 더 커서 그 값 사용)':''} − 현재고(리드타임 중 판매 반영) = 필요 ${n(c.needed)}개${P>0?` → 진행중 발주 ${n(P)}개 차감 →`:' →'} <b>평상시 권장 ${n(reg)}개</b> ${regOk?'(✅ 이 주문으로 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
+  else why+=ln('③ 평상시 권장',`필요수량 ${n(c.needed)}개${P>0?` − 진행중 ${n(P)}개`:''} = <b>${n(reg)}개</b> ${regOk?'(✅ 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
+  // ④ 구정 준비
+  if(coverActive){
+    const {low,base,high,target}=wc.scenarios, sup=wc.supply+Q, diff=sup-target.total;
+    const endTxt=_insFmtMD(new Date(wc.windowEnd.getTime()-86400000));
+    const late=wc.arriveIfOrderNow>wc.closeStart;
+    why+=ln('④ ❄ 구정 준비',`공장이 쉬는 12/1~${endTxt}엔 재발주가 안 돼 12/1 전 입고분으로 버텨야 해요. 예상 판매 ${n(base.total)}개(낙관 ${n(low.total)} ~ 보수 ${n(high.total)}) → 안전 목표 <b>${n(target.total)}개</b>(${wc.grade}등급 ${wc.targetPct}). 확보분 ${n(wc.supply)}개 + 이번 주문 ${n(Q)}개 = ${n(sup)}개 → 목표 대비 <b>${diff>=0?'여유 '+n(diff)+'개':'부족 '+n(-diff)+'개'}</b>.${late?` 🚨 구정 점검은 리드타임을 넉넉히 2개월로 봐서 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착 → 12/1 이후일 수 있어요${wc.onTimePct!=null?`(과거 입고 기록상 12/1 전 도착 가능성 약 ${wc.onTimePct}%)`:''}.`:` 구정 점검 기준(리드타임 2개월) 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착${wc.onTimePct!=null?`(12/1 전 도착 가능성 약 ${wc.onTimePct}%)`:''}.`}`);
+  } else if(wc && wc.status==='ok'){
+    why+=ln('④ ❄ 구정 준비','구정 커버 점검은 9~11월에만 운영해 지금은 반영하지 않았어요.');
+  }
+  // ⑤ 계절 대비 참고
+  const sp=r.seasonPre;
+  if(sp && sp.status==='flag' && sp.neededQty>0){
+    why+=ln('⑤ 계절 대비 참고',`${sp.kind==='winter'?'구정재고 대비':'계절성수기 대비'} 칸 기준으로는 추가 ${sp.boxes.toLocaleString()}박스(${n(sp.neededQty)}개)가 더 필요하다고 나옵니다(마감 ${fmtDate(sp.deadline)}${sp.overdue?' · 🚨지남':''}). 위 판정과는 별개의 참고 정보예요.`);
+  }
+  if(monthsAfter!=null) why+=ln('⑥ 주문 후 재고',`이 주문까지 도착하면 보유 ${n(S+P+Q)}개 ≈ 약 ${monthsAfter>=100?'100+':monthsAfter.toFixed(1)}개월분 판매량입니다.`);
+  res.innerHTML=`<div class="sim-verdict" style="background:${st.bg};color:${st.fg};"><div class="v1">${st.icon} ${n(Q)}개(${bx(Q)}박스) 주문 → ${vText}</div>${head.replace('class="v2"','class="v2" style="color:'+st.fg+';"')}</div>
+    <div class="sim-why"><div style="font-weight:800;margin-bottom:2px;">📋 분석 근거</div>${why}</div>
+    <div class="sim-note">※ 발주 인사이트와 같은 계산(일평균·성수기 보정·등급별 안전배수·구정 커버)을 사용하며 저장되는 값은 없어요. 주문일을 오늘로 가정합니다.</div>`;
 }
 function toggleFloat(){floatOpen=!floatOpen;document.getElementById('floatCard').classList.toggle('open',floatOpen);}
 
