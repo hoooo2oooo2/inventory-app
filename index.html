@@ -11833,7 +11833,7 @@ function goPage(p){
     // 일별 판매량을 재고 판매속도 계산에 직접 반영한다. loadRgDailyCache()는 더 이상 필요 없어 생략.
     const _insMonths=insightRgYms();
     Promise.all([
-      loadDailyCache(), pcEnsureBackdata(),
+      loadDailyCache(), pcEnsureBackdata(), insightFactoryLoad(),
       (_rgOptionMapLoaded?Promise.resolve():loadRgOptionMap()),
       (_rgPackMultiplierLoaded?Promise.resolve():loadRgPackMultiplier()),
       rgEnsureProdMonths(_insMonths[_insMonths.length-1], _insMonths[0])
@@ -14168,9 +14168,49 @@ async function insightToggleSeasonalCheck(id, checked){
 // 겨울마감(구정) 발주 마감일은 모든 상품이 원청 공장의 같은 마감 시점(11월)을 기준으로 리드타임만
 // 빼는 방식이라 상품마다 다르지 않고 전부 동일하다 — 요약 화면 상단 배너에 개별 상품과 무관하게
 // 바로 보여줄 수 있게 별도 헬퍼로 분리(insightSeasonalPreorderInfo의 계산과 반드시 같은 공식 유지).
+// ── 원청 공장 일정(사용자 확인 2026-10-06) ──────────────────────────────
+//  · 주문 마감일: 매년 다르며 보통 11월쯤(기본 11/1). 마감 전에 내도 물량이 많으면 구정 이후에 생산될 수 있어 미리 주문하는 편.
+//  · 11월~3월에도 주문은 가능하지만 입고는 3월 이후로 밀린다 → 마감 이후 낸 주문은 "입고 재개일" 이후에 들어온다고 본다.
+//  · 입고 재개일(기본 4/30): 2026년 실제 입고 기록상 겨울 이후 첫 입고가 4/21~4/30이라 이 값으로 둠(바뀌면 설정에서 수정).
+//  구정 커버 점검·구정재고 대비·발주 시뮬레이터가 전부 이 값을 쓴다. 설정은 구정 요약 화면에서 바꾸고 cloudKv 'insight_factory_cfg'에 저장.
+let _insightFactory={cutoff:'11-01', resume:'04-30'};
+function _insParseMD(s, defM, defD){
+  const m=String(s||'').match(/^(\d{1,2})[-\/.](\d{1,2})$/);
+  if(!m) return {m:defM,d:defD};
+  const mm=+m[1], dd=+m[2];
+  return (mm<1||mm>12||dd<1||dd>31) ? {m:defM,d:defD} : {m:mm-1,d:dd};
+}
+function insightFactoryDates(){
+  const c=_insParseMD(_insightFactory.cutoff,10,1), r=_insParseMD(_insightFactory.resume,3,30);
+  return {cutoffM:c.m, cutoffD:c.d, resumeM:r.m, resumeD:r.d};
+}
+function insightFactoryCutoff(){ const f=insightFactoryDates(); return new Date(CUR_YEAR,f.cutoffM,f.cutoffD); }
+async function insightFactoryLoad(){
+  const d=await cloudKvLoad('insight_factory_cfg');
+  if(d && typeof d==='object' && !Array.isArray(d) && d.cutoff && d.resume) _insightFactory={cutoff:String(d.cutoff), resume:String(d.resume)};
+}
+async function insightFactorySave(){
+  const norm=v=>{ const m=String(v||'').trim().match(/^(\d{1,2})[-\/.](\d{1,2})$/); if(!m) return null; const mm=+m[1], dd=+m[2]; if(mm<1||mm>12||dd<1||dd>31) return null; return String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0'); };
+  const c=norm(document.getElementById('insFacCutoff')?.value), r=norm(document.getElementById('insFacResume')?.value);
+  if(!c||!r){ toast('날짜는 "11/1"처럼 월/일로 입력하세요.'); return; }
+  await cloudKvSave('insight_factory_cfg', {cutoff:c, resume:r});
+  _insightFactory={cutoff:c, resume:r};
+  _simRows=null;
+  toast('✅ 공장 일정을 저장했어요. 구정 관련 계산에 바로 반영됩니다.');
+  renderInsight();
+  if(document.getElementById('insightSeasSummaryModal')?.classList.contains('open')) insightRenderSeasonalSummary();
+}
+function insightFactoryEditHtml(){
+  const f=insightFactoryDates();
+  const inp=(id,m,d)=>`<input id="${id}" value="${m+1}/${d}" style="width:62px;height:28px;border:1px solid var(--bd);border-radius:6px;padding:0 6px;font-size:12px;background:var(--bg);color:var(--tx);text-align:center;">`;
+  return `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px;">
+    <b>⚙ 공장 일정</b><span>주문 마감일 ${inp('insFacCutoff',f.cutoffM,f.cutoffD)}</span><span>입고 재개일 ${inp('insFacResume',f.resumeM,f.resumeD)}</span>
+    <button class="btn btn-sm" onclick="insightFactorySave()">저장</button>
+    <span style="color:var(--tx2);">주문 마감은 매년 달라요(예: 11/15). 마감 이후 낸 주문은 입고 재개일 이후에 들어온다고 계산합니다.</span></div>`;
+}
 function insightWinterDeadlineInfo(){
-  const closeStart=new Date(CUR_YEAR,10,1);
-  const deadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
+  const closeStart=insightFactoryCutoff();
+  const deadline=closeStart;   // 공장 주문 마감일 그대로 — 마감 전에 낸 주문은 정상 입고, 이후 주문은 입고 재개일 이후라 리드타임을 따로 빼지 않음
   const today=new Date(); today.setHours(0,0,0,0);
   const daysToDeadline=Math.round((deadline-today)/86400000);
   return {closeStart, deadline, daysToDeadline};
@@ -14741,9 +14781,9 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
   // 겨울마감 대비(공통) — 겨울과 겹치는 확정 성수기든, 사계절 균등이든, 자체 판정이 안 되는 신상품
   // 이든 전부 이 경로. 마감(11월)부터 재개후 첫 발주 도착까지(11,12,1,2,3,4,5월=7개월)는 최소
   // 보장으로 확보하고, 실제 감지된 성수기 구간이 이보다 더 길면 그만큼 더 늘린다.
-  const closeStart=new Date(CUR_YEAR,10,1);
+  const closeStart=insightFactoryCutoff();   // 공장 주문 마감일
   const monthsAway=Math.round((closeStart-today)/(30*86400000));
-  const _winterDeadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
+  const _winterDeadline=closeStart;
   if(monthsAway>SEASONAL_PREP_MONTHS) return {status:'later', kind:'winter', monthsAway, startDate:closeStart, deadline:_winterDeadline, daysToDeadline:Math.round((_winterDeadline-today)/86400000)};
   const closureMinMonths=[10,11,0,1,2,3,4]; // 11,12,1,2,3,4,5월(0-idx) — 마감+재개리드타임 최소 보장 구간
   const coverMonths = hasWindow ? [...new Set([...windowMonths, ...closureMinMonths])] : closureMinMonths;
@@ -14791,7 +14831,7 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
   const stockAtStart=coverBase ? Math.max(0, p.stock-coverBase.pre) : Math.max(0, p.stock-consumeBeforeClose);
   const neededQty=Math.max(0, Math.round(forecastTotal-stockAtStart-(pending||0)-(normalNetNeeded||0)));
   const boxes=Math.ceil(neededQty/(p.boxQty||1));
-  const deadline=new Date(closeStart.getTime()-SEASONAL_LEAD_MONTHS*30*86400000);
+  const deadline=closeStart;
   const daysToDeadline=Math.round((deadline-today)/86400000);
   return {status:'flag', kind:'winter', reason, windowMonths, startDate:closeStart, forecastTotal, stockAtStart, neededQty, boxes,
     deadline, daysToDeadline, overdue:daysToDeadline<0, monthsAway, typeUsed:p.type||'기타',
@@ -14818,14 +14858,13 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
 //   56%만 품절 없이 감당 → 안전 목표는 기준에 배수를 곱해 정한다. 판매 규모가 작을수록 오차가 커서 월 판매 수준별로 배수가 다르다.
 //   ※ 겨울 자체는 판매 이력이 2025년 1월부터라 직접 검증 불가(작년 겨울이 첫 겨울) — 봄~여름 구간으로 방법을 검증했다.
 // ■ 목표 확보량(서비스 수준) = 등급별: A=상위10%(≈90%) / B=상위20%(≈80%) / C=기준 예상(≈50~60%)
-// ■ 리드타임 2개월(SEASONAL_LEAD_MONTHS). 12~4월은 생산이 안 되므로, 이 구간 재고는 12/1 이전 입고분으로만 채울 수 있다 →
-//   추가 발주 마감 = min(소진 예상일, 12/1) − 2개월. 입고 기록(과거 275건)의 실제 리드타임 분포로 "오늘 발주 시 12/1 전 도착 가능성"도 보여준다.
+// ■ 리드타임 2개월(SEASONAL_LEAD_MONTHS). 공장 주문 마감일(보통 11월, 기본 11/1) 이후엔 주문해도 입고가 재개일(기본 4/30) 이후라서,
+//   마감 후~입고 재개일까지는 지금 확보분 + 마감 전에 낸 주문으로 버텨야 한다 → 추가 발주 마감 = min(소진 예상일 − 2개월, 공장 주문 마감일).
 // 계산은 읽기 전용 — 화면 표시용이며 저장되는 값은 없다.
 const INSIGHT_COVER_GROWTH_MIN=0.5;
 const INSIGHT_COVER_GROWTH_MAX=2.0;
 const INSIGHT_COVER_TIGHT_RATIO=0.95; // 기준 예상의 95% 이상 확보하면 '빠듯'(목표 미달), 미만이면 '부족'
-const INSIGHT_COVER_START_MONTH=11;   // 12월(0-idx) — 구간 시작(생산 중단)
-const INSIGHT_COVER_END_MONTH=3;      // 4월(0-idx) — 구간 끝(그 달 말일까지)
+// 구간 시작(공장 주문 마감일)·끝(입고 재개일)은 위 insightFactoryDates()의 설정값을 쓴다(기본 11/1 ~ 4/30)
 const INSIGHT_COVER_SHOW_DAYS=150;    // 구간 시작까지 이보다 많이 남았으면 아직 재발주 가능한 시기라 점검 대상 아님
 const INSIGHT_COVER_ACTIVE_FROM=8;    // 운영 시작: 9월(0-idx)
 const INSIGHT_COVER_ACTIVE_TO=10;     // 운영 끝: 11월(0-idx) — 11월 30일까지
@@ -14863,9 +14902,10 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   const today=new Date(); today.setHours(0,0,0,0);
   const nextDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
   // 대상 사이클: 5~12월이면 올해 12월 시작, 1~4월이면(이미 구간 중) 작년 12월 시작
-  const Y = MONTH<=INSIGHT_COVER_END_MONTH ? CUR_YEAR-1 : CUR_YEAR;
-  const closeStart=new Date(Y,INSIGHT_COVER_START_MONTH,1);
-  const windowEnd=new Date(Y+1,INSIGHT_COVER_END_MONTH+1,1); // 5/1 미만까지(=4/30)
+  const fac=insightFactoryDates();
+  const Y = today<=new Date(CUR_YEAR,fac.resumeM,fac.resumeD) ? CUR_YEAR-1 : CUR_YEAR;
+  const closeStart=new Date(Y,fac.cutoffM,fac.cutoffD);        // 공장 주문 마감일 — 이후 주문은 입고 재개일 이후에 들어옴
+  const windowEnd=new Date(Y+1,fac.resumeM,fac.resumeD+1);     // 입고 재개일(포함)까지 지금 확보분으로 버텨야 함
   const daysToClose=Math.round((closeStart-today)/DAY);
   if(daysToClose>INSIGHT_COVER_SHOW_DAYS) return {status:'later', daysToClose, closeStart};
   const leadDays=SEASONAL_LEAD_MONTHS*30;
@@ -14918,7 +14958,8 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
     eta=pendingOldestDate ? new Date(new Date(pendingOldestDate+'T00:00:00').getTime()+leadDays*DAY) : new Date(today);
     if(isNaN(eta.getTime()) || eta<today) eta=new Date(today);
   }
-  const arriveIfOrderNow=new Date(today.getTime()+leadDays*DAY);
+  // 마감 전 주문은 리드타임 후 입고, 마감 이후 주문은 입고 재개일 이후에 입고
+  const arriveIfOrderNow = today<=closeStart ? new Date(today.getTime()+leadDays*DAY) : new Date(Math.max(today.getTime()+leadDays*DAY, windowEnd.getTime()-DAY));
   const cpDefs=[[Y,11,31,'12/31'],[Y+1,2,0,null],[Y+1,4,0,'4/30']]
     .map(([yy,mm,dd,lb])=>{ const dt=new Date(yy,mm,dd); return {date:dt, label:lb||`${dt.getMonth()+1}/${dt.getDate()}`}; })
     .filter(cp=>cp.date>=today);
@@ -14938,11 +14979,11 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
       curRow.demand+=rate; curRow.endStock=stock;
       cpDefs.forEach(cp=>{ if(cp.date.getTime()===d.getTime()) cps.push({label:cp.label, date:cp.date, cum, need:Math.max(0,Math.round(cum-supply))}); });
     }
-    // 추가 발주 마감: 12~4월은 생산이 안 되므로 12/1 이후 소진분도 12/1 이전에 들어와야 한다 → min(소진일, 12/1) − 리드타임
-    const deadlineBase=runout?new Date(Math.min(runout.getTime(), closeStart.getTime())):null;
-    const orderBy=deadlineBase?new Date(deadlineBase.getTime()-leadDays*DAY):null;
+    // 추가 발주 마감 = min(소진일 − 리드타임, 공장 주문 마감일). 마감 이후에 낸 주문은 입고 재개일 이후에야 들어오므로(사용자 확인 2026-10-06)
+    // 소진일이 마감일+리드타임보다 늦어도 주문은 마감일까지는 내야 한다.
+    const orderBy=runout?new Date(Math.min(runout.getTime()-leadDays*DAY, closeStart.getTime())):null;
     const orderOverdue=!!orderBy && orderBy<today;
-    const gapDays=(runout && arriveIfOrderNow>deadlineBase) ? Math.ceil((arriveIfOrderNow-deadlineBase)/DAY) : 0;
+    const gapDays=(runout && arriveIfOrderNow>runout) ? Math.ceil((arriveIfOrderNow-runout)/DAY) : 0;
     return {total, pre, win, preOut, runout, months, cps, orderBy, orderOverdue, gapDays,
       daysToOrderBy:orderBy?Math.round((orderBy-today)/DAY):null,
       preOutDays:(preOut && eta)?Math.max(1,Math.round((eta-preOut)/DAY)):0,
@@ -14973,12 +15014,12 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   // 판정: 목표 확보량을 채우면 충분, 기준 예상의 95% 이상이면 빠듯, 그 미만이면 부족
   const verdict = supply>=target.total ? 'ok' : supply>=base.total*INSIGHT_COVER_TIGHT_RATIO ? 'tight' : 'short';
   const targetShort=Math.max(0,Math.round(target.total-supply));
-  const onTimePct=insightOnTimePct(daysToClose);
+  const onTimePct=null;   // "12/1 전 도착 가능성"은 공장 주문 마감일 기준으로 바뀌어 더 이상 쓰지 않음
   return {status:'ok', active, mode:useRef?'lastyear':'estimate', verdict, grade:g, targetPct, fTarget, fLow, fHigh,
     scenarios:{low,base,high,target}, methods:methodTotals,
     ratio:base.ratio, supply, stock:p.stock, pending:pending||0, totalDemand:base.total, preDemand:base.pre, winDemand:base.win,
     baseShortQty:base.shortQty, shortQty:targetShort, surplus:Math.max(0,Math.round(supply-target.total)), boxes:Math.ceil(targetShort/(p.boxQty||1)),
-    runout:base.runout, preOut:base.preOut, eta, etaLate:!!eta && eta>=closeStart, leadDays, arriveIfOrderNow, onTimePct,
+    runout:base.runout, preOut:base.preOut, eta, etaLate:!!eta && eta>=windowEnd, leadDays, arriveIfOrderNow, onTimePct,
     closeStart, windowEnd, daysToClose, months:base.months,
     refWinTotal, refStartLbl:`${(Y-1)%100}.12`, refEndLbl:`${Y%100}.4`, refComplete,
     growth, growthRaw, growthOk:gOk, gCur:lvSum, gPrev, gLbl:lvLbl, level, levelNote, expM:c.expM};
@@ -15026,15 +15067,15 @@ function insightCoverDetailHtml(wc, p){
   // 발주 시점 — 리드타임 2개월, 12월 이후 생산 중단 반영
   const dl=base.runout?new Date(Math.min(base.runout.getTime(),wc.closeStart.getTime())):null;
   if(base.runout){
-    const duringClose=base.runout>=wc.closeStart;
+    const duringClose=(base.runout.getTime()-wc.leadDays*86400000)>=wc.closeStart.getTime();   // 주문 마감일이 발주 마감을 결정하는 경우
     const od=base.orderOverdue
-      ? `<b>이미 늦었습니다</b> — ${duringClose?`12~4월엔 생산이 안 되어 ${startTxt} 전에 들어와야 하는데`:`소진 예상일 ${ymd(base.runout)} 전에 들어와야 하는데`} 오늘 발주해도 도착은 ${ymd(wc.arriveIfOrderNow)}경이라 약 <b>${base.gapDays}일</b> 늦습니다. 최대한 빨리 발주하고 공급처에 단축을 요청하세요.`
-      : `추가 발주는 늦어도 <b>${ymd(base.orderBy)}까지(D-${base.daysToOrderBy})</b> 해야 합니다 — ${duringClose?`12~4월엔 생산이 안 되어 ${startTxt} 전에 입고돼야 하고`:`소진 예상일 ${ymd(base.runout)} 전에 도착하려면`} 리드타임 2개월을 빼면 이 날짜예요(오늘 발주하면 ${ymd(wc.arriveIfOrderNow)}경 도착).`;
+      ? `<b>이미 늦었습니다</b> — ${duringClose?`공장 주문 마감(${startTxt})이 지나 지금 낸 주문은 입고 재개(${endTxt}) 이후에 들어오는데 재고는 ${ymd(base.runout)}경 먼저 소진돼`:`소진 예상일 ${ymd(base.runout)} 전에 들어와야 하는데`} 오늘 발주해도 도착은 ${ymd(wc.arriveIfOrderNow)}경이라 약 <b>${base.gapDays}일</b> 늦습니다. 최대한 빨리 발주하고 공급처에 물량 우선 생산·단축을 요청하세요.`
+      : `추가 발주는 늦어도 <b>${ymd(base.orderBy)}까지(D-${base.daysToOrderBy})</b> 해야 합니다 — ${duringClose?`공장 주문 마감(${startTxt}) 이후 낸 주문은 입고 재개(${endTxt}) 이후에 들어오기 때문이에요(마감 전이라도 물량이 많으면 구정 이후 생산될 수 있어 가능하면 더 일찍)`:`소진 예상일 ${ymd(base.runout)} 전에 도착하려면 리드타임 2개월을 빼면 이 날짜예요`}(오늘 발주하면 ${ymd(wc.arriveIfOrderNow)}경 도착).`;
     lines.push(`🛒 ${od}`);
   } else lines.push(`🛒 기준 시나리오에선 ${endTxt}까지 재고가 버텨 추가 발주 마감일이 없습니다.`);
   if(wc.onTimePct!=null) lines.push(`⏱ 과거 입고 기록(${insightLeadStats().sorted.length}건) 기준, 오늘 발주해서 ${startTxt} 전(${wc.daysToClose}일 이내)에 도착할 가능성은 <b>약 ${wc.onTimePct}%</b>입니다. 이 가능성은 하루 늦출 때마다 줄어듭니다.`);
   if(wc.preOut) lines.push(`⚠ 진행중 발주(입고 예상 ${ymd(wc.eta)} = 주문일+2개월)가 들어오기 전인 <b>${ymd(wc.preOut)}경 현재고가 먼저 바닥나 약 ${base.preOutDays}일간 공백</b>이 생길 수 있습니다.`);
-  if(wc.etaLate) lines.push(`🚨 진행중 발주의 입고 예상일(${ymd(wc.eta)})이 구간 시작(${startTxt}) 이후입니다 — 선적이 더 늦어지지 않는지 확인이 필요해요.`);
+  if(wc.etaLate) lines.push(`🚨 진행중 발주의 입고 예상일(${ymd(wc.eta)})이 입고 재개(${endTxt}) 이후입니다 — 선적이 더 늦어지지 않는지 확인이 필요해요.`);
   // 시나리오 표
   const scRow=(sc,bold)=>{
     const rr=sc.ratio!=null?Math.round(sc.ratio*100):0;
@@ -15062,7 +15103,7 @@ function insightCoverDetailHtml(wc, p){
   } else why.push('참고 — 자체 작년 구정 실적이 없는 상품(출시 1년 미만 등)이라 정확도가 낮습니다.');
   why.push(`현재 수준: ${wc.levelNote} ${n(wc.level)}개/월`);
   return `<div style="margin-bottom:12px;">
-    <div style="font-size:12px;font-weight:700;margin-bottom:6px;"><span class="ins-tag" style="background:${st.bg};color:${st.fg};">${st.icon} ❄ 구정 커버 ${st.label}</span> <span style="font-weight:500;color:var(--tx2);">— 지금 주문분으로 ${startTxt}~${endTxt}를 버틸 수 있을까? (리드타임 2개월 반영)</span></div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px;"><span class="ins-tag" style="background:${st.bg};color:${st.fg};">${st.icon} ❄ 구정 커버 ${st.label}</span> <span style="font-weight:500;color:var(--tx2);">— 지금 확보분으로 공장 주문 마감(${startTxt}) 이후~입고 재개(${endTxt})를 버틸 수 있을까? (리드타임 2개월 반영)</span></div>
     <div style="padding:9px 11px;background:${st.bg};color:${st.fg};border-radius:8px;font-size:12.5px;line-height:1.6;">${headline}${lines.map(l=>`<div style="margin-top:5px;">${l}</div>`).join('')}</div>
     <div style="margin-top:8px;font-size:12px;">
       <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--tx2);">현재고</span><b>${n(wc.stock)}개</b></div>
@@ -15343,7 +15384,7 @@ function insightRenderSeasonalSummary(){
     const {deadline, daysToDeadline}=insightWinterDeadlineInfo();
     const overdue=daysToDeadline<0;
     bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;color:${overdue?'#DC2626':'var(--tx)'};">❄ 원청 공장 마감(11월~익년3월) 대비 발주 마감일 — ${fmtDate(deadline)} ${overdue?`(🚨 마감 ${Math.abs(daysToDeadline)}일 지남)`:`(D-${daysToDeadline})`}</div>
-      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">이 마감일은 원청 공장이 매년 같은 시기(11월)에 문을 닫아 전 상품이 동일합니다. 전체 ${totalCnt}개 중 미처리 <b>${needRows.length}</b>개 · 처리완료 ${doneRows.length}개 · 재고여유 ${readyRows.length}개${laterNote}</div>`;
+      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">이 마감일은 원청 공장 주문 마감일(보통 11월, 매년 달라질 수 있음)이라 전 상품이 동일합니다. 마감 이후엔 주문은 가능해도 입고는 3월 이후예요. 전체 ${totalCnt}개 중 미처리 <b>${needRows.length}</b>개 · 처리완료 ${doneRows.length}개 · 재고여유 ${readyRows.length}개${laterNote}</div>${insightFactoryEditHtml()}`;
   } else {
     const soonest=needRows.length?needRows.reduce((a,b)=>a.seasonPre.daysToDeadline<b.seasonPre.daysToDeadline?a:b):null;
     bannerEl.innerHTML = soonest
@@ -15406,11 +15447,11 @@ function insightRenderCoverSummary(){
   if(bannerEl){
     const wc0=ok[0]&&ok[0].winterCover;
     const endTxt=wc0?_insFmtMD(new Date(wc0.windowEnd.getTime()-86400000)):'4/30';
-    const startTxt=wc0?_insFmtMD(wc0.closeStart):'12/1';
+    const startTxt=wc0?_insFmtMD(wc0.closeStart):'11/1';
     const otNote=(wc0&&wc0.onTimePct!=null)?`과거 입고 기록 기준 오늘 발주 시 ${startTxt} 전 도착 가능성은 약 ${wc0.onTimePct}%입니다. `:'';
     const lateNote=later?` · 구간 시작까지 아직 멀어 점검 대상 아님 ${later}개`:'';
-    bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;">🧮 지금 확보분(현재고+진행중 발주)으로 ${startTxt}~${endTxt}를 버틸 수 있는지 전 제품 점검 (리드타임 2개월 반영)</div>
-      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">🔴 부족 <b>${short.length}</b>개 · ⚠ 빠듯 ${tight.length}개 · ✅ 충분 ${enough.length}개${noData?` · 판매데이터 부족으로 판정 불가 ${noData}개`:''}${lateNote} — 예상 판매는 여러 방법의 평균(기준)에 실제 판매로 검증한 오차를 반영해 낙관/기준/보수로 계산합니다. 판정은 <b>등급별 안전 목표</b>(A 약 90% · B 약 80% · C 기준 수준) 충족 여부예요 — 충분=목표 충족, 빠듯=기준은 버티나 목표 미달, 부족=기준 예상에도 모자람. 부족 목록은 <b>판매량(최근 3개월 월평균)이 많은 순</b>으로 정렬한 발주 우선순위입니다(많이 팔리는 상품부터). 추가 발주 마감일은 각 행에 표시돼요(마감 = min(재고 소진일, 생산 중단 12/1) − 리드타임 2개월). ${otNote}상품명을 클릭하면 근거를 볼 수 있어요.</div>`;
+    bannerEl.innerHTML=`<div style="font-size:13px;font-weight:700;">🧮 지금 확보분(현재고+진행중 발주)으로 공장 주문 마감(${startTxt}) 이후 ~ 입고 재개(${endTxt})를 버틸 수 있는지 전 제품 점검 (리드타임 2개월 반영)</div>
+      <div style="font-size:12px;color:var(--tx2);margin-top:4px;">🔴 부족 <b>${short.length}</b>개 · ⚠ 빠듯 ${tight.length}개 · ✅ 충분 ${enough.length}개${noData?` · 판매데이터 부족으로 판정 불가 ${noData}개`:''}${lateNote} — 예상 판매는 여러 방법의 평균(기준)에 실제 판매로 검증한 오차를 반영해 낙관/기준/보수로 계산합니다. 판정은 <b>등급별 안전 목표</b>(A 약 90% · B 약 80% · C 기준 수준) 충족 여부예요 — 충분=목표 충족, 빠듯=기준은 버티나 목표 미달, 부족=기준 예상에도 모자람. 부족 목록은 <b>판매량(최근 3개월 월평균)이 많은 순</b>으로 정렬한 발주 우선순위입니다(많이 팔리는 상품부터). 추가 발주 마감일은 각 행에 표시돼요(마감 = min(재고 소진일 − 리드타임 2개월, 공장 주문 마감일 ${startTxt})). 마감 이후에 낸 주문은 입고 재개일(${endTxt}) 이후에 들어온다고 봅니다. ${otNote}상품명을 클릭하면 근거를 볼 수 있어요.${insightFactoryEditHtml()}</div>`;
   }
   const esc=s=>String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;');
   const n=v=>Math.round(v).toLocaleString();
@@ -15454,7 +15495,7 @@ function insightRowHtml(r){
   if(r.p.disc) orderCell='<span class="ins-sub">단종 — 발주 불필요</span>';
   else if(r.c.noData) orderCell='<span class="ins-sub">산출불가</span>';
   else if(r.finalQty<=0 && r.covered) orderCell=`<span class="ins-tag" style="background:#ECFDF5;color:#059669;">✓ 발주 진행중(충분)</span>${overBadge}${corrBadge}${suspectBadge}`;
-  else orderCell=`<div class="ins-num">${r.finalBoxes.toLocaleString()}박스</div><div class="ins-sub">(${r.finalQty.toLocaleString()}개)</div>${r.finalBasis==='cover'?`<div class="ins-sub" style="color:#92400E;font-weight:700;" title="구정(12~4월) 생산 중단 전에 들어와야 하는 물량까지 포함한 주문 수량입니다. 평상시 권장은 ${r.regQty.toLocaleString()}개이고, 12/1 전 입고분으로 4/30까지 버티려면 ${r.coverQty.toLocaleString()}개가 필요합니다(상품명을 클릭하면 근거).">❄ 구정 준비 포함 (평상시 ${r.regQty.toLocaleString()}개)</div>`:''}${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}${overBadge}${corrBadge}${suspectBadge}`;
+  else orderCell=`<div class="ins-num">${r.finalBoxes.toLocaleString()}박스</div><div class="ins-sub">(${r.finalQty.toLocaleString()}개)</div>${r.finalBasis==='cover'?`<div class="ins-sub" style="color:#92400E;font-weight:700;" title="구정 대비 물량까지 포함한 주문 수량입니다. 11월~3월엔 주문은 가능해도 입고는 3월 이후라, 공장 주문 마감 전에 낸 주문과 지금 재고로 입고 재개(4/30경)까지 버티려면 ${r.coverQty.toLocaleString()}개가 필요합니다. 평상시 권장은 ${r.regQty.toLocaleString()}개입니다(상품명을 클릭하면 근거).">❄ 구정 준비 포함 (평상시 ${r.regQty.toLocaleString()}개)</div>`:''}${r.pending>0?`<div class="ins-sub">진행중 ${r.pending.toLocaleString()}개 차감</div>`:''}${overBadge}${corrBadge}${suspectBadge}`;
   const confirmed=insightIsConfirmedToday(r.p.id);
   return `<tr class="${confirmed?'ins-row-confirmed':''}">
     <td style="text-align:center;"><input type="checkbox" ${confirmed?'checked':''} onchange="insightToggleOrderConfirm(${r.p.id}, this.checked)" title="오늘 발주 처리 확인"></td>
@@ -16028,7 +16069,7 @@ function insightRenderCalcDetail(code){
   }
   if(r.pending>0) html+=row2('진행중 발주 차감', `−${r.pending.toLocaleString()}개`, '발주관리 미입고 + 패밀리오더 미입고 합산');
   html+=row2('최종 권장 발주', r.netBoxes!=null?`${r.netBoxes.toLocaleString()}박스(${(r.netNeeded||0).toLocaleString()}개)`:'-');
-  if(r.coverQty>0) html+=row2('❄ 구정 준비 필요량', `${r.coverQty.toLocaleString()}개`, `12/1 전 입고분으로 4/30까지 버티는 데 필요한 양. 평상시 권장 ${(r.regQty||0).toLocaleString()}개와 비교해 큰 값이 최종 주문 수량(${r.finalQty.toLocaleString()}개)입니다`);
+  if(r.coverQty>0) html+=row2('❄ 구정 준비 필요량', `${r.coverQty.toLocaleString()}개`, `공장 주문 마감 전 주문분+현재고로 입고 재개(4/30경)까지 버티는 데 필요한 양. 평상시 권장 ${(r.regQty||0).toLocaleString()}개와 비교해 큰 값이 최종 주문 수량(${r.finalQty.toLocaleString()}개)입니다`);
   if(c.suspect) html+='<div class="ins-calc-note" style="color:#DC2626;">⚠ 최근 데이터가 적은데(30일 중 10일 미만) 계산값이 발주시점 역산치의 2.5배를 넘습니다. 배치 입력 오류나 일시적 이상치가 섞였을 수 있으니 위 출고 추이 그래프로 직접 확인해보세요.</div>';
   body.innerHTML=html;
 }
@@ -26437,7 +26478,7 @@ async function simEnsureRows(){
   if(_simRows && Date.now()-_simRowsAt<180000) return _simRows;
   const ms=insightRgYms();
   await Promise.all([
-    loadDailyCache(), pcEnsureBackdata(),
+    loadDailyCache(), pcEnsureBackdata(), insightFactoryLoad(),
     (_rgOptionMapLoaded?Promise.resolve():loadRgOptionMap()),
     (_rgPackMultiplierLoaded?Promise.resolve():loadRgPackMultiplier()),
     rgEnsureProdMonths(ms[ms.length-1], ms[0])
@@ -26555,7 +26596,7 @@ function simRender(){
   else if(shortQty>0) head+=`👉 추가로 <b>${bx(shortQty)}박스(${n(shortQty)}개)</b> 더 주문해야 안전합니다.<br><span style="opacity:.85;">앱 권장 총 주문량 ${bx(need)}박스(${n(need)}개) — ${r.finalBasis==='cover'?'구정 준비 기준':'평상시 권장 기준'}</span>`;
   else if(need>0) head+=`👉 추가 주문은 필요 없어요. (앱 권장 ${bx(need)}박스(${n(need)}개) 이상 주문)`;
   else head+=`👉 현재고와 진행중 발주만으로도 충분해서 추가 주문이 필요 없어요.`;
-  head+='</div>';
+  head+=`<div style="margin-top:6px;font-size:12px;opacity:.9;">📦 보유 계산: 현재고 ${n(S)} + 진행중 발주 ${n(P)}${P>0?`(가장 오래된 주문 ${r.pendingDays!=null?r.pendingDays+'일째':''}${wc&&wc.eta?`, 입고 예상 ${_insFmtMD(wc.eta)}경`:''})`:''} + 이번 주문 ${n(Q)} = <b>${n(T)}개</b>${P>0?' (진행중 발주분을 포함해 분석)':''}</div></div>`;
 
   const ln=(lbl,txt)=>`<div class="ln"><b>${lbl}</b> <span>${txt}</span></div>`;
   // ── ① 판매 패턴 ──
@@ -26581,13 +26622,13 @@ function simRender(){
   } else s2+=`앞으로 1년 예상 판매는 약 <b>${rng(annB,annL)}개</b>예요.`;
   if(coverActive){
     const {low,base,high}=wc.scenarios;
-    s2+=` 신규 입고가 막힌다고 가정한 <b>12월~4월</b>(구정 커버 점검 기준)엔 <b>${n(base.win)}개</b>(낙관 ${n(low.win)} ~ 보수 ${n(high.win)})가 팔릴 걸로 봐요.`;
+    s2+=` 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 이후~입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})엔 <b>${n(base.win)}개</b>(낙관 ${n(low.win)} ~ 보수 ${n(high.win)})가 팔릴 걸로 봐요.`;
   }
   // ── ③ 필요한 재고 ──
   let s3='';
   if(coverActive){
     const {target,base}=wc.scenarios;
-    s3+=`구정 커버 점검은 12월~4월엔 신규 입고가 안 된다고 가정해서(참고: 입고 기록상 2~3월에 낸 주문은 4/21~4/30에 도착) 이 구간은 지금 확보한 물량으로 버텨야 해요. 지금~4/30 예상 판매 ${n(base.total)}개에 ${wc.grade}등급 안전 보정(${wc.targetPct})을 더한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
+    s3+=`공장 주문 마감(${_insFmtMD(wc.closeStart)}) 이후엔 주문은 가능해도 입고는 3월 이후라(실제 입고 기록: 2~3월 주문이 4/21~4/30 도착) ${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))}까지는 지금 확보분 + 마감 전에 낸 주문으로 버텨야 해요. 지금~4/30 예상 판매 ${n(base.total)}개에 ${wc.grade}등급 안전 보정(${wc.targetPct})을 더한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
   }
   s3+=(e?`평소 기준으로는 리드타임(약 ${L}일)+발주주기 동안 쓸 목표 확보량 ${n(e.targetLR)}개에서 현재고·진행중 발주를 반영하면 <b>${n(reg)}개</b>가 필요해요. `:`평소 기준 권장은 ${n(reg)}개예요. `);
   s3+=`→ 앱 권장 총 주문량은 <b>${n(need)}개(${bx(need)}박스)</b>입니다. `;
@@ -26608,8 +26649,8 @@ function simRender(){
   det+=ln('도착 시점',`리드타임 약 ${L}일 → 오늘 주문하면 ${_insFmtMD(new Date(today.getTime()+L*DAY))}경 도착${ls&&ls.a1!=null?` (이 제품 입고 실적 평균 1차 ${ls.a1}일${ls.a2!=null?` · 2차 ${ls.a2}일`:''})`:''}. 도착 시점 예상 재고 ${n(e?e.stockAtDelivery:c.stockAtDelivery)}개.${gap}`);
   if(e) det+=ln('평상시 권장',`앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 예상 판매 ${n(e.dLR)}개 × 안전배수 ×${e.k.toFixed(2)}(${e.grade}등급 ${e.pct}) = 목표 확보량 ${n(e.targetLR)}개${e.usedRecent?'(최근 30일 판매속도가 더 커서 그 값 사용)':''} − 현재고(리드타임 중 판매 반영) = 필요 ${n(c.needed)}개${P>0?` → 진행중 ${n(P)}개 차감 →`:' →'} 평상시 권장 ${n(reg)}개 ${regOk?'(✅ 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
   if(coverActive){
-    const {low,base,high,target}=wc.scenarios, sup=wc.supply+Q, diff=sup-target.total, late=wc.arriveIfOrderNow>wc.closeStart;
-    det+=ln('구정 준비',`예상 판매(오늘~4/30) ${n(base.total)}개(낙관 ${n(low.total)} ~ 보수 ${n(high.total)}) → 안전 목표 ${n(target.total)}개. 확보분 ${n(wc.supply)} + 이번 주문 ${n(Q)} = ${n(sup)}개 → 목표 대비 ${diff>=0?'여유 '+n(diff):'부족 '+n(-diff)}개. 구정 점검은 리드타임을 2개월로 보고, 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착${late?' → 12/1 이후일 수 있어요(🚨)':''}${wc.onTimePct!=null?` (과거 입고 기록상 12/1 전 도착 가능성 약 ${wc.onTimePct}%)`:''}.`);
+    const {low,base,high,target}=wc.scenarios, sup=wc.supply+Q, diff=sup-target.total, late=today>wc.closeStart;
+    det+=ln('구정 준비',`예상 판매(오늘~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))}) ${n(base.total)}개(낙관 ${n(low.total)} ~ 보수 ${n(high.total)}) → 안전 목표 ${n(target.total)}개. 확보분 ${n(wc.supply)} + 이번 주문 ${n(Q)} = ${n(sup)}개 → 목표 대비 ${diff>=0?'여유 '+n(diff):'부족 '+n(-diff)}개. 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착 예정${late?` → 🚨 공장 주문 마감(${_insFmtMD(wc.closeStart)})이 이미 지나 입고 재개 이후에 들어와요`:` (마감 ${_insFmtMD(wc.closeStart)} 전이지만 물량이 많으면 구정 이후 생산될 수 있어 일찍 주문 권장)`}.`);
   } else if(wc && wc.status==='ok') det+=ln('구정 준비','구정 커버 점검은 9~11월에만 운영해 지금은 반영하지 않았어요.');
   const sp=r.seasonPre;
   if(sp && sp.status==='flag' && sp.neededQty>0) det+=ln('계절 대비 칸',`${sp.kind==='winter'?'구정재고 대비':'계절성수기 대비'} 칸 기준으로는 추가 ${sp.boxes.toLocaleString()}박스(${n(sp.neededQty)}개)가 필요하다고 나옵니다(마감 ${fmtDate(sp.deadline)}${sp.overdue?' · 🚨지남':''}).`);
