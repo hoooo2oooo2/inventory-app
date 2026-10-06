@@ -14574,8 +14574,8 @@ function insightDemandRates(p, avg30, c, seasonIndex, nDays){
     maps.push(mp); }
   // ③ 최근 3개월 평균 유지
   { const mp={}; months.forEach(h=>{ mp[key(h.y,h.m)]=level; }); maps.push(mp); }
-  // 본인 작년 실적을 쓸 수 있으면(maps[0]) 50%, 나머지 둘 25%씩 — 아니면 동일 비중
-  const wts=maps.map((_,i)=>useRef?(i===0?INSIGHT_OWN_HISTORY_WEIGHT:(1-INSIGHT_OWN_HISTORY_WEIGHT)/(maps.length-1)):1);
+  // 본인 작년 실적을 쓸 수 있으면(maps[0]) 80% + 같은 구분 패턴 20%(계절 무시 방법 제외) — 아니면 동일 비중
+  const wts=maps.map((_,i)=>useRef?(i===0?INSIGHT_OWN_HISTORY_WEIGHT:(i===1?1-INSIGHT_OWN_HISTORY_WEIGHT:0)):1);
   const wTot=wts.reduce((a,b)=>a+b,0);
   const rates=[];
   for(let i=0;i<nDays;i++){
@@ -14905,8 +14905,10 @@ function _insightCalibFor(monthly){ return INSIGHT_COVER_CALIB.find(c=>monthly<c
 // 부작용이 있어 배수의 "1을 넘는 초과분"을 절반만 반영한다(2026-10-06 사용자 요청: 이동식 UFO 세트 구정물량 556개 지적). 예) B등급 ×1.58 → ×1.29
 const INSIGHT_LOWVOL_MAX_MONTHLY=67, INSIGHT_LOWVOL_KEEP=0.5;
 function _insightDampSafety(f, monthly){ return (monthly<INSIGHT_LOWVOL_MAX_MONTHLY && f>1) ? 1+(f-1)*INSIGHT_LOWVOL_KEEP : f; }
-// 본인 작년 실적(1년 이상 판매 이력)을 쓸 수 있으면 그 방법에 50%, 나머지 두 방법(같은 구분 패턴·최근 수준)에 25%씩 — 아니면 동일 비중(2026-10-06 사용자 요청)
-const INSIGHT_OWN_HISTORY_WEIGHT=0.5;
+// 본인 작년 실적(1년 이상 판매 이력)을 쓸 수 있으면 본인 작년 실적 80% + 같은 구분 패턴 20%, "최근 수준 유지(계절 무시)"는 제외 — 아니면 동일 비중.
+// 이유(2026-10-06 사용자 지적, 전 제품 실측): 계절을 무시하는 방법은 겨울에 판매가 줄어드는 제품(37개)을 작년 실제의 1.8배로 부풀리고, 겨울에 오르는 제품(18개)은
+// 0.5배로 모자라게 했다. 전체 평균은 정상(0.98)이라 두 쪽이 상쇄돼 가려져 있었다. 본인 월별 실적이 있으면 그 계절 모양을 우선한다.
+const INSIGHT_OWN_HISTORY_WEIGHT=0.8;
 // 과거 입고 완료 기록(주문일→완료일)의 실제 리드타임 분포 — 건수가 바뀔 때만 다시 계산
 let _insLeadCache={n:-1,sorted:[]};
 function insightLeadStats(){
@@ -15024,8 +15026,8 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   const scale=(map,f)=>{ const o={}; Object.keys(map).forEach(k=>{ o[k]=map[k]*f; }); return o; };
   // 기준 = 검증된 방법들의 평균
   const primary=methods.filter(m=>m.primary);
-  // 본인 작년 실적을 쓸 수 있으면(1년 이상 판매 이력) 그 방법 50% + 나머지 둘 25%씩, 아니면 동일 비중
-  const wOf=m=>useRef?(m.id==='lastyear'?INSIGHT_OWN_HISTORY_WEIGHT:(1-INSIGHT_OWN_HISTORY_WEIGHT)/(primary.length-1)):1;
+  // 본인 작년 실적을 쓸 수 있으면(1년 이상 판매 이력) 본인 작년 실적 80% + 같은 구분 패턴 20%(계절 무시 방법 제외), 아니면 동일 비중
+  const wOf=m=>useRef?(m.id==='lastyear'?INSIGHT_OWN_HISTORY_WEIGHT:(m.id==='category'?1-INSIGHT_OWN_HISTORY_WEIGHT:0)):1;
   const wSum=primary.reduce((s,m)=>s+wOf(m),0);
   const baseMap={}; Object.keys(primary[0].map).forEach(k=>{ baseMap[k]=primary.reduce((s,m)=>s+m.map[k]*wOf(m),0)/wSum; });
   const baseSim=simulate(baseMap);
@@ -15130,8 +15132,8 @@ function insightCoverDetailHtml(wc, p){
   }).join('');
   // 근거
   const why=[];
-  why.push(`<b>기준 예상 = 서로 다른 방법의 ${wc.weighted?'가중 ':''}평균</b>${wc.mode==='estimate'?' (이 상품은 작년 실적이 없어 작년 기반 방법은 제외)':''}${wc.weighted?' — 1년 이상 판매 이력이 있어 본인 작년 실적에 50%, 나머지 두 방법에 25%씩':''}:`);
-  wc.methods.slice().sort((a,b)=>a.total-b.total).forEach(m=>why.push(`　${m.label}: ${endTxt}까지 ${n(m.total)}개${m.weight>0&&wc.weighted?` (비중 ${Math.round(m.weight*100)}%)`:''}`));
+  why.push(`<b>기준 예상 = 서로 다른 방법의 ${wc.weighted?'가중 ':''}평균</b>${wc.mode==='estimate'?' (이 상품은 작년 실적이 없어 작년 기반 방법은 제외)':''}${wc.weighted?' — 1년 이상 판매 이력이 있어 본인 작년 실적 80% + 같은 구분 패턴 20%로 계산하고, 계절(겨울 비수기)을 무시하는 "최근 수준 유지"는 제외했어요':''}:`);
+  wc.methods.slice().sort((a,b)=>a.total-b.total).forEach(m=>why.push(`　${m.label}: ${endTxt}까지 ${n(m.total)}개${m.weight>0&&wc.weighted?` (비중 ${Math.round(m.weight*100)}%)`:(wc.weighted&&m.id==='flat'?' (계절을 무시해 제외)':'')}`));
   why.push(`<b>낙관·보수·안전 목표는 실제 판매로 검증한 오차로 보정</b>했습니다. 이 앱의 실제 판매로 "3개월 앞을 예측했다면"을 403건 돌려 보니 기준 예상의 평균 오차가 약 30%였고, 기준량만 확보하면 실제 판매의 약 56%만 품절 없이 버텼습니다. 그래서 월 판매 수준별 실측 오차로 낙관=×${wc.fLow.toFixed(2)}, 보수=×${wc.fHigh.toFixed(2)}, ${wc.grade}등급 안전 목표=×${wc.fTarget.toFixed(2)}를 적용합니다(판매 규모가 작을수록 오차가 큼).${wc.damped?` 다만 월 판매가 작은 제품은 안전 배수가 과하게 커져 원래 ×${wc.fTargetRaw.toFixed(2)}인 것을 초과분(1을 넘는 부분)의 절반만 반영해 ×${wc.fTarget.toFixed(2)}로 낮췄어요.`:''}`);
   if(wc.mode==='lastyear'){
     why.push(`참고 — 작년 같은 구간(${wc.refStartLbl}~${wc.refEndLbl}) 실제 판매 ${n(wc.refWinTotal)}개 (월평균 ${n(wc.refWinTotal/5)}개). 월별 흐름은 아래 월별 표를 참고하세요.`);
@@ -16100,7 +16102,7 @@ function insightRenderCalcDetail(code){
   html+=row2('최종 월 소진량(expM)', `${c.expM.toLocaleString()}개/월`, `일평균판매로 표시되는 값(${c.avgDay}개/일)`);
   if(c.expert){
     const e=c.expert;
-    html+=row2('🧮 전문가 방식 — 예상 판매', `${Math.round(e.dLR).toLocaleString()}개`, `앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 동안, ${e.nMethods}가지 방법의 ${e.useRef?'가중 ':''}평균${e.useRef?'(본인 작년 실적 50%·나머지 25%씩)':''} (월 ${Math.round(e.monthly).toLocaleString()}개 수준)`);
+    html+=row2('🧮 전문가 방식 — 예상 판매', `${Math.round(e.dLR).toLocaleString()}개`, `앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 동안, ${e.nMethods}가지 방법의 ${e.useRef?'가중 ':''}평균${e.useRef?'(본인 작년 실적 80%·같은 구분 패턴 20%)':''} (월 ${Math.round(e.monthly).toLocaleString()}개 수준)`);
     html+=row2('등급별 안전 배수 k', `×${e.k.toFixed(2)}`, `${e.grade}등급 서비스 수준 ${e.pct} — 이 앱 실제 판매로 검증한 예측 오차 기준(판매 규모가 작을수록 큼)${e.damped?` · 월 판매가 작은 제품이라 원래 ×${e.kRaw.toFixed(2)} 중 초과분의 절반만 반영`:''}`);
     html+=row2('목표 확보량', `${Math.round(e.targetLR).toLocaleString()}개`, e.usedRecent?'최근 30일 판매속도로 계산한 값이 더 커서 그 값을 목표로 사용(급증 방어)':'예상 판매 × 안전 배수');
     html+=row2('리드타임 동안 팔릴 양', `${Math.round(e.dL).toLocaleString()}개`, '이 기간 판매는 이번 발주분으로 못 채우고 현재고에서 나갑니다');
@@ -26676,7 +26678,7 @@ function simRender(){
   let s3='';
   if(coverActive){
     const {target,base}=wc.scenarios;
-    s3+=`11월~3월엔 입고가 막혀서 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 전에 낸 주문과 지금 확보분으로 입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})까지 버텨야 해요. 지금~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))} 예상 판매 <b>${n(base.total)}개</b>(${wc.methods.filter(m=>m.id!=='recent30').map(m=>`${m.label.replace(/ \(계절 무시\)/,'')} ${n(m.total)}${wc.weighted&&m.weight>0?`(비중 ${Math.round(m.weight*100)}%)`:''}`).join(' / ')}의 ${wc.weighted?'가중 ':''}평균${fpat.seasonal?`, 참고로 작년 같은 기간 실제 판매는 ${n(D(1,today,wc.windowEnd))}개`:''})에 ${wc.grade}등급 안전 보정 ×${wc.fTarget.toFixed(2)}${wc.damped?`(${wc.targetPct} 기준 원래 ×${wc.fTargetRaw.toFixed(2)}인데 월 판매가 작은 제품이라 초과분의 절반만 반영)`:`(${wc.targetPct})`}를 곱한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
+    s3+=`11월~3월엔 입고가 막혀서 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 전에 낸 주문과 지금 확보분으로 입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})까지 버텨야 해요. 지금~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))} 예상 판매 <b>${n(base.total)}개</b>(${wc.methods.filter(m=>m.id!=='recent30').map(m=>`${m.label.replace(/ \(계절 무시\)/,'')} ${n(m.total)}${wc.weighted?(m.weight>0?`(비중 ${Math.round(m.weight*100)}%)`:(m.id==='flat'?'(제외: 겨울 비수기를 무시)':'')):''}`).join(' / ')}의 ${wc.weighted?'가중 ':''}평균${fpat.seasonal?`, 참고로 작년 같은 기간 실제 판매는 ${n(D(1,today,wc.windowEnd))}개`:''})에 ${wc.grade}등급 안전 보정 ×${wc.fTarget.toFixed(2)}${wc.damped?`(${wc.targetPct} 기준 원래 ×${wc.fTargetRaw.toFixed(2)}인데 월 판매가 작은 제품이라 초과분의 절반만 반영)`:`(${wc.targetPct})`}를 곱한 <b>안전 목표 ${n(target.total)}개</b>가 필요하고, 보유(현재고+진행중) ${n(wc.supply)}개를 빼면 <b>${n(cov)}개</b> 부족해요. `;
   }
   s3+=(e?`평소 기준으로는 리드타임(약 ${L}일)+발주주기 동안 쓸 목표 확보량 ${n(e.targetLR)}개에서 현재고·진행중 발주를 반영하면 <b>${n(reg)}개</b>가 필요해요. `:`평소 기준 권장은 ${n(reg)}개예요. `);
   s3+=`→ 앱 권장 총 주문량은 <b>${n(need)}개(${bx(need)}박스)</b>입니다. `;
