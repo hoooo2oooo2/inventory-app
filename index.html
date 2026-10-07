@@ -32225,6 +32225,20 @@ function _csRinoMatch(vendorId, rawName, aliasMap){
   hit = prods.find(p=>{ const pn=_csRinoNorm(p.name); return pn && (pn.includes(norm) || norm.includes(pn)); });
   return hit ? hit.id : null;
 }
+// 중복 판정: 같은 배송처에 고객명 + (제품·수량 구성)이 같은 주문이 이미 있으면 중복
+function _csRinoSig(customer, items){   // items: [{productId, qty}]
+  const parts = items.filter(it=>it.productId).map(it=>`${it.productId}:${it.qty}`).sort();
+  return parts.length ? `${String(customer||'').trim()}|${parts.join(',')}` : '';
+}
+function _csRinoDupGroups(groups, orders, vendorId){
+  const existing = new Set(orders.filter(o=>o.vendorId===vendorId).map(o=>_csRinoSig(o.customer, o.items||[])).filter(Boolean));
+  return groups.filter(g=>{ const sg=_csRinoSig(g.customer, g.items); return sg && existing.has(sg); });
+}
+function _csRinoDupMsg(dups){
+  const names = dups.slice(0,5).map(g=>`· ${g.customer}`).join('\n');
+  return `${names}${dups.length>5?`
+· 외 ${dups.length-5}건`:''}`;
+}
 function csRinoPickFile(evt){
   const f = evt.target.files && evt.target.files[0];
   evt.target.value = '';
@@ -32265,6 +32279,14 @@ async function csRinoParseAndOpen(aoa, vendor, fileName){
   if(!groups.length){ toast('인식 가능한 주문 행이 없습니다. C(수취인)·D(연락처)·G(주소)·H(상품명)·I(수량) 열을 확인하세요.'); return; }
   const aliasMap = (await cloudKvLoad('consign_rino_alias')) || {};
   groups.forEach(g=>{ g.items.forEach(it=>{ it.productId = _csRinoMatch(vendor.id, it.raw, aliasMap); }); });
+  const dupAtOpen = _csRinoDupGroups(groups, _csOrders, vendor.id);
+  if(dupAtOpen.length && dupAtOpen.length===groups.length){
+    alert(`중복된 파일입니다.
+이미 등록된 주문(고객명·제품·수량 동일)이라 업로드할 수 없습니다.
+
+${_csRinoDupMsg(dupAtOpen)}`);
+    return;
+  }
   _csRinoImport = { vendor, fileName, groups, aliasMap };
   document.getElementById('csRinoFileName').textContent = '· '+fileName;
   document.getElementById('csRinoDate').value = _csToday();
@@ -32339,10 +32361,31 @@ async function csRinoConfirmImport(){
   const { vendor, groups, aliasMap } = _csRinoImport;
   const date = document.getElementById('csRinoDate').value || _csToday();
   const shipFee = Math.max(0, Math.round(Number(document.getElementById('csRinoShipFee').value)||0));
-  const usable = groups.filter(g=>g.items.some(it=>it.productId));
+  let usable = groups.filter(g=>g.items.some(it=>it.productId));
   if(!usable.length){ toast('매칭된 제품이 없어 등록할 주문이 없습니다.'); return; }
   if(groups.some(g=>g.items.some(it=>!it.productId))){
     if(!confirm('매칭되지 않은 상품이 있습니다. 매칭 안 된 항목은 제외하고 진행할까요?')) return;
+  }
+
+  // 중복 검사 — 다른 PC에서 방금 올린 주문까지 포함하도록 최신본으로 확인
+  const latestOrders = await cloudKvLoad('consign_orders');
+  _csOrders = Array.isArray(latestOrders) ? latestOrders : _csOrders;
+  const dupGroups = _csRinoDupGroups(usable, _csOrders, vendor.id);
+  if(dupGroups.length===usable.length){
+    alert(`중복된 파일입니다.
+이미 등록된 주문(고객명·제품·수량 동일)이라 업로드할 수 없습니다.
+
+${_csRinoDupMsg(dupGroups)}`);
+    csRinoCloseModal();
+    return;
+  }
+  if(dupGroups.length){
+    if(!confirm(`이미 등록된 주문 ${dupGroups.length}건은 중복이라 제외합니다.
+
+${_csRinoDupMsg(dupGroups)}
+
+나머지 ${usable.length-dupGroups.length}건만 등록할까요?`)) return;
+    usable = usable.filter(g=>!dupGroups.includes(g));
   }
 
   const noSupplyNames = [...new Set(usable.flatMap(g=>g.items.filter(it=>it.productId).map(it=>_csProducts.find(x=>x.id===it.productId)).filter(p=>p&&!p.salePrice).map(p=>p.name)))];
