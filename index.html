@@ -5253,6 +5253,10 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <button class="ins-calc-toggle" onclick="insightToggleCalcDetail()">🔍 발주 계산 근거 보기 <span id="insightCalcToggleIcon">▾</span></button>
       <div class="ins-calc-body" id="insightCalcDetailBody" style="display:none;"></div>
     </div>
+    <div class="ins-calc-detail" id="insightStockoutBox">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">🚫 품절 이력</div>
+      <div id="insightStockoutBody" style="padding:10px 12px;border:0.5px solid var(--bd);border-radius:8px;background:var(--bg2);margin-bottom:14px;"></div>
+    </div>
     <div class="ins-trend-range">
       <span class="ins-trend-range-badge">🎯 이 구간이 발주 계산에 쓰입니다</span>
       <div class="ins-trend-range-row" id="insightRangePtabs">
@@ -15324,6 +15328,8 @@ function insightInit(){
   _insightEnsureFamData().then(renderInsight); // 패밀리오더 매칭 데이터는 별도로 로드되는 대로 다시 반영
   _insightEnsureConfirmData().then(renderInsight); // 오늘 발주 확인 체크 상태도 별도로 로드되는 대로 반영
   _insightEnsureSeasonalCheckData().then(renderInsight); // 구정·성수기 발주 처리 체크리스트도 별도로 로드되는 대로 반영
+  // 품절 이력: 현재 재고·판매 상태를 기록에 반영(하루 한 번 이상) → 끝나면 표의 "품절 N일째" 배지를 다시 그림
+  stockoutLoad().then(async()=>{ try{ await stockoutTrackRun(insightBuildRows()); }catch(e){} renderInsight(); });
 }
 
 function insightSparkHtml(season){
@@ -15587,7 +15593,7 @@ function insightRowHtml(r){
   return `<tr class="${confirmed?'ins-row-confirmed':''}">
     <td style="text-align:center;"><input type="checkbox" ${confirmed?'checked':''} onchange="insightToggleOrderConfirm(${r.p.id}, this.checked)" title="오늘 발주 처리 확인"></td>
     <td><span class="ins-badge" style="background:${stBg};color:${stColor};">${st}</span></td>
-    <td><div class="ins-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px;" onclick="insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이 그래프를 볼 수 있어요">${r.p.name}${r.surge?' <span class="ins-tag" style="background:#FEF2F2;color:#DC2626;font-size:10px;padding:1px 6px;" title="최근 14일 판매가 이전 14일보다 뚜렷이 늘었습니다 — 품절 위험 재검토">🔺급증</span>':''}${r.drop?' <span class="ins-tag" style="background:#EFF6FF;color:#2563EB;font-size:10px;padding:1px 6px;" title="최근 14일 판매가 이전 14일보다 뚜렷이 줄었습니다 — 재고 과잉 위험, 발주 보류 검토">🔻급감</span>':''}</div><div class="ins-code">${r.p.code}</div></td>
+    <td><div class="ins-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px;" onclick="insightOpenTrend('${esc(r.p.code)}','${esc(r.p.name)}')" title="클릭하면 출고 추이 그래프를 볼 수 있어요">${r.p.name}${r.surge?' <span class="ins-tag" style="background:#FEF2F2;color:#DC2626;font-size:10px;padding:1px 6px;" title="최근 14일 판매가 이전 14일보다 뚜렷이 늘었습니다 — 품절 위험 재검토">🔺급증</span>':''}${r.drop?' <span class="ins-tag" style="background:#EFF6FF;color:#2563EB;font-size:10px;padding:1px 6px;" title="최근 14일 판매가 이전 14일보다 뚜렷이 줄었습니다 — 재고 과잉 위험, 발주 보류 검토">🔻급감</span>':''}${insightStockoutBadgeHtml(r.p.code)}</div><div class="ins-code">${r.p.code}</div></td>
     <td>${r.p.type||'기타'}</td>
     <td><span class="ins-tag" style="background:var(--bg2);color:${gradeColor};font-weight:800;">${r.grade}</span></td>
     <td style="text-align:right;${(st==='부족'||st==='긴급')?`color:${stColor};font-weight:800;`:''}" class="ins-num" title="${(st==='부족'||st==='긴급')?'판매속도 대비 재고 '+st:''}">${r.p.stock.toLocaleString()}</td>
@@ -16006,6 +16012,125 @@ function insightMergedSeriesDetailed(code,name){
   Object.entries(rg).forEach(([d,q])=>{ total[d]=(total[d]||0)+q; });
   return {total,reg,rg};
 }
+// ══════════════════════════════════════════════════════════════
+// 🚫 품절 이력 — 상품별 품절 구간(시작일~입고일, 소요 일수)을 쌓아 발주 인사이트에서 보여준다(2026-10-07 요청)
+//  · 품절 = 현재고 0 이면서 최근 3일 판매(일반+로켓그로스)도 0. 단종·숨김 상품은 제외.
+//  · 한 제품이 여러 번 품절될 수 있다 — 재고가 다시 채워지면 그 구간을 닫고(몇 일 걸렸는지 기록), 다시 0이 되면 새 구간이 1일차부터 시작.
+//  · 상품 재고의 과거 시점 기록은 시스템에 없어(상품 테이블엔 현재고만 있음) 과거 품절은 복원할 수 없다 — 이 기능을 켠 날부터 쌓인다.
+//    지금 이미 품절인 상품은 마지막 판매일 다음 날을 시작일로 추정(추정 표시).
+//  · 저장: cloudKv 'stockout_log' = {v:1, lastRun:'YYYY-MM-DD', items:{코드:{open:{s,est}|null, eps:[{s,e,est}]}}} — 발주 인사이트를 열 때(하루 한 번 이상) 갱신,
+//    저장 직전 항상 최신본을 다시 읽어 병합(여러 PC 동시 사용 대비).
+// ══════════════════════════════════════════════════════════════
+let _stockoutLog=null;
+function _soDays(a,b){ return Math.round((Date.parse(b)-Date.parse(a))/86400000); }
+async function stockoutLoad(){
+  const d=await cloudKvLoad('stockout_log');
+  _stockoutLog=(d&&typeof d==='object'&&!Array.isArray(d)&&d.items)?d:{v:1,lastRun:'',items:{}};
+}
+// 현재고 0 + 최근 3일 판매 0 → 품절로 판단하는 상품 목록(rows = insightBuildRows 결과). 기준 판매 데이터의 마지막 날짜를 "오늘"로 본다(업로드 지연 반영).
+function _stockoutCurrent(rows){
+  const rq=_insightRgQtyByIdCache||{};
+  let lastData='';   // 일별 판매 데이터의 가장 최근 날짜
+  Object.values(_dCache).forEach(o=>{ const ks=Object.keys(o); if(ks.length){ const m=ks.reduce((a,b)=>a>b?a:b); if(m>lastData) lastData=m; } });
+  const today=fmtDate(new Date());
+  const ref=(lastData&&lastData<=today)?lastData:today;
+  const out={};
+  rows.forEach(r=>{
+    const p=r.p; if(p.disc||p.hidden) return;
+    if((p.stock||0)>0) return;
+    const bdId=insightBdIdFor(p);
+    const ser=insightMergedSeriesFor(p, rq, bdId);
+    // 최근 3일(기준일 포함) 판매 합계 + 마지막 판매일
+    let recent=0; for(let i=0;i<3;i++){ recent+=ser[fmtDate(new Date(Date.parse(ref)-i*86400000))]||0; }
+    if(recent>0) return;
+    const dates=Object.keys(ser).filter(d=>ser[d]>0 && d<=ref).sort();
+    const lastSale=dates.length?dates[dates.length-1]:null;
+    out[p.code]={lastSale, ref};
+  });
+  return {out, ref, today};
+}
+// 하루 한 번(이상) 현재 재고 상태를 기록에 반영 — 발주 인사이트가 열릴 때 호출
+async function stockoutTrackRun(rows){
+  try{
+    if(!rows||!rows.length) return;
+    const {out:cur, today}=_stockoutCurrent(rows);
+    const loaded=await cloudKvLoad('stockout_log');
+    const log=(loaded&&typeof loaded==='object'&&!Array.isArray(loaded)&&loaded.items)?loaded:(_stockoutLog&&_stockoutLog.items?_stockoutLog:{v:1,lastRun:'',items:{}});
+    let changed=false;
+    const byCode={}; rows.forEach(r=>{ byCode[r.p.code]=r; });
+    // 1) 새로 품절이 된 상품 → 구간 열기
+    Object.keys(cur).forEach(code=>{
+      const it=log.items[code]||(log.items[code]={open:null,eps:[]});
+      if(!it.open){
+        const ls=cur[code].lastSale;
+        // 시작일 = 마지막 판매일 다음 날(마지막 재고가 팔린 날 다음). 판매 기록이 없으면 오늘. 첫 기록 시점 이전일 수 있어 추정(est) 표시.
+        const startEst = ls ? fmtDate(new Date(Date.parse(ls)+86400000)) : today;
+        let st = startEst>today?today:startEst, est=true;
+        // 이전 품절 구간이 끝난(재입고된) 날보다 앞설 수 없다 — 재입고 후 다시 0이 되면 그날부터 새로 1일차
+        const lastEnd=it.eps.length?it.eps[it.eps.length-1].e:null;
+        if(lastEnd && st<lastEnd){ st=lastEnd; est=false; }
+        it.open={s:st, est};
+        changed=true;
+      }
+    });
+    // 2) 재고가 다시 채워진 상품 → 구간 닫기(입고일 = 재고가 찬 것을 확인한 날, 단 그 전에 판매가 재개됐으면 그 첫 판매일)
+    Object.keys(log.items).forEach(code=>{
+      const it=log.items[code]; if(!it.open) return;
+      if(cur[code]) return;                       // 아직 품절
+      const r=byCode[code]; if(!r) return;        // 상품이 사라졌으면 그대로 둠
+      if(r.p.disc||r.p.hidden){ it.open=null; changed=true; return; }   // 단종·숨김 처리된 상품은 추적 종료(구간 기록 안 함)
+      if((r.p.stock||0)<=0 && !r.p.disc) return; // 재고 0인데 최근 판매가 있었던 경우(업로드 지연 등) — 아직 닫지 않음
+      let end=today;
+      try{
+        const ser=insightMergedSeriesFor(r.p,_insightRgQtyByIdCache||{},insightBdIdFor(r.p));
+        const resumed=Object.keys(ser).filter(d=>ser[d]>0 && d>it.open.s && d<=today).sort()[0];
+        if(resumed && resumed<end) end=resumed;
+      }catch(e){}
+      if(end<it.open.s) end=it.open.s;
+      it.eps.push({s:it.open.s, e:end, est:!!it.open.est});
+      it.open=null; changed=true;
+    });
+    if(changed || log.lastRun!==today){
+      log.lastRun=today;
+      await cloudKvSave('stockout_log', log);
+    }
+    _stockoutLog=log;
+  }catch(e){ console.warn('품절 이력 갱신 실패', e); }
+}
+function _soStatus(code){
+  const it=_stockoutLog&&_stockoutLog.items&&_stockoutLog.items[code]; if(!it) return null;
+  return it;
+}
+function insightStockoutBadgeHtml(code){
+  const it=_soStatus(code); if(!it||!it.open) return '';
+  const days=_soDays(it.open.s, fmtDate(new Date()))+1;   // 시작일이 1일차
+  return ` <span class="ins-tag" style="background:#FEF2F2;color:#B91C1C;font-size:10px;padding:1px 6px;" title="현재고 0 · 최근 3일 판매 0 — ${it.open.s}부터 품절${it.open.est?'(시작일은 마지막 판매일로 추정)':''}. 상품명을 클릭하면 품절 이력을 볼 수 있어요.">🚫품절 ${days}일째</span>`;
+}
+function insightRenderStockout(code){
+  const el=document.getElementById('insightStockoutBody'); if(!el) return;
+  const md=d=>{ const t=new Date(d+'T00:00:00'); return `${t.getMonth()+1}월 ${t.getDate()}일`; };
+  const it=_soStatus(code);
+  const today=fmtDate(new Date());
+  const lastRun=(_stockoutLog&&_stockoutLog.lastRun)||'';
+  const foot=`<div style="margin-top:8px;font-size:11px;line-height:1.55;color:var(--tx2);">품절 = 현재고 0 이면서 최근 3일 판매(일반+로켓그로스)가 0인 상태. 재고가 다시 채워지면 그 구간을 닫고, 다시 0이 되면 1일차부터 새로 기록합니다. 상품별 과거 재고 기록은 없어 <b>기록은 이 기능이 켜진 날(2026-10-07)부터</b> 쌓이고, 지금 품절인 상품의 시작일은 마지막 판매일로 추정합니다.${lastRun?` · 마지막 확인 ${lastRun}`:''}</div>`;
+  if(!it || (!it.open && !(it.eps&&it.eps.length))){
+    el.innerHTML=`<div style="font-size:12.5px;">✅ 기록된 품절이 없습니다.</div>${foot}`;
+    return;
+  }
+  const eps=(it.eps||[]).slice().reverse();
+  let html='';
+  if(it.open){
+    const d=_soDays(it.open.s, today)+1;
+    html+=`<div style="padding:9px 11px;background:#FEF2F2;border-radius:8px;margin-bottom:8px;color:#7A1212;font-size:13px;line-height:1.5;">🚫 <b>지금 품절 중 — ${d}일째</b> (입고 대기)<br><span style="font-size:12px;">${md(it.open.s)}부터${it.open.est?' <span style="opacity:.8;">(추정: 마지막 판매일 다음 날)</span>':''} · 아직 입고되지 않았어요</span></div>`;
+  }
+  const totalDays=eps.reduce((a,e)=>a+Math.max(1,_soDays(e.s,e.e)),0)+(it.open?_soDays(it.open.s,today)+1:0);
+  const count=eps.length+(it.open?1:0);
+  html+=`<div style="font-size:12px;margin-bottom:6px;">총 <b>${count}회</b> 품절 · 누적 <b>${totalDays}일</b></div>`;
+  if(eps.length){
+    html+=`<div style="font-size:12.5px;">`+eps.map((e,i)=>{ const days=Math.max(1,_soDays(e.s,e.e)); return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;${i?'border-top:0.5px solid var(--bd);':''}"><span>${md(e.s)} ~ ${md(e.e)}${e.est?' <span class="ins-sub">(시작일 추정)</span>':''}</span><b>${days}일 소요</b></div>`; }).join('')+`</div>`;
+  }
+  el.innerHTML=html+foot;
+}
 function insightOpenTrend(code,name){
   _insightTrendCode=code;
   _insightTrendName=name;
@@ -16015,6 +16140,7 @@ function insightOpenTrend(code,name){
   insightRenderTrend();
   insightRenderCalcDetail(code);
   insightRenderSeasonAnalysis(code);
+  insightRenderStockout(code);
 }
 // 제품 클릭 시 상세 팝업에 월별/계절별 평균, 판매량이 오르기 시작하는 시점, 향후 발주(수량·시점)
 // 제안을 보여준다(2026-09-30 사용자 요청: "월별/계절별 평균 수량과 어느 시점에서 주문량이 오르는지
