@@ -4332,7 +4332,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div style="background:var(--bg);border-radius:14px;padding:24px;width:400px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
     <div id="csProdModalTitle" style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:18px;">＋ 제품 추가</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div><div class="pc-lbl">위탁 배송처</div><select id="csPVendor" class="pc-inp" style="cursor:pointer;"></select></div>
+      <div><div class="pc-lbl">위탁 배송처</div><select id="csPVendor" class="pc-inp" style="cursor:pointer;" onchange="csToggleSupplyField()"></select></div>
       <div><div class="pc-lbl">카테고리 (선택)</div><input type="text" id="csPCat" class="pc-inp" list="csCatDatalist" placeholder="선택 또는 새로 입력" autocomplete="off"/><datalist id="csCatDatalist"></datalist></div>
       <div style="grid-column:1/-1;"><div class="pc-lbl">상품명</div><input type="text" id="csPName" class="pc-inp" placeholder="상품명" autocomplete="off"/></div>
       <div><div class="pc-lbl">상품번호</div><input type="text" id="csPCode" class="pc-inp" placeholder="상품번호" autocomplete="off"/></div>
@@ -4341,7 +4341,11 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <span style="font-size:12px;color:var(--tx2);">부가세 포함단가 (단가 × 1.1, 자동)</span>
         <span id="csPVatPreview" style="font-size:15px;font-weight:700;color:#3182F6;">0원</span>
       </div>
-      <div style="grid-column:1/-1;"><div class="pc-lbl">판매가 · 정산단가 (원) <span style="font-weight:400;color:var(--tx2);">— 거래명세서·발주서 자동반영 시 사용</span></div><input type="number" id="csPSale" class="pc-inp" placeholder="0" min="0"/></div>
+      <div id="csPSaleWrap" style="grid-column:1/-1;display:none;background:#ECFDF5;border:1px solid #6EE7B7;border-radius:8px;padding:10px 12px;">
+        <div class="pc-lbl" style="color:#047857;font-weight:600;">🤝 리노우 납품가 (원)</div>
+        <input type="number" id="csPSale" class="pc-inp" placeholder="0" min="0"/>
+        <div style="font-size:11px;color:var(--tx2);margin-top:5px;line-height:1.5;">위의 단가는 <b>우리 단가</b>(매입), 이 칸은 <b>리노우에 납품하는 가격</b>입니다. 발주서 업로드 시 정산금액·거래명세서 단가로 사용됩니다.</div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:18px;">
       <button onclick="document.getElementById('csProdModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
@@ -4389,12 +4393,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div><div class="pc-lbl">택배비 (건당, 원)</div><input type="number" id="csRinoShipFee" class="pc-inp" min="0" oninput="csRinoRecalcAndRender()"/></div>
     </div>
     <div id="csRinoUnmatchedWarn" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#DC2626;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;">⚠️ 매칭 안 된 상품이 있습니다. 각 항목의 드롭다운에서 일치하는 제품을 선택하세요.</div>
+    <div id="csRinoNoSupplyWarn" style="display:none;background:#FFFBEB;border:1px solid #FCD34D;color:#B45309;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;"></div>
     <div id="csRinoGroupList" style="flex:1;overflow-y:auto;border:1px solid var(--bd);border-radius:10px;"></div>
     <div style="margin-top:12px;background:var(--bg2);border-radius:8px;padding:10px 13px;display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;align-items:center;">
       <span style="font-size:12px;color:var(--tx2);">택배건수 · <b id="csRinoSumCnt" style="color:var(--tx);">0건</b></span>
       <span style="font-size:12px;color:var(--tx2);">발생금액(원가) · <b id="csRinoSumCost" style="color:var(--tx);">0원</b></span>
       <span style="font-size:12px;color:var(--tx2);">배송비 합계 · <b id="csRinoSumShip" style="color:#D97706;">0원</b></span>
-      <span style="font-size:12px;color:var(--tx2);">정산금액(매출) · <b id="csRinoSumSettle" style="color:#3182F6;">0원</b></span>
+      <span style="font-size:12px;color:var(--tx2);">리노우 납품금액(정산) · <b id="csRinoSumSettle" style="color:#3182F6;">0원</b></span>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button onclick="csRinoCloseModal()" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
@@ -31871,6 +31876,10 @@ function csRenderProducts(){
         <div><div class="cs-pcard-plbl">단가</div><div class="cs-pcard-unit">${_csWon(p.price)}</div></div>
         <div style="text-align:right;"><div class="cs-pcard-plbl">부가세 포함단가</div><div class="cs-pcard-vat">${_csWon(p.vat)}</div></div>
       </div>
+      ${_csVendorName(p.vendorId)==='리노우'?`<div style="margin-top:8px;padding:7px 10px;border-radius:8px;background:#ECFDF5;border:1px solid #6EE7B7;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;font-weight:600;color:#047857;">🤝 리노우 납품가</span>
+        <span style="font-size:14px;font-weight:700;color:${p.salePrice?'#047857':'#DC2626'};">${p.salePrice?_csWon(p.salePrice):'미등록'}</span>
+      </div>`:''}
     </div>`).join('')}${addCard}</div>`;
 }
 function csOpenProdModal(id){
@@ -31888,8 +31897,15 @@ function csOpenProdModal(id){
   document.getElementById('csPPrice').value = p?(p.price??''):'';
   document.getElementById('csPSale').value = p?(p.salePrice??''):'';
   csUpdateVatPreview();
+  csToggleSupplyField();
   document.getElementById('csProdModal').style.display='flex';
   setTimeout(()=>document.getElementById('csPName').focus(),50);
+}
+// 납품가 칸은 리노우 배송처 제품에만 노출
+function csToggleSupplyField(){
+  const vid = document.getElementById('csPVendor').value;
+  const wrap = document.getElementById('csPSaleWrap');
+  if(wrap) wrap.style.display = (_csVendorName(vid)==='리노우') ? 'block' : 'none';
 }
 function csUpdateVatPreview(){
   const price = Number(document.getElementById('csPPrice').value)||0;
@@ -32280,18 +32296,19 @@ function csRinoRecalcAndRender(){
   const { vendor, groups } = _csRinoImport;
   const shipFee = Math.max(0, Math.round(Number(document.getElementById('csRinoShipFee').value)||0));
   let anyUnmatched=false, costSum=0, settleSum=0;
+  const noSupply=new Set();
   const vendorProds = _csProducts.filter(x=>x.vendorId===vendor.id);
   const rowsHtml = groups.map((g,gi)=>{
     let gSettle=0;
     const itemsHtml = g.items.map((it,ii)=>{
       const p = it.productId ? _csProducts.find(x=>x.id===it.productId) : null;
       if(!p) anyUnmatched=true;
-      if(p){ costSum += (p.vat||0)*it.qty; gSettle += (p.salePrice||0)*it.qty; }
-      const opts = `<option value="">❓ 매칭할 제품 선택</option>` + vendorProds.map(x=>`<option value="${x.id}" ${x.id===it.productId?'selected':''}>${_csEsc(x.name)}${x.salePrice?'':' (판매가 미등록)'}</option>`).join('');
+      if(p){ costSum += (p.vat||0)*it.qty; gSettle += (p.salePrice||0)*it.qty; if(!p.salePrice) noSupply.add(p.name); }
+      const opts = `<option value="">❓ 매칭할 제품 선택</option>` + vendorProds.map(x=>`<option value="${x.id}" ${x.id===it.productId?'selected':''}>${_csEsc(x.name)}${x.salePrice?'':' (납품가 미등록)'}</option>`).join('');
       return `<div class="cs-rino-item ${p?'':'cs-rino-unmatched'}">
         <select onchange="csRinoSetMatch(${gi},${ii},this.value)">${opts}</select>
         <input type="number" min="0" value="${it.qty}" oninput="csRinoSetQty(${gi},${ii},this.value)">
-        <span class="cs-rino-item-raw" title="엑셀 원본 상품명: ${_csEsc(it.raw)}">엑셀: ${_csEsc(it.raw)}</span>
+        <span class="cs-rino-item-raw" title="엑셀 원본 상품명: ${_csEsc(it.raw)}">엑셀: ${_csEsc(it.raw)}${p?` · 납품가 ${p.salePrice?_csWon(p.salePrice):'미등록'}`:''}</span>
       </div>`;
     }).join('');
     settleSum += gSettle;
@@ -32307,6 +32324,11 @@ function csRinoRecalcAndRender(){
   document.getElementById('csRinoGroupList').innerHTML = rowsHtml;
   document.getElementById('csRinoSummaryLine').textContent = `택배건수 ${groups.length}건 · 상품 ${groups.reduce((s,g)=>s+g.items.length,0)}품목 인식됨`;
   document.getElementById('csRinoUnmatchedWarn').style.display = anyUnmatched ? '' : 'none';
+  const nsw = document.getElementById('csRinoNoSupplyWarn');
+  if(nsw){
+    nsw.style.display = noSupply.size ? '' : 'none';
+    nsw.innerHTML = noSupply.size ? `⚠️ 리노우 납품가가 등록되지 않은 제품: <b>${[...noSupply].map(_csEsc).join(', ')}</b> — 제품 세팅에서 납품가를 입력하지 않으면 정산금액·거래명세서 단가가 0원으로 들어갑니다.` : '';
+  }
   document.getElementById('csRinoSumCnt').textContent = groups.length+'건';
   document.getElementById('csRinoSumCost').textContent = _csWon(costSum);
   document.getElementById('csRinoSumShip').textContent = _csWon(shipFee*groups.length);
@@ -32323,10 +32345,15 @@ async function csRinoConfirmImport(){
     if(!confirm('매칭되지 않은 상품이 있습니다. 매칭 안 된 항목은 제외하고 진행할까요?')) return;
   }
 
+  const noSupplyNames = [...new Set(usable.flatMap(g=>g.items.filter(it=>it.productId).map(it=>_csProducts.find(x=>x.id===it.productId)).filter(p=>p&&!p.salePrice).map(p=>p.name)))];
+  if(noSupplyNames.length && !confirm(`납품가가 등록되지 않은 제품이 있습니다.
+(${noSupplyNames.join(', ')})
+해당 제품은 정산금액·거래명세서 단가가 0원으로 들어갑니다. 그래도 진행할까요?`)) return;
+
   const newOrders = usable.map(g=>{
     const items = g.items.filter(it=>it.productId).map(it=>{
       const p = _csProducts.find(x=>x.id===it.productId);
-      return { productId:p.id, productName:p.name, productCode:p.code||'', vatUnit:p.vat, qty:it.qty, vatTotal:p.vat*it.qty };
+      return { productId:p.id, productName:p.name, productCode:p.code||'', vatUnit:p.vat, qty:it.qty, vatTotal:p.vat*it.qty, supplyUnit:p.salePrice||0 };
     });
     const vatTotal = items.reduce((s,it)=>s+it.vatTotal,0);
     const settlement = items.reduce((s,it)=>{ const p=_csProducts.find(x=>x.id===it.productId); return s+(p.salePrice||0)*it.qty; },0);
