@@ -15985,6 +15985,7 @@ async function erpApplyImport(){
     await loadProducts(true);
     await loadDailyCache(true);
     closeModal('erpUploadModal');
+    stockoutTrackAfterUpload();   // 업로드 직후 품절 이력 기록(백그라운드)
     toast(`ERP 업로드 완료 — 신규 ${newRows.length}개, 갱신 ${toUpdate.length}개, 출고데이터 ${dailyRows.length}건 반영됐습니다.`);
     renderInsight();
     if(currentPage==='inv'){ renderInv(); updateFloat(); }
@@ -16022,6 +16023,7 @@ function insightMergedSeriesDetailed(code,name){
 //    저장 직전 항상 최신본을 다시 읽어 병합(여러 PC 동시 사용 대비).
 // ══════════════════════════════════════════════════════════════
 let _stockoutLog=null;
+const STOCKOUT_DORMANT_DAYS=60;   // 마지막 판매가 이보다 오래된(또는 판매 이력이 없는) 재고 0 상품은 품절이 아니라 '장기 무판매'로 보고 품절 기록에서 제외(2026-10-07 사용자 요청)
 function _soDays(a,b){ return Math.round((Date.parse(b)-Date.parse(a))/86400000); }
 async function stockoutLoad(){
   const d=await cloudKvLoad('stockout_log');
@@ -16034,7 +16036,7 @@ function _stockoutCurrent(rows){
   Object.values(_dCache).forEach(o=>{ const ks=Object.keys(o); if(ks.length){ const m=ks.reduce((a,b)=>a>b?a:b); if(m>lastData) lastData=m; } });
   const today=fmtDate(new Date());
   const ref=(lastData&&lastData<=today)?lastData:today;
-  const out={};
+  const out={}, dormant={};
   rows.forEach(r=>{
     const p=r.p; if(p.disc||p.hidden) return;
     if((p.stock||0)>0) return;
@@ -16045,15 +16047,16 @@ function _stockoutCurrent(rows){
     if(recent>0) return;
     const dates=Object.keys(ser).filter(d=>ser[d]>0 && d<=ref).sort();
     const lastSale=dates.length?dates[dates.length-1]:null;
+    if(!lastSale || _soDays(lastSale, ref)>STOCKOUT_DORMANT_DAYS){ dormant[p.code]=true; return; }   // 오래 안 팔린 상품은 제외
     out[p.code]={lastSale, ref};
   });
-  return {out, ref, today};
+  return {out, dormant, ref, today};
 }
 // 하루 한 번(이상) 현재 재고 상태를 기록에 반영 — 발주 인사이트가 열릴 때 호출
 async function stockoutTrackRun(rows){
   try{
     if(!rows||!rows.length) return;
-    const {out:cur, today}=_stockoutCurrent(rows);
+    const {out:cur, dormant, today}=_stockoutCurrent(rows);
     const loaded=await cloudKvLoad('stockout_log');
     const log=(loaded&&typeof loaded==='object'&&!Array.isArray(loaded)&&loaded.items)?loaded:(_stockoutLog&&_stockoutLog.items?_stockoutLog:{v:1,lastRun:'',items:{}});
     let changed=false;
@@ -16079,6 +16082,7 @@ async function stockoutTrackRun(rows){
       if(cur[code]) return;                       // 아직 품절
       const r=byCode[code]; if(!r) return;        // 상품이 사라졌으면 그대로 둠
       if(r.p.disc||r.p.hidden){ it.open=null; changed=true; return; }   // 단종·숨김 처리된 상품은 추적 종료(구간 기록 안 함)
+      if(dormant[code]){ it.open=null; changed=true; return; }          // 오래 안 팔린 상품은 품절로 보지 않음(이미 열려 있던 구간도 제거)
       if((r.p.stock||0)<=0 && !r.p.disc) return; // 재고 0인데 최근 판매가 있었던 경우(업로드 지연 등) — 아직 닫지 않음
       let end=today;
       try{
@@ -16097,6 +16101,16 @@ async function stockoutTrackRun(rows){
     _stockoutLog=log;
   }catch(e){ console.warn('품절 이력 갱신 실패', e); }
 }
+// 재고는 업로드 때마다 덮어써져 과거 값이 남지 않으므로, 업로드가 끝난 직후(가장 최신 재고·판매가 들어온 시점)에도 바로 기록한다
+async function stockoutTrackAfterUpload(){
+  try{
+    _simRows=null;
+    const rows=await simEnsureRows();
+    await stockoutLoad();
+    await stockoutTrackRun(rows);
+    if(currentPage==='insight') renderInsight();
+  }catch(e){ console.warn('업로드 후 품절 기록 실패', e); }
+}
 function _soStatus(code){
   const it=_stockoutLog&&_stockoutLog.items&&_stockoutLog.items[code]; if(!it) return null;
   return it;
@@ -16112,7 +16126,7 @@ function insightRenderStockout(code){
   const it=_soStatus(code);
   const today=fmtDate(new Date());
   const lastRun=(_stockoutLog&&_stockoutLog.lastRun)||'';
-  const foot=`<div style="margin-top:8px;font-size:11px;line-height:1.55;color:var(--tx2);">품절 = 현재고 0 이면서 최근 3일 판매(일반+로켓그로스)가 0인 상태. 재고가 다시 채워지면 그 구간을 닫고, 다시 0이 되면 1일차부터 새로 기록합니다. 상품별 과거 재고 기록은 없어 <b>기록은 이 기능이 켜진 날(2026-10-07)부터</b> 쌓이고, 지금 품절인 상품의 시작일은 마지막 판매일로 추정합니다.${lastRun?` · 마지막 확인 ${lastRun}`:''}</div>`;
+  const foot=`<div style="margin-top:8px;font-size:11px;line-height:1.55;color:var(--tx2);">품절 = 현재고 0 이면서 최근 3일 판매(일반+로켓그로스)가 0인 상태. 마지막 판매가 60일 넘게 지났거나 판매 이력이 없는 재고 0 상품은 품절로 보지 않습니다. 재고가 다시 채워지면 그 구간을 닫고, 다시 0이 되면 1일차부터 새로 기록합니다. 재고 업로드가 끝날 때와 발주 인사이트를 열 때 기록합니다. 상품별 과거 재고 기록은 없어 <b>기록은 이 기능이 켜진 날(2026-10-07)부터</b> 쌓이고, 지금 품절인 상품의 시작일은 마지막 판매일로 추정합니다.${lastRun?` · 마지막 확인 ${lastRun}`:''}</div>`;
   if(!it || (!it.open && !(it.eps&&it.eps.length))){
     el.innerHTML=`<div style="font-size:12.5px;">✅ 기록된 품절이 없습니다.</div>${foot}`;
     return;
@@ -27379,6 +27393,7 @@ async function confirmUpload(){
       await addHistory({menu:'재고관리',type:'upload',code:'MULTI',name:`${_pendingRows.length}개`,desc:'재고 엑셀 업로드',before:'-',after:`${_pendingRows.length}건`,user:'업로드'});
       // DB에서 최신 데이터 다시 로드하여 완전 동기화
       await loadProducts(true);
+      stockoutTrackAfterUpload();   // 재고 업로드 직후 품절 이력 기록(백그라운드)
       renderInv();updateFloat();
       if(products.length>0&&salesSel.size===0)salesSel=new Set([products[0].id]);
     } else if(type==='sales'){
