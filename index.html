@@ -28733,14 +28733,15 @@ function _rpRenderPinned(){
       // 위/아래 순서 변경 버튼 (첫/마지막은 비활성)
       const mv=`<button class="rp-block-btn rp-pin-move" title="위로 이동" onclick="reportMovePin('${p.id}','${section}',-1)"${i===0?' disabled':''}>▲</button>`
              +`<button class="rp-block-btn rp-pin-move" title="아래로 이동" onclick="reportMovePin('${p.id}','${section}',1)"${i===visible.length-1?' disabled':''}>▼</button>`;
+      // 업무 고정/내용 고정 모두 같은 형태(내용 — 시간 선택)로 보이게 통일
+      const time=_rpPinFieldAt(p,'time',curDate);
+      const timeSelOpts=`<option value=""${!time?' selected':''}>시간 미설정</option>`+RP_TIME_OPTS.map(o=>`<option${time===o?' selected':''}>${o}</option>`).join('');
       if(p.type==='text'){
         const txt=_esc(_rpPinFieldAt(p,'text',curDate));
-        return `<div class="rp-pinned-item"><span class="rp-pin-editable" style="flex:1;" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span>
+        return `<div class="rp-pinned-item"><span style="flex:1;"><span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span> — <select class="rp-pin-time-sel" onchange="reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select></span>
           ${mv}<button class="rp-block-btn" title="고정 해제" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
       }
       const task=_esc(_rpPinFieldAt(p,'task',curDate));
-      const time=_rpPinFieldAt(p,'time',curDate);
-      const timeSelOpts=`<option value=""${!time?' selected':''}>시간 미설정</option>`+RP_TIME_OPTS.map(o=>`<option${time===o?' selected':''}>${o}</option>`).join('');
       return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b> — <select class="rp-pin-time-sel" onchange="reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select>${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
         ${mv}<button class="rp-block-btn" title="고정 해제" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
     }).join('');
