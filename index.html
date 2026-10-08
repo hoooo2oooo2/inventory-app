@@ -56,7 +56,7 @@ button,input,select,textarea{color:inherit;}
 select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);}
 select option{background:var(--bg);color:var(--tx);}
 :root{--pr:#3182F6;--prl:#EEF4FF;--bg:#fff;--bg2:#F7F8FA;--bd:rgba(0,0,0,0.08);--tx:#191919;--tx2:#888;}
-/* 다크모드는 마스터 계정 전용 — data-theme="dark"는 마스터가 토글을 눌렀을 때만 JS가 세팅함(아래 참고) */
+/* 다크모드는 로그인한 전체 계정이 토글로 사용 — data-theme="dark"는 토글을 눌렀을 때 JS가 세팅함(아래 참고) */
 :root[data-theme="dark"]{--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;color-scheme:dark;}
 body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
@@ -2226,7 +2226,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.08a</span>
   </div>
   <div class="tbr">
-    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="화면 테마 (이 컴퓨터에만 저장됩니다 · 마스터/전유현 전용)">
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="화면 테마 (이 컴퓨터에만 저장됩니다)">
       <span id="themeSunBtn">☀️</span><span id="themeMoonBtn">🌙</span>
     </div>
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -7538,14 +7538,11 @@ async function logout(){
 }
 
 // ══════════════════════════════════════════════
-// 다크모드 — 마스터 계정 전용 기능. 기기(브라우저)별 localStorage 저장, 껐다 켜도 유지됨.
-// 직원 계정은 토글 버튼 자체가 안 보이고, 이 기기에 저장된 값과 무관하게 항상 라이트모드로 강제됨.
-// ══════════════════════════════════════════════
-// 다크모드 사용 허용 계정: 마스터 + 전유현(이름/아이디에 '유현' 포함)
+// 다크모드 — 전체 계정 사용 가능. 기기(브라우저)별 localStorage 저장, 껐다 켜도 유지됨.
+// 로그인 전에는 토글이 안 보이고 라이트모드로 강제됨.// ══════════════════════════════════════════════
+// 다크모드 사용 허용: 로그인한 전체 계정(마스터·직원 모두)
 function _canUseDark(){
-  const u=window.__CURRENT_USER; if(!u) return false;
-  if(u.role==='master') return true;
-  return /유현/.test(String(u.name||''))||/유현/.test(String(u.username||''));
+  return !!window.__CURRENT_USER;
 }
 function _currentTheme(){
   return document.documentElement.getAttribute('data-theme')==='dark' ? 'dark' : 'light';
