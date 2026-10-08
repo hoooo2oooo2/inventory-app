@@ -1138,6 +1138,8 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .piv-table tbody td{padding:7px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);white-space:nowrap;text-align:center;}
 .piv-table tbody tr:hover{background:var(--bg2);}
 .piv-table tbody tr:last-child td{border-bottom:none;}
+.piv-table tbody tr.piv-click{cursor:pointer;}
+.piv-table tbody tr.piv-over{background:rgba(220,38,38,.08);}
 .piv-table td.piv-l{text-align:left;}
 .piv-table td.piv-r{text-align:right;font-variant-numeric:tabular-nums;}
 .piv-table td.piv-clip{max-width:200px;overflow:hidden;text-overflow:ellipsis;}
@@ -1145,14 +1147,31 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .piv-badge{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}
 .piv-badge.piv-ok{background:#DCFCE7;color:#15803D;}
 .piv-badge.piv-wait{background:#FEF3C7;color:#B45309;}
+.piv-badge.piv-late{background:#FEE2E2;color:#B91C1C;}
 .piv-badge.piv-type{background:#EFF6FF;color:#2563EB;}
+.piv-sub{display:block;font-size:10.5px;color:var(--tx2);margin-top:2px;}
 .piv-act{border:1px solid var(--bd);background:var(--bg);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--tx2);cursor:pointer;font-family:inherit;}
 .piv-act:hover{border-color:#3182F6;color:#3182F6;}
 .piv-act.piv-del:hover{border-color:#DC2626;color:#DC2626;}
 .piv-pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;flex-shrink:0;}
-#pivModal .modal{max-width:680px;}
+#pivModal .modal{max-width:920px;padding:22px 24px;}
+#pivCoModal .modal{max-width:760px;padding:22px 24px;}
+#pivModal .modal h3,#pivCoModal .modal h3{font-size:16px;margin-bottom:16px;}
 #pivModal textarea{resize:vertical;min-height:54px;font-family:inherit;}
-.piv-span2{grid-column:1 / -1;}
+#pivModal .field input:disabled,#pivCoModal .field input:disabled{background:var(--bg2);color:var(--tx2);opacity:.6;cursor:not-allowed;}
+.piv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 14px;}
+.piv-grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 14px;}
+.piv-span2{grid-column:span 2;}
+.piv-span3{grid-column:1 / -1;}
+.piv-hint{font-size:10.5px;color:var(--tx2);margin-top:3px;min-height:14px;}
+.piv-items{border:1px solid var(--bd);border-radius:9px;padding:8px 10px;background:var(--bg);}
+.piv-item-row{display:grid;grid-template-columns:1fr 110px 74px 104px 30px;gap:6px;align-items:center;margin-bottom:5px;}
+.piv-item-row.piv-item-head{font-size:10.5px;color:var(--tx2);font-weight:600;margin-bottom:3px;}
+.piv-item-row input{width:100%;padding:5px 7px;border:0.5px solid var(--bd);border-radius:6px;font-size:12px;background:var(--bg);color:var(--tx);outline:none;text-align:right;}
+.piv-item-name{font-size:12px;color:var(--tx);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.piv-item-name small{display:block;font-size:10px;color:var(--tx2);font-family:ui-monospace,monospace;}
+.piv-item-sub{text-align:right;font-size:12px;font-variant-numeric:tabular-nums;color:var(--tx);}
+.piv-items-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;}
 /* 우측하단 커스텀 알림 카드 (카톡 PC버전 느낌) */
 .ntf-card{position:fixed;right:20px;width:320px;background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px 16px;z-index:100050;font-family:inherit;transition:bottom .15s;}
 .ntf-card-title{font-size:12.5px;font-weight:700;color:var(--tx);display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
@@ -1161,6 +1180,8 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .ntf-card-actions{display:flex;justify-content:flex-end;gap:8px;}
 .ntf-card-btn{padding:6px 14px;border:none;border-radius:8px;background:#3182F6;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}
 .ntf-card-btn:hover{background:#1B64DA;}
+.ntf-card-btn.ntf-card-btn-sub{background:var(--bg2);color:var(--tx);border:1px solid var(--bd);}
+.ntf-card-btn.ntf-card-btn-sub:hover{background:var(--bd);}
 /* 🚀 로켓그로스 관리 */
 .rgm-wrap{max-width:1360px;margin:0 auto;}
 .rgm-tabcontent{height:calc(100vh - 140px);overflow-y:auto;padding:16px 18px;}
@@ -4031,7 +4052,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <thead><tr>
           <th>요청일자</th><th>담당자</th><th>등록번호</th><th>거래구분</th><th>상호</th><th>대표자명</th>
           <th>사업장</th><th>업태</th><th>종목</th><th>이메일</th><th>품목</th><th>금액</th><th>마진</th>
-          <th>영수처리</th><th>발행일자</th><th>발급여부</th><th>입금여부</th><th>비고</th><th style="width:92px;">관리</th>
+          <th>영수처리</th><th>발행일자</th><th>발급여부</th><th>입금여부</th><th>비고</th><th style="width:60px;">관리</th>
         </tr></thead>
         <tbody id="pivTbody"></tbody>
       </table>
@@ -4039,9 +4060,24 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="piv-pager" id="pivPager"></div>
   </div>
 
-  <!-- ─── 업체등록 (준비 중) ─── -->
+  <!-- ─── 업체등록 ─── -->
   <div class="piv-tab" id="pivTab-company">
-    <div class="cs-card"><div class="cs-empty">🏢 업체등록 화면은 준비 중입니다.</div></div>
+    <div class="piv-toolbar">
+      <div class="cs-title">🏢 업체등록 <span class="cs-count" id="pivCoCount">0</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input class="cs-search" id="pivCoSearch" placeholder="상호·등록번호·대표자 검색" autocomplete="off" oninput="pivCoSearchChanged()"/>
+        <button class="cs-add-btn" id="pivCoAddBtn" onclick="pivCoOpenModal()">＋ 업체 등록</button>
+      </div>
+    </div>
+    <div class="piv-table-scroll">
+      <table class="piv-table">
+        <thead><tr>
+          <th>종류</th><th>등록번호</th><th>상호명</th><th>대표자명</th><th>주소</th><th>업태</th><th>종목</th><th>이메일</th><th style="width:60px;">관리</th>
+        </tr></thead>
+        <tbody id="pivCoTbody"></tbody>
+      </table>
+    </div>
+    <div class="piv-pager" id="pivCoPager"></div>
   </div>
  </div>
 </div>
@@ -4050,31 +4086,69 @@ html.mob-native .lcr-det-val{font-size:15px;}
 <div class="modal-overlay" id="pivModal">
   <div class="modal">
     <h3 id="pivModalTitle">🧾 계산서 등록</h3>
-    <div class="field-grid">
+    <div class="piv-grid">
       <div class="field"><label>요청일자 *</label><input type="date" id="pivFReqDate"></div>
-      <div class="field"><label>담당자</label><input type="text" id="pivFStaff" autocomplete="off"></div>
+      <div class="field"><label>담당자</label><input type="text" id="pivFStaff" list="pivStaffList" autocomplete="off"><datalist id="pivStaffList"></datalist></div>
       <div class="field"><label>영수처리</label>
         <select id="pivFReceipt" onchange="pivReceiptChanged()"><option value="세금계산서">세금계산서</option><option value="현금영수증">현금영수증</option></select></div>
-      <div class="field"><label id="pivFRegNoLbl">등록번호 (사업자번호)</label><input type="text" id="pivFRegNo" autocomplete="off"></div>
-      <div class="field"><label>거래구분</label><input type="text" id="pivFTrade" list="pivTradeList" autocomplete="off"><datalist id="pivTradeList"></datalist></div>
+
+      <div class="field"><label id="pivFRegNoLbl">등록번호 (사업자번호)</label><input type="text" id="pivFRegNo" oninput="pivRegNoInput()" autocomplete="off"><div class="piv-hint" id="pivRegHint"></div></div>
       <div class="field"><label>상호 *</label><input type="text" id="pivFCompany" autocomplete="off"></div>
       <div class="field"><label>대표자명</label><input type="text" id="pivFCeo" autocomplete="off"></div>
-      <div class="field"><label>이메일</label><input type="text" id="pivFEmail" autocomplete="off"></div>
-      <div class="field piv-span2"><label>사업장</label><input type="text" id="pivFAddr" autocomplete="off"></div>
+
+      <div class="field"><label>거래구분</label><input type="text" id="pivFTrade" list="pivTradeList" autocomplete="off"><datalist id="pivTradeList"></datalist></div>
       <div class="field"><label>업태</label><input type="text" id="pivFBizType" autocomplete="off"></div>
       <div class="field"><label>종목</label><input type="text" id="pivFBizItem" autocomplete="off"></div>
-      <div class="field piv-span2"><label>품목</label><input type="text" id="pivFItem" autocomplete="off"></div>
-      <div class="field"><label>금액</label><input type="number" id="pivFAmount" min="0"></div>
-      <div class="field"><label>마진</label><input type="number" id="pivFMargin"></div>
+
+      <div class="field piv-span2"><label>사업장</label><input type="text" id="pivFAddr" autocomplete="off"></div>
+      <div class="field"><label>이메일</label><input type="text" id="pivFEmail" autocomplete="off"></div>
+
+      <div class="field piv-span3"><label>품목 (백데이터 제품 선택 · 수량)</label>
+        <div class="piv-items">
+          <div id="pivItemsBox"></div>
+          <div class="piv-items-foot">
+            <button type="button" class="cs-mini-btn" onclick="pivAddItem()">＋ 제품 추가</button>
+            <span style="font-size:12.5px;color:var(--tx);">단가 합계 <b id="pivCostTotal">0원</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field"><label>금액 (발행금액)</label><input type="number" id="pivFAmount" min="0" oninput="pivCalcMargin()"></div>
+      <div class="field"><label>단가 합계 (품목 기준)</label><input type="text" id="pivFCostView" readonly disabled></div>
+      <div class="field"><label>마진 (금액 − 단가 합계)</label><input type="number" id="pivFMargin"></div>
+
       <div class="field"><label>발행일자</label><input type="date" id="pivFIssueDate"></div>
       <div class="field"><label>발급여부</label>
         <select id="pivFIssued"><option value="미발급">미발급</option><option value="발급완료">발급완료</option></select></div>
       <div class="field"><label>입금여부</label>
-        <select id="pivFPaid"><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
+        <select id="pivFPaid" onchange="pivPaidChanged()"><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
+
+      <div class="field" id="pivDueWrap"><label>입금예정일 *</label><input type="date" id="pivFDueDate"></div>
       <div class="field piv-span2"><label>비고</label><textarea id="pivFNote"></textarea></div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('pivModal')">취소</button>
       <button class="btn btn-pr" id="pivSaveBtn" onclick="pivSave()">저장</button></div>
+  </div>
+</div>
+
+<!-- 업체 등록/수정 모달 -->
+<div class="modal-overlay" id="pivCoModal">
+  <div class="modal">
+    <h3 id="pivCoModalTitle">🏢 업체 등록</h3>
+    <div class="piv-grid2">
+      <div class="field"><label>종류 *</label>
+        <select id="pivCoKind" onchange="pivCoKindChanged()"><option value="사업자등록증">사업자등록증</option><option value="고유번호증">고유번호증</option><option value="현금영수증">현금영수증</option></select></div>
+      <div class="field"><label id="pivCoRegNoLbl">사업자등록번호 *</label><input type="text" id="pivCoRegNo" oninput="pivCoRegNoInput()" autocomplete="off"></div>
+      <div class="field"><label>상호명 *</label><input type="text" id="pivCoCompany" autocomplete="off"></div>
+      <div class="field"><label>대표자명</label><input type="text" id="pivCoCeo" autocomplete="off"></div>
+      <div class="field piv-span2"><label>주소</label><input type="text" id="pivCoAddr" autocomplete="off"></div>
+      <div class="field"><label>업태</label><input type="text" id="pivCoBizType" autocomplete="off"></div>
+      <div class="field"><label>종목</label><input type="text" id="pivCoBizItem" autocomplete="off"></div>
+      <div class="field piv-span2"><label>이메일</label><input type="text" id="pivCoEmail" autocomplete="off"></div>
+    </div>
+    <div class="piv-hint" id="pivCoKindHint" style="margin-top:6px;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('pivCoModal')">취소</button>
+      <button class="btn btn-pr" id="pivCoSaveBtn" onclick="pivCoSave()">저장</button></div>
   </div>
 </div>
 
@@ -7527,6 +7601,7 @@ function _revealApp(sess){
   applyPermissions();
   _initThemeForRole();
   logiStartNoticeWatch();   // 다른 PC 공지 등록 시 알림 받기 시작
+  try{ pivStartWatch(); }catch(e){ console.warn("pivStartWatch 실패", e); }   // 세금계산서 입금예정일 경과 알림(담당자 본인 건)
   taskStartWatch();   // 계정 간 업무 요청 실시간 알림 감시 시작
   _startAppData();   // 실제 로그인 성공(또는 저장된 세션 복원) 후에만 데이터 로드 시작 — 로그인 전 방문(봇/크롤러 포함)에는 Supabase egress 발생 안 함
 }
@@ -12912,9 +12987,9 @@ function pcSelectBd(code,name,price){
 // ── 상품 검색 팝업 — 단가계산기 상품코드 입력창 / 모바일 당근 제품명 공용 ──
 //  · 입력창은 작은 드롭다운 대신 큰 글씨 팝업(모바일은 전체화면)에서 검색 → 항목 탭하면 채워짐
 //  · 코드·상품명·별칭코드를 띄어쓰기 단위로 모두 포함하는 항목을 찾음 (대소문자 무시)
-let _bdpOnPick=null, _bdpShown=[], _bdpAllowFree=false;
+let _bdpOnPick=null, _bdpShown=[], _bdpAllowFree=false, _bdpKeepOpen=false;   // keepOpen: 여러 개 연속 선택(닫기는 ✕)
 function bdPickerOpen(opt){
-  _bdpOnPick=opt.onPick; _bdpAllowFree=!!opt.allowFree;
+  _bdpOnPick=opt.onPick; _bdpAllowFree=!!opt.allowFree; _bdpKeepOpen=!!opt.keepOpen;
   document.getElementById('bdpTitle').textContent=opt.title||'🔍 상품 검색';
   const inp=document.getElementById('bdpInput');
   inp.value=opt.initial||'';
@@ -12925,7 +13000,7 @@ function bdPickerOpen(opt){
 }
 function bdPickerClose(){
   document.getElementById('bdpModal').style.display='none';
-  _bdpOnPick=null;
+  _bdpOnPick=null; _bdpKeepOpen=false;
 }
 function bdpKey(e){
   if(e.key==='Escape'){ bdPickerClose(); return; }
@@ -12956,11 +13031,13 @@ function bdpRender(){
 }
 function bdpPick(i){
   const r=_bdpShown[i], cb=_bdpOnPick; if(!r||!cb) return;
-  bdPickerClose(); cb(r);
+  if(!_bdpKeepOpen) bdPickerClose();
+  cb(r);
 }
 function bdpPickFree(){
   const cb=_bdpOnPick, txt=document.getElementById('bdpInput').value.trim(); if(!cb||!txt) return;
-  bdPickerClose(); cb({free:true, code:txt, name:txt});
+  if(!_bdpKeepOpen) bdPickerClose();
+  cb({free:true, code:txt, name:txt});
 }
 function pcOpenPicker(){
   bdPickerOpen({title:'🔍 상품 검색 (코드·상품명)', allowFree:true, onPick:r=>{
@@ -32850,28 +32927,58 @@ async function tcbSaveDelete(id){
 // ══════════════════════════════════════════════
 // 📞 전화구매건 관리 (CX팀) — 하위메뉴: 전화구매건 / 세금계산서 발행 / 업체등록
 //   (기존 전화구매건 화면은 삭제됨 — work_calendar의 옛 po_* 행은 건드리지 않고 DB에 그대로 남아 있음)
-//   세금계산서 발행: cloudKv 'phone_invoices' 배열 공유. 멀티 PC 레이스 방지 위해 매 저장 전 최신본을 다시 불러와 병합.
-//   레코드: {id,reqDate,staff,regNo,tradeType,company,ceo,addr,bizType,bizItem,email,item,amount,margin,
-//            receiptType('세금계산서'|'현금영수증'),issueDate,issued('미발급'|'발급완료'),paid('미입금'|'입금완료'),note,createdAt,updatedAt}
+//   cloudKv 공유배열 2개. 멀티 PC 레이스 방지 위해 매 저장 전 최신본을 다시 불러와 병합(_pivMutate).
+//   · 'phone_invoices' 세금계산서 발행 건:
+//       {id,reqDate,staff,regNo,tradeType,company,ceo,addr,bizType,bizItem,email,
+//        items:[{code,name,qty,unitPrice}](등록시점 단가 스냅샷),costTotal,item(표시용 요약),amount,margin,
+//        receiptType('세금계산서'|'현금영수증'),issueDate,issued('미발급'|'발급완료'),paid('미입금'|'입금완료'),dueDate(미입금일 때 입금예정일),note,createdAt,updatedAt}
+//   · 'phone_companies' 업체등록: {id,kind('사업자등록증'|'고유번호증'|'현금영수증'),regNo,company,ceo,addr,bizType,bizItem,email,createdAt,updatedAt}
+//   입금예정일 경과 알림: 담당자(staff = 로그인 name/username) 접속 중 오전 9시·오후 4시 시간대마다 1회(pivWatchTick)
 // ══════════════════════════════════════════════
 const PIV_KEY = 'phone_invoices';
+const PIV_CO_KEY = 'phone_companies';
 const PIV_PAGE_SIZE = 30;
 const PIV_TRADE_TYPES = [];   // 거래구분 목록 — 확정되면 여기에 채움 (비어 있으면 자유 입력)
+const PIV_ALERT_HOURS = [9, 16];
 let _pivRows = [];
 let _pivLoaded = false;
+let _pivCoRows = [];
+let _pivCoLoaded = false;
 let _pivPage = 0;
+let _pivCoPage = 0;
 let _pivEditId = null;
+let _pivCoEditId = null;
 let _pivTab = 'invoice';
+let _pivItems = [];           // 팝업에서 편집 중인 품목 [{code,name,qty,unitPrice}]
+let _pivLegacyItem = '';      // items 없이 문자열로만 저장돼 있던 옛 품목(수정 시 보존)
+let _pivWatchStarted = false;
+let _pivCheckedSlot = '';     // 이번 접속에서 이미 판정한 알림 시간대
 
 function _pivCanEdit(){ return _permOf('phoneorder')==='edit'; }
-function _pivNewId(){ return 'piv_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _pivNewId(p){ return (p||'piv')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function _pivNum(n){ return (Math.round(Number(n)||0)).toLocaleString('ko-KR'); }
+function _pivYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _pivToday(){ return _pivYmd(new Date()); }
+function _pivDigits(s){ return String(s||'').replace(/\D/g,''); }
+// 입금예정일이 오늘보다 과거인 미입금 건의 경과일수 (아니면 null)
+function _pivOverdueDays(r){
+  if(r.paid==='입금완료' || !r.dueDate) return null;
+  const t = _pivToday();
+  if(r.dueDate >= t) return null;
+  return Math.round((new Date(t+'T00:00:00') - new Date(r.dueDate+'T00:00:00'))/86400000);
+}
+function _pivFmtBiz(v){
+  const d = _pivDigits(v);
+  if(!d || d.length>10) return v;
+  return d.slice(0,3) + (d.length>3 ? '-'+d.slice(3,5) : '') + (d.length>5 ? '-'+d.slice(5) : '');
+}
 
 function pivInit(){
   pivSwitchTab(_pivTab);
-  const add = document.getElementById('pivAddBtn');
-  if(add) add.style.display = _pivCanEdit() ? '' : 'none';
+  const canEdit = _pivCanEdit();
+  ['pivAddBtn','pivCoAddBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display = canEdit ? '' : 'none'; });
   if(!_pivLoaded) pivLoad(); else pivRender();
+  if(!_pivCoLoaded) pivCoLoad(); else pivCoRender();
 }
 function pivSwitchTab(t){
   _pivTab = t;
@@ -32886,17 +32993,29 @@ async function pivLoad(){
   _pivLoaded = true;
   pivRender();
 }
+async function pivCoLoad(){
+  const d = await cloudKvLoad(PIV_CO_KEY);
+  _pivCoRows = Array.isArray(d) ? d : [];
+  _pivCoLoaded = true;
+  pivCoRender();
+}
 
 // 최신본을 다시 불러온 뒤 fn으로 변경 → 저장. 불러오기 실패로 빈 목록을 덮어쓰는 사고 방지.
-async function _pivMutate(fn, opts){
-  const latest = await cloudKvLoad(PIV_KEY);
-  if(latest===null && _pivRows.length){ toast('저장 실패: 서버에서 최신 목록을 불러오지 못했습니다. 잠시 후 다시 시도하세요.'); return false; }
-  const next = fn(Array.isArray(latest) ? latest : []);
-  await cloudKvSave(PIV_KEY, next, opts||{});
-  _pivRows = next;
+// fn 안에서 throw new Error(메시지) 하면 저장 없이 메시지를 띄움.
+async function _pivMutate(key, fn, opts){
+  const isCo = key===PIV_CO_KEY;
+  const cur = isCo ? _pivCoRows : _pivRows;
+  const latest = await cloudKvLoad(key);
+  if(latest===null && cur.length){ toast('저장 실패: 서버에서 최신 목록을 불러오지 못했습니다. 잠시 후 다시 시도하세요.'); return false; }
+  let next;
+  try{ next = fn(Array.isArray(latest) ? latest : []); }
+  catch(e){ toast(e.message||'저장할 수 없습니다.'); return false; }
+  await cloudKvSave(key, next, opts||{});
+  if(isCo) _pivCoRows = next; else _pivRows = next;
   return true;
 }
 
+// ───────────────── 세금계산서 발행 목록 ─────────────────
 function _pivFiltered(){
   const q = (document.getElementById('pivSearch')?.value || '').trim().toLowerCase();
   return _pivRows.filter(r=>{
@@ -32927,7 +33046,12 @@ function pivRender(){
     const clip = (v)=>`<td class="piv-l piv-clip" title="${_esc(v||'')}">${_esc(v||'')}</td>`;
     tb.innerHTML = page.map(r=>{
       const m = Number(r.margin)||0;
-      return `<tr>
+      const od = _pivOverdueDays(r);
+      let paidCell;
+      if(r.paid==='입금완료') paidCell = '<span class="piv-badge piv-ok">입금완료</span>';
+      else if(od!=null) paidCell = `<span class="piv-badge piv-late">미입금 · ${od}일 경과</span><span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`;
+      else paidCell = `<span class="piv-badge piv-wait">미입금</span>${r.dueDate?`<span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`:''}`;
+      return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pivOpenModal('${r.id}')"`:''}>
         <td>${_esc(r.reqDate||'')}</td>
         <td>${_esc(r.staff||'')}</td>
         <td>${_esc(r.regNo||'')}</td>
@@ -32944,9 +33068,9 @@ function pivRender(){
         <td><span class="piv-badge piv-type">${_esc(r.receiptType||'')}</span></td>
         <td>${_esc(r.issueDate||'')}</td>
         <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':'piv-wait'}">${_esc(r.issued||'미발급')}</span></td>
-        <td><span class="piv-badge ${r.paid==='입금완료'?'piv-ok':'piv-wait'}">${_esc(r.paid||'미입금')}</span></td>
+        <td>${paidCell}</td>
         ${clip(r.note)}
-        <td>${canEdit ? `<button class="piv-act" onclick="pivOpenModal('${r.id}')">수정</button> <button class="piv-act piv-del" onclick="pivDelete('${r.id}')">삭제</button>` : ''}</td>
+        <td>${canEdit ? `<button class="piv-act piv-del" onclick="event.stopPropagation();pivDelete('${r.id}')">삭제</button>` : ''}</td>
       </tr>`;
     }).join('');
   }
@@ -32954,45 +33078,152 @@ function pivRender(){
   if(pg) pg.innerHTML = _rgmPagerHtml(_pivPage, PIV_PAGE_SIZE, list.length, 'pivGoto');
 }
 
+// ───────────────── 계산서 등록/수정 팝업 ─────────────────
+function _pivSet(k,v){ const el=document.getElementById('pivF'+k); if(el) el.value = v==null ? '' : v; }
+function _pivGet(k){ return document.getElementById('pivF'+k).value.trim(); }
+
+// 현금영수증이면 사업장·업태·종목·이메일은 빈칸 고정
+function pivApplyLock(){
+  const cash = document.getElementById('pivFReceipt').value==='현금영수증';
+  ['Addr','BizType','BizItem','Email'].forEach(k=>{
+    const el = document.getElementById('pivF'+k);
+    if(cash) el.value = '';
+    el.disabled = cash;
+  });
+}
 function pivReceiptChanged(){
   const t = document.getElementById('pivFReceipt').value;
   document.getElementById('pivFRegNoLbl').textContent = t==='현금영수증' ? '등록번호 (현금영수증번호)' : '등록번호 (사업자번호)';
+  pivApplyLock();
+  pivApplyCompany(true);
 }
+function pivPaidChanged(){
+  const unpaid = document.getElementById('pivFPaid').value==='미입금';
+  document.getElementById('pivDueWrap').style.display = unpaid ? '' : 'none';
+}
+function _pivFindCompany(regNo){
+  const d = _pivDigits(regNo);
+  if(d.length<5) return null;
+  return _pivCoRows.find(c=>_pivDigits(c.regNo)===d) || null;
+}
+// 업체등록에 등록된 번호면 상호·대표자·사업장·업태·종목·이메일 자동 반영
+function pivApplyCompany(silent){
+  const hint = document.getElementById('pivRegHint');
+  const raw = _pivGet('RegNo');
+  const c = _pivFindCompany(raw);
+  if(!c){
+    hint.textContent = (_pivDigits(raw).length>=10 && !silent) ? '업체등록에 없는 번호입니다 — 직접 입력하거나 업체등록 탭에서 먼저 등록하세요.' : '';
+    return;
+  }
+  _pivSet('Company', c.company); _pivSet('Ceo', c.ceo); _pivSet('Addr', c.addr);
+  _pivSet('BizType', c.bizType); _pivSet('BizItem', c.bizItem); _pivSet('Email', c.email);
+  pivApplyLock();
+  hint.textContent = `✅ 업체등록 정보 자동 반영 (${c.kind})`;
+}
+function pivRegNoInput(){
+  const el = document.getElementById('pivFRegNo');
+  if(document.getElementById('pivFReceipt').value==='세금계산서'){
+    const f = _pivFmtBiz(el.value);
+    if(f!==el.value) el.value = f;
+  }
+  pivApplyCompany(false);
+}
+
+// 품목: 백데이터 제품 다중 선택 + 수량. 단가는 선택 시점 스냅샷(이후 백데이터 단가가 바뀌어도 기존 건은 유지)
+function pivAddItem(){
+  bdPickerOpen({ title:'🔍 제품 선택 (여러 개 선택 가능 · 다 고르면 ✕ 로 닫기)', allowFree:true, keepOpen:true, onPick:r=>{
+    const code = r.code||'', name = r.name||r.code||'';
+    const ex = _pivItems.find(x=>x.code===code && x.name===name);
+    if(ex) ex.qty += 1;
+    else _pivItems.push({ code, name, qty:1, unitPrice: r.price!=null ? Number(r.price) : 0 });
+    pivRenderItems(); pivUpdateCost();
+    toast('추가: '+name);
+  }});
+}
+function pivRenderItems(){
+  const box = document.getElementById('pivItemsBox');
+  if(!_pivItems.length){
+    box.innerHTML = `<div class="piv-hint" style="padding:6px 2px;">${_pivLegacyItem ? '기존 입력 품목: '+_esc(_pivLegacyItem)+' (제품을 추가하면 대체됩니다)' : '“＋ 제품 추가”로 백데이터 제품을 선택하세요.'}</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="piv-item-row piv-item-head"><span>제품</span><span style="text-align:right;">단가</span><span style="text-align:right;">수량</span><span style="text-align:right;">소계</span><span></span></div>`
+    + _pivItems.map((it,i)=>`<div class="piv-item-row">
+      <div class="piv-item-name" title="${_esc(it.name)}">${_esc(it.name)}<small>${_esc(it.code)}</small></div>
+      <input type="number" min="0" value="${it.unitPrice}" oninput="pivItemChg(${i},'unitPrice',this.value)">
+      <input type="number" min="1" value="${it.qty}" oninput="pivItemChg(${i},'qty',this.value)">
+      <div class="piv-item-sub" id="pivItemSub${i}">${_pivNum(it.unitPrice*it.qty)}</div>
+      <button type="button" class="piv-act piv-del" onclick="pivItemDel(${i})">✕</button>
+    </div>`).join('');
+}
+function pivItemChg(i, k, v){
+  const it = _pivItems[i]; if(!it) return;
+  it[k] = Math.max(0, Number(v)||0);
+  const sub = document.getElementById('pivItemSub'+i); if(sub) sub.textContent = _pivNum(it.unitPrice*it.qty);
+  pivUpdateCost();
+}
+function pivItemDel(i){ _pivItems.splice(i,1); pivRenderItems(); pivUpdateCost(); }
+function _pivCost(){ return Math.round(_pivItems.reduce((s,it)=>s+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0)); }
+function pivUpdateCost(){
+  const c = _pivCost();
+  document.getElementById('pivCostTotal').textContent = _pivNum(c)+'원';
+  document.getElementById('pivFCostView').value = _pivItems.length ? _pivNum(c)+'원' : '';
+  pivCalcMargin();
+}
+// 품목이 있을 때만 마진 = 금액 − 단가 합계 자동 반영 (품목 없으면 직접 입력값 유지)
+function pivCalcMargin(){
+  if(!_pivItems.length) return;
+  const a = document.getElementById('pivFAmount').value;
+  _pivSet('Margin', a==='' ? '' : Math.round(Number(a) - _pivCost()));
+}
+
 function pivOpenModal(id){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   _pivEditId = id || null;
   const r = id ? (_pivRows.find(x=>x.id===id) || {}) : {};
   const u = window.__CURRENT_USER || {};
-  const set = (k,v)=>{ document.getElementById('pivF'+k).value = v==null ? '' : v; };
   document.getElementById('pivModalTitle').textContent = id ? '🧾 계산서 수정' : '🧾 계산서 등록';
   document.getElementById('pivTradeList').innerHTML = PIV_TRADE_TYPES.map(t=>`<option value="${_esc(t)}"></option>`).join('');
-  set('ReqDate', r.reqDate || new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10));
-  set('Staff', id ? r.staff : (u.name || u.username || ''));
-  set('Receipt', r.receiptType || '세금계산서');
-  set('RegNo', r.regNo); set('Trade', r.tradeType); set('Company', r.company); set('Ceo', r.ceo);
-  set('Email', r.email); set('Addr', r.addr); set('BizType', r.bizType); set('BizItem', r.bizItem);
-  set('Item', r.item); set('Amount', r.amount); set('Margin', r.margin); set('IssueDate', r.issueDate);
-  set('Issued', r.issued || '미발급'); set('Paid', r.paid || '미입금'); set('Note', r.note);
-  pivReceiptChanged();
+  const staffs = [...new Set([u.name, u.username, ..._pivRows.map(x=>x.staff)].filter(Boolean))];
+  document.getElementById('pivStaffList').innerHTML = staffs.map(t=>`<option value="${_esc(t)}"></option>`).join('');
+  _pivSet('ReqDate', r.reqDate || _pivToday());
+  _pivSet('Staff', id ? r.staff : (u.name || u.username || ''));
+  _pivSet('Receipt', r.receiptType || '세금계산서');
+  _pivSet('RegNo', r.regNo); _pivSet('Trade', r.tradeType); _pivSet('Company', r.company); _pivSet('Ceo', r.ceo);
+  _pivSet('Email', r.email); _pivSet('Addr', r.addr); _pivSet('BizType', r.bizType); _pivSet('BizItem', r.bizItem);
+  _pivSet('Amount', r.amount); _pivSet('Margin', r.margin); _pivSet('IssueDate', r.issueDate);
+  _pivSet('Issued', r.issued || '미발급'); _pivSet('Paid', r.paid || '미입금'); _pivSet('DueDate', r.dueDate); _pivSet('Note', r.note);
+  _pivItems = (r.items||[]).map(x=>({...x}));
+  _pivLegacyItem = (!_pivItems.length && r.item) ? r.item : '';
+  document.getElementById('pivRegHint').textContent = '';
+  document.getElementById('pivFRegNoLbl').textContent = (r.receiptType==='현금영수증') ? '등록번호 (현금영수증번호)' : '등록번호 (사업자번호)';
+  pivApplyLock();
+  pivPaidChanged();
+  pivRenderItems();
+  document.getElementById('pivCostTotal').textContent = _pivNum(_pivCost())+'원';
+  document.getElementById('pivFCostView').value = _pivItems.length ? _pivNum(_pivCost())+'원' : '';
   openModal('pivModal');
-  setTimeout(()=>document.getElementById('pivFCompany')?.focus(), 100);
+  if(!_pivCoLoaded) pivCoLoad();   // 자동 반영에 쓸 업체등록 목록 확보
+  setTimeout(()=>document.getElementById(id?'pivFCompany':'pivFRegNo')?.focus(), 100);
 }
 async function pivSave(){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
-  const g = k=>document.getElementById('pivF'+k).value.trim();
+  const g = _pivGet;
   const rec = {
     reqDate:g('ReqDate'), staff:g('Staff'), regNo:g('RegNo'), tradeType:g('Trade'), company:g('Company'), ceo:g('Ceo'),
-    addr:g('Addr'), bizType:g('BizType'), bizItem:g('BizItem'), email:g('Email'), item:g('Item'),
+    addr:g('Addr'), bizType:g('BizType'), bizItem:g('BizItem'), email:g('Email'),
+    items:_pivItems.map(x=>({code:x.code,name:x.name,qty:Number(x.qty)||0,unitPrice:Number(x.unitPrice)||0})), costTotal:_pivCost(),
     amount:Number(g('Amount'))||0, margin:Number(g('Margin'))||0, receiptType:g('Receipt'),
-    issueDate:g('IssueDate'), issued:g('Issued'), paid:g('Paid'), note:g('Note')
+    issueDate:g('IssueDate'), issued:g('Issued'), paid:g('Paid'), dueDate:g('DueDate'), note:g('Note')
   };
+  rec.item = rec.items.length ? rec.items.map(x=>`${x.name} ×${x.qty}`).join(', ') : _pivLegacyItem;
   if(!rec.reqDate){ toast('요청일자를 입력하세요.'); return; }
   if(!rec.company){ toast('상호를 입력하세요.'); return; }
+  if(rec.paid==='미입금' && !rec.dueDate){ toast('미입금 건은 입금예정일을 지정해주세요.'); return; }
   const btn = document.getElementById('pivSaveBtn');
   btn.disabled = true; btn.textContent = '저장 중…';
   const editId = _pivEditId;
   const now = new Date().toISOString();
-  const ok = await _pivMutate(list=>{
+  const ok = await _pivMutate(PIV_KEY, list=>{
     const i = editId ? list.findIndex(x=>x.id===editId) : -1;
     if(i>=0) list[i] = { ...list[i], ...rec, updatedAt:now };
     else list.push({ ...rec, id: editId || _pivNewId(), createdAt:now });
@@ -33008,21 +33239,180 @@ function pivDelete(id){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   const r = _pivRows.find(x=>x.id===id); if(!r) return;
   _openDelPw(`계산서 발행 건 삭제 — ${r.company||''} (${r.reqDate||''})`, async ()=>{
-    const ok = await _pivMutate(list=>list.filter(x=>x.id!==id), {force:true});
+    const ok = await _pivMutate(PIV_KEY, list=>list.filter(x=>x.id!==id), {force:true});
     if(ok){ pivRender(); toast('삭제되었습니다.'); }
   });
 }
 
+// ───────────────── 업체등록 ─────────────────
+function _pivCoFiltered(){
+  const q = (document.getElementById('pivCoSearch')?.value || '').trim().toLowerCase();
+  return _pivCoRows.filter(r=>{
+    if(!q) return true;
+    return [r.company,r.regNo,r.ceo,r.kind].map(x=>String(x||'').toLowerCase()).join(' ').includes(q)
+      || (_pivDigits(q) && _pivDigits(r.regNo).includes(_pivDigits(q)));
+  }).sort((a,b)=> String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+}
+function pivCoSearchChanged(){ _pivCoPage = 0; pivCoRender(); }
+function pivCoGoto(p){
+  const maxP = Math.max(1, Math.ceil(_pivCoFiltered().length/PIV_PAGE_SIZE));
+  _pivCoPage = Math.min(Math.max(0,p), maxP-1);
+  pivCoRender();
+}
+function pivCoRender(){
+  const list = _pivCoFiltered();
+  const maxP = Math.max(1, Math.ceil(list.length/PIV_PAGE_SIZE));
+  if(_pivCoPage > maxP-1) _pivCoPage = maxP-1;
+  const cnt = document.getElementById('pivCoCount'); if(cnt) cnt.textContent = list.length;
+  const tb = document.getElementById('pivCoTbody'); if(!tb) return;
+  const canEdit = _pivCanEdit();
+  const page = list.slice(_pivCoPage*PIV_PAGE_SIZE, (_pivCoPage+1)*PIV_PAGE_SIZE);
+  if(!_pivCoLoaded){
+    tb.innerHTML = '<tr><td colspan="9" class="cs-empty">불러오는 중…</td></tr>';
+  } else if(!page.length){
+    tb.innerHTML = `<tr><td colspan="9" class="cs-empty">${_pivCoRows.length ? '조건에 맞는 업체가 없습니다.' : '등록된 업체가 없습니다. 우측 상단 “＋ 업체 등록”으로 추가하세요.'}</td></tr>`;
+  } else {
+    const clip = (v)=>`<td class="piv-l piv-clip" title="${_esc(v||'')}">${_esc(v||'')}</td>`;
+    tb.innerHTML = page.map(r=>`<tr class="${canEdit?'piv-click':''}" ${canEdit?`onclick="pivCoOpenModal('${r.id}')"`:''}>
+      <td><span class="piv-badge piv-type">${_esc(r.kind||'')}</span></td>
+      <td>${_esc(r.regNo||'')}</td>
+      <td class="piv-l" style="font-weight:600;">${_esc(r.company||'')}</td>
+      <td>${_esc(r.ceo||'')}</td>
+      ${clip(r.addr)}
+      <td>${_esc(r.bizType||'')}</td>
+      <td>${_esc(r.bizItem||'')}</td>
+      <td class="piv-l">${_esc(r.email||'')}</td>
+      <td>${canEdit ? `<button class="piv-act piv-del" onclick="event.stopPropagation();pivCoDelete('${r.id}')">삭제</button>` : ''}</td>
+    </tr>`).join('');
+  }
+  const pg = document.getElementById('pivCoPager');
+  if(pg) pg.innerHTML = _rgmPagerHtml(_pivCoPage, PIV_PAGE_SIZE, list.length, 'pivCoGoto');
+}
+
+function _pivCoSet(k,v){ const el=document.getElementById('pivCo'+k); if(el) el.value = v==null ? '' : v; }
+function _pivCoGet(k){ return document.getElementById('pivCo'+k).value.trim(); }
+// 고유번호증: 업태·종목 빈칸 고정 / 현금영수증: 주소·업태·종목·이메일 빈칸 고정
+function pivCoKindChanged(){
+  const kind = document.getElementById('pivCoKind').value;
+  const locked = kind==='현금영수증' ? ['Addr','BizType','BizItem','Email'] : (kind==='고유번호증' ? ['BizType','BizItem'] : []);
+  ['Addr','BizType','BizItem','Email'].forEach(k=>{
+    const el = document.getElementById('pivCo'+k);
+    const lock = locked.includes(k);
+    if(lock) el.value = '';
+    el.disabled = lock;
+  });
+  document.getElementById('pivCoRegNoLbl').textContent = (kind==='현금영수증' ? '현금영수증번호' : kind==='고유번호증' ? '고유번호' : '사업자등록번호') + ' *';
+  document.getElementById('pivCoKindHint').textContent = kind==='현금영수증' ? '현금영수증은 주소·업태·종목·이메일이 빈칸으로 고정됩니다.' : kind==='고유번호증' ? '고유번호증은 업태·종목이 빈칸으로 고정됩니다.' : '';
+  pivCoRegNoInput();
+}
+function pivCoRegNoInput(){
+  const el = document.getElementById('pivCoRegNo');
+  if(document.getElementById('pivCoKind').value!=='현금영수증'){
+    const f = _pivFmtBiz(el.value);
+    if(f!==el.value) el.value = f;
+  }
+}
+function pivCoOpenModal(id){
+  if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  _pivCoEditId = id || null;
+  const r = id ? (_pivCoRows.find(x=>x.id===id) || {}) : {};
+  document.getElementById('pivCoModalTitle').textContent = id ? '🏢 업체 수정' : '🏢 업체 등록';
+  _pivCoSet('Kind', r.kind || '사업자등록증');
+  _pivCoSet('RegNo', r.regNo); _pivCoSet('Company', r.company); _pivCoSet('Ceo', r.ceo); _pivCoSet('Addr', r.addr);
+  _pivCoSet('BizType', r.bizType); _pivCoSet('BizItem', r.bizItem); _pivCoSet('Email', r.email);
+  pivCoKindChanged();
+  openModal('pivCoModal');
+  setTimeout(()=>document.getElementById('pivCoRegNo')?.focus(), 100);
+}
+async function pivCoSave(){
+  if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  const g = _pivCoGet;
+  const rec = { kind:g('Kind'), regNo:g('RegNo'), company:g('Company'), ceo:g('Ceo'), addr:g('Addr'), bizType:g('BizType'), bizItem:g('BizItem'), email:g('Email') };
+  if(!rec.regNo){ toast('등록번호를 입력하세요.'); return; }
+  if(!rec.company){ toast('상호명을 입력하세요.'); return; }
+  const btn = document.getElementById('pivCoSaveBtn');
+  btn.disabled = true; btn.textContent = '저장 중…';
+  const editId = _pivCoEditId;
+  const now = new Date().toISOString();
+  const ok = await _pivMutate(PIV_CO_KEY, list=>{
+    const d = _pivDigits(rec.regNo);
+    if(list.some(x=>x.id!==editId && _pivDigits(x.regNo)===d)) throw new Error('이미 등록된 등록번호입니다.');
+    const i = editId ? list.findIndex(x=>x.id===editId) : -1;
+    if(i>=0) list[i] = { ...list[i], ...rec, updatedAt:now };
+    else list.push({ ...rec, id: editId || _pivNewId('pco'), createdAt:now });
+    return list;
+  });
+  btn.disabled = false; btn.textContent = '저장';
+  if(!ok) return;
+  closeModal('pivCoModal');
+  pivCoRender();
+  toast(editId ? '수정되었습니다.' : '등록되었습니다.');
+}
+function pivCoDelete(id){
+  if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  const r = _pivCoRows.find(x=>x.id===id); if(!r) return;
+  _openDelPw(`업체 삭제 — ${r.company||''} (${r.regNo||''})`, async ()=>{
+    const ok = await _pivMutate(PIV_CO_KEY, list=>list.filter(x=>x.id!==id), {force:true});
+    if(ok){ pivCoRender(); toast('삭제되었습니다.'); }
+  });
+}
+
+// ───────────────── 입금예정일 경과 알림 (담당자 본인 건만) ─────────────────
+//  접속 시 + 접속 유지 중 오전 9시·오후 4시 시간대마다 한 번. 같은 시간대는 새로고침/재로그인해도 다시 안 띄움(localStorage).
+//  시간대 판정 때만 네트워크 조회(시간대당 1회) — 주기 폴링 아님.
+function _pivSlotKey(now){
+  const d = new Date(now), h = d.getHours();
+  if(h>=PIV_ALERT_HOURS[1]) return _pivYmd(d)+'@'+PIV_ALERT_HOURS[1];
+  if(h>=PIV_ALERT_HOURS[0]) return _pivYmd(d)+'@'+PIV_ALERT_HOURS[0];
+  return _pivYmd(new Date(d.getTime()-86400000))+'@'+PIV_ALERT_HOURS[1];
+}
+function _pivSlotStoreKey(){ const u=window.__CURRENT_USER||{}; return 'piv_alert_slot_'+(u.username||u.name||'anon'); }
+function _pivIsMine(r){
+  const u = window.__CURRENT_USER; if(!u) return false;
+  const s = String(r.staff||'').trim();
+  return !!s && (s===String(u.name||'').trim() || s===String(u.username||'').trim());
+}
+function pivStartWatch(){
+  if(_pivWatchStarted) return;
+  const u = window.__CURRENT_USER; if(!u) return;
+  if(_permOf('phoneorder')==='none') return;
+  _pivWatchStarted = true;
+  pivWatchTick();
+  setInterval(pivWatchTick, 60*1000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pivWatchTick(); });
+}
+async function pivWatchTick(){
+  if(document.hidden || !window.__CURRENT_USER) return;
+  const slot = _pivSlotKey(Date.now());
+  if(_pivCheckedSlot===slot) return;
+  _pivCheckedSlot = slot;
+  let shown = ''; try{ shown = localStorage.getItem(_pivSlotStoreKey()) || ''; }catch{}
+  if(shown===slot) return;
+  const d = await cloudKvLoad(PIV_KEY);
+  if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); }
+  const mine = _pivRows.filter(r=>_pivIsMine(r) && _pivOverdueDays(r)!=null)
+    .sort((a,b)=>_pivOverdueDays(b)-_pivOverdueDays(a));
+  if(!mine.length) return;
+  try{ localStorage.setItem(_pivSlotStoreKey(), slot); }catch{}
+  const lines = mine.slice(0,5).map(r=>`· ${r.company||''} · ${_pivNum(r.amount)}원 · 입금예정일 ${r.dueDate} (${_pivOverdueDays(r)}일 경과)`);
+  if(mine.length>5) lines.push(`외 ${mine.length-5}건`);
+  ntfShow('piv_overdue', '🧾 입금예정일 경과 알림',
+    lines.join('\n')+'\n\n입금예정일이 지났습니다. 업체 문의 바랍니다.',
+    ()=>{ _pivTab='invoice'; goMenu('phoneorder'); },
+    { confirmLabel:'바로가기', closeLabel:'닫기' });
+}
+
 // ── 우측하단 커스텀 알림 카드 (범용 헬퍼 — 세금계산서 발행 알림 등 다른 기능에서도 재사용) ──
 let _ntfCards = [];
-function ntfShow(id, title, bodyText, onConfirm){
+function ntfShow(id, title, bodyText, onConfirm, opts){
+  opts = opts || {};
   ntfDismiss(id);
   const el = document.createElement('div');
   el.className = 'ntf-card';
   el.id = 'ntf-'+id;
   el.innerHTML = `<div class="ntf-card-title"><span>${_esc(title)}</span><button class="ntf-card-close" onclick="ntfDismiss('${id}')">✕</button></div>
     <div class="ntf-card-body">${_esc(bodyText)}</div>
-    <div class="ntf-card-actions"><button class="ntf-card-btn" id="ntf-ok-${id}">확인</button></div>`;
+    <div class="ntf-card-actions">${opts.closeLabel?`<button class="ntf-card-btn ntf-card-btn-sub" onclick="ntfDismiss('${id}')">${_esc(opts.closeLabel)}</button>`:''}<button class="ntf-card-btn" id="ntf-ok-${id}">${_esc(opts.confirmLabel||'확인')}</button></div>`;
   document.body.appendChild(el);
   document.getElementById('ntf-ok-'+id).onclick = ()=>{ ntfDismiss(id); if(onConfirm) onConfirm(); };
   _ntfCards = _ntfCards.filter(c=>c!==id);
