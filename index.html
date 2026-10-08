@@ -208,7 +208,10 @@ body.design-scope #collabManager .postit-foot{margin-top:2px;}
 .rp-pin-editable{border-radius:3px;outline:none;min-width:10px;}
 .rp-pin-editable:hover{background:rgba(0,0,0,.06);}
 .rp-pin-editable:focus{background:#fff8dc;box-shadow:0 0 0 1.5px #FCD34D;}
-.rp-pin-time-sel{font-size:11.5px;font-family:inherit;color:#1A1A1A;background:#fff;color-scheme:light;border:1px solid #FCD34D;border-radius:3px;padding:1px 3px;outline:none;}
+.rp-pin-time-sel{font:inherit;color:inherit;background:transparent;border:none;border-radius:0;padding:0;margin:0;outline:none;cursor:pointer;-webkit-appearance:none;-moz-appearance:none;appearance:none;field-sizing:content;max-width:100%;}
+.rp-pin-time-sel.rp-pin-time-empty{color:#A8946A;}
+.rp-pin-time-sel:hover,.rp-pin-time-sel:focus{text-decoration:underline dotted;text-underline-offset:3px;}
+.rp-pin-time-sel option{color:#1A1A1A;background:#fff;}
 .rp-body{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);border-radius:0 0 12px 12px;}
 /* 에디터 — 텍스트 라인 + 블럭 혼합 */
 .rp-editor{min-height:80px;padding:6px 10px 10px;outline:none;}
@@ -28738,11 +28741,11 @@ function _rpRenderPinned(){
       const timeSelOpts=`<option value=""${!time?' selected':''}>시간 미설정</option>`+RP_TIME_OPTS.map(o=>`<option${time===o?' selected':''}>${o}</option>`).join('');
       if(p.type==='text'){
         const txt=_esc(_rpPinFieldAt(p,'text',curDate));
-        return `<div class="rp-pinned-item"><span style="flex:1;"><span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span> — <select class="rp-pin-time-sel" onchange="reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select></span>
+        return `<div class="rp-pinned-item"><span style="flex:1;"><span class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','text',this)">${txt}</span> — <select class="rp-pin-time-sel${time?'':' rp-pin-time-empty'}" onchange="this.classList.toggle('rp-pin-time-empty',!this.value);reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select></span>
           ${mv}<button class="rp-block-btn" title="고정 해제" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
       }
       const task=_esc(_rpPinFieldAt(p,'task',curDate));
-      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b> — <select class="rp-pin-time-sel" onchange="reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select>${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
+      return `<div class="rp-pinned-item"><span style="flex:1;">⏱ <b class="rp-pin-editable" contenteditable="true" onblur="reportEditPin('${p.id}','${section}','task',this)">${task}</b> — <select class="rp-pin-time-sel${time?'':' rp-pin-time-empty'}" onchange="this.classList.toggle('rp-pin-time-empty',!this.value);reportEditPin('${p.id}','${section}','time',this)">${timeSelOpts}</select>${p.linked_title?` <span style="color:#7C3AED;">🔗${_esc(p.linked_title)}</span>`:''}</span>
         ${mv}<button class="rp-block-btn" title="고정 해제" onclick="reportDelPinById('${p.id}','${section}')">✕</button></div>`;
     }).join('');
   });
