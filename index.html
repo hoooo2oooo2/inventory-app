@@ -17032,6 +17032,12 @@ function shipFreeshipFee(freeship, salePrice){
   const th=Number(freeship);
   return (salePrice||0) >= th ? 3000 : 0;
 }
+// 택배비 설정 한 건(cfg={fee,perUnit,freeship})과 판매가·수량으로 실제 부과할 배송비를 계산 (recalc·업로드 공용)
+//  수량비례(perUnit) 체크 시 무료배송기준 옵션(대형/이형 등)과 관계없이 계산된 배송비 × 구매수량
+function shipCfgFee(cfg, salePrice, qty){
+  const base = cfg.freeship ? shipFreeshipFee(cfg.freeship, salePrice) : (cfg.fee||0);
+  return cfg.perUnit ? base*(qty||0) : base;
+}
 // 관리 화면 표/모달에서 판매가와 무관하게 보여줄 대표 금액 (가격기준형은 기존과 동일하게 3,000원으로 표시)
 function shipFreeshipDisplayFee(freeship){
   return (freeship in SHIP_FREESHIP_FLAT) ? SHIP_FREESHIP_FLAT[freeship] : 3000;
@@ -17146,7 +17152,7 @@ function renderShipTable(){
     <td style="font-size:11px;">${r.item_no}</td>
     <td style="font-size:11px;">${r.item_name||''}</td>
     <td style="text-align:right;font-weight:600;">${r.freeship? shipFreeshipDisplayFee(r.freeship).toLocaleString()+'원' : (r.fee||0).toLocaleString()+'원'}</td>
-    <td style="text-align:center;"><input type="checkbox" ${r.perUnit?'checked':''} ${r.freeship?'disabled':''} onchange="toggleShipPerUnit(${r.id},this.checked)" title="체크 시 구매수량×배송비"></td>
+    <td style="text-align:center;"><input type="checkbox" ${r.perUnit?'checked':''} onchange="toggleShipPerUnit(${r.id},this.checked)" title="체크 시 구매수량×배송비"></td>
     <td style="text-align:center;">
       <select style="font-size:11px;padding:2px 4px;" onchange="toggleShipFreeship(${r.id},this.value)" title="선택 시 판매가 기준 또는 상품 유형별 고정 택배비 부과">
         <option value="" ${!r.freeship?'selected':''}>미사용</option>
@@ -17168,7 +17174,6 @@ function renderShipTable(){
 async function toggleShipPerUnit(id, checked){
   const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
   r.perUnit=checked;
-  if(checked) r.freeship='';
   await _shipPersist();
   const n=await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:r.perUnit, freeship:r.freeship});
   renderShipTable();
@@ -17178,7 +17183,7 @@ async function toggleShipPerUnit(id, checked){
 async function toggleShipFreeship(id, value){
   const r=_shipData.find(x=>String(x.id)===String(id)); if(!r) return;
   r.freeship=value;
-  if(value){ r.perUnit=false; r.fee=shipFreeshipDisplayFee(value); }
+  if(value){ r.fee=shipFreeshipDisplayFee(value); }
   await _shipPersist();
   const n=await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:r.perUnit, freeship:r.freeship});
   renderShipTable();
@@ -17229,11 +17234,11 @@ async function saveShipModal(){
     let perUnit=false;
     if(id){
       const r=_shipData.find(x=>String(x.id)===String(id));
-      if(r){ r.channel=channel; r.item_no=item_no; r.item_name=item_name; r.fee=fee; r.freeship=freeship; perUnit = freeship ? false : !!r.perUnit; r.perUnit=perUnit; }
+      if(r){ r.channel=channel; r.item_no=item_no; r.item_name=item_name; r.fee=fee; r.freeship=freeship; perUnit = !!r.perUnit; }
     } else {
       // 같은 (판매처+상품번호) 있으면 덮어쓰기
       const ex=_shipData.find(x=>x.channel===channel&&x.item_no===item_no);
-      if(ex){ ex.item_name=item_name; ex.fee=fee; ex.freeship=freeship; perUnit = freeship ? false : !!ex.perUnit; ex.perUnit=perUnit; }
+      if(ex){ ex.item_name=item_name; ex.fee=fee; ex.freeship=freeship; perUnit = !!ex.perUnit; }
       else _shipData.push({id:Date.now()+Math.floor(Math.random()*1000),channel,item_no,item_name,fee,perUnit:false,freeship});
     }
     await _shipPersist();
@@ -17316,10 +17321,7 @@ async function recalcShippingForKey(channel,item_no,feeObj){
     for(const r of rows){
       let newFee;
       const f = (r.item_no===item_no) ? feeObj : _shipMap[`${channel}|${r.item_no}`];
-      if(f!=null){
-        if(f.freeship){ newFee = shipFreeshipFee(f.freeship, r.sale_price||0); }
-        else newFee = f.perUnit ? (f.fee||0)*(r.order_qty||0) : (f.fee||0);
-      }
+      if(f!=null) newFee = shipCfgFee(f, r.sale_price||0, r.order_qty||0);
       else newFee = calcShippingFee(channel,r.item_type,r.sale_price||0);
       r.shipping_fee = newFee;
       r.margin = Math.round((r.settlement||0)-(r.cost_price||0)-newFee);
@@ -25287,7 +25289,7 @@ function applyShipGroupDedup(rows){
   }
   const isPerUnitFee = row => {
     const m = _shipMap[`${row.channel}|${row.item_no}`];
-    return !!(m && m.perUnit && !m.freeship);
+    return !!(m && m.perUnit);
   };
   for(const list of groups.values()){
     // 수량비례(perUnit) 상품은 합배송이어도 합배송 그룹과 무관하게 자기 배송비(배송비×수량)를 그대로 부과한다.
@@ -25378,8 +25380,7 @@ async function parseChannelFile(file, channelName){
     const itemNo    = (map.itemNo==null) ? '' : _s(r[map.itemNo]);
     const manual    = _shipMap[`${channelName}|${itemNo}`];
     const shipping  = manual
-      ? (manual.freeship ? shipFreeshipFee(manual.freeship, salePrice)
-                          : (manual.perUnit ? (manual.fee||0)*orderQty : (manual.fee||0)))
+      ? shipCfgFee(manual, salePrice, orderQty)
       : calcShippingFee(channelName, itemType, salePrice);
 
     const costPrice = Math.round(unitCost * orderQty);
