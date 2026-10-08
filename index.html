@@ -1185,6 +1185,9 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .piv-item-name{font-size:12px;color:var(--tx);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .piv-item-name small{display:block;font-size:10px;color:var(--tx2);font-family:ui-monospace,monospace;}
 .piv-item-sub{text-align:right;font-size:12px;font-variant-numeric:tabular-nums;color:var(--tx);}
+.piv-chk{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--tx);cursor:pointer;margin:0;}
+#pivModal .piv-chk input{width:auto;padding:0;margin:0;}
+#pivModal .piv-fee-in{width:100px;padding:4px 7px;text-align:right;}
 .piv-items-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;}
 /* 우측하단 커스텀 알림 카드 (카톡 PC버전 느낌) */
 .ntf-card{position:fixed;right:20px;width:320px;background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px 16px;z-index:100050;font-family:inherit;transition:bottom .15s;}
@@ -4127,7 +4130,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <div class="piv-items">
           <div id="pivItemsBox"></div>
           <div class="piv-items-foot">
-            <button type="button" class="cs-mini-btn" onclick="pivAddItem()">＋ 제품 추가</button>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <button type="button" class="cs-mini-btn" onclick="pivAddItem()">＋ 제품 추가</button>
+              <label class="piv-chk"><input type="checkbox" id="pivFRepairOn" onchange="pivFeeChanged()">수리비</label>
+              <input type="number" id="pivFRepairAmt" class="piv-fee-in" min="0" placeholder="금액" oninput="pivCalcMargin()" style="display:none;">
+              <label class="piv-chk"><input type="checkbox" id="pivFShipOn" onchange="pivFeeChanged()">배송비</label>
+              <input type="number" id="pivFShipAmt" class="piv-fee-in" min="0" placeholder="금액" oninput="pivCalcMargin()" style="display:none;">
+            </div>
             <span style="font-size:12.5px;color:var(--tx);">단가 합계 <b id="pivCostTotal">0원</b></span>
           </div>
         </div>
@@ -4135,7 +4144,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
       <div class="field"><label>금액 (발행금액)</label><input type="number" id="pivFAmount" min="0" oninput="pivCalcMargin()"></div>
       <div class="field"><label>단가 합계 (품목 기준)</label><input type="text" id="pivFCostView" readonly disabled></div>
-      <div class="field"><label>마진 (금액 − 단가 합계)</label><input type="number" id="pivFMargin"></div>
+      <div class="field"><label>마진 (금액 − 수리비·배송비 − 단가 합계)</label><input type="number" id="pivFMargin"></div>
 
       <div class="field"><label>발행일자</label><input type="date" id="pivFIssueDate"></div>
       <div class="field"><label>발급여부</label>
@@ -33249,7 +33258,21 @@ function pivUpdateCost(){
 function pivCalcMargin(){
   if(!_pivItems.length) return;
   const a = document.getElementById('pivFAmount').value;
-  _pivSet('Margin', a==='' ? '' : Math.round(Number(a) - _pivCost()));
+  _pivSet('Margin', a==='' ? '' : Math.round(Number(a) - _pivFees() - _pivCost()));
+}
+// 수리비·배송비: 체크하면 금액 입력칸이 나오고, 금액에는 포함되지만 마진 계산에서는 제외(마진 = 금액 − 수리비 − 배송비 − 단가 합계)
+function _pivFees(){
+  const on = k=>document.getElementById('pivF'+k+'On').checked;
+  return (on('Repair') ? Number(_pivGet('RepairAmt'))||0 : 0) + (on('Ship') ? Number(_pivGet('ShipAmt'))||0 : 0);
+}
+function pivFeeChanged(){
+  ['Repair','Ship'].forEach(k=>{
+    const on = document.getElementById('pivF'+k+'On').checked;
+    const amt = document.getElementById('pivF'+k+'Amt');
+    amt.style.display = on ? '' : 'none';
+    if(!on) amt.value = '';
+  });
+  pivCalcMargin();
 }
 
 function pivOpenModal(id){
@@ -33271,8 +33294,11 @@ function pivOpenModal(id){
   _pivSetEmail(r.email); _pivSet('Addr', r.addr); _pivSet('BizType', r.bizType); _pivSet('BizItem', r.bizItem);
   _pivSet('Amount', r.amount); _pivSet('Margin', r.margin); _pivSet('IssueDate', r.issueDate);
   _pivSet('Issued', r.issued || '미발급'); _pivSet('Paid', r.paid || '미입금'); _pivSet('DueDate', r.dueDate); _pivSet('Note', r.note);
+  document.getElementById('pivFRepairOn').checked = !!r.repairOn; _pivSet('RepairAmt', r.repairOn ? r.repairAmt : '');
+  document.getElementById('pivFShipOn').checked = !!r.shipOn; _pivSet('ShipAmt', r.shipOn ? r.shipAmt : '');
+  ['Repair','Ship'].forEach(k=>{ document.getElementById('pivF'+k+'Amt').style.display = document.getElementById('pivF'+k+'On').checked ? '' : 'none'; });
   _pivItems = (r.items||[]).map(x=>({...x}));
-  _pivLegacyItem = (!_pivItems.length && r.item) ? r.item : '';
+  _pivLegacyItem = (!_pivItems.length && r.item && !r.repairOn && !r.shipOn) ? r.item : '';
   document.getElementById('pivRegHint').textContent = '';
   document.getElementById('pivFRegNoLbl').textContent = (r.receiptType==='현금영수증') ? '등록번호 (현금영수증번호)' : '등록번호 (사업자번호)';
   pivApplyLock();
@@ -33293,9 +33319,14 @@ async function pivSave(confirmed){
     addr:g('Addr'), bizType:g('BizType'), bizItem:g('BizItem'), email:_pivGetEmail(),
     items:_pivItems.map(x=>({code:x.code,name:x.name,qty:Number(x.qty)||0,unitPrice:Number(x.unitPrice)||0})), costTotal:_pivCost(),
     amount:Number(g('Amount'))||0, margin:Number(g('Margin'))||0, receiptType:g('Receipt'),
-    issueDate:g('IssueDate'), issued:g('Issued'), paid:g('Paid'), dueDate:g('DueDate'), note:g('Note')
+    issueDate:g('IssueDate'), issued:g('Issued'), paid:g('Paid'), dueDate:g('DueDate'), note:g('Note'),
+    repairOn:document.getElementById('pivFRepairOn').checked, repairAmt:Number(g('RepairAmt'))||0,
+    shipOn:document.getElementById('pivFShipOn').checked, shipAmt:Number(g('ShipAmt'))||0
   };
-  rec.item = rec.items.length ? rec.items.map(x=>`${x.name} ×${x.qty}`).join(', ') : _pivLegacyItem;
+  const parts = rec.items.length ? rec.items.map(x=>`${x.name} ×${x.qty}`) : (_pivLegacyItem ? [_pivLegacyItem] : []);
+  if(rec.repairOn) parts.push('수리비' + (rec.repairAmt ? `(${_pivNum(rec.repairAmt)})` : ''));
+  if(rec.shipOn) parts.push('배송비' + (rec.shipAmt ? `(${_pivNum(rec.shipAmt)})` : ''));
+  rec.item = parts.join(', ');
   if(!rec.reqDate){ toast('요청일자를 입력하세요.'); return; }
   if(!rec.company){ toast('상호를 입력하세요.'); return; }
   if(rec.paid==='미입금' && !rec.dueDate){ toast('미입금 건은 입금예정일을 지정해주세요.'); return; }
