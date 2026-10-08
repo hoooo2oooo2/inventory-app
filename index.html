@@ -17311,13 +17311,14 @@ async function recalcShippingForKey(channel,item_no,feeObj){
 
     const before = new Map(rows.map(r=>[r.id, {shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}]));
 
-    // 대상 상품(item_no 일치) 행만 새 규칙으로 배송비 원가 재계산
+    // 같은 날짜의 모든 행의 배송비 원가를 현재 택배비 설정으로 다시 계산한다(대상 상품은 feeObj 우선).
+    //  — 예전에 합배송 보정으로 0원이 된 다른 상품 행도, 수량비례 상품 분리 규칙에 따라 원래 배송비가 복원되도록
     for(const r of rows){
-      if(r.item_no!==item_no) continue;
       let newFee;
-      if(feeObj!=null){
-        if(feeObj.freeship){ newFee = shipFreeshipFee(feeObj.freeship, r.sale_price||0); }
-        else newFee = feeObj.perUnit ? (feeObj.fee||0)*(r.order_qty||0) : (feeObj.fee||0);
+      const f = (r.item_no===item_no) ? feeObj : _shipMap[`${channel}|${r.item_no}`];
+      if(f!=null){
+        if(f.freeship){ newFee = shipFreeshipFee(f.freeship, r.sale_price||0); }
+        else newFee = f.perUnit ? (f.fee||0)*(r.order_qty||0) : (f.fee||0);
       }
       else newFee = calcShippingFee(channel,r.item_type,r.sale_price||0);
       r.shipping_fee = newFee;
@@ -25284,12 +25285,19 @@ function applyShipGroupDedup(rows){
     if(!groups.has(key)) groups.set(key, []);
     groups.get(key).push(row);
   }
-  const isPerUnitFee = row => !!(_shipMap[`${row.channel}|${row.item_no}`]||{}).perUnit;
+  const isPerUnitFee = row => {
+    const m = _shipMap[`${row.channel}|${row.item_no}`];
+    return !!(m && m.perUnit && !m.freeship);
+  };
   for(const list of groups.values()){
-    const holder = list.find(isPerUnitFee) || list.find(r=>r.shipping_fee>0) || list[0];
+    // 수량비례(perUnit) 상품은 합배송이어도 합배송 그룹과 무관하게 자기 배송비(배송비×수량)를 그대로 부과한다.
+    // 나머지(일반) 상품끼리만 배송비 1건으로 합친다.
+    const normal = list.filter(r=>!isPerUnitFee(r));
+    const normalHolder = normal.find(r=>r.shipping_fee>0) || normal[0];
+    const shipHolder = list.find(isPerUnitFee) || normalHolder;   // 출고건수는 그룹당 1건
     list.forEach(row=>{
-      if(row===holder){ row.ship_qty = 1; return; }
-      row.ship_qty = 0;
+      row.ship_qty = (row===shipHolder) ? 1 : 0;
+      if(isPerUnitFee(row) || row===normalHolder) return;
       if(row.shipping_fee>0){
         row.shipping_fee = 0;
         row.margin = Math.round(row.settlement - row.cost_price);
