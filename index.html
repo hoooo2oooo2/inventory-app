@@ -1148,6 +1148,14 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .piv-badge.piv-ok{background:#DCFCE7;color:#15803D;}
 .piv-badge.piv-wait{background:#FEF3C7;color:#B45309;}
 .piv-badge.piv-late{background:#FEE2E2;color:#B91C1C;}
+.piv-badge.piv-tt-개인{background:#DBEAFE;color:#1D4ED8;}
+.piv-badge.piv-tt-고정{background:#EDE9FE;color:#6D28D9;}
+.piv-badge.piv-tt-업자{background:#FFEDD5;color:#C2410C;}
+.piv-badge.piv-tt-공공기관{background:#CCFBF1;color:#0F766E;}
+.piv-badge.piv-tt-학교{background:#FEF9C3;color:#A16207;}
+.piv-badge.piv-tt-아파트{background:#FCE7F3;color:#BE185D;}
+.piv-badge.piv-tt-군부대{background:#DCFCE7;color:#15803D;}
+.piv-badge.piv-tt-마을사업{background:#FEE2E2;color:#B91C1C;}
 .piv-badge.piv-type{background:#EFF6FF;color:#2563EB;}
 .piv-sub{display:block;font-size:10.5px;color:var(--tx2);margin-top:2px;}
 .piv-act{border:1px solid var(--bd);background:var(--bg);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--tx2);cursor:pointer;font-family:inherit;}
@@ -4103,7 +4111,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>상호 *</label><input type="text" id="pivFCompany" autocomplete="off"></div>
       <div class="field"><label>대표자명</label><input type="text" id="pivFCeo" autocomplete="off"></div>
 
-      <div class="field"><label>거래구분</label><input type="text" id="pivFTrade" list="pivTradeList" autocomplete="off"><datalist id="pivTradeList"></datalist></div>
+      <div class="field"><label>거래구분</label><select id="pivFTrade"></select></div>
       <div class="field"><label>업태</label><input type="text" id="pivFBizType" autocomplete="off"></div>
       <div class="field"><label>종목</label><input type="text" id="pivFBizItem" autocomplete="off"></div>
 
@@ -32960,7 +32968,7 @@ async function tcbSaveDelete(id){
 const PIV_KEY = 'phone_invoices';
 const PIV_CO_KEY = 'phone_companies';
 const PIV_PAGE_SIZE = 30;
-const PIV_TRADE_TYPES = [];   // 거래구분 목록 — 확정되면 여기에 채움 (비어 있으면 자유 입력)
+const PIV_TRADE_TYPES = ['개인','고정','업자','공공기관','학교','아파트','군부대','마을사업'];   // 거래구분 (색상은 CSS .piv-tt-<이름>)
 const PIV_ALERT_HOURS = [9, 16];
 let _pivRows = [];
 let _pivLoaded = false;
@@ -33078,7 +33086,7 @@ function pivRender(){
         <td>${_esc(r.reqDate||'')}</td>
         <td>${_esc(r.staff||'')}</td>
         <td>${_esc(r.regNo||'')}</td>
-        <td>${_esc(r.tradeType||'')}</td>
+        <td>${r.tradeType?`<span class="piv-badge piv-tt-${_esc(r.tradeType)}">${_esc(r.tradeType)}</span>`:''}</td>
         <td class="piv-l" style="font-weight:600;">${_esc(r.company||'')}</td>
         <td>${_esc(r.ceo||'')}</td>
         ${clip(r.addr)}
@@ -33251,7 +33259,9 @@ function pivOpenModal(id){
   const r = id ? (_pivRows.find(x=>x.id===id) || {}) : {};
   const u = window.__CURRENT_USER || {};
   document.getElementById('pivModalTitle').textContent = id ? '🧾 계산서 수정' : '🧾 계산서 등록';
-  document.getElementById('pivTradeList').innerHTML = PIV_TRADE_TYPES.map(t=>`<option value="${_esc(t)}"></option>`).join('');
+  // 거래구분 선택지 — 목록에 없는 옛 값이 저장돼 있으면 그 값도 보존
+  { const opts = [...PIV_TRADE_TYPES]; if(r.tradeType && !opts.includes(r.tradeType)) opts.push(r.tradeType);
+    document.getElementById('pivFTrade').innerHTML = '<option value="">선택</option>' + opts.map(t=>`<option value="${_esc(t)}">${_esc(t)}</option>`).join(''); }
   const staffs = [...new Set([u.name, u.username, ..._pivRows.map(x=>x.staff)].filter(Boolean))];
   document.getElementById('pivStaffList').innerHTML = staffs.map(t=>`<option value="${_esc(t)}"></option>`).join('');
   _pivSet('ReqDate', r.reqDate || _pivToday());
