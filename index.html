@@ -2226,7 +2226,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <span id="buildVer" style="font-size:10px;color:var(--tx2);opacity:.6;" title="배포 버전">v2026.07.08a</span>
   </div>
   <div class="tbr">
-    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="화면 테마 (이 컴퓨터에만 저장됩니다 · 마스터 전용)">
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="화면 테마 (이 컴퓨터에만 저장됩니다 · 마스터/전유현 전용)">
       <span id="themeSunBtn">☀️</span><span id="themeMoonBtn">🌙</span>
     </div>
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
@@ -7541,6 +7541,12 @@ async function logout(){
 // 다크모드 — 마스터 계정 전용 기능. 기기(브라우저)별 localStorage 저장, 껐다 켜도 유지됨.
 // 직원 계정은 토글 버튼 자체가 안 보이고, 이 기기에 저장된 값과 무관하게 항상 라이트모드로 강제됨.
 // ══════════════════════════════════════════════
+// 다크모드 사용 허용 계정: 마스터 + 전유현(이름/아이디에 '유현' 포함)
+function _canUseDark(){
+  const u=window.__CURRENT_USER; if(!u) return false;
+  if(u.role==='master') return true;
+  return /유현/.test(String(u.name||''))||/유현/.test(String(u.username||''));
+}
 function _currentTheme(){
   return document.documentElement.getAttribute('data-theme')==='dark' ? 'dark' : 'light';
 }
@@ -7550,7 +7556,7 @@ function _renderThemeBtn(){
   document.getElementById('themeMoonBtn')?.classList.toggle('on', t==='dark');
 }
 function toggleTheme(){
-  if(!(window.__CURRENT_USER && window.__CURRENT_USER.role==='master')) return; // 이중 방어: 직원 계정은 클릭돼도 무시
+  if(!_canUseDark()) return; // 이중 방어: 허용되지 않은 직원 계정은 클릭돼도 무시
   const next = _currentTheme()==='dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   try{ localStorage.setItem('theme_mode', next); }catch(e){}
@@ -7559,7 +7565,7 @@ function toggleTheme(){
 }
 // 로그인 성공 후(역할 확정 후) 호출 — 마스터가 아니면 이 기기 설정과 무관하게 무조건 라이트모드
 function _initThemeForRole(){
-  const isMaster = !!(window.__CURRENT_USER && window.__CURRENT_USER.role==='master');
+  const isMaster = _canUseDark();
   document.getElementById('themeToggle')?.classList.toggle('show', isMaster);
   if(!isMaster){ document.documentElement.setAttribute('data-theme','light'); }
   _renderThemeBtn();
