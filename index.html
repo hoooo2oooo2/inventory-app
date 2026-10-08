@@ -7713,6 +7713,29 @@ function _canUseDark(){
 function _currentTheme(){
   return document.documentElement.getAttribute('data-theme')==='dark' ? 'dark' : 'light';
 }
+// 다크모드에서 화면 글자를 복사하면 브라우저가 "흰색 글자" 스타일까지 클립보드에 실어서 엑셀 등에 흰 글씨로 붙는다.
+// → 다크모드일 때만 복사 내용을 스타일 없는 HTML(표 구조는 유지)+일반 텍스트로 바꿔 넣어, 붙여넣으면 기본 검정 글씨가 되게 한다.
+document.addEventListener('copy', function(e){
+  try{
+    if(_currentTheme()!=='dark' || !e.clipboardData) return;
+    const ae = document.activeElement;
+    if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;   // 입력칸 복사는 원래 일반 텍스트
+    const sel = window.getSelection();
+    if(!sel || sel.isCollapsed || !sel.rangeCount) return;
+    const wrap = document.createElement('div');
+    for(let i=0;i<sel.rangeCount;i++) wrap.appendChild(sel.getRangeAt(i).cloneContents());
+    wrap.querySelectorAll('script,style,[hidden]').forEach(el=>el.remove());
+    wrap.querySelectorAll('*').forEach(el=>{ el.removeAttribute('style'); el.removeAttribute('class'); });
+    let html = wrap.innerHTML;
+    // 표의 일부(행/칸)만 선택하면 table 껍데기가 빠지므로 보강 — 그래야 엑셀에서 칸이 나뉘어 붙는다
+    const first = wrap.firstElementChild;
+    if(first && /^(TD|TH)$/.test(first.tagName)) html = '<tr>'+html+'</tr>';
+    if(first && /^(TR|TD|TH|TBODY|THEAD|TFOOT)$/.test(first.tagName) && !wrap.querySelector('table')) html = '<table>'+html+'</table>';
+    e.clipboardData.setData('text/html', '<meta charset="utf-8">'+html);
+    e.clipboardData.setData('text/plain', sel.toString());
+    e.preventDefault();
+  }catch(err){ /* 실패하면 브라우저 기본 복사 동작 */ }
+});
 function _renderThemeBtn(){
   const t=_currentTheme();
   document.getElementById('themeSunBtn')?.classList.toggle('on', t==='light');
