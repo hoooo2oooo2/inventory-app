@@ -4051,7 +4051,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <table class="piv-table">
         <thead><tr>
           <th>요청일자</th><th>담당자</th><th>등록번호</th><th>거래구분</th><th>상호</th><th>대표자명</th>
-          <th>사업장</th><th>업태</th><th>종목</th><th>이메일</th><th>품목</th><th>금액</th><th>마진</th>
+          <th>사업장</th><th>업태</th><th>종목</th><th>이메일 ID</th><th>도메인</th><th>품목</th><th>금액</th><th>마진</th>
           <th>영수처리</th><th>발행일자</th><th>발급여부</th><th>입금여부</th><th>비고</th><th style="width:60px;">관리</th>
         </tr></thead>
         <tbody id="pivTbody"></tbody>
@@ -4100,8 +4100,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>업태</label><input type="text" id="pivFBizType" autocomplete="off"></div>
       <div class="field"><label>종목</label><input type="text" id="pivFBizItem" autocomplete="off"></div>
 
-      <div class="field piv-span2"><label>사업장</label><input type="text" id="pivFAddr" autocomplete="off"></div>
-      <div class="field"><label>이메일</label><input type="text" id="pivFEmail" autocomplete="off"></div>
+      <div class="field piv-span3"><label>사업장</label><input type="text" id="pivFAddr" autocomplete="off"></div>
+      <div class="field piv-span2"><label>이메일 (@ 기준 아이디 / 도메인)</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="pivFEmailId" autocomplete="off" placeholder="아이디" oninput="pivEmailIdInput()">
+          <span style="color:var(--tx2);">@</span>
+          <input type="text" id="pivFEmailDomain" autocomplete="off" placeholder="naver.com">
+        </div></div>
 
       <div class="field piv-span3"><label>품목 (백데이터 제품 선택 · 수량)</label>
         <div class="piv-items">
@@ -33039,9 +33044,9 @@ function pivRender(){
   const canEdit = _pivCanEdit();
   const page = list.slice(_pivPage*PIV_PAGE_SIZE, (_pivPage+1)*PIV_PAGE_SIZE);
   if(!_pivLoaded){
-    tb.innerHTML = '<tr><td colspan="19" class="cs-empty">불러오는 중…</td></tr>';
+    tb.innerHTML = '<tr><td colspan="20" class="cs-empty">불러오는 중…</td></tr>';
   } else if(!page.length){
-    tb.innerHTML = `<tr><td colspan="19" class="cs-empty">${_pivRows.length ? '조건에 맞는 건이 없습니다.' : '등록된 계산서가 없습니다. 우측 상단 “＋ 계산서 등록”으로 추가하세요.'}</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="20" class="cs-empty">${_pivRows.length ? '조건에 맞는 건이 없습니다.' : '등록된 계산서가 없습니다. 우측 상단 “＋ 계산서 등록”으로 추가하세요.'}</td></tr>`;
   } else {
     const clip = (v)=>`<td class="piv-l piv-clip" title="${_esc(v||'')}">${_esc(v||'')}</td>`;
     tb.innerHTML = page.map(r=>{
@@ -33061,7 +33066,8 @@ function pivRender(){
         ${clip(r.addr)}
         <td>${_esc(r.bizType||'')}</td>
         <td>${_esc(r.bizItem||'')}</td>
-        <td class="piv-l">${_esc(r.email||'')}</td>
+        <td class="piv-l">${_esc(_pivSplitEmail(r.email)[0])}</td>
+        <td class="piv-l">${_esc(_pivSplitEmail(r.email)[1])}</td>
         ${clip(r.item)}
         <td class="piv-r">${_pivNum(r.amount)}</td>
         <td class="piv-r ${m<0?'piv-neg':''}">${_pivNum(m)}</td>
@@ -33081,11 +33087,20 @@ function pivRender(){
 // ───────────────── 계산서 등록/수정 팝업 ─────────────────
 function _pivSet(k,v){ const el=document.getElementById('pivF'+k); if(el) el.value = v==null ? '' : v; }
 function _pivGet(k){ return document.getElementById('pivF'+k).value.trim(); }
+// 이메일은 저장은 한 문자열(a@b.com), 화면은 @ 기준 아이디/도메인 두 칸
+function _pivSplitEmail(e){ const s=String(e||'').trim(); const i=s.indexOf('@'); return i<0 ? [s,''] : [s.slice(0,i), s.slice(i+1)]; }
+function _pivSetEmail(e){ const [a,b]=_pivSplitEmail(e); _pivSet('EmailId',a); _pivSet('EmailDomain',b); }
+function _pivGetEmail(){ const a=_pivGet('EmailId'), b=_pivGet('EmailDomain'); return (a||b) ? a+'@'+b : ''; }
+// 아이디칸에 전체 주소를 붙여넣거나 @를 치면 자동으로 도메인칸으로 넘김
+function pivEmailIdInput(){
+  const el=document.getElementById('pivFEmailId');
+  if(el.value.includes('@')){ const [a,b]=_pivSplitEmail(el.value); el.value=a; const d=document.getElementById('pivFEmailDomain'); d.value=b; d.focus(); }
+}
 
 // 현금영수증이면 사업장·업태·종목·이메일은 빈칸 고정
 function pivApplyLock(){
   const cash = document.getElementById('pivFReceipt').value==='현금영수증';
-  ['Addr','BizType','BizItem','Email'].forEach(k=>{
+  ['Addr','BizType','BizItem','EmailId','EmailDomain'].forEach(k=>{
     const el = document.getElementById('pivF'+k);
     if(cash) el.value = '';
     el.disabled = cash;
@@ -33116,7 +33131,7 @@ function pivApplyCompany(silent){
     return;
   }
   _pivSet('Company', c.company); _pivSet('Ceo', c.ceo); _pivSet('Addr', c.addr);
-  _pivSet('BizType', c.bizType); _pivSet('BizItem', c.bizItem); _pivSet('Email', c.email);
+  _pivSet('BizType', c.bizType); _pivSet('BizItem', c.bizItem); _pivSetEmail(c.email);
   pivApplyLock();
   hint.textContent = `✅ 업체등록 정보 자동 반영 (${c.kind})`;
 }
@@ -33189,7 +33204,7 @@ function pivOpenModal(id){
   _pivSet('Staff', id ? r.staff : (u.name || u.username || ''));
   _pivSet('Receipt', r.receiptType || '세금계산서');
   _pivSet('RegNo', r.regNo); _pivSet('Trade', r.tradeType); _pivSet('Company', r.company); _pivSet('Ceo', r.ceo);
-  _pivSet('Email', r.email); _pivSet('Addr', r.addr); _pivSet('BizType', r.bizType); _pivSet('BizItem', r.bizItem);
+  _pivSetEmail(r.email); _pivSet('Addr', r.addr); _pivSet('BizType', r.bizType); _pivSet('BizItem', r.bizItem);
   _pivSet('Amount', r.amount); _pivSet('Margin', r.margin); _pivSet('IssueDate', r.issueDate);
   _pivSet('Issued', r.issued || '미발급'); _pivSet('Paid', r.paid || '미입금'); _pivSet('DueDate', r.dueDate); _pivSet('Note', r.note);
   _pivItems = (r.items||[]).map(x=>({...x}));
@@ -33210,7 +33225,7 @@ async function pivSave(){
   const g = _pivGet;
   const rec = {
     reqDate:g('ReqDate'), staff:g('Staff'), regNo:g('RegNo'), tradeType:g('Trade'), company:g('Company'), ceo:g('Ceo'),
-    addr:g('Addr'), bizType:g('BizType'), bizItem:g('BizItem'), email:g('Email'),
+    addr:g('Addr'), bizType:g('BizType'), bizItem:g('BizItem'), email:_pivGetEmail(),
     items:_pivItems.map(x=>({code:x.code,name:x.name,qty:Number(x.qty)||0,unitPrice:Number(x.unitPrice)||0})), costTotal:_pivCost(),
     amount:Number(g('Amount'))||0, margin:Number(g('Margin'))||0, receiptType:g('Receipt'),
     issueDate:g('IssueDate'), issued:g('Issued'), paid:g('Paid'), dueDate:g('DueDate'), note:g('Note')
@@ -33372,6 +33387,11 @@ function _pivIsMine(r){
   const s = String(r.staff||'').trim();
   return !!s && (s===String(u.name||'').trim() || s===String(u.username||'').trim());
 }
+// 경과 알림 대상 건 — 마스터 계정은 전체, 그 외는 본인이 담당자인 건만
+function _pivAlertTarget(r){
+  const u = window.__CURRENT_USER; if(!u) return false;
+  return u.role==='master' || _pivIsMine(r);
+}
 function pivStartWatch(){
   if(_pivWatchStarted) return;
   const u = window.__CURRENT_USER; if(!u) return;
@@ -33390,11 +33410,12 @@ async function pivWatchTick(){
   if(shown===slot) return;
   const d = await cloudKvLoad(PIV_KEY);
   if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); }
-  const mine = _pivRows.filter(r=>_pivIsMine(r) && _pivOverdueDays(r)!=null)
+  const isMaster = window.__CURRENT_USER.role==='master';
+  const mine = _pivRows.filter(r=>_pivAlertTarget(r) && _pivOverdueDays(r)!=null)
     .sort((a,b)=>_pivOverdueDays(b)-_pivOverdueDays(a));
   if(!mine.length) return;
   try{ localStorage.setItem(_pivSlotStoreKey(), slot); }catch{}
-  const lines = mine.slice(0,5).map(r=>`· ${r.company||''} · ${_pivNum(r.amount)}원 · 입금예정일 ${r.dueDate} (${_pivOverdueDays(r)}일 경과)`);
+  const lines = mine.slice(0,5).map(r=>`· ${r.company||''} · ${_pivNum(r.amount)}원 · 입금예정일 ${r.dueDate} (${_pivOverdueDays(r)}일 경과)${isMaster && r.staff ? ` · 담당 ${r.staff}` : ''}`);
   if(mine.length>5) lines.push(`외 ${mine.length-5}건`);
   ntfShow('piv_overdue', '🧾 입금예정일 경과 알림',
     lines.join('\n')+'\n\n입금예정일이 지났습니다. 업체 문의 바랍니다.',
