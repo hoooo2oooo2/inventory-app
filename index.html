@@ -1163,6 +1163,12 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .piv-grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 14px;}
 .piv-span2{grid-column:span 2;}
 .piv-span3{grid-column:1 / -1;}
+.piv-suggest{display:none;position:absolute;left:0;right:0;top:100%;margin-top:2px;z-index:5;max-height:240px;overflow-y:auto;background:var(--bg);border:1px solid var(--bd);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.18);}
+.piv-sg-row{padding:8px 11px;cursor:pointer;border-bottom:0.5px solid var(--bd);}
+.piv-sg-row:last-child{border-bottom:none;}
+.piv-sg-row:hover,.piv-sg-row.on{background:var(--bg2);}
+.piv-sg-name{font-size:12.5px;font-weight:600;color:var(--tx);}
+.piv-sg-sub{font-size:10.5px;color:var(--tx2);margin-top:1px;}
 .piv-hint{font-size:10.5px;color:var(--tx2);margin-top:3px;min-height:14px;}
 .piv-items{border:1px solid var(--bd);border-radius:9px;padding:8px 10px;background:var(--bg);}
 .piv-item-row{display:grid;grid-template-columns:1fr 110px 74px 104px 30px;gap:6px;align-items:center;margin-bottom:5px;}
@@ -4092,7 +4098,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>영수처리</label>
         <select id="pivFReceipt" onchange="pivReceiptChanged()"><option value="세금계산서">세금계산서</option><option value="현금영수증">현금영수증</option></select></div>
 
-      <div class="field"><label id="pivFRegNoLbl">등록번호 (사업자번호)</label><input type="text" id="pivFRegNo" oninput="pivRegNoInput()" autocomplete="off"><div class="piv-hint" id="pivRegHint"></div></div>
+      <div class="field" style="position:relative;"><label id="pivFRegNoLbl">등록번호 (사업자번호)</label><input type="text" id="pivFRegNo" oninput="pivRegNoInput()" onfocus="pivCoSuggest()" onblur="setTimeout(pivCoSuggestHide,150)" onkeydown="pivRegKey(event)" placeholder="등록번호 입력 또는 상호명 검색" autocomplete="off">
+        <div class="piv-suggest" id="pivSuggest"></div><div class="piv-hint" id="pivRegHint"></div></div>
       <div class="field"><label>상호 *</label><input type="text" id="pivFCompany" autocomplete="off"></div>
       <div class="field"><label>대표자명</label><input type="text" id="pivFCeo" autocomplete="off"></div>
 
@@ -4133,6 +4140,16 @@ html.mob-native .lcr-det-val{font-size:15px;}
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('pivModal')">취소</button>
       <button class="btn btn-pr" id="pivSaveBtn" onclick="pivSave()">저장</button></div>
+  </div>
+</div>
+
+<!-- 저장 전 업체 확인 팝업 -->
+<div class="modal-overlay" id="pivConfirmModal" style="z-index:320;">
+  <div class="modal" style="max-width:380px;">
+    <h3>🏢 이 업체가 맞는지 확인해주세요</h3>
+    <div id="pivConfirmBody" style="font-size:13px;line-height:1.8;color:var(--tx);padding:10px 12px;background:var(--bg2);border-radius:9px;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('pivConfirmModal')">취소</button>
+      <button class="btn btn-pr" onclick="pivConfirmOk()">확인</button></div>
   </div>
 </div>
 
@@ -32954,6 +32971,7 @@ let _pivCoPage = 0;
 let _pivEditId = null;
 let _pivCoEditId = null;
 let _pivTab = 'invoice';
+let _pivMatchedCo = null;     // 이번 팝업에서 업체등록 정보가 자동 반영된 업체(저장 전 확인 팝업 대상)
 let _pivItems = [];           // 팝업에서 편집 중인 품목 [{code,name,qty,unitPrice}]
 let _pivLegacyItem = '';      // items 없이 문자열로만 저장돼 있던 옛 품목(수정 시 보존)
 let _pivWatchStarted = false;
@@ -33126,8 +33144,9 @@ function pivApplyCompany(silent){
   const hint = document.getElementById('pivRegHint');
   const raw = _pivGet('RegNo');
   const c = _pivFindCompany(raw);
+  _pivMatchedCo = c;
   if(!c){
-    hint.textContent = (_pivDigits(raw).length>=10 && !silent) ? '업체등록에 없는 번호입니다 — 직접 입력하거나 업체등록 탭에서 먼저 등록하세요.' : '';
+    hint.textContent = (_pivDigits(raw).length>=10 && !silent && /^[d-]+$/.test(raw)) ? '업체등록에 없는 번호입니다 — 직접 입력하거나 업체등록 탭에서 먼저 등록하세요.' : '';
     return;
   }
   _pivSet('Company', c.company); _pivSet('Ceo', c.ceo); _pivSet('Addr', c.addr);
@@ -33137,11 +33156,45 @@ function pivApplyCompany(silent){
 }
 function pivRegNoInput(){
   const el = document.getElementById('pivFRegNo');
-  if(document.getElementById('pivFReceipt').value==='세금계산서'){
+  if(document.getElementById('pivFReceipt').value==='세금계산서' && /^[d-]*$/.test(el.value)){
     const f = _pivFmtBiz(el.value);
     if(f!==el.value) el.value = f;
   }
   pivApplyCompany(false);
+  pivCoSuggest();
+}
+// 등록번호 칸에서 업체등록의 상호명(또는 번호 일부)으로 검색 → 선택하면 번호·업체정보 자동 반영
+let _pivSgList = [], _pivSgIdx = -1;
+function pivCoSuggest(){
+  const box = document.getElementById('pivSuggest'); if(!box) return;
+  const raw = _pivGet('RegNo'), q = raw.toLowerCase();
+  if(!q || _pivFindCompany(raw)){ pivCoSuggestHide(); return; }
+  const numeric = /^[d-]+$/.test(raw), d = _pivDigits(raw);
+  _pivSgList = _pivCoRows.filter(c=> numeric ? (d.length>=2 && _pivDigits(c.regNo).includes(d)) : String(c.company||'').toLowerCase().includes(q)).slice(0,8);
+  _pivSgIdx = -1;
+  if(!_pivSgList.length){
+    box.innerHTML = '<div class="piv-sg-row" style="cursor:default;"><div class="piv-sg-sub">일치하는 등록 업체가 없습니다.</div></div>';
+  } else {
+    box.innerHTML = _pivSgList.map((c,i)=>`<div class="piv-sg-row" onmousedown="event.preventDefault();pivCoPickSuggest(${i})"><div class="piv-sg-name">${_esc(c.company||'')}</div><div class="piv-sg-sub">${_esc(c.regNo||'')} · ${_esc(c.ceo||'대표자 미입력')} · ${_esc(c.kind||'')}</div></div>`).join('');
+  }
+  box.style.display = 'block';
+}
+function pivCoSuggestHide(){ const b=document.getElementById('pivSuggest'); if(b) b.style.display='none'; }
+function pivCoPickSuggest(i){
+  const c = _pivSgList[i]; if(!c) return;
+  _pivSet('RegNo', c.regNo);
+  pivCoSuggestHide();
+  pivApplyCompany(false);
+}
+function pivRegKey(e){
+  const box = document.getElementById('pivSuggest');
+  if(!box || box.style.display==='none' || !_pivSgList.length) return;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    _pivSgIdx = (_pivSgIdx + (e.key==='ArrowDown'?1:-1) + _pivSgList.length) % _pivSgList.length;
+    [...box.children].forEach((el,i)=>el.classList.toggle('on', i===_pivSgIdx));
+  } else if(e.key==='Enter'){ e.preventDefault(); pivCoPickSuggest(_pivSgIdx<0?0:_pivSgIdx); }
+  else if(e.key==='Escape'){ pivCoSuggestHide(); }
 }
 
 // 품목: 백데이터 제품 다중 선택 + 수량. 단가는 선택 시점 스냅샷(이후 백데이터 단가가 바뀌어도 기존 건은 유지)
@@ -33194,6 +33247,7 @@ function pivCalcMargin(){
 function pivOpenModal(id){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   _pivEditId = id || null;
+  _pivMatchedCo = null;
   const r = id ? (_pivRows.find(x=>x.id===id) || {}) : {};
   const u = window.__CURRENT_USER || {};
   document.getElementById('pivModalTitle').textContent = id ? '🧾 계산서 수정' : '🧾 계산서 등록';
@@ -33220,7 +33274,8 @@ function pivOpenModal(id){
   if(!_pivCoLoaded) pivCoLoad();   // 자동 반영에 쓸 업체등록 목록 확보
   setTimeout(()=>document.getElementById(id?'pivFCompany':'pivFRegNo')?.focus(), 100);
 }
-async function pivSave(){
+function pivConfirmOk(){ closeModal('pivConfirmModal'); pivSave(true); }
+async function pivSave(confirmed){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   const g = _pivGet;
   const rec = {
@@ -33234,6 +33289,12 @@ async function pivSave(){
   if(!rec.reqDate){ toast('요청일자를 입력하세요.'); return; }
   if(!rec.company){ toast('상호를 입력하세요.'); return; }
   if(rec.paid==='미입금' && !rec.dueDate){ toast('미입금 건은 입금예정일을 지정해주세요.'); return; }
+  // 업체등록에서 불러온 업체면 저장 전에 한 번 더 확인
+  if(_pivMatchedCo && confirmed!==true){
+    document.getElementById('pivConfirmBody').innerHTML = `<b>${_esc(rec.company)}</b><br>등록번호 ${_esc(rec.regNo)}<br>대표자 ${_esc(rec.ceo||'-')}`;
+    openModal('pivConfirmModal');
+    return;
+  }
   const btn = document.getElementById('pivSaveBtn');
   btn.disabled = true; btn.textContent = '저장 중…';
   const editId = _pivEditId;
