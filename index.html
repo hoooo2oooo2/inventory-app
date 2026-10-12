@@ -9209,6 +9209,30 @@ function _paSummarize(rows){
 }
 function _paBucket(v){ return Math.round(Math.log(Math.max(v,1))/Math.log(1.03)); }   // 가격 ±3% 이내 흔들림은 같은 키
 
+// 인하 탐지(올해 전체): 현재(가장 최근 주문일) 개당 가격보다 5% 이상 높은 '기존 가격'이 3건 이상 확립돼 있었고,
+// 그 기존 가격으로 마지막 판매된 이후로는 한 번도 기존 가격으로 돌아가지 않았으면 인하로 본다.
+// 판매가를 먼저 보고, 판매가는 그대로인데 정산금액만 빠진 경우는 정산금액 기준으로 본다.
+function _paDetectDrop(rows){
+  const s=[...rows].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  if(s.length<PRICE_ALERT_MIN_BASE+1) return null;
+  const lastD=s[s.length-1].d, nowRows=s.filter(x=>x.d===lastD), nNow=nowRows.length;
+  for(const m of ['sale','settle']){
+    const cur=_paMedian(nowRows.map(x=>x[m]));
+    const hi=s.filter(x=>x[m]>=cur*(1+PRICE_ALERT_CHANGE));
+    if(hi.length<PRICE_ALERT_MIN_BASE) continue;
+    const ref=_paMainCluster(hi.map(x=>x[m]));
+    if(ref.count<PRICE_ALERT_MIN_BASE) continue;
+    let last=-1; s.forEach((x,i)=>{ if(x[m]>=ref.center*0.97) last=i; });   // 기존 가격 수준으로 마지막 팔린 주문
+    if(last<0||last>=s.length-nNow) continue;
+    const pre=s.slice(0,last+1);
+    if(ref.count/pre.length<0.6) continue;                                   // 인하 전 가격이 뚜렷하지 않으면(옵션가 다양) 보류
+    if(pre.some(x=>Math.abs(x[m]-cur)<=cur*PRICE_ALERT_SAME)) continue;       // 현재 가격이 예전에도 흔하던 가격이면 인하가 아님
+    const refRows=pre.filter(x=>Math.abs(x[m]/ref.center-1)<=0.015);
+    const now=_paSummarize(nowRows); now.date=lastD; now.n=s.length-1-last;     // 변경 주문 = 인하 이후 전체 주문 수
+    return { metric:m, dir:'down', base:_paSummarize(refRows), now, since:s[last+1].d };
+  }
+  return null;
+}
 function _paAnalyze(){
   const {byName,anchor}=_paBuildRows(); const detected=[];
   if(!anchor) return {byName,detected};
@@ -9216,6 +9240,10 @@ function _paAnalyze(){
   const cutoff=_paYmd(cd);
   Object.entries(byName).forEach(([gk,rows])=>{
     const name=rows[0].name;
+    // 인하: 시점과 무관하게 올해 전체에서 탐지(이미 오래전에 인하돼 지금까지 그 가격으로 팔리는 제품 포함)
+    const drop=_paDetectDrop(rows);
+    if(drop) detected.push({gk, name, ...drop, key:gk+'|'+(drop.metric==='sale'?'S':'T')+_paBucket(drop.now[drop.metric])});
+    // 인상: 최근 N일 안에 바뀐 것만
     const base=rows.filter(x=>x.d<=cutoff), recent=rows.filter(x=>x.d>cutoff);
     if(base.length<PRICE_ALERT_MIN_BASE||!recent.length) return;
     const bs=_paMainCluster(base.map(x=>x.sale)), bt=_paMainCluster(base.map(x=>x.settle));
@@ -9228,6 +9256,7 @@ function _paAnalyze(){
       const setDev=bt.count>=PRICE_ALERT_MIN_BASE && Math.abs(tc)>=PRICE_ALERT_CHANGE && !base.some(b=>Math.abs(b.settle-x.settle)<=x.settle*PRICE_ALERT_SAME);
       if(saleDev||setDev) dev.push({x,saleDev,down:(saleDev?sc:tc)<0});
     });
+    const ups=dev.filter(v=>!v.down); dev.length=0; ups.forEach(v=>dev.push(v));
     if(!dev.length) return;
     const baseRows=base.filter(b=>Math.abs(b.sale/bs.center-1)<=0.015);
     const now=_paSummarize(dev.map(v=>v.x)); now.date=lastD;
@@ -9282,7 +9311,7 @@ function _paRenderHtml(items){
         <thead><tr><th></th><th>기존</th><th>변경</th><th>차이</th></tr></thead>
         <tbody>${dRow('판매가',b.sale,n.sale)}${dRow('정산금액',b.settle,n.settle)}${dRow('마진',b.margin,n.margin)}${dRow('마진율',b.rate,n.rate,true)}</tbody>
       </table>
-      <div class="sys-report-meta"><span>기존 주문 <b>${b.n}건</b></span><span>변경 주문 <b>${n.n}건</b>${md?` (최근 ${md})`:''}</span>
+      <div class="sys-report-meta"><span>기존 주문 <b>${b.n}건</b></span><span>변경 주문 <b>${n.n}건</b>${md?` (최근 ${md})`:''}</span>${it.since?`<span>변경 시작 <b>${parseInt(it.since.slice(5,7))}/${parseInt(it.since.slice(8,10))}</b></span>`:''}
         <label style="margin-left:auto;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--tx);font-weight:600;"><input type="checkbox" class="pa-chk" data-i="${idx}" onchange="_paUpdateBtns()"> 원인 확인 완료</label></div>
     </div>`;
   });
