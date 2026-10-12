@@ -6978,8 +6978,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <button class="btn" onclick="taskPopupClose()">닫기 ✕</button>
       <button class="btn tp-def" onclick="taskPopupAck()">확인</button>
       <button class="btn btn-pr tp-def" onclick="taskPopupGoto()">바로가기</button>
-      <button class="btn tp-price" style="display:none;" onclick="priceAlertAct('watch')" title="매일 9:10 · 13:00 · 16:00 이후 통합 페이지에 들어오면 다시 알려드립니다">확인하기</button>
-      <button class="btn btn-pr tp-price" style="display:none;" onclick="priceAlertAct('ack')">원인 확인 완료</button>
+      <button class="btn tp-price" id="paBtnWatch" style="display:none;" onclick="priceAlertAct('watch')" title="체크한 제품(체크 없으면 전체)을 매일 9:10 · 13:00 · 16:00 이후 통합 페이지에 들어오면 다시 알려드립니다">확인하기</button>
+      <button class="btn btn-pr tp-price" id="paBtnAck" style="display:none;" onclick="priceAlertAct('ack')">원인 확인 완료</button>
     </div>
   </div>
 </div>
@@ -8828,6 +8828,7 @@ function _taskRenderPopupBody(rec){
     document.getElementById('taskPopTitle').textContent='💸 스마트스토어 판매가 변동 알림';
     richEl.innerHTML=_paRenderHtml(rich.items||[]);
     richEl.style.display='';
+    _paUpdateBtns();
     return;
   }
   if(!rich){
@@ -9259,8 +9260,9 @@ function _paCurrentSlot(now){
 function _paWon(n){ return Math.round(n).toLocaleString('ko-KR')+'원'; }
 function _paPct(a,b){ return b? (((a/b)-1)*100) : 0; }
 function _paRenderHtml(items){
-  let html=`<div class="sys-report-summary">스마트스토어 주문 중 <b>${items.length}개 제품</b>의 판매가·정산금액이 기존 주문 대비 변동되었습니다. (모두 <b>개당</b> 기준)</div>`;
-  items.forEach(it=>{
+  let html=`<div class="sys-report-summary">스마트스토어 주문 중 <b>${items.length}개 제품</b>의 판매가·정산금액이 기존 주문 대비 변동되었습니다. (모두 <b>개당</b> 기준)
+    <label style="display:flex;align-items:center;gap:6px;margin-top:7px;cursor:pointer;color:var(--tx);font-weight:600;"><input type="checkbox" id="paChkAll" onchange="_paToggleAll(this.checked)"> 전체 선택 <span style="font-weight:400;color:var(--tx2);">— 제품별로 체크한 뒤 아래 [원인 확인 완료]를 누르면 체크한 제품만 처리됩니다</span></label></div>`;
+  items.forEach((it,idx)=>{
     const down=it.dir==='down', b=it.base, n=it.now;
     const itemNo=String(it.itemNo||(it.gk||'').split('|')[0]||'');   // 같은 제품도 상품번호별로 따로 비교·표시
     const dRow=(label,bv,nv,isRate)=>{
@@ -9280,7 +9282,8 @@ function _paRenderHtml(items){
         <thead><tr><th></th><th>기존</th><th>변경</th><th>차이</th></tr></thead>
         <tbody>${dRow('판매가',b.sale,n.sale)}${dRow('정산금액',b.settle,n.settle)}${dRow('마진',b.margin,n.margin)}${dRow('마진율',b.rate,n.rate,true)}</tbody>
       </table>
-      <div class="sys-report-meta"><span>기존 주문 <b>${b.n}건</b></span><span>변경 주문 <b>${n.n}건</b>${md?` (최근 ${md})`:''}</span></div>
+      <div class="sys-report-meta"><span>기존 주문 <b>${b.n}건</b></span><span>변경 주문 <b>${n.n}건</b>${md?` (최근 ${md})`:''}</span>
+        <label style="margin-left:auto;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--tx);font-weight:600;"><input type="checkbox" class="pa-chk" data-i="${idx}" onchange="_paUpdateBtns()"> 원인 확인 완료</label></div>
     </div>`;
   });
   return html;
@@ -9330,20 +9333,48 @@ async function checkSsPriceAlerts(){
   }catch(e){ console.warn('판매가 변동 알림 체크 실패', e); }
   finally{ _paRunning=false; }
 }
-// 팝업 버튼: 'ack' = 원인 확인 완료(다시 알리지 않음) / 'watch' = 확인하기(정해진 시각 통합 페이지 진입 시 재알림)
+function _paCheckedIdx(){ return [...document.querySelectorAll('#taskPopRich .pa-chk')].filter(c=>c.checked).map(c=>Number(c.dataset.i)); }
+function _paToggleAll(on){ document.querySelectorAll('#taskPopRich .pa-chk').forEach(c=>{ c.checked=on; }); _paUpdateBtns(); }
+function _paUpdateBtns(){
+  const all=document.querySelectorAll('#taskPopRich .pa-chk'), n=_paCheckedIdx().length;
+  const ack=document.getElementById('paBtnAck'), wt=document.getElementById('paBtnWatch'), ca=document.getElementById('paChkAll');
+  if(ack) ack.textContent = n ? `원인 확인 완료 (${n}건)` : '원인 확인 완료';
+  if(wt) wt.textContent = n ? `확인하기 (${n}건)` : '확인하기';
+  if(ca) ca.checked = all.length>0 && n===all.length;
+}
+// 팝업 버튼(체크한 제품에만 적용): 'ack' = 원인 확인 완료(다시 알리지 않음) / 'watch' = 확인하기(정해진 시각 통합 페이지 진입 시 재알림, 체크 없으면 남은 전체)
+// 처리된 제품은 팝업에서 빠지고, 남은 제품은 팝업에 그대로 남아 이어서 처리할 수 있다.
 async function priceAlertAct(mode){
   const t=_taskPopupCur; if(!t||!t.sysAlertData||t.sysAlertData.kind!=='price') return;
+  const all=t.sysAlertData.items||[];
+  let idxs=_paCheckedIdx();
+  if(!idxs.length){
+    if(mode==='ack'){ toast('원인 확인이 끝난 제품을 체크해 주세요.'); return; }
+    idxs=all.map((_,i)=>i);
+  }
+  const target=idxs.map(i=>all[i]).filter(Boolean);
+  const remaining=all.filter((_,i)=>!idxs.includes(i));
   let st; try{ st=(await cloudKvLoad(PRICE_ALERT_KEY))||{}; }catch{ toast('저장에 실패했습니다. 잠시 후 다시 시도해주세요.'); return; }
   st.seen=st.seen||{}; st.ack=st.ack||{}; st.watch=st.watch||{};
   const iso=new Date().toISOString();
-  (t.sysAlertData.items||[]).forEach(it=>{
+  target.forEach(it=>{
     if(mode==='ack'){ st.ack[it.key]=iso; delete st.watch[it.key]; }
     else { const {recheck,...snap}=it; st.watch[it.key]=snap; delete st.ack[it.key]; }
   });
   try{ await cloudKvSave(PRICE_ALERT_KEY, st); }catch{ toast('저장에 실패했습니다. 잠시 후 다시 시도해주세요.'); return; }
-  _taskPopupNext();
-  await taskMarkRead(t.id);
-  toast(mode==='ack' ? '✅ 원인 확인 완료 — 같은 가격 변동은 다시 알리지 않습니다.' : '🔔 확인하기 — 매일 9:10 · 13:00 · 16:00 이후 통합 페이지에 들어오면 다시 알려드립니다.');
+  const msg = mode==='ack' ? `✅ ${target.length}건 원인 확인 완료 — 같은 가격 변동은 다시 알리지 않습니다.` : `🔔 ${target.length}건 확인하기 — 매일 9:10 · 13:00 · 16:00 이후 통합 페이지에 들어오면 다시 알려드립니다.`;
+  if(!remaining.length){
+    _taskPopupNext();
+    await taskMarkRead(t.id);
+    toast(msg); return;
+  }
+  // 남은 제품만 팝업/받은요청함 레코드에 유지
+  const patch={ sysAlertData:{kind:'price', items:remaining} };
+  await _taskUpdateRecord(t.id, patch);
+  const cur=_taskRequests.find(x=>x.id===t.id) || {...t, ...patch};
+  _taskPopupCur=cur;
+  _taskRenderPopupBody(cur);
+  toast(msg+` (남은 제품 ${remaining.length}건)`);
 }
 
 // F9: 어디서든 업무 요청하기 팝업 (입력창 포커스 여부와 무관하게 안전 — 문자 입력이 아닌 함수키)
