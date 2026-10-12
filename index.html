@@ -656,6 +656,9 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .sys-report-meta b{color:var(--tx);font-weight:700;}
 .sys-report-chart-wrap{margin-top:9px;height:52px;}
 .sys-report-badge.st-up{background:#DBEAFE;color:#1D4ED8;}
+.rgs-row input{width:auto !important;min-width:0;margin:0;}
+.rgs-row .rgs-price{width:96px !important;}
+.rgs-row .rgs-from,.rgs-row .rgs-to{width:138px !important;}
 .sys-pa-tbl{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;}
 .sys-pa-tbl th,.sys-pa-tbl td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap;}
 .sys-pa-tbl th:first-child,.sys-pa-tbl td:first-child{text-align:left;color:var(--tx2);}
@@ -6387,13 +6390,14 @@ html.mob-native .lcr-det-val{font-size:15px;}
           <span class="rev-filter-lbl" style="margin-left:8px;">보기</span>
           <div class="rev-filter-group" id="rgProdChartModeBtns"></div>
         </div>
-        <div id="rgSupplyBox" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;margin-bottom:12px;">
-          <span style="font-size:12.5px;font-weight:700;">🚀 로켓그로스 공급가</span>
-          <input type="number" id="rgSupplyInp" min="0" step="1" placeholder="백데이터 단가와 동일" style="width:130px;font-size:12.5px;padding:4px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);">
-          <span style="font-size:12px;color:var(--tx2);">원</span>
-          <button class="btn btn-sm btn-pr" id="rgSupplySaveBtn" onclick="rgSaveSupplyFromPopup()">저장</button>
-          <button class="btn btn-sm" id="rgSupplyResetBtn" onclick="rgResetSupplyFromPopup()" title="별도 설정을 지우고 백데이터 단가를 그대로 사용합니다">백데이터 단가로</button>
-          <span id="rgSupplyHint" style="font-size:11px;color:var(--tx2);flex-basis:100%;"></span>
+        <div id="rgSupplyBox" style="background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:12.5px;font-weight:700;">🚀 로켓그로스 공급가</span>
+            <span id="rgSupplyHint" style="font-size:11px;color:var(--tx2);flex:1;min-width:200px;"></span>
+            <button class="btn btn-sm btn-pr" id="rgSupplySaveBtn" onclick="rgSaveSupplyFromPopup()">저장</button>
+            <button class="btn btn-sm" id="rgSupplyResetBtn" onclick="rgResetSupplyFromPopup()" title="별도 설정을 모두 지우고 백데이터 단가를 그대로 사용합니다">백데이터 단가로</button>
+          </div>
+          <div id="popRgsBox" style="margin-top:6px;"></div>
         </div>
         <div class="rev-kpi" style="grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
           <div class="rev-kpi-card" style="padding:10px 12px;">
@@ -7079,12 +7083,12 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>전체상품코드 *</label><input id="bdCode" placeholder="예: ABC-001"></div>
       <div class="field"><label>공급자명</label><input id="bdSupplier" placeholder="예: OEM제조사"></div>
       <div class="field"><label>구분</label><select id="bdType"></select></div>
-      <div class="field"><label>공급가(단가, 원)</label><input id="bdPrice" type="number" min="0" placeholder="0" oninput="bdRgSyncFromPrice()"></div>
+      <div class="field"><label>공급가(단가, 원)</label><input id="bdPrice" type="number" min="0" placeholder="0"></div>
     </div>
     <div class="field">
-      <label>🚀 로켓그로스용 공급가 (원)</label>
-      <input id="bdRgPrice" type="number" min="0" placeholder="비워두면 공급가와 동일" oninput="_bdRgTouched.bd=true">
-      <div id="bdRgHint" style="font-size:10.5px;color:var(--tx2);margin-top:3px;">로켓그로스 매출·일일보고의 로켓그로스 마진 계산에만 쓰입니다(통합 데이터와는 별개). 로켓그로스 매출 화면의 제품 팝업과 같은 값으로 연동됩니다.</div>
+      <label>🚀 로켓그로스용 공급가</label>
+      <div id="bdRgsBox"></div>
+      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">로켓그로스 매출·일일보고의 로켓그로스 마진 계산에만 쓰입니다(통합 데이터와는 별개). 로켓그로스 매출 화면의 제품 팝업과 같은 값으로 연동됩니다. 설정 안 하면 위 공급가를 그대로 사용합니다.</div>
     </div>
     <div class="field"><label>상품명 *</label><input id="bdName" placeholder="상품명을 입력하세요"></div>
     <div class="field">
@@ -7162,9 +7166,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div id="bdComboItemList" style="max-height:220px;overflow-y:auto;margin-top:4px;"></div>
     <div class="bd-combo-total"><span>세트단가 합계</span><span id="bdComboTotal">0원</span></div>
     <div class="field" style="margin-top:8px;">
-      <label>🚀 로켓그로스용 공급가 (원)</label>
-      <input id="bdComboRgPrice" type="number" min="0" placeholder="비워두면 세트단가 합계와 동일" oninput="_bdRgTouched.combo=true">
-      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">로켓그로스 매출·일일보고의 로켓그로스 마진 계산에만 쓰입니다(통합 데이터와는 별개).</div>
+      <label>🚀 로켓그로스용 공급가</label>
+      <div id="comboRgsBox"></div>
+      <div style="font-size:10.5px;color:var(--tx2);margin-top:3px;">로켓그로스 매출·일일보고의 로켓그로스 마진 계산에만 쓰입니다(통합 데이터와는 별개). 설정 안 하면 세트단가 합계를 그대로 사용합니다.</div>
     </div>
     <div class="field" id="bdComboEffDateField" style="display:none;">
       <label>공급가 변경 반영 시작일</label>
@@ -21242,18 +21246,37 @@ async function _rgFreshSupplyMap(){
   if(d && typeof d==='object' && !Array.isArray(d)) _rgSupplyMap=d;
   return _rgSupplyMap;
 }
-// 로켓그로스 공급가 저장 — price=null이면 별도 설정 해제(백데이터 단가를 따라감). 로켓그로스 매출 팝업/백데이터 수정 모달이 같은 값을 읽고 써서 서로 연동된다.
-async function rgSetSupplyPrice(bdId, price){
+// 로켓그로스 공급가 저장(적용 기간별 항목 배열) — entries가 비면 별도 설정 해제(백데이터 단가를 따라감).
+// 저장 형태: { 백데이터id: [ {price, from:'YYYY-MM-DD'|null, to:'YYYY-MM-DD'|null}, ... ] }  (from/to가 없으면 처음부터/계속)
+// 예전 형태(숫자 하나)로 저장된 값도 "기간 없는 1개 항목"으로 읽는다. 로켓그로스 매출 팝업/백데이터 수정 모달이 같은 값을 읽고 써서 서로 연동된다.
+async function rgSetSupplyEntries(bdId, entries){
   const base=await _rgFreshSupplyMap();
   const next={...base}, k=String(bdId);
-  if(price==null) delete next[k]; else next[k]=price;
+  if(!entries || !entries.length) delete next[k]; else next[k]=entries.map(e=>({price:Number(e.price), from:e.from||null, to:e.to||null}));
   _rgSupplyMap=next;
   await cloudKvSave('rg_supply_price', next, {force:true});
 }
-function rgSupplyOverride(bdId){
-  if(bdId==null) return null;
+function rgSupplyEntries(bdId){
+  if(bdId==null) return [];
   const v=_rgSupplyMap[String(bdId)];
-  return (v!=null && isFinite(Number(v)) && Number(v)>=0) ? Number(v) : null;
+  if(v==null) return [];
+  if(Array.isArray(v)) return v.filter(e=>e && isFinite(Number(e.price)) && Number(e.price)>=0).map(e=>({price:Number(e.price), from:e.from||null, to:e.to||null}));
+  return (isFinite(Number(v)) && Number(v)>=0) ? [{price:Number(v), from:null, to:null}] : [];
+}
+// 해당 날짜(YYYY-MM-DD)에 적용되는 로켓그로스 공급가 — 기간이 겹치면 시작일이 더 늦은(더 구체적인) 항목 우선, 해당 없으면 null(=백데이터 단가)
+function rgSupplyPriceAt(bdId, date){
+  const es=rgSupplyEntries(bdId); let best=null;
+  es.forEach(e=>{
+    if(date){ if(e.from && date<e.from) return; if(e.to && date>e.to) return; }
+    else if(e.from||e.to) return;
+    if(!best || (e.from||'')>(best.from||'')) best=e;
+  });
+  return best ? best.price : null;
+}
+function _rgsPeriodText(e){
+  const md=d=>d?`${parseInt(d.slice(5,7))}/${parseInt(d.slice(8,10))}`:'';
+  if(!e.from && !e.to) return '계속';
+  return `${e.from?md(e.from)+' ~ ':'처음 ~ '}${e.to?md(e.to):'계속'}`;
 }
 async function loadRgPackMultiplier(){
   try{
@@ -21328,11 +21351,11 @@ async function loadRgFeeMap(){
   _rgFeeMapLoaded=true;
 }
 // 매칭된 백데이터의 단가(원가) — 매칭 안 됐으면 null
-function rgResolveCostPrice(optionId){
+function rgResolveCostPrice(optionId, date){
   const id=_rgOptionMap[optionId];
   if(id==null) return null;
   const bd=_bdData.find(r=>String(r.id)===String(id));
-  const ov=rgSupplyOverride(id);   // 로켓그로스 전용 공급가가 있으면 우선, 없으면 백데이터 단가
+  const ov=rgSupplyPriceAt(id, date);   // 그 날짜에 적용되는 로켓그로스 전용 공급가가 있으면 우선, 없으면 백데이터 단가
   if(ov!=null && bd) return ov;
   return (bd && bd.price!=null) ? Number(bd.price) : null;
 }
@@ -21345,7 +21368,7 @@ function rgCalcRowFinance(r){
   const inOut=fee?(fee.inOutFee||0)*qty:0;
   const ship=fee?(fee.shipFee||0)*qty:0;
   const settlement=revenue-(commission+inOut+ship)*1.1;
-  const unitCost=rgResolveCostPrice(r.optionId);
+  const unitCost=rgResolveCostPrice(r.optionId, r.date);
   const mult=rgQtyMultiplier(r.optionId);
   const margin=(unitCost!=null)?(settlement-unitCost*qty*mult):null;
   return {settlement, margin, hasFee:!!fee, hasCost:unitCost!=null};
@@ -22030,44 +22053,95 @@ let _rgProdChartOptionIds=[];
 let _rgProdChartRange={from:null,to:null};
 let _rgProdChartCv=null;
 let _rgProdChartBdId=null;   // 팝업 중인 제품에 매칭된 백데이터 id (로켓그로스 공급가 저장 대상)
+
+// ── 로켓그로스 공급가 기간 편집기 (로켓그로스 팝업 'pop' / 백데이터 수정 'bd' / 세트 모달 'combo' 공용) ──
+const _rgsRows={pop:[],bd:[],combo:[]};
+const _rgsTouched={pop:false,bd:false,combo:false};
+function _rgsDefPrice(kind){
+  if(kind==='pop'){ const bd=_bdData.find(r=>String(r.id)===String(_rgProdChartBdId)); return bd&&bd.price!=null?bd.price:''; }
+  if(kind==='bd'){ return document.getElementById('bdPrice')?.value||''; }
+  return (_bdComboItemsBuf||[]).reduce((a,it)=>a+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0)||'';
+}
+function _rgsSetRows(kind, bdId){
+  _rgsRows[kind]=rgSupplyEntries(bdId).map(e=>({price:e.price, from:e.from||'', to:e.to||''}));
+  _rgsTouched[kind]=false; _rgsRender(kind);
+}
+function _rgsSync(kind){   // 화면 입력값 → 상태 배열
+  const box=document.getElementById(kind+'RgsBox'); if(!box) return;
+  _rgsRows[kind]=[...box.querySelectorAll('.rgs-row')].map(r=>({
+    price:r.querySelector('.rgs-price').value.trim(), from:r.querySelector('.rgs-from').value, to:r.querySelector('.rgs-to').value }));
+}
+function _rgsRender(kind){
+  const box=document.getElementById(kind+'RgsBox'); if(!box) return;
+  const rows=_rgsRows[kind];
+  const inpSt='font-size:12px;padding:3px 6px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);';
+  box.innerHTML = (rows.length ? rows.map((r,i)=>`
+    <div class="rgs-row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <input type="number" class="rgs-price" min="0" step="1" value="${r.price}" placeholder="공급가" style="${inpSt}width:100px;" onchange="_rgsTouched['${kind}']=true">
+      <span style="font-size:12px;color:var(--tx2);">원 ·</span>
+      <input type="date" class="rgs-from" value="${r.from||''}" title="적용 시작일 (비우면 처음부터)" style="${inpSt}" onchange="_rgsTouched['${kind}']=true">
+      <span style="font-size:12px;color:var(--tx2);">부터</span>
+      <input type="date" class="rgs-to" value="${r.to||''}" title="적용 종료일 (비우면 계속 유지)" style="${inpSt}" onchange="_rgsTouched['${kind}']=true">
+      <span style="font-size:12px;color:var(--tx2);">까지</span>
+      <button type="button" class="btn btn-sm" style="padding:1px 7px;color:#DC2626;" onclick="_rgsDel('${kind}',${i})" title="이 기간 삭제">✕</button>
+    </div>`).join('') : '<div style="font-size:11.5px;color:var(--tx2);margin-bottom:6px;">별도 설정 없음 — 모든 날짜에 백데이터 단가를 사용합니다.</div>')
+    + `<button type="button" class="btn btn-sm" onclick="_rgsAdd('${kind}')">+ 기간 추가</button>
+       <span style="font-size:10.5px;color:var(--tx2);margin-left:6px;">날짜를 비우면 계속 유지 · 기간이 겹치면 시작일이 더 늦은 쪽 우선 · 어느 기간에도 해당 안 되는 날짜는 백데이터 단가</span>`;
+}
+function _rgsAdd(kind){ _rgsSync(kind); _rgsRows[kind].push({price:_rgsDefPrice(kind), from:'', to:''}); _rgsTouched[kind]=true; _rgsRender(kind); }
+function _rgsDel(kind,i){ _rgsSync(kind); _rgsRows[kind].splice(i,1); _rgsTouched[kind]=true; _rgsRender(kind); }
+// 입력값 검증 → {ok:true, entries} | {ok:false, msg}  (완전히 빈 행은 무시)
+function _rgsCollect(kind){
+  _rgsSync(kind);
+  const entries=[];
+  for(const r of _rgsRows[kind]){
+    const raw=String(r.price??'').trim();
+    if(raw==='' && !r.from && !r.to) continue;
+    const price=parseFloat(raw);
+    if(raw===''||isNaN(price)||price<0) return {ok:false, msg:'로켓그로스 공급가는 0 이상의 숫자로 입력해주세요.'};
+    if(r.from && r.to && r.from>r.to) return {ok:false, msg:'로켓그로스 공급가 기간의 시작일이 종료일보다 늦습니다.'};
+    entries.push({price, from:r.from||null, to:r.to||null});
+  }
+  return {ok:true, entries};
+}
 function rgRenderSupplyBox(){
-  const inp=document.getElementById('rgSupplyInp'), hint=document.getElementById('rgSupplyHint');
-  const saveBtn=document.getElementById('rgSupplySaveBtn'), rst=document.getElementById('rgSupplyResetBtn');
-  if(!inp||!hint) return;
+  const hint=document.getElementById('rgSupplyHint');
+  const saveBtn=document.getElementById('rgSupplySaveBtn'), rst=document.getElementById('rgSupplyResetBtn'), box=document.getElementById('popRgsBox');
+  if(!hint||!box) return;
   const id=_rgProdChartBdId;
   const bd=id!=null ? _bdData.find(r=>String(r.id)===String(id)) : null;
   if(!bd){
-    inp.value=''; inp.disabled=true; if(saveBtn) saveBtn.disabled=true; if(rst) rst.disabled=true;
+    _rgsRows.pop=[]; box.innerHTML='';
+    if(saveBtn) saveBtn.disabled=true; if(rst) rst.disabled=true;
     hint.textContent='백데이터와 매칭된 제품만 로켓그로스 공급가를 설정할 수 있습니다 (제품명 옆 🔗로 먼저 매칭하세요).';
     return;
   }
-  inp.disabled=false; if(saveBtn) saveBtn.disabled=false; if(rst) rst.disabled=false;
-  const ov=rgSupplyOverride(id);
-  inp.value = ov!=null ? ov : (bd.price!=null ? bd.price : '');
+  if(saveBtn) saveBtn.disabled=false; if(rst) rst.disabled=false;
+  _rgsSetRows('pop', id);
+  const n=rgSupplyEntries(id).length;
   hint.innerHTML = `백데이터 단가 <b>${bd.price!=null?Number(bd.price).toLocaleString()+'원':'—'}</b> · `
-    + (ov!=null ? '<b style="color:#2563EB;">로켓그로스 전용 공급가 적용 중</b>' : '별도 설정 없음 (백데이터 단가와 동일)')
-    + ' · 로켓그로스 매출·일일보고의 로켓그로스 마진에만 반영되며 통합 데이터와는 별개입니다. 백데이터 수정 화면과 연동됩니다.';
+    + (n ? `<b style="color:#2563EB;">로켓그로스 전용 공급가 ${n}건 적용 중</b>` : '별도 설정 없음')
+    + ' · 로켓그로스 매출·일일보고의 로켓그로스 마진에만 반영(통합 데이터와 별개), 백데이터 수정 화면과 연동';
 }
-async function _rgApplySupplyChange(val){
+async function _rgApplySupplyEntries(entries){
   const id=_rgProdChartBdId; if(id==null) return;
   const bd=_bdData.find(r=>String(r.id)===String(id)); if(!bd) return;
-  if(val!=null && bd.price!=null && val===Number(bd.price)) val=null;   // 백데이터 단가와 같으면 별도 설정 없음으로 처리(백데이터 단가를 따라감)
-  await rgSetSupplyPrice(id, val);
+  await rgSetSupplyEntries(id, entries);
   rgRenderSupplyBox();
-  try{ addHistory({menu:'로켓그로스',type:'edit',code:bd.code,name:bd.name,desc:'로켓그로스 공급가 '+(val==null?'해제(백데이터 단가 사용)':'수정: '+val.toLocaleString()+'원'),before:'-',after:val==null?'-':String(val),user:'수동'}); }catch{}
+  const desc=!entries.length?'해제(백데이터 단가 사용)':entries.map(e=>`${e.price.toLocaleString()}원(${_rgsPeriodText(e)})`).join(', ');
+  try{ addHistory({menu:'로켓그로스',type:'edit',code:bd.code,name:bd.name,desc:'로켓그로스 공급가 '+desc,before:'-',after:'-',user:'수동'}); }catch{}
   try{ renderRgProdSection(); }catch{}
   try{ _renderRevCurrentPage(); }catch{}
 }
 async function rgSaveSupplyFromPopup(){
-  const raw=document.getElementById('rgSupplyInp').value.trim();
-  if(raw===''){ await _rgApplySupplyChange(null); toast('로켓그로스 공급가 설정을 해제했습니다 (백데이터 단가 사용).'); return; }
-  const v=parseFloat(raw);
-  if(isNaN(v)||v<0){ toast('공급가는 0 이상의 숫자로 입력해주세요.'); return; }
-  await _rgApplySupplyChange(v);
-  toast('🚀 로켓그로스 공급가를 저장했습니다.');
+  const r=_rgsCollect('pop');
+  if(!r.ok){ toast(r.msg); return; }
+  await _rgApplySupplyEntries(r.entries);
+  toast(r.entries.length ? '🚀 로켓그로스 공급가를 저장했습니다.' : '로켓그로스 공급가 설정을 해제했습니다 (백데이터 단가 사용).');
 }
 async function rgResetSupplyFromPopup(){
-  await _rgApplySupplyChange(null);
+  if(!rgSupplyEntries(_rgProdChartBdId).length && !_rgsRows.pop.length){ toast('이미 백데이터 단가를 사용 중입니다.'); return; }
+  await _rgApplySupplyEntries([]);
   toast('백데이터 단가를 사용하도록 되돌렸습니다.');
 }
 async function openRgProdChart(optionId, displayName){
@@ -24542,7 +24616,7 @@ function renderBdTable(){
         ${(r.aliasNames&&r.aliasNames.length)?`<div class="bd-alias-tag">별칭 상품명: ${r.aliasNames.map(a=>`${_bdEscHtml(a)}<button type="button" onclick="bdUnmergeAliasName('${String(r.id).replace(/'/g,"\\'")}','${String(a).replace(/'/g,"\\'")}')" title="분리(되돌리기)" style="border:none;background:transparent;color:var(--tx2);cursor:pointer;font-size:10px;padding:0 2px;">×</button>`).join(', ')}</div>`:''}
       </td>
       <td style="text-align:right;font-weight:600;">${r.price!=null?Number(r.price).toLocaleString()+'원':'—'}
-        ${(()=>{const ov=rgSupplyOverride(r.id); return ov!=null?`<div style="font-size:10px;font-weight:400;color:#2563EB;text-align:right;" title="로켓그로스 매출·일일보고의 로켓그로스 마진 계산에만 쓰이는 전용 공급가">🚀 로켓그로스 ${ov.toLocaleString()}원</div>`:'';})()}
+        ${(()=>{const es=rgSupplyEntries(r.id); return es.length?`<div style="font-size:10px;font-weight:400;color:#2563EB;text-align:right;" title="로켓그로스 매출·일일보고의 로켓그로스 마진 계산에만 쓰이는 전용 공급가">🚀 로켓그로스 ${es.map(e=>`${e.price.toLocaleString()}원${(e.from||e.to)?' ('+_rgsPeriodText(e)+')':''}`).join(' / ')}</div>`:'';})()}
         ${(()=>{const res=bdActiveReservationFor(r); return res?`<div style="font-size:10px;font-weight:400;color:#D97706;text-align:right;">⏳ 이전 ${Number(res.oldPrice).toLocaleString()}원 → 변경 ${Number(res.newPrice).toLocaleString()}원 · 잔여 ${Math.max(0,res.oldStockQty-(res.soldSinceStart||0))}개</div>`:'';})()}
         ${(()=>{const m=_bdPriceCutMarks[r.id]; return m?`<div style="font-size:10px;font-weight:400;color:#2563EB;text-align:right;" title="일괄적용 시각: ${m.changedAt}">🔽 ${m.effDate}부터 인하 (이전 ${Number(m.prevPrice).toLocaleString()}원)</div>`:'';})()}
       </td>
@@ -24583,33 +24657,26 @@ function fillBdTypeOptions(selected){
   };
 }
 
-// 로켓그로스 공급가 입력칸 공통 처리 (일반 수정 모달 bd / 세트 모달 combo)
-const _bdRgTouched={bd:false,combo:false};
-const _bdRgHadOverride={bd:false,combo:false};
+// 로켓그로스 공급가 기간 편집기 연결 (일반 수정 모달 'bd' / 세트 모달 'combo') — 편집기 본체는 _rgs* 함수(로켓그로스 팝업과 공용)
 function _bdRgFill(kind, row){
-  const inp=document.getElementById(kind==='bd'?'bdRgPrice':'bdComboRgPrice'); if(!inp) return;
-  _bdRgTouched[kind]=false;
-  const ov=row ? rgSupplyOverride(row.id) : null;
-  _bdRgHadOverride[kind]=ov!=null;
-  inp.value = ov!=null ? ov : (row && row.price!=null ? row.price : '');
-  if(!_rgOptionMapLoaded) loadRgOptionMap().then(()=>{ if(!_bdRgTouched[kind]){ const o2=row?rgSupplyOverride(row.id):null; _bdRgHadOverride[kind]=o2!=null; inp.value = o2!=null ? o2 : (row && row.price!=null ? row.price : ''); } });
+  _rgsSetRows(kind, row ? row.id : null);
+  if(!_rgOptionMapLoaded) loadRgOptionMap().then(()=>{ if(!_rgsTouched[kind]) _rgsSetRows(kind, row ? row.id : null); });
 }
-// 공급가를 고치는 동안, 로켓그로스 공급가를 따로 건드린 적 없고 별도 설정도 없으면 입력칸이 공급가를 그대로 따라간다
-function bdRgSyncFromPrice(){
-  if(_bdRgTouched.bd || _bdRgHadOverride.bd) return;
-  const inp=document.getElementById('bdRgPrice'); if(inp) inp.value=document.getElementById('bdPrice').value;
+// 저장 전 입력 검증 — 잘못된 값이면 알림 후 false (이 경우 저장 자체를 중단)
+function _bdRgPrecheck(kind){
+  if(!_rgsTouched[kind]) return true;
+  const r=_rgsCollect(kind);
+  if(!r.ok){ alert(r.msg); return false; }
+  return true;
 }
-// 저장 직후 호출 — 사용자가 로켓그로스 칸을 직접 고친 경우에만 반영(공급가와 같거나 비우면 별도 설정 해제)
+// 저장 직후 호출 — 사용자가 로켓그로스 칸을 직접 고친 경우에만 반영(전부 지우면 별도 설정 해제)
 async function _bdRgApply(kind, row){
-  if(!_bdRgTouched[kind] || !row || row.id==null) return;
-  const raw=document.getElementById(kind==='bd'?'bdRgPrice':'bdComboRgPrice').value.trim();
-  let val = raw===''?null:parseFloat(raw);
-  if(val!=null && (isNaN(val)||val<0)) val=null;
-  if(val!=null && row.price!=null && val===Number(row.price)) val=null;
-  const cur=rgSupplyOverride(row.id);
-  if(cur===val) return;
-  await rgSetSupplyPrice(row.id, val);
-  try{ addHistory({menu:'로켓그로스',type:'edit',code:row.code,name:row.name,desc:'로켓그로스 공급가 '+(val==null?'해제(백데이터 단가 사용)':'수정: '+val.toLocaleString()+'원'),before:'-',after:val==null?'-':String(val),user:'수동'}); }catch{}
+  if(!_rgsTouched[kind] || !row || row.id==null) return;
+  const r=_rgsCollect(kind); if(!r.ok) return;
+  await rgSetSupplyEntries(row.id, r.entries);
+  const desc=!r.entries.length?'해제(백데이터 단가 사용)':r.entries.map(e=>`${e.price.toLocaleString()}원(${_rgsPeriodText(e)})`).join(', ');
+  try{ addHistory({menu:'로켓그로스',type:'edit',code:row.code,name:row.name,desc:'로켓그로스 공급가 '+desc,before:'-',after:'-',user:'수동'}); }catch{}
+  _rgsTouched[kind]=false;
 }
 
 function openBdAdd(){
@@ -24983,6 +25050,7 @@ async function saveBdModal(){
   const aliasNames = _bdAliasNameChips.slice();
   if(!code){alert('전체상품코드를 입력하세요.');return;}
   if(!name){alert('상품명을 입력하세요.');return;}
+  if(!_bdRgPrecheck('bd')) return;
 
   const saveBtn = document.querySelector('#bdModal .btn-pr');
   if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='저장 중...';}
@@ -25542,6 +25610,7 @@ async function saveBdCombo(){
   if(!code){ alert('세트코드를 입력하세요.'); return; }
   if(!name){ alert('세트상품명을 입력하세요.'); return; }
   if(!_bdComboItemsBuf.length){ alert('구성품을 1개 이상 추가하세요.'); return; }
+  if(!_bdRgPrecheck('combo')) return;
   const price=_bdComboItemsBuf.reduce((a,it)=>a+(Number(it.unitPrice)||0)*(Number(it.qty)||0),0);
   const comboItems=_bdComboItemsBuf.map(it=>({...it}));
   const saveBtn=document.querySelector('#bdComboModal .btn-pr');
