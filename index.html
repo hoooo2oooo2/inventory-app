@@ -865,6 +865,10 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .pc-inp{width:100%;border:1px solid var(--bd);border-radius:8px;padding:9px 11px;font-size:13px;color:var(--tx);background:var(--bg2);outline:none;font-family:inherit;}
 .pc-inp:focus{border-color:#3182F6;background:var(--bg);}
 .pc-res{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:9px 11px;font-size:14px;font-weight:600;color:var(--tx);min-height:38px;display:flex;align-items:center;}
+/* 단가계산기 우측 패널: 카드가 눌려 잘리지 않고 패널 자체가 스크롤되게 하고, 견적 항목이 많으면 표 안에서 스크롤(헤더 고정) */
+.pc-right>*{flex-shrink:0;}
+#pc-tbl .pc-th{position:sticky;top:0;background:var(--bg2);z-index:1;}
+html.mob-native #pc-items-wrap{max-height:none!important;}
 .pc-th{padding:8px 10px;text-align:right;border-bottom:0.5px solid var(--bd);white-space:nowrap;font-weight:600;color:var(--tx2);font-size:11px;}
 .pc-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:300;display:none;align-items:center;justify-content:center;}
 /* 단가계산기 하위탭 */
@@ -3412,7 +3416,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <span style="font-size:13px;font-weight:600;color:var(--tx);">📋 견적 항목</span>
         <span id="pc-count" style="font-size:11px;color:var(--tx2);background:var(--bg2);padding:2px 8px;border-radius:10px;">0개</span>
       </div>
-      <div style="overflow-x:auto;">
+      <div id="pc-items-wrap" style="overflow:auto;max-height:min(58vh,560px);">
         <div id="pc-empty" style="padding:28px;text-align:center;color:var(--tx2);font-size:12px;">← 좌측 계산기에서 항목을 추가하세요</div>
         <table id="pc-tbl" style="display:none;width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
           <thead>
