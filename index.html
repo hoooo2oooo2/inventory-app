@@ -9262,6 +9262,7 @@ function _paRenderHtml(items){
   let html=`<div class="sys-report-summary">스마트스토어 주문 중 <b>${items.length}개 제품</b>의 판매가·정산금액이 기존 주문 대비 변동되었습니다. (모두 <b>개당</b> 기준)</div>`;
   items.forEach(it=>{
     const down=it.dir==='down', b=it.base, n=it.now;
+    const itemNo=String(it.itemNo||(it.gk||'').split('|')[0]||'');   // 같은 제품도 상품번호별로 따로 비교·표시
     const dRow=(label,bv,nv,isRate)=>{
       let diffTxt, cls;
       if(isRate){ const pp=(nv-bv)*100; diffTxt=(pp>0?'+':'')+pp.toFixed(1)+'%p'; cls=pp<0?'pa-neg':pp>0?'pa-pos':''; }
@@ -9272,7 +9273,7 @@ function _paRenderHtml(items){
     const md=n.date?`${parseInt(n.date.slice(5,7))}/${parseInt(n.date.slice(8,10))}`:'';
     html+=`<div class="sys-report-item">
       <div class="sys-report-top">
-        <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span class="sys-report-name">${_esc(it.name)}</span></div>
+        <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span class="sys-report-name">${_esc(it.name)}</span>${itemNo?`<span class="sys-report-code">상품번호 ${_esc(itemNo)}</span>`:''}</div>
         <span class="sys-report-badge ${down?'st-부족':'st-up'}">${it.recheck?'🔁 ':''}${down?'▼ 인하':'▲ 인상'}</span>
       </div>
       <table class="sys-pa-tbl">
