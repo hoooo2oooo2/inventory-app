@@ -655,6 +655,14 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 .sys-report-meta{display:flex;gap:12px;margin-top:8px;font-size:11.5px;color:var(--tx2);flex-wrap:wrap;line-height:1.5;}
 .sys-report-meta b{color:var(--tx);font-weight:700;}
 .sys-report-chart-wrap{margin-top:9px;height:52px;}
+.sys-report-badge.st-up{background:#DBEAFE;color:#1D4ED8;}
+.sys-pa-tbl{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;}
+.sys-pa-tbl th,.sys-pa-tbl td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap;}
+.sys-pa-tbl th:first-child,.sys-pa-tbl td:first-child{text-align:left;color:var(--tx2);}
+.sys-pa-tbl th{font-size:11px;color:var(--tx2);font-weight:600;}
+.sys-pa-tbl tr:last-child td{border-bottom:none;}
+.sys-pa-tbl .pa-neg{color:#DC2626;font-weight:700;}
+.sys-pa-tbl .pa-pos{color:#2563EB;font-weight:700;}
 .modal h3{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--tx);}
 .field{margin-bottom:10px;}
 .field label{display:block;font-size:11px;color:var(--tx2);margin-bottom:3px;}
@@ -6968,8 +6976,10 @@ html.mob-native .lcr-det-val{font-size:15px;}
     </div>
     <div class="ma" style="margin-top:16px;">
       <button class="btn" onclick="taskPopupClose()">닫기 ✕</button>
-      <button class="btn" onclick="taskPopupAck()">확인</button>
-      <button class="btn btn-pr" onclick="taskPopupGoto()">바로가기</button>
+      <button class="btn tp-def" onclick="taskPopupAck()">확인</button>
+      <button class="btn btn-pr tp-def" onclick="taskPopupGoto()">바로가기</button>
+      <button class="btn tp-price" style="display:none;" onclick="priceAlertAct('watch')" title="매일 9:10 · 13:00 · 16:00 이후 통합 페이지에 들어오면 다시 알려드립니다">확인하기</button>
+      <button class="btn btn-pr tp-price" style="display:none;" onclick="priceAlertAct('ack')">원인 확인 완료</button>
     </div>
   </div>
 </div>
@@ -8808,6 +8818,18 @@ function _taskRenderPopupBody(rec){
   const plainEl=document.getElementById('taskPopContent');
   const subEl=document.getElementById('taskPopSubtitle');
   _taskDestroyPopupCharts();
+  const isPrice=!!rich && rich.kind==='price';   // 판매가 변동 알림만 전용 버튼(원인 확인 완료/확인하기/닫기) 사용
+  inner.querySelectorAll('.tp-def').forEach(b=>{ b.style.display=isPrice?'none':''; });
+  inner.querySelectorAll('.tp-price').forEach(b=>{ b.style.display=isPrice?'':'none'; });
+  if(isPrice){
+    inner.style.maxWidth='600px';
+    subEl.style.display='none';
+    plainEl.style.display='none';
+    document.getElementById('taskPopTitle').textContent='💸 스마트스토어 판매가 변동 알림';
+    richEl.innerHTML=_paRenderHtml(rich.items||[]);
+    richEl.style.display='';
+    return;
+  }
   if(!rich){
     inner.style.maxWidth='380px';
     document.getElementById('taskPopTitle').textContent='📨 업무 요청이 도착했습니다';
@@ -9133,6 +9155,194 @@ async function checkMarginDropAlerts(){
   toAlert.forEach(({ch})=>{ log[ch]=weekId; });
   await _sysAlertSend(records);
   await cloudKvSave('sys_alert_log_margin', log);
+}
+
+// ── 스마트스토어 판매가·정산금액 변동 알림 (admin 전용) ──
+// 올해 스마트스토어 주문을 제품(모델명)별로 묶어, 최근 주문의 개당 판매가/정산금액이 그 전까지의
+// 주문(= 기존 가격)보다 5% 이상 인하·인상됐으면 팝업으로 알린다. 가격을 잘못 내려 마진이 줄어도
+// 일일보고에서는 정상 마진으로 보여 놓치는 문제를 막기 위한 장치.
+//  · 원인 확인 완료 → price_alert_state.ack  (같은 가격 변동은 다시 알리지 않음)
+//  · 확인하기      → price_alert_state.watch (매일 9:10 · 13:00 · 16:00 이후 통합 페이지 진입 시 재알림,
+//                     최근 주문이 기존 가격으로 돌아오면 자동 해제)
+//  · 닫기          → 받은요청함에 안읽음으로 남음(재팝업 없음)
+const PRICE_ALERT_CH='스마트스토어';
+const PRICE_ALERT_WINDOW_DAYS=14;     // 이 기간 안의 주문을 '새 가격' 후보로, 그 이전 주문을 '기존 가격' 기준으로 본다
+const PRICE_ALERT_CHANGE=0.05;        // 기존 대비 5% 이상 변동 시 알림
+const PRICE_ALERT_MIN_BASE=3;         // 기존 가격으로 확립되려면 같은 가격대 주문이 최소 3건
+const PRICE_ALERT_SAME=0.02;          // 기존 주문 중 ±2% 안에 이미 있던 가격이면 '새 가격'이 아님(옵션별 가격 차이 오탐 방지)
+const PRICE_ALERT_SLOTS=[[9,10],[13,0],[16,0]];   // '확인하기' 재알림 시각
+const PRICE_ALERT_SALE_IS_TOTAL=true; // 통합데이터 sale_price가 행 합계(수량 포함)이면 true → 수량으로 나눠 개당 환산
+const PRICE_ALERT_KEY='price_alert_state';
+
+function _paMedian(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y), m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+// 값들 중 ±1.5% 안에 가장 많이 몰린 군집(= 그 제품의 '평소 가격')
+function _paMainCluster(vals){
+  const s=[...vals].sort((a,b)=>a-b); let best={center:0,count:0}, j=0;
+  for(let i=0;i<s.length;i++){
+    if(j<i) j=i;
+    while(j+1<s.length && s[j+1]<=s[i]*1.03) j++;
+    if(j-i+1>best.count) best={center:_paMedian(s.slice(i,j+1)), count:j-i+1};
+  }
+  return best;
+}
+function _paYmd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function _paBuildRows(){
+  const yr=new Date().getFullYear(), byName={}; let anchor='';
+  (_revData||[]).forEach(r=>{
+    if(r.year!==yr||r.ch!==PRICE_ALERT_CH||!r.date) return;
+    const q=Number(r.orderQty)||0, sale=Number(r.salePrice)||0, st=Number(r.settlement)||0;
+    if(q<=0||sale<=0||st<=0) return;
+    const name=String(r.modelName||'').trim(); if(!name) return;
+    const itemNo=String(r.itemNo||'').trim();   // 같은 상품명도 스마트스토어 등록상품(상품번호)마다 가격이 다르므로 상품번호까지 묶어서 비교
+    const gk=itemNo+'|'+name;
+    const [mm,dd]=String(r.date).split('-');
+    const d=`${r.year}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+    if(d>anchor) anchor=d;
+    (byName[gk]=byName[gk]||[]).push({ name, d, sale:PRICE_ALERT_SALE_IS_TOTAL?sale/q:sale, settle:st/q, margin:(Number(r.margin)||0)/q, rate:Number(r.marginRate)||0 });
+  });
+  return {byName, anchor};
+}
+function _paSummarize(rows){
+  return { sale:Math.round(_paMedian(rows.map(x=>x.sale))), settle:Math.round(_paMedian(rows.map(x=>x.settle))),
+           margin:Math.round(_paMedian(rows.map(x=>x.margin))), rate:_paMedian(rows.map(x=>x.rate)), n:rows.length };
+}
+function _paBucket(v){ return Math.round(Math.log(Math.max(v,1))/Math.log(1.03)); }   // 가격 ±3% 이내 흔들림은 같은 키
+
+function _paAnalyze(){
+  const {byName,anchor}=_paBuildRows(); const detected=[];
+  if(!anchor) return {byName,detected};
+  const cd=new Date(anchor+'T00:00:00'); cd.setDate(cd.getDate()-PRICE_ALERT_WINDOW_DAYS);
+  const cutoff=_paYmd(cd);
+  Object.entries(byName).forEach(([gk,rows])=>{
+    const name=rows[0].name;
+    const base=rows.filter(x=>x.d<=cutoff), recent=rows.filter(x=>x.d>cutoff);
+    if(base.length<PRICE_ALERT_MIN_BASE||!recent.length) return;
+    const bs=_paMainCluster(base.map(x=>x.sale)), bt=_paMainCluster(base.map(x=>x.settle));
+    if(bs.count<PRICE_ALERT_MIN_BASE || bs.count/base.length<0.4) return;   // 평소 가격이 뚜렷하지 않은 제품(옵션가 다양 등)은 판정 보류
+    const lastD=recent.reduce((m,x)=>x.d>m?x.d:m,'');
+    const dev=[];
+    recent.filter(x=>x.d===lastD).forEach(x=>{
+      const sc=x.sale/bs.center-1, tc=x.settle/bt.center-1;
+      const saleDev=Math.abs(sc)>=PRICE_ALERT_CHANGE && !base.some(b=>Math.abs(b.sale-x.sale)<=x.sale*PRICE_ALERT_SAME);
+      const setDev=bt.count>=PRICE_ALERT_MIN_BASE && Math.abs(tc)>=PRICE_ALERT_CHANGE && !base.some(b=>Math.abs(b.settle-x.settle)<=x.settle*PRICE_ALERT_SAME);
+      if(saleDev||setDev) dev.push({x,saleDev,down:(saleDev?sc:tc)<0});
+    });
+    if(!dev.length) return;
+    const baseRows=base.filter(b=>Math.abs(b.sale/bs.center-1)<=0.015);
+    const now=_paSummarize(dev.map(v=>v.x)); now.date=lastD;
+    const saleDev=dev.some(v=>v.saleDev);
+    detected.push({
+      gk, key: gk+'|'+(saleDev?'S'+_paBucket(now.sale):'T'+_paBucket(now.settle)),
+      name, dir:dev[0].down?'down':'up', base:_paSummarize(baseRows), now
+    });
+  });
+  // 인하(마진 위험) 먼저, 그 안에서는 마진 감소폭이 큰 순
+  detected.sort((a,b)=>(a.dir==='down'?0:1)-(b.dir==='down'?0:1) || (a.now.margin-a.base.margin)-(b.now.margin-b.base.margin));
+  return {byName,detected};
+}
+// '확인하기'로 지켜보는 제품: 저장해 둔 기존 가격 대비 가장 최근 주문이 아직도 벗어나 있으면 최신값으로 갱신, 돌아왔으면 null
+function _paRefresh(w, byName){
+  const rows=byName[w.gk]; if(!rows||!rows.length) return w;   // 올해 주문 데이터가 아직 없으면 그대로 유지
+  const lastD=rows.reduce((m,x)=>x.d>m?x.d:m,'');
+  const dev=rows.filter(x=>x.d===lastD).filter(x=>
+    Math.abs(x.sale/w.base.sale-1)>=PRICE_ALERT_CHANGE || (w.base.settle>0 && Math.abs(x.settle/w.base.settle-1)>=PRICE_ALERT_CHANGE));
+  if(!dev.length) return null;
+  const now=_paSummarize(dev); now.date=lastD;
+  return {...w, now, dir:(now.sale/w.base.sale-1)<0?'down':'up'};
+}
+function _paCurrentSlot(now){
+  let cur=null;
+  PRICE_ALERT_SLOTS.forEach(([h,m])=>{ const t=new Date(now); t.setHours(h,m,0,0); if(now>=t) cur=`${_paYmd(now)}#${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; });
+  return cur;
+}
+
+function _paWon(n){ return Math.round(n).toLocaleString('ko-KR')+'원'; }
+function _paPct(a,b){ return b? (((a/b)-1)*100) : 0; }
+function _paRenderHtml(items){
+  let html=`<div class="sys-report-summary">스마트스토어 주문 중 <b>${items.length}개 제품</b>의 판매가·정산금액이 기존 주문 대비 변동되었습니다. (모두 <b>개당</b> 기준)</div>`;
+  items.forEach(it=>{
+    const down=it.dir==='down', b=it.base, n=it.now;
+    const dRow=(label,bv,nv,isRate)=>{
+      let diffTxt, cls;
+      if(isRate){ const pp=(nv-bv)*100; diffTxt=(pp>0?'+':'')+pp.toFixed(1)+'%p'; cls=pp<0?'pa-neg':pp>0?'pa-pos':''; }
+      else { const df=nv-bv, pc=_paPct(nv,bv); diffTxt=`${df>0?'+':''}${Math.round(df).toLocaleString('ko-KR')}원 (${pc>0?'+':''}${pc.toFixed(1)}%)`; cls=df<0?'pa-neg':df>0?'pa-pos':''; }
+      const fmtV=v=>isRate?(v*100).toFixed(1)+'%':_paWon(v);
+      return `<tr><td>${label}</td><td>${fmtV(bv)}</td><td><b>${fmtV(nv)}</b></td><td class="${cls}">${diffTxt}</td></tr>`;
+    };
+    const md=n.date?`${parseInt(n.date.slice(5,7))}/${parseInt(n.date.slice(8,10))}`:'';
+    html+=`<div class="sys-report-item">
+      <div class="sys-report-top">
+        <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span class="sys-report-name">${_esc(it.name)}</span></div>
+        <span class="sys-report-badge ${down?'st-부족':'st-up'}">${it.recheck?'🔁 ':''}${down?'▼ 인하':'▲ 인상'}</span>
+      </div>
+      <table class="sys-pa-tbl">
+        <thead><tr><th></th><th>기존</th><th>변경</th><th>차이</th></tr></thead>
+        <tbody>${dRow('판매가',b.sale,n.sale)}${dRow('정산금액',b.settle,n.settle)}${dRow('마진',b.margin,n.margin)}${dRow('마진율',b.rate,n.rate,true)}</tbody>
+      </table>
+      <div class="sys-report-meta"><span>기존 주문 <b>${b.n}건</b></span><span>변경 주문 <b>${n.n}건</b>${md?` (최근 ${md})`:''}</span></div>
+    </div>`;
+  });
+  return html;
+}
+
+let _paRunning=false;
+async function checkSsPriceAlerts(){
+  const me=_taskMe(); if(!me||me.username!=='admin') return;   // admin 계정에만 알림
+  if(_paRunning) return; _paRunning=true;
+  try{
+    const yr=new Date().getFullYear();
+    if(!_revYearsLoaded.has(yr)) await ensureRevYear(yr);
+    if(!_revData||!_revData.length) return;
+    let st; try{ st=(await cloudKvLoad(PRICE_ALERT_KEY))||{}; }catch{ return; }   // 상태를 못 읽으면 중복알림 위험 → 중단
+    st.seen=st.seen||{}; st.ack=st.ack||{}; st.watch=st.watch||{};
+    const {byName,detected}=_paAnalyze();
+    const iso=new Date().toISOString(), items=[]; let dirty=false;
+    detected.forEach(it=>{
+      if(st.seen[it.key]||st.ack[it.key]||st.watch[it.key]) return;
+      st.seen[it.key]=iso; dirty=true; items.push(it);
+    });
+    const slot=_paCurrentSlot(new Date());
+    if(slot && st.lastSlot!==slot && Object.keys(st.watch).length){
+      Object.entries(st.watch).forEach(([k,w])=>{
+        const r=_paRefresh(w,byName);
+        if(!r){ delete st.watch[k]; }
+        else { st.watch[k]={...r,recheck:undefined}; items.push({...r,recheck:true}); }
+      });
+      st.lastSlot=slot; dirty=true;
+    }
+    if(!dirty) return;
+    if(!items.length){ await cloudKvSave(PRICE_ALERT_KEY, st); return; }
+    const masters=await _sysAlertMasters();
+    if(!masters.length) return;
+    await cloudKvSave(PRICE_ALERT_KEY, st);
+    const shortList=items.slice(0,3).map(x=>x.name).join(', ')+(items.length>3?` 외 ${items.length-3}건`:'');
+    const records=masters.map(m=>({
+      id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
+      fromUsername:'__system__', fromName:'🤖 판매가 변동 리포트',
+      toUsername:m.username, toName:m.name||m.username,
+      menu:'revenue', dept:'ops', menuLabel:'매출관리 > 통합',
+      content:`💸 스마트스토어 판매가·정산금액 변동 ${items.length}건 — ${shortList}. 원인 확인이 필요합니다.`,
+      createdAt:new Date().toISOString(), read:false, resolvedAt:null,
+      sysAlertData:{kind:'price', items}
+    }));
+    await _sysAlertSend(records);
+  }catch(e){ console.warn('판매가 변동 알림 체크 실패', e); }
+  finally{ _paRunning=false; }
+}
+// 팝업 버튼: 'ack' = 원인 확인 완료(다시 알리지 않음) / 'watch' = 확인하기(정해진 시각 통합 페이지 진입 시 재알림)
+async function priceAlertAct(mode){
+  const t=_taskPopupCur; if(!t||!t.sysAlertData||t.sysAlertData.kind!=='price') return;
+  let st; try{ st=(await cloudKvLoad(PRICE_ALERT_KEY))||{}; }catch{ toast('저장에 실패했습니다. 잠시 후 다시 시도해주세요.'); return; }
+  st.seen=st.seen||{}; st.ack=st.ack||{}; st.watch=st.watch||{};
+  const iso=new Date().toISOString();
+  (t.sysAlertData.items||[]).forEach(it=>{
+    if(mode==='ack'){ st.ack[it.key]=iso; delete st.watch[it.key]; }
+    else { const {recheck,...snap}=it; st.watch[it.key]=snap; delete st.ack[it.key]; }
+  });
+  try{ await cloudKvSave(PRICE_ALERT_KEY, st); }catch{ toast('저장에 실패했습니다. 잠시 후 다시 시도해주세요.'); return; }
+  _taskPopupNext();
+  await taskMarkRead(t.id);
+  toast(mode==='ack' ? '✅ 원인 확인 완료 — 같은 가격 변동은 다시 알리지 않습니다.' : '🔔 확인하기 — 매일 9:10 · 13:00 · 16:00 이후 통합 페이지에 들어오면 다시 알려드립니다.');
 }
 
 // F9: 어디서든 업무 요청하기 팝업 (입력창 포커스 여부와 무관하게 안전 — 문자 입력이 아닌 함수키)
@@ -12056,7 +12266,7 @@ function goPage(p){
   if(p==='rg'){ loadRgDailyCache().then(()=>{ renderRgPeriod();renderRgTbody();renderRgProdPanel();renderTop5(); }); }
   if(p==='hist'){ renderHist(); loadDsBackups().then(renderDsBackups); }
   if(p==='report') loadDailyCache().then(()=>renderReport());
-  if(p==='revenue') loadRevenuePage().then(()=>{ goRevPage(_revPage); checkMarginDropAlerts(); });
+  if(p==='revenue') loadRevenuePage().then(()=>{ goRevPage(_revPage); checkMarginDropAlerts(); checkSsPriceAlerts(); });
   if(p==='price'){ pcEnsureBackdata(); pcRenderEstimates(); pcLoadEstimatesCloud(); cmbInit(); }
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
@@ -18274,6 +18484,7 @@ async function reloadRevLoadedYears(){
     else for(const y of yrs) await loadRevenueYear(y);
   } finally{ showRevLoading(false); }
   _renderRevCurrentPage();
+  checkSsPriceAlerts();   // 업로드 직후 새 가격 변동 바로 감지(admin 전용, 내부 중복 실행 방지)
 }
 
 // 기본 로드: 범위 파악 후 최신 연도 1개만
@@ -18461,6 +18672,7 @@ function goRevPage(p){
     _renderRevCurrentPage();
   }
   _applyWriteLockUI();
+  if(p==='unified' && _revLoaded) checkSsPriceAlerts();   // 통합 탭 진입 시에도 판매가 변동 알림 체크(내부에서 중복 실행 방지)
 }
 
 function setRevCh(btn, ch){
