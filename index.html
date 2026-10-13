@@ -1187,6 +1187,10 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-seg button.on{background:#3182F6;color:#fff;}
 .piv-seg button.on.piv-seg-warn{background:#DC2626;}
 .piv-neg{color:#DC2626;}
+.piv-table tbody tr.piv-cancel,.piv-table tbody tr.piv-cancel:hover{background:rgba(220,38,38,.13);}
+.piv-table tbody tr.piv-cancel td{color:#DC2626;text-decoration:line-through;text-decoration-thickness:1.5px;}
+.piv-table tbody tr.piv-cancel .piv-badge{background:#FEE2E2;color:#B91C1C;text-decoration:line-through;}
+.piv-table tbody tr.piv-cancel .piv-sub{color:#DC2626;}
 .piv-badge{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}
 .piv-badge.piv-ok{background:#DCFCE7;color:#15803D;}
 .piv-badge.piv-wait{background:#FEF3C7;color:#B45309;}
@@ -4283,7 +4287,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
       <div class="field"><label>발행일자</label><input type="date" id="pivFIssueDate"></div>
       <div class="field"><label>발급여부</label>
-        <select id="pivFIssued"><option value="미발급">미발급</option><option value="발급완료">발급완료</option></select></div>
+        <select id="pivFIssued"><option value="미발급">미발급</option><option value="발급완료">발급완료</option><option value="발급취소">발급취소</option></select></div>
       <div class="field"><label>입금여부</label>
         <select id="pivFPaid" onchange="pivPaidChanged()"><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
 
@@ -33597,7 +33601,7 @@ async function tcbSaveDelete(id){
 //   · 'phone_invoices' 세금계산서 발행 건:
 //       {id,reqDate,staff,regNo,tradeType,company,ceo,addr,bizType,bizItem,email,
 //        items:[{code,name,qty,unitPrice}](등록시점 단가 스냅샷),costTotal,item(표시용 요약),amount,margin,
-//        receiptType('세금계산서'|'현금영수증'),issueDate,issued('미발급'|'발급완료'),paid('미입금'|'입금완료'),dueDate(미입금일 때 입금예정일),note,createdAt,updatedAt}
+//        receiptType('세금계산서'|'현금영수증'),issueDate,issued('미발급'|'발급완료'|'발급취소'),paid('미입금'|'입금완료'),dueDate(미입금일 때 입금예정일),note,createdAt,updatedAt}
 //   · 'phone_companies' 업체등록: {id,kind('사업자등록증'|'고유번호증'|'현금영수증'),regNo,company,ceo,addr,bizType,bizItem,email,createdAt,updatedAt}
 //   입금예정일 경과 알림: 담당자(staff = 로그인 name/username) 접속 중 오전 9시·오후 4시 시간대마다 1회(pivWatchTick)
 // ══════════════════════════════════════════════
@@ -33629,7 +33633,7 @@ function _pivToday(){ return _pivYmd(new Date()); }
 function _pivDigits(s){ return String(s||'').replace(/\D/g,''); }
 // 입금예정일이 오늘보다 과거인 미입금 건의 경과일수 (아니면 null)
 function _pivOverdueDays(r){
-  if(r.paid==='입금완료' || !r.dueDate) return null;
+  if(r.paid==='입금완료' || !r.dueDate || r.issued==='발급취소') return null;
   const t = _pivToday();
   if(r.dueDate >= t) return null;
   return Math.round((new Date(t+'T00:00:00') - new Date(r.dueDate+'T00:00:00'))/86400000);
@@ -33706,7 +33710,7 @@ let _pivPaidFilter = 'all';   // all | unpaid(입금여부 미입금) | overdue(
 function pivSetPaidFilter(f){ _pivPaidFilter = f; _pivPage = 0; pivRender(); }
 function pivRenderFilterSeg(){
   const seg = document.getElementById('pivFilterSeg'); if(!seg) return;
-  const unpaid = _pivRows.filter(r=>r.paid!=='입금완료');
+  const unpaid = _pivRows.filter(r=>r.paid!=='입금완료' && r.issued!=='발급취소');
   const over = _pivRows.filter(r=>_pivOverdueDays(r)!=null);
   const sum = unpaid.reduce((t,r)=>t+(Number(r.amount)||0),0);
   const b = (k,label,cls)=>`<button class="${_pivPaidFilter===k?'on ':''}${cls||''}" onclick="pivSetPaidFilter('${k}')">${label}</button>`;
@@ -33715,7 +33719,7 @@ function pivRenderFilterSeg(){
 function _pivFiltered(){
   const q = (document.getElementById('pivSearch')?.value || '').trim().toLowerCase();
   return _pivRows.filter(r=>{
-    if(_pivPaidFilter==='unpaid' && r.paid==='입금완료') return false;
+    if(_pivPaidFilter==='unpaid' && (r.paid==='입금완료' || r.issued==='발급취소')) return false;
     if(_pivPaidFilter==='overdue' && _pivOverdueDays(r)==null) return false;
     if(!q) return true;
     return [r.company,r.regNo,r.staff,r.item,r.ceo].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
@@ -33750,7 +33754,7 @@ function pivRender(){
       if(r.paid==='입금완료') paidCell = '<span class="piv-badge piv-ok">입금완료</span>';
       else if(od!=null) paidCell = `<span class="piv-badge piv-late">미입금 · ${od}일 경과</span><span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`;
       else paidCell = `<span class="piv-badge piv-wait">미입금</span>${r.dueDate?`<span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`:''}`;
-      return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pivOpenModal('${r.id}')"`:''}>
+      return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''} ${r.issued==='발급취소'?'piv-cancel':''}" ${canEdit?`onclick="pivOpenModal('${r.id}')"`:''}>
         <td>${_esc(r.reqDate||'')}</td>
         <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff)}">${_esc(r.staff)}</span>`:''}</td>
         <td>${_esc(r.regNo||'')}</td>
@@ -33768,7 +33772,7 @@ function pivRender(){
         <td class="piv-r ${m<0?'piv-neg':''}">${_pivMarginRate(r)}</td>
         <td><span class="piv-badge piv-type">${_esc(r.receiptType||'')}</span></td>
         <td>${_esc(r.issueDate||'')}</td>
-        <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':'piv-wait'}">${_esc(r.issued||'미발급')}</span></td>
+        <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':(r.issued==='발급취소'?'piv-late':'piv-wait')}">${_esc(r.issued||'미발급')}</span></td>
         <td>${paidCell}</td>
         ${clip(r.note)}
         <td>${canEdit ? `<button class="piv-act piv-del" onclick="event.stopPropagation();pivDelete('${r.id}')">삭제</button>` : ''}</td>
@@ -34354,6 +34358,7 @@ function pbRender(){
 function _pbRowHtml(r, canEdit, isTop){
   const wr = (v,wide)=>`<td class="piv-l piv-wrapc${wide?' piv-wide':''}">${_esc(v||'')}</td>`;
   const od = _pbOverdueDays(r);
+  const cancelled = !!r.invoiceId && (_pivRows.find(x=>x.id===r.invoiceId)||{}).issued==='발급취소';   // 연동된 세금계산서가 발급취소면 빨간 취소선 처리
   let paid = '';
   if(_pbIsUnpaid(r.paid)){
     if(od!=null) paid = `<span class="piv-badge piv-late">미입금 · ${od}일 경과</span><span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`;
@@ -34362,8 +34367,8 @@ function _pbRowHtml(r, canEdit, isTop){
     paid = `<span class="piv-badge piv-ok">${_esc(r.paid)}</span>`;
   }
   const inv = _pbNormInvoice(r.invoice);
-  const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?'<span class="piv-sub">🔗 계산서 연동</span>':''}` : '';
-  return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
+  const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?`<span class="piv-sub">${cancelled?'🔗 계산서 발급취소':'🔗 계산서 연동'}</span>`:''}` : '';
+  return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''} ${cancelled?'piv-cancel':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
     <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff, _pbAll)}">${_esc(r.staff)}</span>`:''}</td>
     <td>${_esc(r.date||'')}</td>
     ${wr(r.recipient)}
