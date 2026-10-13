@@ -1159,6 +1159,11 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-table td.piv-r{text-align:right;font-variant-numeric:tabular-nums;}
 .piv-table td.piv-wrapc{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;min-width:56px;line-height:1.45;}  /* 가로 스크롤 대신 글이 길면 칸 안에서 줄바꿈하며 칸이 늘어남 */
 .piv-table td.piv-wrapc.piv-wide{min-width:100px;}
+.piv-badge.pb-inv-a{background:#DCFCE7;color:#15803D;}
+.piv-badge.pb-inv-b{background:#FEF3C7;color:#B45309;}
+.piv-badge.pb-inv-c{background:#CCFBF1;color:#0F766E;}
+.piv-badge.pb-inv-d{background:#FFEDD5;color:#C2410C;}
+.piv-badge.pb-inv-e{background:#E2E8F0;color:#334155;}
 .pb-split{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;}
 .pb-panel{min-height:0;display:flex;flex-direction:column;}
 .pb-panel-head{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
@@ -4162,9 +4167,10 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div class="modal" style="max-width:640px;padding:22px 24px;">
     <h3 style="font-size:16px;margin-bottom:14px;">📤 전화구매건 엑셀 업로드</h3>
     <div class="piv-grid2" style="margin-bottom:10px;">
-      <div class="field"><label>업로드 날짜 * (모든 행에 적용)</label><input type="date" id="pbUpDate"></div>
+      <div class="field"><label>업로드 날짜 * (모든 행에 적용)</label><input type="date" id="pbUpDate" onchange="pbRefreshDup()"></div>
       <div class="field"><label>담당자 (업로드하는 직원 · 자동)</label><input type="text" id="pbUpStaff" readonly disabled></div>
     </div>
+    <div class="field" id="pbUpDueWrap" style="display:none;margin-bottom:10px;"><label id="pbUpDueLbl">미입금 건의 입금예정일 *</label><input type="date" id="pbUpDue"></div>
     <div class="dz" id="pbDrop" onclick="document.getElementById('pbFileInput').click()">
       <div style="font-size:26px;">📄</div>
       <p>엑셀 파일을 여기로 드래그하거나 클릭해서 불러오기</p>
@@ -4187,6 +4193,16 @@ html.mob-native .lcr-det-val{font-size:15px;}
   </div>
 </div>
 
+<!-- 전화구매건: 세금계산서 발행 건 연동 선택 -->
+<div class="modal-overlay" id="pbLinkModal" style="z-index:330;">
+  <div class="modal" style="max-width:820px;padding:22px 24px;">
+    <h3 style="font-size:16px;margin-bottom:12px;">🔗 세금계산서 발행 건 선택</h3>
+    <input class="cs-search" id="pbLinkSearch" style="width:100%;margin-bottom:10px;" placeholder="상호·등록번호·담당자·품목·금액 검색 (최근 50건 표시)" autocomplete="off" oninput="pbRenderLinkList()">
+    <div id="pbLinkList" style="max-height:360px;overflow-y:auto;border:1px solid var(--bd);border-radius:9px;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('pbLinkModal')">닫기</button></div>
+  </div>
+</div>
+
 <!-- 전화구매건: 수기 입력/수정 모달 -->
 <div class="modal-overlay" id="pbModal">
   <div class="modal" style="max-width:920px;padding:22px 24px;">
@@ -4204,14 +4220,17 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>배송방법</label><input type="text" id="pbFShipMethod" list="pbShipList" autocomplete="off"><datalist id="pbShipList"><option value="택배"></option><option value="화물"></option><option value="퀵"></option><option value="직접수령"></option></datalist></div>
       <div class="field"><label>운임구분</label><input type="text" id="pbFFreight" list="pbFreightList" autocomplete="off"><datalist id="pbFreightList"><option value="선불"></option><option value="착불"></option></datalist></div>
       <div class="field piv-span2"><label>배송메모</label><input type="text" id="pbFShipMemo" autocomplete="off"></div>
-      <div class="field"><label>공란</label><input type="text" id="pbFBlank" autocomplete="off"></div>
       <div class="field"><label>패밀리상품코드</label><input type="text" id="pbFCode" autocomplete="off"></div>
       <div class="field"><label>총금액</label><input type="number" id="pbFAmount" min="0"></div>
-      <div class="field"><label>입금여부</label><input type="text" id="pbFPaid" list="pbPaidList" autocomplete="off"><datalist id="pbPaidList"><option value="미입금"></option><option value="입금완료"></option></datalist></div>
-      <div class="field"><label>계산서 발급여부</label><input type="text" id="pbFInvoice" list="pbInvList" autocomplete="off"><datalist id="pbInvList"><option value="계산서완"></option><option value="계산서 진행예정"></option><option value="추후 계산서"></option><option value="현금영수증완"></option><option value="x"></option></datalist></div>
-      <div class="field piv-span2"><label>비고란</label><input type="text" id="pbFNote" autocomplete="off"></div>
+      <div class="field"><label>입금여부</label><select id="pbFPaid" onchange="pbPaidChanged()"></select></div>
+      <div class="field" id="pbDueWrap" style="display:none;"><label>입금예정일 *</label><input type="date" id="pbFDue"></div>
+      <div class="field"><label>계산서 발급여부</label><select id="pbFInvoice" onchange="pbInvoiceChanged()"></select></div>
+      <div class="field piv-span3"><label>비고란</label><input type="text" id="pbFNote" autocomplete="off"></div>
+      <div class="field piv-span3" id="pbLinkWrap" style="display:none;"><label>🔗 세금계산서 발행 건 연동 (세금계산서·현금영수증 건 — 어느 한쪽이 입금완료되면 다른 쪽도 입금완료로 반영)</label>
+        <div style="display:flex;gap:8px;align-items:center;"><div id="pbLinkInfo" class="piv-hint" style="margin:0;flex:1;color:var(--tx);">연동 안 됨</div>
+          <button type="button" class="cs-mini-btn" onclick="pbOpenLinkPicker()">연동 선택</button><button type="button" class="cs-mini-btn" onclick="pbClearLink()">해제</button></div></div>
     </div>
-    <div class="piv-hint" style="margin-top:6px;">총금액을 입력하면 입금여부와 계산서 발급여부도 기입해야 합니다. 입금여부가 “미입금”이면 위쪽 미입금건 관리에 표시됩니다.</div>
+    <div class="piv-hint" style="margin-top:6px;">총금액을 입력하면 입금여부와 계산서 발급여부도 기입해야 합니다. 미입금 · 계산서 미발행 · 현금 미발행 건은 위쪽 미입금건 관리에 표시되고, 입금완료 + (세금계산서 · 현금영수증 · x)가 되면 아래 거래건으로 이동합니다.</div>
     <div class="ma"><button class="btn" onclick="closeModal('pbModal')">취소</button>
       <button class="btn btn-pr" id="pbSaveBtn" onclick="pbSave()">저장</button></div>
   </div>
@@ -4268,6 +4287,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>입금여부</label>
         <select id="pivFPaid" onchange="pivPaidChanged()"><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
 
+      <div class="field piv-span3" id="pivLinkWrap" style="display:none;"><label>🔗 연동된 전화구매건 (입금완료되면 함께 입금완료 처리됩니다)</label><div class="piv-hint" id="pivLinkInfo" style="margin:0;color:var(--tx);"></div></div>
       <div class="field" id="pivDueWrap"><label>입금예정일 *</label><input type="date" id="pivFDueDate"></div>
       <div class="field piv-span2"><label>비고</label><textarea id="pivFNote"></textarea></div>
     </div>
@@ -33923,6 +33943,8 @@ function pivOpenModal(id){
   _pivSet('Issued', r.issued || '미발급'); _pivSet('Paid', r.paid || '미입금'); _pivSet('DueDate', r.dueDate); _pivSet('Note', r.note);
   document.getElementById('pivFRepairOn').checked = !!r.repairOn;
   document.getElementById('pivFShipOn').checked = !!r.shipOn;
+  { const links = r.pbLinks||[]; document.getElementById('pivLinkWrap').style.display = links.length ? '' : 'none';
+    document.getElementById('pivLinkInfo').textContent = links.map(l=>`${l.recipient||''} (${l.product||''})`).join(' / '); }
   _pivItems = (r.items||[]).map(x=>({...x}));
   _pivLegacyItem = (!_pivItems.length && r.item && !r.repairOn && !r.shipOn) ? r.item : '';
   document.getElementById('pivRegHint').textContent = '';
@@ -33965,14 +33987,16 @@ async function pivSave(confirmed){
   btn.disabled = true; btn.textContent = '저장 중…';
   const editId = _pivEditId;
   const now = new Date().toISOString();
+  let savedRec = null;
   const ok = await _pivMutate(PIV_KEY, list=>{
     const i = editId ? list.findIndex(x=>x.id===editId) : -1;
-    if(i>=0) list[i] = { ...list[i], ...rec, updatedAt:now };
-    else list.push({ ...rec, id: editId || _pivNewId(), createdAt:now });
+    if(i>=0) list[i] = savedRec = { ...list[i], ...rec, updatedAt:now };
+    else list.push(savedRec = { ...rec, id: editId || _pivNewId(), createdAt:now });
     return list;
   });
   btn.disabled = false; btn.textContent = '저장';
   if(!ok) return;
+  try{ await _pbSyncFromInvoice(savedRec); }catch(e){ console.warn('전화구매건 연동 반영 실패', e); }
   closeModal('pivModal');
   pivRender();
   toast(editId ? '수정되었습니다.' : '등록되었습니다.');
@@ -34138,23 +34162,32 @@ async function pivWatchTick(){
   const d = await cloudKvLoad(PIV_KEY);
   if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); }
   const isMaster = window.__CURRENT_USER.role==='master';
-  const mine = _pivRows.filter(r=>_pivAlertTarget(r) && _pivOverdueDays(r)!=null)
-    .sort((a,b)=>_pivOverdueDays(b)-_pivOverdueDays(a));
-  if(!mine.length) return;
+  // 전화구매건(미입금 + 입금예정일 경과)도 같은 시간대 알림에 합쳐서 보여준다 — 실패해도 세금계산서 알림은 계속
+  let pbList = null; try{ pbList = await _pbFetchUnpaid(); }catch(e){}
+  if(pbList){ _pbUnpaid = pbList; }
+  const items = [];
+  _pivRows.filter(r=>_pivAlertTarget(r) && _pivOverdueDays(r)!=null).forEach(r=>items.push({ type:'invoice', label:'세금계산서', name:r.company, amount:r.amount, due:r.dueDate, days:_pivOverdueDays(r), staff:r.staff }));
+  (pbList||[]).filter(r=>_pivAlertTarget(r) && _pbOverdueDays(r)!=null).forEach(r=>items.push({ type:'order', label:'전화구매', name:r.recipient, amount:r.amount, due:r.dueDate, days:_pbOverdueDays(r), staff:r.staff }));
+  items.sort((a,b)=>b.days-a.days);
+  if(!items.length) return;
   try{ localStorage.setItem(_pivSlotStoreKey(), slot); }catch{}
-  const lines = mine.slice(0,5).map(r=>`· ${r.company||''} · ${_pivNum(r.amount)}원 · 입금예정일 ${r.dueDate} (${_pivOverdueDays(r)}일 경과)${isMaster && r.staff ? ` · 담당 ${r.staff}` : ''}`);
-  if(mine.length>5) lines.push(`외 ${mine.length-5}건`);
+  const lines = items.slice(0,6).map(r=>`· [${r.label}] ${r.name||''} · ${r.amount!=null?_pivNum(r.amount)+'원':'금액 미입력'} · 입금예정일 ${r.due} (${r.days}일 경과)${isMaster && r.staff ? ` · 담당 ${r.staff}` : ''}`);
+  if(items.length>6) lines.push(`외 ${items.length-6}건`);
+  const firstType = items[0].type;
   ntfShow('piv_overdue', '🧾 입금예정일 경과 알림',
     lines.join('\n')+'\n\n입금예정일이 지났습니다. 업체 문의 바랍니다.',
-    ()=>{ _pivTab='invoice'; goMenu('phoneorder'); },
+    ()=>{ _pivTab = firstType==='order' ? 'order' : 'invoice'; goMenu('phoneorder'); },
     { confirmLabel:'바로가기', closeLabel:'닫기' });
 }
 
 // ───────────────── 전화구매건 (위: 미입금건 관리 / 아래: 거래건) ─────────────────
 //  건별 개별 저장: work_calendar(person='__app__', kind='pb_<id>', data=레코드). 옛 전화구매건(po_*)과 접두어가 달라 섞이지 않음.
-//  레코드: {id,date,staff,recipient,phone1,phone2,zip,addr,product,qty,shipMethod,freight,shipMemo,blank(공란),code,
-//           amount(숫자|null),paid,invoice,note,unpaid(입금여부가 미입금이면 true — 서버 필터용),batch,source('excel'|'manual'),createdAt,updatedAt}
-//  조회(egress 절약): 미입금건은 월과 무관하게 전부 + 거래건은 선택한 월(기본 이번 달)만.
+//  레코드: {id,date,staff,recipient,phone1,phone2,zip,addr,product,qty,shipMethod,freight,shipMemo,blank(공란·엑셀 비고열),code,
+//           amount(숫자|null),paid('미입금'|'입금완료'|…),dueDate(미입금일 때 입금예정일),invoice(계산서 발급여부 5종),note,
+//           invoiceId(연동된 세금계산서 발행 건 id),unpaid(입금여부=미입금),pending(미입금 또는 계산서/현금 미발행 → 위쪽 패널),
+//           batch,source('excel'|'manual'),createdAt,updatedAt}
+//  위쪽(미입금건 관리) = 미입금 OR 계산서 미발행 OR 현금 미발행. 입금완료 + (세금계산서/현금영수증/x)가 되면 자동으로 아래 거래건으로 이동.
+//  조회(egress 절약): 위쪽 건은 월과 무관하게 전부 + 거래건은 선택한 월(기본 이번 달)만.
 //  DB 읽기/쓰기는 _pbFetch*/_pbUpsert/_pbRemove 함수 안에서만 한다(검증 시 이 함수들만 가로채면 실DB 쓰기 방지).
 const PB_COLS = [
   {k:'staff',h:'담당자'},{k:'date',h:'날짜'},{k:'recipient',h:'수취인'},{k:'phone1',h:'수취인연락처1'},{k:'phone2',h:'수취인연락처2'},
@@ -34169,20 +34202,60 @@ const PB_HEADER_MAP = {
   '배송메모':'shipMemo','비고':'blank','패밀리상품코드':'code','총금액':'amount','입금여부':'paid',
   '계산서발급여부':'invoice','계산서발행여부':'invoice','비고란':'note'
 };
+const PB_INVOICE_OPTS = ['세금계산서','계산서 미발행','현금영수증','현금 미발행','x'];
+const PB_INVOICE_PENDING = ['계산서 미발행','현금 미발행'];   // 이 값이면 입금완료여도 위쪽(미입금건 관리)에 남음
+const PB_INVOICE_CLS = { '세금계산서':'pb-inv-a', '계산서 미발행':'pb-inv-b', '현금영수증':'pb-inv-c', '현금 미발행':'pb-inv-d', 'x':'pb-inv-e' };
 const PB_PAGE_SIZE = 30;
 let _pbInited = false;
 let _pbLoaded = false;
-let _pbUnpaid = [];       // 미입금건(전체 기간)
-let _pbMonthRows = [];    // 선택한 월의 거래건
+let _pbUnpaid = [];       // 서버에서 받은 위쪽 후보(미입금/미발행 플래그가 있는 건, 전체 기간)
+let _pbMonthRows = [];    // 선택한 월의 건
+let _pbAll = [];          // 위 둘을 합친 목록(담당자 색 배정 기준)
 let _pbPage = 0;
 let _pbEditId = null;
-let _pbAll = [];          // 미입금+월 거래건 합친 목록(담당자 색 배정 기준)
-let _pbPending = null;    // 업로드 대기(파싱 완료) {rows, fileName}
+let _pbLinkId = '';       // 수정 팝업에서 선택된 세금계산서 발행 건 id
+let _pbLinkOrig = '';     // 팝업을 열 때 연동돼 있던 id
+let _pbPending = null;    // 업로드 대기(파싱 완료) {rows, newRows, dup, fileName}
+let _pbDupToken = 0;
 
 function _pbIsUnpaid(paid){ return /미입금|입금예정|입금전|입금\s*전/.test(String(paid||'')); }
+// 계산서 발급여부 → 5종으로 정리 (추후 계산서 → 계산서 미발행 등). 알 수 없는 값은 그대로 둠
+function _pbNormInvoice(v){
+  const s = String(v==null?'':v).trim(); if(!s) return '';
+  if(PB_INVOICE_OPTS.includes(s)) return s;
+  if(/^x$/i.test(s)) return 'x';
+  const cash = /현금/.test(s);
+  if(/추후|미발행|미발급|진행\s*예정|발행\s*예정|발급\s*예정|예정/.test(s)) return cash ? '현금 미발행' : '계산서 미발행';
+  if(cash) return '현금영수증';
+  if(/계산서|세금/.test(s)) return '세금계산서';
+  return s;
+}
+function _pbNormPaid(v){
+  const s = String(v==null?'':v).trim(); if(!s) return '';
+  if(_pbIsUnpaid(s)) return '미입금';
+  if(/입금\s*완료|입금\s*확인|^완료$/.test(s)) return '입금완료';
+  return s;
+}
+function _pbIsPending(r){ return _pbIsUnpaid(r.paid) || PB_INVOICE_PENDING.includes(_pbNormInvoice(r.invoice)); }
+function _pbFlags(r){ return { unpaid:_pbIsUnpaid(r.paid), pending:_pbIsPending(r) }; }
+function _pbOverdueDays(r){
+  if(!_pbIsUnpaid(r.paid) || !r.dueDate) return null;
+  const t = _pivToday(); if(r.dueDate >= t) return null;
+  return Math.round((new Date(t+'T00:00:00') - new Date(r.dueDate+'T00:00:00'))/86400000);
+}
 function _pbNorm(s){ return String(s==null?'':s).replace(/\s+/g,'').toLowerCase(); }
 function _pbAmountNum(v){ const s=String(v==null?'':v); if(!/\d/.test(s)) return null; const n=Number(s.replace(/[^\d.-]/g,'')); return isNaN(n)?null:n; }
 function _pbNextYm(ym){ const [y,m]=ym.split('-').map(Number); return m===12 ? (y+1)+'-01' : y+'-'+String(m+1).padStart(2,'0'); }
+// 중복 판정 키: 날짜 + 수취인(고객명) + 상품명 + 수량 + 총금액
+function _pbDupKey(date, r){ return [date, r.recipient, r.product, r.qty, r.amount==null?'':r.amount].map(_pbNorm).join('|'); }
+// 같은 키가 기존에 N건 있으면 파일의 같은 키 중 N건까지만 중복으로 본다(같은 상품 줄이 파일 안에 2줄 있어도 정상 처리)
+function _pbSplitDup(rows, date, existing){
+  const cnt = new Map();
+  existing.forEach(e=>{ const k=_pbDupKey(e.date||date, e); cnt.set(k,(cnt.get(k)||0)+1); });
+  const newRows = []; let dup = 0;
+  rows.forEach(r=>{ const k=_pbDupKey(date,r); const c=cnt.get(k)||0; if(c>0){ cnt.set(k,c-1); dup++; } else newRows.push(r); });
+  return { newRows, dup };
+}
 
 function pbInit(){
   if(!_pbInited){
@@ -34198,7 +34271,7 @@ function pbInit(){
   if(!_pbLoaded) pbReload(); else pbRender();
 }
 
-// ── DB 접근 (이 4개 함수만 sb를 직접 사용) ──
+// ── DB 접근 (이 함수들만 sb를 직접 사용) ──
 async function _pbFetch(filterFn){
   const all = [];
   for(let from=0; ; from+=1000){
@@ -34210,8 +34283,16 @@ async function _pbFetch(filterFn){
   }
   return all;
 }
-function _pbFetchUnpaid(){ return _pbFetch(q=>q.eq('data->>unpaid','true')); }
+// 위쪽 후보: pending 플래그 + (이전 버전에서 저장된) unpaid 플래그 건을 합쳐서 반환
+async function _pbFetchUnpaid(){
+  const [a,b] = await Promise.all([ _pbFetch(q=>q.eq('data->>pending','true')), _pbFetch(q=>q.eq('data->>unpaid','true')) ]);
+  if(a===null || b===null) return null;
+  const m = new Map(); a.concat(b).forEach(r=>m.set(r.id,r));
+  return [...m.values()];
+}
 function _pbFetchMonth(ym){ return _pbFetch(q=>q.gte('data->>date', ym+'-01').lt('data->>date', _pbNextYm(ym)+'-01')); }
+function _pbFetchByDate(date){ return _pbFetch(q=>q.eq('data->>date', date)); }
+function _pbFetchByIds(ids){ return ids.length ? _pbFetch(q=>q.in('kind', ids.map(i=>'pb_'+i))) : Promise.resolve([]); }
 async function _pbUpsert(recs){
   const now = new Date().toISOString();
   for(let i=0;i<recs.length;i+=200){
@@ -34245,37 +34326,44 @@ function _pbMatch(r, q){
   return [r.recipient,r.phone1,r.phone2,r.product,r.code,r.staff,r.note,r.addr].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
 }
 function _pbSort(a,b){ return String(b.date||'').localeCompare(String(a.date||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')); }
+function _pbFind(id){ return _pbAll.find(x=>x.id===id) || _pbUnpaid.concat(_pbMonthRows).find(x=>x.id===id); }
 
 function pbRender(){
   const q = (document.getElementById('pbSearch')?.value||'').trim().toLowerCase();
-  _pbAll = _pbUnpaid.concat(_pbMonthRows);
-  const unpaid = _pbUnpaid.filter(r=>_pbMatch(r,q)).sort(_pbSort);
-  const unpaidIds = new Set(_pbUnpaid.map(r=>r.id));
-  const deals = _pbMonthRows.filter(r=>!unpaidIds.has(r.id) && _pbMatch(r,q)).sort(_pbSort);
-  const sum = unpaid.reduce((t,r)=>t+(Number(r.amount)||0),0);
-  document.getElementById('pbUnpaidCount').textContent = unpaid.length;
-  document.getElementById('pbUnpaidSum').textContent = unpaid.length ? `미입금 합계 ${_pivNum(sum)}원` : '';
+  const byId = new Map(); _pbUnpaid.concat(_pbMonthRows).forEach(r=>byId.set(r.id,r));
+  _pbAll = [...byId.values()];
+  // 위: 미입금 OR 계산서/현금 미발행 (월과 무관) / 아래: 이번 선택 월의 나머지
+  const pendingRows = _pbAll.filter(_pbIsPending);
+  const top = pendingRows.filter(r=>_pbMatch(r,q)).sort(_pbSort);
+  const deals = _pbMonthRows.filter(r=>!_pbIsPending(r) && _pbMatch(r,q)).sort(_pbSort);
+  const sum = pendingRows.filter(r=>_pbIsUnpaid(r.paid)).reduce((t,r)=>t+(Number(r.amount)||0),0);
+  const overN = pendingRows.filter(r=>_pbOverdueDays(r)!=null).length;
+  document.getElementById('pbUnpaidCount').textContent = top.length;
+  document.getElementById('pbUnpaidSum').textContent = pendingRows.length ? `미입금 합계 ${_pivNum(sum)}원${overN?` · 입금예정일 경과 ${overN}건`:''} · 미입금 / 계산서·현금 미발행 건` : '';
   document.getElementById('pbDealCount').textContent = deals.length;
-  document.getElementById('pbDealHint').textContent = `${document.getElementById('pbMonth').value||''} 거래건 (미입금건 제외)`;
+  document.getElementById('pbDealHint').textContent = `${document.getElementById('pbMonth').value||''} 거래건 (위쪽 관리 대상 제외)`;
   const canEdit = _pivCanEdit();
   const maxP = Math.max(1, Math.ceil(deals.length/PB_PAGE_SIZE));
   if(_pbPage > maxP-1) _pbPage = maxP-1;
   const empty = (t)=>`<tr><td colspan="${PB_COLS.length+1}" class="cs-empty">${t}</td></tr>`;
-  document.getElementById('pbBodyU').innerHTML = !_pbLoaded ? empty('불러오는 중…') : (unpaid.length ? unpaid.map(r=>_pbRowHtml(r,canEdit,true)).join('') : empty('미입금건이 없습니다.'));
+  document.getElementById('pbBodyU').innerHTML = !_pbLoaded ? empty('불러오는 중…') : (top.length ? top.map(r=>_pbRowHtml(r,canEdit,true)).join('') : empty('미입금 · 미발행 건이 없습니다.'));
   document.getElementById('pbBodyD').innerHTML = !_pbLoaded ? empty('불러오는 중…') : (deals.length ? deals.slice(_pbPage*PB_PAGE_SIZE,(_pbPage+1)*PB_PAGE_SIZE).map(r=>_pbRowHtml(r,canEdit,false)).join('') : empty('이 달의 거래건이 없습니다. 엑셀 업로드 또는 수기 입력으로 추가하세요.'));
   document.getElementById('pbPager').innerHTML = _rgmPagerHtml(_pbPage, PB_PAGE_SIZE, deals.length, 'pbGoto');
 }
 
-function _pbRowHtml(r, canEdit, isUnpaidPanel){
+function _pbRowHtml(r, canEdit, isTop){
   const wr = (v,wide)=>`<td class="piv-l piv-wrapc${wide?' piv-wide':''}">${_esc(v||'')}</td>`;
-  const days = isUnpaidPanel && r.date ? Math.floor((new Date(_pivToday()+'T00:00:00') - new Date(r.date+'T00:00:00'))/86400000) : null;
+  const od = _pbOverdueDays(r);
   let paid = '';
-  if(r.paid){
-    paid = _pbIsUnpaid(r.paid)
-      ? `<span class="piv-badge ${days!=null&&days>=14?'piv-late':'piv-wait'}">${_esc(r.paid)}</span>${days!=null&&days>0?`<span class="piv-sub">${days}일 경과</span>`:''}`
-      : `<span class="piv-badge piv-ok">${_esc(r.paid)}</span>`;
+  if(_pbIsUnpaid(r.paid)){
+    if(od!=null) paid = `<span class="piv-badge piv-late">미입금 · ${od}일 경과</span><span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`;
+    else paid = `<span class="piv-badge piv-wait">미입금</span>${r.dueDate?`<span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`:''}`;
+  } else if(r.paid){
+    paid = `<span class="piv-badge piv-ok">${_esc(r.paid)}</span>`;
   }
-  return `<tr class="${canEdit?'piv-click':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
+  const inv = _pbNormInvoice(r.invoice);
+  const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?'<span class="piv-sub">🔗 계산서 연동</span>':''}` : '';
+  return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
     <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff, _pbAll)}">${_esc(r.staff)}</span>`:''}</td>
     <td>${_esc(r.date||'')}</td>
     ${wr(r.recipient)}
@@ -34292,7 +34380,7 @@ function _pbRowHtml(r, canEdit, isUnpaidPanel){
     <td>${_esc(r.code||'')}</td>
     <td class="piv-r">${r.amount!=null?_pivNum(r.amount):''}</td>
     <td>${paid}</td>
-    ${wr(r.invoice)}
+    <td>${invCell}</td>
     ${wr(r.note)}
     <td>${canEdit?`<button class="piv-act piv-del" onclick="event.stopPropagation();pbDelete('${r.id}')">삭제</button>`:''}</td>
   </tr>`;
@@ -34308,9 +34396,11 @@ function pbBindDrop(){
 function pbOpenUpload(){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   const u = window.__CURRENT_USER || {};
-  _pbPending = null;
+  _pbPending = null; _pbDupToken++;
   document.getElementById('pbUpDate').value = _pivToday();
   document.getElementById('pbUpStaff').value = u.name || u.username || '';
+  document.getElementById('pbUpDue').value = '';
+  document.getElementById('pbUpDueWrap').style.display = 'none';
   document.getElementById('pbUpResult').innerHTML = '';
   document.getElementById('pbUpConfirmBtn').disabled = true;
   document.getElementById('pbUpConfirmBtn').textContent = '업로드';
@@ -34353,10 +34443,10 @@ function pbParseWorkbook(wb){
       if(!g('recipient') && !g('product')) return;
       const rec = { recipient:g('recipient'), phone1:g('phone1'), phone2:g('phone2'), zip:g('zip'), addr:g('addr'), product:g('product'),
         qty:g('qty'), shipMethod:g('shipMethod'), freight:g('freight'), shipMemo:g('shipMemo'), blank:g('blank'), code:g('code'),
-        amount:_pbAmountNum(g('amount')), paid:g('paid'), invoice:g('invoice'), note:g('note') };
+        amount:_pbAmountNum(g('amount')), paid:_pbNormPaid(g('paid')), invoice:_pbNormInvoice(g('invoice')), note:g('note') };
       // 총금액이 적혀 있는데 입금여부/계산서 발급여부가 비어 있으면 업로드 불가 대상
       if(g('amount') && /\d/.test(g('amount'))){
-        const needPaid = !rec.paid, needInv = !rec.invoice;
+        const needPaid = !g('paid'), needInv = !g('invoice');
         if(needPaid || needInv) out.missing.push({ row:r0+i+1, name:rec.recipient||'(수취인 없음)', amount:rec.amount, needPaid, needInv, sheet:sn });
       }
       out.rows.push(rec); found++;
@@ -34368,7 +34458,8 @@ function pbParseWorkbook(wb){
 function pbHandleParsed(res, fileName){
   const box = document.getElementById('pbUpResult');
   const btn = document.getElementById('pbUpConfirmBtn');
-  _pbPending = null; btn.disabled = true;
+  _pbPending = null; btn.disabled = true; _pbDupToken++;
+  document.getElementById('pbUpDueWrap').style.display = 'none';
   if(!res.sheets.length){
     box.innerHTML = '<div style="color:#DC2626;font-size:12.5px;line-height:1.6;">헤더를 찾지 못했습니다.<br>“수취인”, “상품명” 헤더가 있는 행이 있는 엑셀인지 확인해주세요.</div>';
     return;
@@ -34379,15 +34470,37 @@ function pbHandleParsed(res, fileName){
     return;
   }
   if(!res.rows.length){ box.innerHTML = '<div style="color:#DC2626;font-size:12.5px;">헤더는 찾았지만 올릴 데이터 행이 없습니다.</div>'; return; }
-  _pbPending = { rows:res.rows, fileName };
-  const unpaidN = res.rows.filter(r=>_pbIsUnpaid(r.paid)).length;
+  _pbPending = { rows:res.rows, newRows:res.rows, dup:0, fileName };
+  const pendN = res.rows.filter(_pbIsPending).length;
   const sheetInfo = res.sheets.map(s=>`‘${_esc(s.name)}’ ${s.headerRow}행 헤더 · ${s.count}건`).join(' / ');
   const prev = res.rows.slice(0,5).map(r=>`<tr><td class="piv-l">${_esc(r.recipient)}</td><td class="piv-l piv-wrapc">${_esc(r.product)}</td><td>${_esc(r.qty)}</td><td class="piv-r">${r.amount!=null?_pivNum(r.amount):''}</td><td>${_esc(r.paid)}</td><td>${_esc(r.invoice)}</td></tr>`).join('');
-  box.innerHTML = `<div style="font-size:12.5px;color:var(--tx);line-height:1.7;">✅ <b>${_esc(fileName)}</b><br>${sheetInfo}<br>총 <b>${res.rows.length}건</b> 인식${unpaidN?` (미입금 ${unpaidN}건 → 미입금건 관리에 표시)`:''}</div>
-    <div class="piv-table-scroll" style="max-height:170px;margin-top:8px;flex:none;"><table class="piv-table"><thead><tr><th>수취인</th><th>상품명</th><th>수량</th><th>총금액</th><th>입금여부</th><th>계산서</th></tr></thead><tbody>${prev}</tbody></table></div>
+  box.innerHTML = `<div style="font-size:12.5px;color:var(--tx);line-height:1.7;">✅ <b>${_esc(fileName)}</b><br>${sheetInfo}<br>총 <b>${res.rows.length}건</b> 인식${pendN?` (미입금·미발행 ${pendN}건 → 미입금건 관리에 표시)`:''}</div>
+    <div id="pbUpDupInfo" style="font-size:12.5px;color:var(--tx);margin:4px 0;"></div>
+    <div class="piv-table-scroll" style="max-height:170px;margin-top:6px;flex:none;"><table class="piv-table"><thead><tr><th>수취인</th><th>상품명</th><th>수량</th><th>총금액</th><th>입금여부</th><th>계산서 발급여부</th></tr></thead><tbody>${prev}</tbody></table></div>
     ${res.rows.length>5?`<div class="piv-hint">… 외 ${res.rows.length-5}건 (미리보기는 5건까지)</div>`:''}`;
-  btn.textContent = `${res.rows.length}건 업로드`;
-  btn.disabled = false;
+  pbRefreshDup();
+}
+// 선택한 업로드 날짜에 이미 올라간 건과 비교해서 중복(날짜·수취인·상품명·수량·총금액 동일)을 뺀 신규 건수를 계산
+async function pbRefreshDup(){
+  if(!_pbPending) return;
+  const token = ++_pbDupToken;
+  const date = document.getElementById('pbUpDate').value;
+  const info = document.getElementById('pbUpDupInfo'), btn = document.getElementById('pbUpConfirmBtn');
+  btn.disabled = true;
+  if(!date){ if(info) info.textContent = '업로드 날짜를 선택하면 중복 여부를 확인합니다.'; return; }
+  if(info) info.textContent = '중복 확인 중…';
+  const existing = await _pbFetchByDate(date);
+  if(token!==_pbDupToken || !_pbPending) return;
+  if(existing===null){ if(info) info.innerHTML = '<span style="color:#DC2626;">⚠️ 중복 확인에 실패했습니다. 날짜를 다시 선택하거나 잠시 후 시도해주세요.</span>'; return; }
+  const res = _pbSplitDup(_pbPending.rows, date, existing);
+  _pbPending.newRows = res.newRows; _pbPending.dup = res.dup;
+  if(info) info.innerHTML = res.dup ? `♻️ ${_esc(date)}에 이미 올라간 <b>${res.dup}건</b>은 중복이라 제외 → 신규 <b>${res.newRows.length}건</b>` : '중복 없음';
+  const unpaidN = res.newRows.filter(r=>_pbIsUnpaid(r.paid)).length;
+  const dw = document.getElementById('pbUpDueWrap');
+  dw.style.display = unpaidN ? '' : 'none';
+  document.getElementById('pbUpDueLbl').textContent = `미입금 ${unpaidN}건의 입금예정일 * (일괄 적용 · 건별 수정은 업로드 후 행 클릭)`;
+  btn.textContent = res.newRows.length ? `${res.newRows.length}건 업로드` : '업로드할 신규 건 없음';
+  btn.disabled = !res.newRows.length;
 }
 function pbShowMissing(list){
   const rows = list.slice(0,40).map(m=>`<tr><td class="piv-l" style="font-weight:600;">${_esc(m.name)}</td><td class="piv-r">${m.amount!=null?_pivNum(m.amount):''}</td><td class="piv-l">${[m.needPaid?'입금여부':'',m.needInv?'계산서 발급여부':''].filter(Boolean).join(', ')} 미기입</td><td>${m.row}행</td></tr>`).join('');
@@ -34399,38 +34512,63 @@ async function pbConfirmUpload(){
   if(!_pbPending){ return; }
   const date = document.getElementById('pbUpDate').value;
   if(!date){ toast('업로드 날짜를 선택하세요.'); return; }
+  const btn = document.getElementById('pbUpConfirmBtn');
+  btn.disabled = true; btn.textContent = '확인 중…';
+  // 업로드 직전에 한 번 더 최신 데이터로 중복 확인(다른 직원이 방금 올렸을 수 있음)
+  const existing = await _pbFetchByDate(date);
+  if(existing===null){ btn.disabled = false; btn.textContent = '업로드'; toast('중복 확인에 실패했습니다. 잠시 후 다시 시도해주세요.'); return; }
+  const { newRows, dup } = _pbSplitDup(_pbPending.rows, date, existing);
+  if(!newRows.length){ btn.textContent = '업로드할 신규 건 없음'; toast('이미 모두 업로드된 건입니다(중복).'); return; }
+  const due = document.getElementById('pbUpDue').value;
+  if(newRows.some(r=>_pbIsUnpaid(r.paid)) && !due){ btn.disabled = false; btn.textContent = `${newRows.length}건 업로드`; toast('미입금 건의 입금예정일을 선택하세요.'); return; }
   const u = window.__CURRENT_USER || {};
   const staff = u.name || u.username || '';
   const batch = _pivNewId('pbb'), now = new Date().toISOString();
-  const recs = _pbPending.rows.map(r=>({ ...r, id:_pivNewId('pb'), date, staff, unpaid:_pbIsUnpaid(r.paid), batch, source:'excel', createdAt:now }));
-  const btn = document.getElementById('pbUpConfirmBtn');
-  btn.disabled = true; btn.textContent = '업로드 중…';
+  const recs = newRows.map(r=>({ ...r, id:_pivNewId('pb'), date, staff, dueDate:_pbIsUnpaid(r.paid)?due:'', ..._pbFlags(r), batch, source:'excel', createdAt:now }));
+  btn.textContent = '업로드 중…';
   const ok = await _pbUpsert(recs);
   if(!ok){ btn.disabled = false; btn.textContent = `${recs.length}건 업로드`; toast('업로드에 실패했습니다. 다시 시도해주세요.'); return; }
   _pbPending = null;
   closeModal('pbUploadModal');
-  const ym = date.slice(0,7);
-  document.getElementById('pbMonth').value = ym;   // 방금 올린 달로 이동해서 바로 확인
+  document.getElementById('pbMonth').value = date.slice(0,7);   // 방금 올린 달로 이동해서 바로 확인
   _pbPage = 0;
   await pbReload();
-  toast(`${recs.length}건이 업로드되었습니다.`);
+  toast(`${recs.length}건 업로드되었습니다.${dup?` (중복 ${dup}건 제외)`:''}`);
 }
 
 // ───────────────── 수기 입력 / 수정 / 삭제 ─────────────────
 const PB_FIELD_IDS = { date:'Date', staff:'Staff', recipient:'Recipient', phone1:'Phone1', phone2:'Phone2', zip:'Zip', addr:'Addr', product:'Product', qty:'Qty',
-  shipMethod:'ShipMethod', freight:'Freight', shipMemo:'ShipMemo', blank:'Blank', code:'Code', amount:'Amount', paid:'Paid', invoice:'Invoice', note:'Note' };
+  shipMethod:'ShipMethod', freight:'Freight', shipMemo:'ShipMemo', code:'Code', amount:'Amount', paid:'Paid', dueDate:'Due', invoice:'Invoice', note:'Note' };
+// select에 목록에 없는 옛 값이 들어 있으면 그 값도 선택지로 보존
+function _pbSetSelect(id, val, opts, blankLabel){
+  const el = document.getElementById(id);
+  const list = [...opts]; if(val && !list.includes(val)) list.push(val);
+  el.innerHTML = `<option value="">${blankLabel||'선택'}</option>` + list.map(o=>`<option value="${_esc(o)}">${_esc(o)}</option>`).join('');
+  el.value = val || '';
+}
+function pbPaidChanged(){ document.getElementById('pbDueWrap').style.display = document.getElementById('pbFPaid').value==='미입금' ? '' : 'none'; }
+function pbInvoiceChanged(){
+  const v = document.getElementById('pbFInvoice').value;
+  document.getElementById('pbLinkWrap').style.display = ['세금계산서','계산서 미발행','현금영수증','현금 미발행'].includes(v) ? '' : 'none';
+}
 function pbOpenModal(id){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   _pbEditId = id || null;
-  const r = id ? (_pbUnpaid.concat(_pbMonthRows).find(x=>x.id===id) || {}) : {};
+  const r = id ? (_pbFind(id) || {}) : {};
   const u = window.__CURRENT_USER || {};
   document.getElementById('pbModalTitle').textContent = id ? '📞 전화구매건 수정' : '📞 전화구매건 수기 입력';
   Object.entries(PB_FIELD_IDS).forEach(([k,suffix])=>{
+    if(k==='paid' || k==='invoice') return;
     let v = r[k];
     if(!id && k==='date') v = _pivToday();
     if(!id && k==='staff') v = u.name || u.username || '';
     document.getElementById('pbF'+suffix).value = v==null ? '' : v;
   });
+  _pbSetSelect('pbFPaid', _pbNormPaid(r.paid), ['미입금','입금완료']);
+  _pbSetSelect('pbFInvoice', _pbNormInvoice(r.invoice), PB_INVOICE_OPTS);
+  _pbLinkId = _pbLinkOrig = r.invoiceId || '';
+  pbPaidChanged(); pbInvoiceChanged(); pbUpdateLinkInfo();
+  if(!_pivLoaded) pivLoad();   // 연동 선택에 쓸 세금계산서 발행 목록 확보
   openModal('pbModal');
   setTimeout(()=>document.getElementById('pbFRecipient')?.focus(), 100);
 }
@@ -34440,31 +34578,113 @@ async function pbSave(){
   const rec = {};
   Object.keys(PB_FIELD_IDS).forEach(k=>{ rec[k] = g(k); });
   rec.amount = _pbAmountNum(rec.amount);
+  rec.invoiceId = _pbLinkId || '';
   if(!rec.date){ toast('날짜를 입력하세요.'); return; }
   if(!rec.recipient){ toast('수취인을 입력하세요.'); return; }
+  // 연동된 세금계산서 발행 건이 이미 입금완료면 이쪽도 입금완료로 맞춤
+  const linked = rec.invoiceId ? _pivRows.find(x=>x.id===rec.invoiceId) : null;
+  if(linked && linked.paid==='입금완료' && _pbIsUnpaid(rec.paid)){ rec.paid = '입금완료'; toast('연동된 계산서가 입금완료라 입금완료로 반영합니다.'); }
   if(rec.amount!=null && (!rec.paid || !rec.invoice)){ toast('총금액이 있으면 입금여부와 계산서 발급여부를 기입해주세요.'); return; }
-  rec.unpaid = _pbIsUnpaid(rec.paid);
+  if(rec.paid==='미입금' && !rec.dueDate){ toast('미입금 건은 입금예정일을 지정해주세요.'); return; }
+  if(rec.paid!=='미입금') rec.dueDate = rec.dueDate || '';
+  Object.assign(rec, _pbFlags(rec));
   const btn = document.getElementById('pbSaveBtn');
   btn.disabled = true; btn.textContent = '저장 중…';
-  const old = _pbEditId ? (_pbUnpaid.concat(_pbMonthRows).find(x=>x.id===_pbEditId) || {}) : {};
+  const old = _pbEditId ? (_pbFind(_pbEditId) || {}) : {};
   const now = new Date().toISOString();
   const full = _pbEditId ? { ...old, ...rec, id:_pbEditId, updatedAt:now } : { ...rec, id:_pivNewId('pb'), source:'manual', createdAt:now };
   const ok = await _pbUpsert([full]);
+  if(!ok){ btn.disabled = false; btn.textContent = '저장'; toast('저장에 실패했습니다. 다시 시도해주세요.'); return; }
+  try{ await _pbSyncInvoice(full, _pbLinkOrig); }catch(e){ console.warn('계산서 연동 동기화 실패', e); toast('저장은 됐지만 세금계산서 발행 건과의 연동 반영에 실패했습니다.'); }
   btn.disabled = false; btn.textContent = '저장';
-  if(!ok){ toast('저장에 실패했습니다. 다시 시도해주세요.'); return; }
   closeModal('pbModal');
   await pbReload();
   toast(_pbEditId ? '수정되었습니다.' : '등록되었습니다.');
 }
 function pbDelete(id){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
-  const r = _pbUnpaid.concat(_pbMonthRows).find(x=>x.id===id); if(!r) return;
+  const r = _pbFind(id); if(!r) return;
   _openDelPw(`전화구매건 삭제 — ${r.recipient||''} / ${r.product||''}`, async ()=>{
     const ok = await _pbRemove(id);
     if(!ok){ toast('삭제되지 않았습니다. 잠시 후 다시 시도해주세요.'); return; }
+    if(r.invoiceId){ try{ await _pbSyncInvoice({ ...r, invoiceId:'' }, r.invoiceId); }catch(e){} }   // 계산서 쪽 연동 목록에서도 제거
     await pbReload();
     toast('삭제되었습니다.');
   });
+}
+
+// ───────────────── 세금계산서 발행 건과 연동 (입금완료 양방향 반영) ─────────────────
+//  전화구매건 레코드: invoiceId  /  세금계산서 발행 레코드: pbLinks [{id,recipient,product,date}] (표시용 스냅샷)
+//  어느 한쪽이라도 입금완료가 되면 연동된 다른 쪽도 입금완료로 맞춘다.
+function pbUpdateLinkInfo(){
+  const el = document.getElementById('pbLinkInfo'); if(!el) return;
+  if(!_pbLinkId){ el.textContent = '연동 안 됨'; return; }
+  const inv = _pivRows.find(x=>x.id===_pbLinkId);
+  el.textContent = inv ? `🔗 ${inv.company||''} · ${_pivNum(inv.amount)}원 · ${inv.receiptType||''} · 발급 ${inv.issued||'-'} · 입금 ${inv.paid||'-'}` : '🔗 연동된 계산서를 찾을 수 없습니다(삭제됐을 수 있음) — 해제 후 다시 선택하세요.';
+}
+function pbOpenLinkPicker(){
+  document.getElementById('pbLinkSearch').value = '';
+  pbRenderLinkList();
+  openModal('pbLinkModal');
+  setTimeout(()=>document.getElementById('pbLinkSearch')?.focus(), 100);
+}
+function pbRenderLinkList(){
+  const box = document.getElementById('pbLinkList');
+  if(!_pivLoaded){ box.innerHTML = '<div class="cs-empty">세금계산서 발행 목록 불러오는 중…</div>'; pivLoad().then(pbRenderLinkList); return; }
+  const q = (document.getElementById('pbLinkSearch').value||'').trim().toLowerCase();
+  const list = [..._pivRows].filter(r=>!q || [r.company,r.regNo,r.staff,r.item,r.ceo,String(r.amount||'')].map(x=>String(x||'').toLowerCase()).join(' ').includes(q))
+    .sort((a,b)=>String(b.reqDate||'').localeCompare(String(a.reqDate||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,50);
+  box.innerHTML = list.length ? `<table class="piv-table"><thead><tr><th>요청일자</th><th>상호</th><th>영수처리</th><th>금액</th><th>발급여부</th><th>입금여부</th><th>담당자</th></tr></thead><tbody>${list.map(r=>`<tr class="piv-click" onclick="pbPickLink('${r.id}')">
+      <td>${_esc(r.reqDate||'')}</td><td class="piv-l" style="font-weight:600;">${_esc(r.company||'')}</td><td>${_esc(r.receiptType||'')}</td><td class="piv-r">${_pivNum(r.amount)}</td><td>${_esc(r.issued||'')}</td><td>${_esc(r.paid||'')}</td><td>${_esc(r.staff||'')}</td></tr>`).join('')}</tbody></table>` : '<div class="cs-empty">일치하는 세금계산서 발행 건이 없습니다.</div>';
+}
+function pbPickLink(id){
+  _pbLinkId = id;
+  closeModal('pbLinkModal');
+  const inv = _pivRows.find(x=>x.id===id);
+  if(inv && inv.paid==='입금완료' && document.getElementById('pbFPaid').value!=='입금완료'){
+    _pbSetSelect('pbFPaid', '입금완료', ['미입금','입금완료']); pbPaidChanged();
+    toast('연동한 계산서가 입금완료라 입금여부를 입금완료로 맞췄습니다.');
+  }
+  pbUpdateLinkInfo();
+}
+function pbClearLink(){ _pbLinkId = ''; pbUpdateLinkInfo(); }
+function _pbWithPaid(r, paid){ const n = { ...r, paid, updatedAt:new Date().toISOString() }; return { ...n, ..._pbFlags(n) }; }
+const _pbIsPaidDone = r=>!!r.paid && !_pbIsUnpaid(r.paid);
+// 전화구매건 저장 후: 세금계산서 쪽 연동 목록 갱신 + 이쪽이 입금완료면 계산서와 같은 계산서에 연동된 다른 전화구매건도 입금완료로
+async function _pbSyncInvoice(full, oldInvoiceId){
+  const newId = full.invoiceId || '';
+  if(!newId && !oldInvoiceId) return;
+  let siblingsToPay = [];
+  await _pivMutate(PIV_KEY, list=>{
+    if(oldInvoiceId && oldInvoiceId!==newId){
+      const o = list.find(x=>x.id===oldInvoiceId);
+      if(o && o.pbLinks) o.pbLinks = o.pbLinks.filter(l=>l.id!==full.id);
+    }
+    if(newId){
+      const t = list.find(x=>x.id===newId);
+      if(t){
+        t.pbLinks = (t.pbLinks||[]).filter(l=>l.id!==full.id);
+        t.pbLinks.push({ id:full.id, recipient:full.recipient, product:full.product, date:full.date });
+        if(_pbIsPaidDone(full) && t.paid!=='입금완료'){ t.paid = '입금완료'; t.updatedAt = new Date().toISOString(); }
+        if(t.paid==='입금완료') siblingsToPay = t.pbLinks.map(l=>l.id).filter(i=>i!==full.id);
+      }
+    }
+    return list;
+  });
+  if(siblingsToPay.length){
+    const rows = await _pbFetchByIds(siblingsToPay);
+    const upd = (rows||[]).filter(r=>!_pbIsPaidDone(r)).map(r=>_pbWithPaid(r,'입금완료'));
+    if(upd.length) await _pbUpsert(upd);
+  }
+  if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender();
+}
+// 세금계산서 발행 건이 저장됐을 때: 입금완료이면 연동된 전화구매건도 입금완료로
+async function _pbSyncFromInvoice(inv){
+  if(!inv || inv.paid!=='입금완료' || !(inv.pbLinks||[]).length) return;
+  const rows = await _pbFetchByIds(inv.pbLinks.map(l=>l.id));
+  if(rows===null) return;
+  const upd = rows.filter(r=>!_pbIsPaidDone(r)).map(r=>_pbWithPaid(r,'입금완료'));
+  if(upd.length){ await _pbUpsert(upd); if(_pbLoaded) pbReload(); }
 }
 
 // ── 우측하단 커스텀 알림 카드 (범용 헬퍼 — 세금계산서 발행 알림 등 다른 기능에서도 재사용) ──
