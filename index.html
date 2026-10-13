@@ -1164,6 +1164,10 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-badge.pb-inv-c{background:#CCFBF1;color:#0F766E;}
 .piv-badge.pb-inv-d{background:#FFEDD5;color:#C2410C;}
 .piv-badge.pb-inv-e{background:#E2E8F0;color:#334155;}
+.pb-summary{flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--tx);}
+.pb-summary .pb-sum-title{font-weight:700;margin-right:4px;}
+.pb-summary .pb-sum-total{font-weight:700;background:var(--bg);border:1px solid var(--bd);border-radius:9px;padding:4px 10px;}
+.pb-summary .piv-badge{font-size:11.5px;padding:3px 10px;}
 .pb-split{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;}
 .pb-panel{min-height:0;display:flex;flex-direction:column;}
 .pb-panel-head{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
@@ -4108,6 +4112,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <button class="cs-add-btn" id="pbAddBtn" style="background:#059669;" onclick="pbOpenModal()">＋ 수기 입력</button>
       </div>
     </div>
+    <div class="pb-summary" id="pbSummary"></div>
     <div class="pb-split">
       <div class="pb-panel" style="flex:2;">
         <div class="pb-panel-head">⏰ 미입금건 관리 <span class="cs-count" id="pbUnpaidCount">0</span><span class="piv-hint" id="pbUnpaidSum" style="margin:0;"></span></div>
@@ -34332,6 +34337,19 @@ function _pbMatch(r, q){
 function _pbSort(a,b){ return String(b.date||'').localeCompare(String(a.date||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')); }
 function _pbFind(id){ return _pbAll.find(x=>x.id===id) || _pbUnpaid.concat(_pbMonthRows).find(x=>x.id===id); }
 
+// 선택한 월의 "계산서 발급여부 x + 입금완료" 금액 합계 — 담당자별 + 총 합계
+function pbRenderSummary(){
+  const box = document.getElementById('pbSummary'); if(!box) return;
+  const ym = document.getElementById('pbMonth').value || '';
+  const rows = _pbMonthRows.filter(r=>String(r.date||'').startsWith(ym) && _pbNormInvoice(r.invoice)==='x' && _pbIsPaidDone(r) && r.amount!=null);
+  const by = new Map();
+  rows.forEach(r=>{ const k = String(r.staff||'').trim() || '미지정'; const o = by.get(k) || { sum:0, n:0 }; o.sum += Number(r.amount)||0; o.n++; by.set(k,o); });
+  const total = rows.reduce((t,r)=>t+(Number(r.amount)||0),0);
+  const mm = ym ? Number(ym.slice(5,7))+'월' : '';
+  box.innerHTML = `<span class="pb-sum-title">💰 ${mm} 계산서 x · 입금완료 합계</span>`
+    + (rows.length ? [...by.entries()].sort((a,b)=>b[1].sum-a[1].sum).map(([k,o])=>`<span class="piv-badge piv-st piv-st-${_pivStaffColor(k, _pbAll)}">${_esc(k)} ${_pivNum(o.sum)}원 · ${o.n}건</span>`).join('') : '<span class="piv-hint" style="margin:0;">해당 건이 없습니다.</span>')
+    + `<span class="pb-sum-total">총 합계 ${_pivNum(total)}원 · ${rows.length}건</span>`;
+}
 function pbRender(){
   const q = (document.getElementById('pbSearch')?.value||'').trim().toLowerCase();
   const byId = new Map(); _pbUnpaid.concat(_pbMonthRows).forEach(r=>byId.set(r.id,r));
@@ -34344,6 +34362,7 @@ function pbRender(){
   const overN = pendingRows.filter(r=>_pbOverdueDays(r)!=null).length;
   document.getElementById('pbUnpaidCount').textContent = top.length;
   document.getElementById('pbUnpaidSum').textContent = pendingRows.length ? `미입금 합계 ${_pivNum(sum)}원${overN?` · 입금예정일 경과 ${overN}건`:''} · 미입금 / 계산서·현금 미발행 건` : '';
+  pbRenderSummary();
   document.getElementById('pbDealCount').textContent = deals.length;
   document.getElementById('pbDealHint').textContent = `${document.getElementById('pbMonth').value||''} 거래건 (위쪽 관리 대상 제외)`;
   const canEdit = _pivCanEdit();
@@ -34358,7 +34377,7 @@ function pbRender(){
 function _pbRowHtml(r, canEdit, isTop){
   const wr = (v,wide)=>`<td class="piv-l piv-wrapc${wide?' piv-wide':''}">${_esc(v||'')}</td>`;
   const od = _pbOverdueDays(r);
-  const cancelled = !!r.invoiceId && (_pivRows.find(x=>x.id===r.invoiceId)||{}).issued==='발급취소';   // 연동된 세금계산서가 발급취소면 빨간 취소선 처리
+  const cancelled = !!r.invoiceId && (_pivRows.find(x=>x.id===r.invoiceId)||{}).issued==='발급취소';   // 연동된 세금계산서가 발급취소됐는지(안내 문구용)
   let paid = '';
   if(_pbIsUnpaid(r.paid)){
     if(od!=null) paid = `<span class="piv-badge piv-late">미입금 · ${od}일 경과</span><span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`;
@@ -34367,8 +34386,8 @@ function _pbRowHtml(r, canEdit, isTop){
     paid = `<span class="piv-badge piv-ok">${_esc(r.paid)}</span>`;
   }
   const inv = _pbNormInvoice(r.invoice);
-  const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?`<span class="piv-sub">${cancelled?'🔗 계산서 발급취소':'🔗 계산서 연동'}</span>`:''}` : '';
-  return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''} ${cancelled?'piv-cancel':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
+  const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?`<span class="piv-sub">${cancelled?'🔗 연동 계산서 발급취소됨':'🔗 계산서 연동'}</span>`:''}` : '';
+  return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
     <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff, _pbAll)}">${_esc(r.staff)}</span>`:''}</td>
     <td>${_esc(r.date||'')}</td>
     ${wr(r.recipient)}
@@ -34684,11 +34703,22 @@ async function _pbSyncInvoice(full, oldInvoiceId){
   if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender();
 }
 // 세금계산서 발행 건이 저장됐을 때: 입금완료이면 연동된 전화구매건도 입금완료로
+//   · 계산서 입금완료 → 연동된 전화구매건 입금완료
+//   · 계산서 발급취소 → 연동된 전화구매건의 계산서 발급여부를 "계산서 미발행"(현금영수증 건이면 "현금 미발행")으로 → 위쪽 미입금건 관리로 돌아옴
 async function _pbSyncFromInvoice(inv){
-  if(!inv || inv.paid!=='입금완료' || !(inv.pbLinks||[]).length) return;
+  if(!inv || !(inv.pbLinks||[]).length) return;
+  const needPaid = inv.paid==='입금완료', cancelled = inv.issued==='발급취소';
+  if(!needPaid && !cancelled) return;
   const rows = await _pbFetchByIds(inv.pbLinks.map(l=>l.id));
   if(rows===null) return;
-  const upd = rows.filter(r=>!_pbIsPaidDone(r)).map(r=>_pbWithPaid(r,'입금완료'));
+  const target = inv.receiptType==='현금영수증' ? '현금 미발행' : '계산서 미발행';
+  const upd = [];
+  rows.forEach(r=>{
+    const n = { ...r }; let changed = false;
+    if(needPaid && !_pbIsPaidDone(r)){ n.paid = '입금완료'; changed = true; }
+    if(cancelled && _pbNormInvoice(r.invoice)!==target){ n.invoice = target; changed = true; }
+    if(changed){ n.updatedAt = new Date().toISOString(); upd.push({ ...n, ..._pbFlags(n) }); }
+  });
   if(upd.length){ await _pbUpsert(upd); if(_pbLoaded) pbReload(); }
 }
 
