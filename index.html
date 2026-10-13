@@ -1147,17 +1147,36 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-tab{display:none;flex:1;min-height:0;flex-direction:column;padding:14px 18px;box-sizing:border-box;}
 .piv-tab.active{display:flex;}
 .piv-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
-.piv-table-scroll{flex:1;min-height:0;overflow:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
+.piv-table-scroll{flex:1;min-height:0;overflow-x:auto;overflow-y:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
 .piv-table{width:100%;border-collapse:collapse;font-size:12px;}
-.piv-table thead th{position:sticky;top:0;z-index:2;background:var(--bg2);padding:9px 10px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11px;white-space:nowrap;}
-.piv-table tbody td{padding:7px 10px;border-bottom:0.5px solid var(--bd);color:var(--tx);white-space:nowrap;text-align:center;}
+.piv-table thead th{position:sticky;top:0;z-index:2;background:var(--bg2);padding:8px 6px;text-align:center;border-bottom:1px solid var(--bd);font-weight:700;color:var(--tx2);font-size:11px;white-space:nowrap;}
+.piv-table tbody td{padding:7px 6px;border-bottom:0.5px solid var(--bd);color:var(--tx);white-space:nowrap;text-align:center;}
 .piv-table tbody tr:hover{background:var(--bg2);}
 .piv-table tbody tr:last-child td{border-bottom:none;}
 .piv-table tbody tr.piv-click{cursor:pointer;}
 .piv-table tbody tr.piv-over{background:rgba(220,38,38,.08);}
 .piv-table td.piv-l{text-align:left;}
 .piv-table td.piv-r{text-align:right;font-variant-numeric:tabular-nums;}
-.piv-table td.piv-clip{max-width:200px;overflow:hidden;text-overflow:ellipsis;}
+.piv-table td.piv-wrapc{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;min-width:56px;line-height:1.45;}  /* 가로 스크롤 대신 글이 길면 칸 안에서 줄바꿈하며 칸이 늘어남 */
+.piv-table td.piv-wrapc.piv-wide{min-width:100px;}
+.piv-st{background:#E0E7FF;color:#3730A3;}
+.piv-st.piv-st-0{background:#DBEAFE;color:#1D4ED8;}
+.piv-st.piv-st-1{background:#EDE9FE;color:#6D28D9;}
+.piv-st.piv-st-2{background:#FFEDD5;color:#C2410C;}
+.piv-st.piv-st-3{background:#CCFBF1;color:#0F766E;}
+.piv-st.piv-st-4{background:#FEF9C3;color:#A16207;}
+.piv-st.piv-st-5{background:#FCE7F3;color:#BE185D;}
+.piv-st.piv-st-6{background:#DCFCE7;color:#15803D;}
+.piv-st.piv-st-7{background:#FEE2E2;color:#B91C1C;}
+.piv-st.piv-st-8{background:#E0F2FE;color:#0369A1;}
+.piv-st.piv-st-9{background:#F3E8FF;color:#7E22CE;}
+.piv-st.piv-st-10{background:#ECFCCB;color:#4D7C0F;}
+.piv-st.piv-st-11{background:#E2E8F0;color:#334155;}
+.piv-seg{display:inline-flex;border:1px solid var(--bd);border-radius:9px;overflow:hidden;}
+.piv-seg button{border:none;background:var(--bg);color:var(--tx2);font-size:11.5px;font-weight:600;padding:7px 12px;cursor:pointer;font-family:inherit;border-right:1px solid var(--bd);}
+.piv-seg button:last-child{border-right:none;}
+.piv-seg button.on{background:#3182F6;color:#fff;}
+.piv-seg button.on.piv-seg-warn{background:#DC2626;}
 .piv-neg{color:#DC2626;}
 .piv-badge{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}
 .piv-badge.piv-ok{background:#DCFCE7;color:#15803D;}
@@ -4074,6 +4093,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="piv-toolbar">
       <div class="cs-title">🧾 세금계산서 발행 <span class="cs-count" id="pivCount">0</span></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="piv-seg" id="pivFilterSeg"></div>
         <input class="cs-search" id="pivSearch" placeholder="상호·등록번호·담당자·품목 검색" autocomplete="off" oninput="pivSearchChanged()"/>
         <button class="cs-add-btn" id="pivAddBtn" onclick="pivOpenModal()">＋ 계산서 등록</button>
       </div>
@@ -4082,7 +4102,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <table class="piv-table">
         <thead><tr>
           <th>요청일자</th><th>담당자</th><th>등록번호</th><th>거래구분</th><th>상호</th><th>대표자명</th>
-          <th>사업장</th><th>업태</th><th>종목</th><th>이메일 ID</th><th>도메인</th><th>품목</th><th>금액</th><th>마진</th>
+          <th>사업장</th><th>업태</th><th>종목</th><th>이메일 ID</th><th>도메인</th><th>품목</th><th>금액</th><th>마진</th><th>마진율</th>
           <th>영수처리</th><th>발행일자</th><th>발급여부</th><th>입금여부</th><th>비고</th><th style="width:60px;">관리</th>
         </tr></thead>
         <tbody id="pivTbody"></tbody>
@@ -33559,9 +33579,36 @@ async function _pivMutate(key, fn, opts){
 }
 
 // ───────────────── 세금계산서 발행 목록 ─────────────────
+// 담당자별 고정 색 — 담당자가 처음 등장한 순서(등록 시각 기준)대로 12색을 차례로 배정 → 새 담당자가 생겨도 기존 색은 안 바뀌고, 12명까지는 겹치지 않음
+const PIV_STAFF_COLORS = 12;
+let _pivStaffOrderCache = {rows:null, len:-1, order:[]};
+function _pivStaffColor(name){
+  if(_pivStaffOrderCache.rows!==_pivRows || _pivStaffOrderCache.len!==_pivRows.length){
+    const order = [];
+    [..._pivRows].sort((a,b)=>String(a.createdAt||a.reqDate||'').localeCompare(String(b.createdAt||b.reqDate||'')))
+      .forEach(r=>{ const n=String(r.staff||'').trim(); if(n && !order.includes(n)) order.push(n); });
+    _pivStaffOrderCache = {rows:_pivRows, len:_pivRows.length, order};
+  }
+  const i = _pivStaffOrderCache.order.indexOf(String(name).trim());
+  return (i<0 ? 0 : i) % PIV_STAFF_COLORS;
+}
+// 마진율(%) = 마진 ÷ 금액 × 100 (금액 0이면 -)
+function _pivMarginRate(r){ const a=Number(r.amount)||0; return a>0 ? ((Number(r.margin)||0)/a*100).toFixed(1)+'%' : '-'; }
+let _pivPaidFilter = 'all';   // all | unpaid(입금여부 미입금) | overdue(입금예정일 경과)
+function pivSetPaidFilter(f){ _pivPaidFilter = f; _pivPage = 0; pivRender(); }
+function pivRenderFilterSeg(){
+  const seg = document.getElementById('pivFilterSeg'); if(!seg) return;
+  const unpaid = _pivRows.filter(r=>r.paid!=='입금완료');
+  const over = _pivRows.filter(r=>_pivOverdueDays(r)!=null);
+  const sum = unpaid.reduce((t,r)=>t+(Number(r.amount)||0),0);
+  const b = (k,label,cls)=>`<button class="${_pivPaidFilter===k?'on ':''}${cls||''}" onclick="pivSetPaidFilter('${k}')">${label}</button>`;
+  seg.innerHTML = b('all','전체 '+_pivRows.length) + b('unpaid',`미입금 ${unpaid.length}건 · ${_pivNum(sum)}원`) + b('overdue','예정일 경과 '+over.length,' piv-seg-warn');
+}
 function _pivFiltered(){
   const q = (document.getElementById('pivSearch')?.value || '').trim().toLowerCase();
   return _pivRows.filter(r=>{
+    if(_pivPaidFilter==='unpaid' && r.paid==='입금완료') return false;
+    if(_pivPaidFilter==='overdue' && _pivOverdueDays(r)==null) return false;
     if(!q) return true;
     return [r.company,r.regNo,r.staff,r.item,r.ceo].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
   }).sort((a,b)=> String(b.reqDate||'').localeCompare(String(a.reqDate||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
@@ -33578,15 +33625,16 @@ function pivRender(){
   const maxP = Math.max(1, Math.ceil(list.length/PIV_PAGE_SIZE));
   if(_pivPage > maxP-1) _pivPage = maxP-1;
   const cnt = document.getElementById('pivCount'); if(cnt) cnt.textContent = list.length;
+  pivRenderFilterSeg();
   const tb = document.getElementById('pivTbody'); if(!tb) return;
   const canEdit = _pivCanEdit();
   const page = list.slice(_pivPage*PIV_PAGE_SIZE, (_pivPage+1)*PIV_PAGE_SIZE);
   if(!_pivLoaded){
-    tb.innerHTML = '<tr><td colspan="20" class="cs-empty">불러오는 중…</td></tr>';
+    tb.innerHTML = '<tr><td colspan="21" class="cs-empty">불러오는 중…</td></tr>';
   } else if(!page.length){
-    tb.innerHTML = `<tr><td colspan="20" class="cs-empty">${_pivRows.length ? '조건에 맞는 건이 없습니다.' : '등록된 계산서가 없습니다. 우측 상단 “＋ 계산서 등록”으로 추가하세요.'}</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="21" class="cs-empty">${_pivRows.length ? '조건에 맞는 건이 없습니다.' : '등록된 계산서가 없습니다. 우측 상단 “＋ 계산서 등록”으로 추가하세요.'}</td></tr>`;
   } else {
-    const clip = (v)=>`<td class="piv-l piv-clip" title="${_esc(v||'')}">${_esc(v||'')}</td>`;
+    const clip = (v)=>`<td class="piv-l piv-wrapc piv-wide">${_esc(v||'')}</td>`;
     tb.innerHTML = page.map(r=>{
       const m = Number(r.margin)||0;
       const od = _pivOverdueDays(r);
@@ -33596,19 +33644,20 @@ function pivRender(){
       else paidCell = `<span class="piv-badge piv-wait">미입금</span>${r.dueDate?`<span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`:''}`;
       return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pivOpenModal('${r.id}')"`:''}>
         <td>${_esc(r.reqDate||'')}</td>
-        <td>${_esc(r.staff||'')}</td>
+        <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff)}">${_esc(r.staff)}</span>`:''}</td>
         <td>${_esc(r.regNo||'')}</td>
         <td>${r.tradeType?`<span class="piv-badge piv-tt-${_esc(r.tradeType)}">${_esc(r.tradeType)}</span>`:''}</td>
-        <td class="piv-l" style="font-weight:600;">${_esc(r.company||'')}</td>
-        <td>${_esc(r.ceo||'')}</td>
+        <td class="piv-l piv-wrapc" style="font-weight:600;">${_esc(r.company||'')}</td>
+        <td class="piv-wrapc">${_esc(r.ceo||'')}</td>
         ${clip(r.addr)}
         <td>${_esc(r.bizType||'')}</td>
         <td>${_esc(r.bizItem||'')}</td>
-        <td class="piv-l">${_esc(_pivSplitEmail(r.email)[0])}</td>
-        <td class="piv-l">${_esc(_pivSplitEmail(r.email)[1])}</td>
+        <td class="piv-l piv-wrapc">${_esc(_pivSplitEmail(r.email)[0])}</td>
+        <td class="piv-l piv-wrapc">${_esc(_pivSplitEmail(r.email)[1])}</td>
         ${clip(r.item)}
         <td class="piv-r">${_pivNum(r.amount)}</td>
         <td class="piv-r ${m<0?'piv-neg':''}">${_pivNum(m)}</td>
+        <td class="piv-r ${m<0?'piv-neg':''}">${_pivMarginRate(r)}</td>
         <td><span class="piv-badge piv-type">${_esc(r.receiptType||'')}</span></td>
         <td>${_esc(r.issueDate||'')}</td>
         <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':'piv-wait'}">${_esc(r.issued||'미발급')}</span></td>
@@ -33877,16 +33926,16 @@ function pivCoRender(){
   } else if(!page.length){
     tb.innerHTML = `<tr><td colspan="9" class="cs-empty">${_pivCoRows.length ? '조건에 맞는 업체가 없습니다.' : '등록된 업체가 없습니다. 우측 상단 “＋ 업체 등록”으로 추가하세요.'}</td></tr>`;
   } else {
-    const clip = (v)=>`<td class="piv-l piv-clip" title="${_esc(v||'')}">${_esc(v||'')}</td>`;
+    const clip = (v)=>`<td class="piv-l piv-wrapc piv-wide">${_esc(v||'')}</td>`;
     tb.innerHTML = page.map(r=>`<tr class="${canEdit?'piv-click':''}" ${canEdit?`onclick="pivCoOpenModal('${r.id}')"`:''}>
       <td><span class="piv-badge piv-type">${_esc(r.kind||'')}</span></td>
       <td>${_esc(r.regNo||'')}</td>
-      <td class="piv-l" style="font-weight:600;">${_esc(r.company||'')}</td>
-      <td>${_esc(r.ceo||'')}</td>
+      <td class="piv-l piv-wrapc" style="font-weight:600;">${_esc(r.company||'')}</td>
+      <td class="piv-wrapc">${_esc(r.ceo||'')}</td>
       ${clip(r.addr)}
       <td>${_esc(r.bizType||'')}</td>
       <td>${_esc(r.bizItem||'')}</td>
-      <td class="piv-l">${_esc(r.email||'')}</td>
+      <td class="piv-l piv-wrapc">${_esc(r.email||'')}</td>
       <td>${canEdit ? `<button class="piv-act piv-del" onclick="event.stopPropagation();pivCoDelete('${r.id}')">삭제</button>` : ''}</td>
     </tr>`).join('');
   }
