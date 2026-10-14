@@ -1159,6 +1159,13 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-table td.piv-r{text-align:right;font-variant-numeric:tabular-nums;}
 .piv-table td.piv-wrapc{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;min-width:56px;line-height:1.45;}  /* 가로 스크롤 대신 글이 길면 칸 안에서 줄바꿈하며 칸이 늘어남 */
 .piv-table td.piv-wrapc.piv-wide{min-width:100px;}
+.piv-badge.pb-cat-a{background:#DCFCE7;color:#15803D;}
+.piv-badge.pb-cat-b{background:#DBEAFE;color:#1D4ED8;}
+.piv-badge.pb-cat-c{background:#EDE9FE;color:#6D28D9;}
+.piv-badge.pb-cat-d{background:#FFEDD5;color:#C2410C;}
+.piv-badge.pb-cat-e{background:#FEE2E2;color:#B91C1C;}
+.pb-monthbar{display:inline-flex;align-items:center;gap:4px;}
+.pb-monthbar button.on{background:#3182F6;color:#fff;border-color:#3182F6;}
 .piv-badge.pb-inv-a{background:#DCFCE7;color:#15803D;}
 .piv-badge.pb-inv-b{background:#FEF3C7;color:#B45309;}
 .piv-badge.pb-inv-c{background:#CCFBF1;color:#0F766E;}
@@ -4105,7 +4112,12 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="piv-toolbar">
       <div class="cs-title">📞 전화구매건</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input type="month" id="pbMonth" class="cs-search" style="width:140px;" onchange="pbMonthChanged()" title="거래건 조회 월 (미입금건은 월과 상관없이 전부 표시)"/>
+        <div class="pb-monthbar" title="거래건 조회 월 (미입금건은 월과 상관없이 전부 표시)">
+          <span id="pbMonthChips" class="pb-monthbar"></span>
+          <button class="cs-mini-btn" onclick="pbShiftMonth(-1)">◀</button>
+          <input type="month" id="pbMonth" class="cs-search" style="width:140px;" onchange="pbMonthChanged()"/>
+          <button class="cs-mini-btn" onclick="pbShiftMonth(1)">▶</button>
+        </div>
         <input class="cs-search" id="pbSearch" placeholder="수취인·연락처·상품명·코드 검색" autocomplete="off" oninput="pbSearchChanged()"/>
         <button class="cs-mini-btn" onclick="pbReload()">🔄 새로고침</button>
         <button class="cs-add-btn" id="pbUploadBtn" onclick="pbOpenUpload()">📤 엑셀 업로드</button>
@@ -4217,13 +4229,14 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div class="modal" style="max-width:920px;padding:22px 24px;">
     <h3 id="pbModalTitle" style="font-size:16px;margin-bottom:16px;">📞 전화구매건 수기 입력</h3>
     <div class="piv-grid">
+      <div class="field"><label>거래구분</label><select id="pbFCategory"></select></div>
       <div class="field"><label>날짜 *</label><input type="date" id="pbFDate"></div>
       <div class="field"><label>담당자</label><input type="text" id="pbFStaff" autocomplete="off"></div>
       <div class="field"><label>수취인 *</label><input type="text" id="pbFRecipient" autocomplete="off"></div>
       <div class="field"><label>수취인연락처1</label><input type="text" id="pbFPhone1" autocomplete="off"></div>
       <div class="field"><label>수취인연락처2</label><input type="text" id="pbFPhone2" autocomplete="off"></div>
       <div class="field"><label>우편번호</label><input type="text" id="pbFZip" autocomplete="off"></div>
-      <div class="field piv-span3"><label>기본주소</label><input type="text" id="pbFAddr" autocomplete="off"></div>
+      <div class="field piv-span2"><label>기본주소</label><input type="text" id="pbFAddr" autocomplete="off"></div>
       <div class="field piv-span3"><label>상품명</label><input type="text" id="pbFProduct" autocomplete="off"></div>
       <div class="field"><label>수량</label><input type="text" id="pbFQty" autocomplete="off"></div>
       <div class="field"><label>배송방법</label><input type="text" id="pbFShipMethod" list="pbShipList" autocomplete="off"><datalist id="pbShipList"><option value="택배"></option><option value="화물"></option><option value="퀵"></option><option value="직접수령"></option></datalist></div>
@@ -33710,7 +33723,7 @@ function _pivStaffColor(name, rows){
   return (i<0 ? 0 : i) % PIV_STAFF_COLORS;
 }
 // 마진율(%) = 마진 ÷ 금액 × 100 (금액 0이면 -)
-function _pivMarginRate(r){ const a=Number(r.amount)||0; return a>0 ? ((Number(r.margin)||0)/a*100).toFixed(1)+'%' : '-'; }
+function _pivMarginRate(r){ const a=Number(r.amount)||0; if(r.margin==null || r.margin==='') return '-'; return a>0 ? ((Number(r.margin)||0)/a*100).toFixed(1)+'%' : '-'; }
 let _pivPaidFilter = 'all';   // all | unpaid(입금여부 미입금) | overdue(입금예정일 경과)
 function pivSetPaidFilter(f){ _pivPaidFilter = f; _pivPage = 0; pivRender(); }
 function pivRenderFilterSeg(){
@@ -33773,7 +33786,7 @@ function pivRender(){
         <td class="piv-l piv-wrapc">${_esc(_pivSplitEmail(r.email)[1])}</td>
         ${clip(r.item)}
         <td class="piv-r">${_pivNum(r.amount)}</td>
-        <td class="piv-r ${m<0?'piv-neg':''}">${_pivNum(m)}</td>
+        <td class="piv-r ${m<0?'piv-neg':''}">${r.margin==null||r.margin===''?'':_pivNum(m)}</td>
         <td class="piv-r ${m<0?'piv-neg':''}">${_pivMarginRate(r)}</td>
         <td><span class="piv-badge piv-type">${_esc(r.receiptType||'')}</span></td>
         <td>${_esc(r.issueDate||'')}</td>
@@ -34198,15 +34211,17 @@ async function pivWatchTick(){
 //  위쪽(미입금건 관리) = 미입금 OR 계산서 미발행 OR 현금 미발행. 입금완료 + (세금계산서/현금영수증/x)가 되면 자동으로 아래 거래건으로 이동.
 //  조회(egress 절약): 위쪽 건은 월과 무관하게 전부 + 거래건은 선택한 월(기본 이번 달)만.
 //  DB 읽기/쓰기는 _pbFetch*/_pbUpsert/_pbRemove 함수 안에서만 한다(검증 시 이 함수들만 가로채면 실DB 쓰기 방지).
+const PB_CATEGORIES = ['구매','누락','불량','오배송','파손'];
+const PB_CAT_CLS = { '구매':'pb-cat-a', '누락':'pb-cat-b', '불량':'pb-cat-c', '오배송':'pb-cat-d', '파손':'pb-cat-e' };
 const PB_COLS = [
-  {k:'staff',h:'담당자'},{k:'date',h:'날짜'},{k:'recipient',h:'수취인'},{k:'phone1',h:'수취인연락처1'},{k:'phone2',h:'수취인연락처2'},
+  {k:'category',h:'거래구분'},{k:'staff',h:'담당자'},{k:'date',h:'날짜'},{k:'recipient',h:'수취인'},{k:'phone1',h:'수취인연락처1'},{k:'phone2',h:'수취인연락처2'},
   {k:'zip',h:'우편번호'},{k:'addr',h:'기본주소'},{k:'product',h:'상품명'},{k:'qty',h:'수량'},{k:'shipMethod',h:'배송방법'},
   {k:'freight',h:'운임구분'},{k:'shipMemo',h:'배송메모'},{k:'blank',h:'공란'},{k:'code',h:'패밀리상품코드'},{k:'amount',h:'총금액'},
   {k:'paid',h:'입금여부'},{k:'invoice',h:'계산서 발급여부'},{k:'note',h:'비고란'}
 ];
 // 엑셀 헤더(공백 제거 후) → 필드. 담당자·날짜는 파일 값을 쓰지 않음(담당자=업로드 직원, 날짜=업로드 시 선택)
 const PB_HEADER_MAP = {
-  '수취인':'recipient','수취인연락처1':'phone1','수취인연락처':'phone1','연락처1':'phone1','수취인연락처2':'phone2','연락처2':'phone2',
+  '거래구분':'category','수취인':'recipient','수취인연락처1':'phone1','수취인연락처':'phone1','연락처1':'phone1','수취인연락처2':'phone2','연락처2':'phone2',
   '우편번호':'zip','기본주소':'addr','주소':'addr','상품명':'product','수량':'qty','배송방법':'shipMethod','운임구분':'freight',
   '배송메모':'shipMemo','비고':'blank','패밀리상품코드':'code','총금액':'amount','입금여부':'paid',
   '계산서발급여부':'invoice','계산서발행여부':'invoice','비고란':'note'
@@ -34327,12 +34342,28 @@ async function pbReload(){
   pbRender();
 }
 function pbMonthChanged(){ _pbPage = 0; pbReload(); }
+function pbShiftMonth(d){
+  const el = document.getElementById('pbMonth'); const cur = el.value || _pivToday().slice(0,7);
+  const [y,m] = cur.split('-').map(Number); const t = new Date(y, m-1+d, 1);
+  el.value = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');
+  pbMonthChanged();
+}
+function pbSetMonth(ym){ document.getElementById('pbMonth').value = ym; pbMonthChanged(); }
+// 최근 6개월 바로가기(선택된 달이 6개월 밖이어도 그 달을 함께 표시)
+function pbRenderMonthChips(){
+  const box = document.getElementById('pbMonthChips'); if(!box) return;
+  const sel = document.getElementById('pbMonth').value || '';
+  const now = new Date(), list = [];
+  for(let i=5;i>=0;i--){ const t = new Date(now.getFullYear(), now.getMonth()-i, 1); list.push(t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')); }
+  if(sel && !list.includes(sel)) list.unshift(sel);
+  box.innerHTML = list.map(ym=>`<button class="cs-mini-btn${ym===sel?' on':''}" title="${ym}" onclick="pbSetMonth('${ym}')">${Number(ym.slice(5,7))}월</button>`).join('');
+}
 function pbSearchChanged(){ _pbPage = 0; pbRender(); }
 function pbGoto(p){ _pbPage = Math.max(0,p); pbRender(); }
 
 function _pbMatch(r, q){
   if(!q) return true;
-  return [r.recipient,r.phone1,r.phone2,r.product,r.code,r.staff,r.note,r.addr].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
+  return [r.category,r.recipient,r.phone1,r.phone2,r.product,r.code,r.staff,r.note,r.addr].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
 }
 function _pbSort(a,b){ return String(b.date||'').localeCompare(String(a.date||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')); }
 function _pbFind(id){ return _pbAll.find(x=>x.id===id) || _pbUnpaid.concat(_pbMonthRows).find(x=>x.id===id); }
@@ -34362,7 +34393,7 @@ function pbRender(){
   const overN = pendingRows.filter(r=>_pbOverdueDays(r)!=null).length;
   document.getElementById('pbUnpaidCount').textContent = top.length;
   document.getElementById('pbUnpaidSum').textContent = pendingRows.length ? `미입금 합계 ${_pivNum(sum)}원${overN?` · 입금예정일 경과 ${overN}건`:''} · 미입금 / 계산서·현금 미발행 건` : '';
-  pbRenderSummary();
+  pbRenderSummary(); pbRenderMonthChips();
   document.getElementById('pbDealCount').textContent = deals.length;
   document.getElementById('pbDealHint').textContent = `${document.getElementById('pbMonth').value||''} 거래건 (위쪽 관리 대상 제외)`;
   const canEdit = _pivCanEdit();
@@ -34388,6 +34419,7 @@ function _pbRowHtml(r, canEdit, isTop){
   const inv = _pbNormInvoice(r.invoice);
   const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?`<span class="piv-sub">${cancelled?'🔗 연동 계산서 발급취소됨':'🔗 계산서 연동'}</span>`:''}` : '';
   return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
+    <td>${r.category?`<span class="piv-badge ${PB_CAT_CLS[r.category]||'piv-type'}">${_esc(r.category)}</span>`:''}</td>
     <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff, _pbAll)}">${_esc(r.staff)}</span>`:''}</td>
     <td>${_esc(r.date||'')}</td>
     ${wr(r.recipient)}
@@ -34465,7 +34497,7 @@ function pbParseWorkbook(wb){
       if(!map) return;
       const g = k=> map[k]==null ? '' : String(row[map[k]]==null?'':row[map[k]]).trim();
       if(!g('recipient') && !g('product')) return;
-      const rec = { recipient:g('recipient'), phone1:g('phone1'), phone2:g('phone2'), zip:g('zip'), addr:g('addr'), product:g('product'),
+      const rec = { category:g('category'), recipient:g('recipient'), phone1:g('phone1'), phone2:g('phone2'), zip:g('zip'), addr:g('addr'), product:g('product'),
         qty:g('qty'), shipMethod:g('shipMethod'), freight:g('freight'), shipMemo:g('shipMemo'), blank:g('blank'), code:g('code'),
         amount:_pbAmountNum(g('amount')), paid:_pbNormPaid(g('paid')), invoice:_pbNormInvoice(g('invoice')), note:g('note') };
       // 총금액이 적혀 있는데 입금여부/계산서 발급여부가 비어 있으면 업로드 불가 대상
@@ -34561,7 +34593,7 @@ async function pbConfirmUpload(){
 }
 
 // ───────────────── 수기 입력 / 수정 / 삭제 ─────────────────
-const PB_FIELD_IDS = { date:'Date', staff:'Staff', recipient:'Recipient', phone1:'Phone1', phone2:'Phone2', zip:'Zip', addr:'Addr', product:'Product', qty:'Qty',
+const PB_FIELD_IDS = { category:'Category', date:'Date', staff:'Staff', recipient:'Recipient', phone1:'Phone1', phone2:'Phone2', zip:'Zip', addr:'Addr', product:'Product', qty:'Qty',
   shipMethod:'ShipMethod', freight:'Freight', shipMemo:'ShipMemo', code:'Code', amount:'Amount', paid:'Paid', dueDate:'Due', invoice:'Invoice', note:'Note' };
 // select에 목록에 없는 옛 값이 들어 있으면 그 값도 선택지로 보존
 function _pbSetSelect(id, val, opts, blankLabel){
@@ -34582,12 +34614,13 @@ function pbOpenModal(id){
   const u = window.__CURRENT_USER || {};
   document.getElementById('pbModalTitle').textContent = id ? '📞 전화구매건 수정' : '📞 전화구매건 수기 입력';
   Object.entries(PB_FIELD_IDS).forEach(([k,suffix])=>{
-    if(k==='paid' || k==='invoice') return;
+    if(k==='paid' || k==='invoice' || k==='category') return;
     let v = r[k];
     if(!id && k==='date') v = _pivToday();
     if(!id && k==='staff') v = u.name || u.username || '';
     document.getElementById('pbF'+suffix).value = v==null ? '' : v;
   });
+  _pbSetSelect('pbFCategory', r.category || '', PB_CATEGORIES);
   _pbSetSelect('pbFPaid', _pbNormPaid(r.paid), ['미입금','입금완료']);
   _pbSetSelect('pbFInvoice', _pbNormInvoice(r.invoice), PB_INVOICE_OPTS);
   _pbLinkId = _pbLinkOrig = r.invoiceId || '';
