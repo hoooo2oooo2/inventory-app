@@ -2164,6 +2164,11 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .um-table th,.um-table td{border:0.5px solid var(--bd);padding:6px 8px;text-align:center;}
 .um-table th{background:var(--bg2);color:var(--tx2);font-weight:600;font-size:11px;}
 .um-table td:first-child,.um-table th:first-child{text-align:left;}
+/* 마이페이지 직원 권한 목록 — 아이디·이름 틀 고정 */
+#mpList .um-table th:nth-child(1),#mpList .um-table td:nth-child(1){position:sticky;left:0;z-index:2;width:118px;min-width:118px;max-width:118px;}
+#mpList .um-table th:nth-child(2),#mpList .um-table td:nth-child(2){position:sticky;left:118px;z-index:2;width:78px;min-width:78px;max-width:78px;box-shadow:2px 0 0 var(--bd);}
+#mpList .um-table th:nth-child(1),#mpList .um-table th:nth-child(2){background:var(--bg2);z-index:3;}
+#mpList .um-table td:nth-child(1),#mpList .um-table td:nth-child(2){background:var(--bg);}
 .um-sel{border:1px solid var(--bd);border-radius:6px;font-size:12px;padding:3px 4px;background:var(--bg);cursor:pointer;}
 /* 통합 수정모드 잠금 시 행 수정버튼 흐리게 */
 #revUniTable.uni-locked td:last-child button{opacity:.35;}
@@ -34161,10 +34166,11 @@ function _pivIsMine(r){
   const s = String(r.staff||'').trim();
   return !!s && (s===String(u.name||'').trim() || s===String(u.username||'').trim());
 }
-// 경과 알림 대상 건 — 마스터 계정은 전체, 그 외는 본인이 담당자인 건만
+// 경과 알림 대상 건 — 관리자(admin 계정)는 전체, 그 외 계정은 본인이 담당자인 건만 (조신성 등 다른 마스터는 해당 건 담당자일 때만)
+function _pivIsAlertAdmin(){ const u = window.__CURRENT_USER; return !!u && u.username==='admin'; }
 function _pivAlertTarget(r){
   const u = window.__CURRENT_USER; if(!u) return false;
-  return u.role==='master' || _pivIsMine(r);
+  return _pivIsAlertAdmin() || _pivIsMine(r);
 }
 function pivStartWatch(){
   if(_pivWatchStarted) return;
@@ -34184,7 +34190,7 @@ async function pivWatchTick(){
   if(shown===slot) return;
   const d = await cloudKvLoad(PIV_KEY);
   if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); }
-  const isMaster = window.__CURRENT_USER.role==='master';
+  const isMaster = _pivIsAlertAdmin();   // 전체 건을 받는 관리자에게만 '담당 OOO' 표시
   // 전화구매건(미입금 + 입금예정일 경과)도 같은 시간대 알림에 합쳐서 보여준다 — 실패해도 세금계산서 알림은 계속
   let pbList = null; try{ pbList = await _pbFetchUnpaid(); }catch(e){}
   if(pbList){ _pbUnpaid = pbList; }
