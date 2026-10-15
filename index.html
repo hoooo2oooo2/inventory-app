@@ -4131,7 +4131,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <div class="piv-table-scroll"><table class="piv-table pb-table"><thead id="pbHeadU"></thead><tbody id="pbBodyU"></tbody></table></div>
       </div>
       <div class="pb-panel" style="flex:3;">
-        <div class="pb-panel-head">📦 거래건 <span class="cs-count" id="pbDealCount">0</span><span class="piv-hint" id="pbDealHint" style="margin:0;"></span></div>
+        <div class="pb-panel-head">📦 거래건 <span class="cs-count" id="pbDealCount">0</span><span class="piv-hint" id="pbDealHint" style="margin:0;"></span>
+          <select id="pbDayFilter" class="cs-search" style="width:150px;margin-left:auto;padding:4px 8px;cursor:pointer;" onchange="pbDayChanged()" title="날짜별로 골라 보기"><option value="">전체 날짜</option></select></div>
         <div class="piv-table-scroll"><table class="piv-table pb-table"><thead id="pbHeadD"></thead><tbody id="pbBodyD"></tbody></table></div>
         <div class="piv-pager" id="pbPager"></div>
       </div>
@@ -34341,7 +34342,8 @@ async function pbReload(){
   _pbLoaded = true;
   pbRender();
 }
-function pbMonthChanged(){ _pbPage = 0; pbReload(); }
+function pbMonthChanged(){ _pbPage = 0; const d = document.getElementById('pbDayFilter'); if(d) d.value = ''; pbReload(); }
+function pbDayChanged(){ _pbPage = 0; pbRender(); }
 function pbShiftMonth(d){
   const el = document.getElementById('pbMonth'); const cur = el.value || _pivToday().slice(0,7);
   const [y,m] = cur.split('-').map(Number); const t = new Date(y, m-1+d, 1);
@@ -34388,7 +34390,18 @@ function pbRender(){
   // 위: 미입금 OR 계산서/현금 미발행 (월과 무관) / 아래: 이번 선택 월의 나머지
   const pendingRows = _pbAll.filter(_pbIsPending);
   const top = pendingRows.filter(r=>_pbMatch(r,q)).sort(_pbSort);
-  const deals = _pbMonthRows.filter(r=>!_pbIsPending(r) && _pbMatch(r,q)).sort(_pbSort);
+  const dealsAll = _pbMonthRows.filter(r=>!_pbIsPending(r) && _pbMatch(r,q)).sort(_pbSort);
+  // 날짜별 보기: 그 달에 건이 있는 날짜 목록(건수 포함)을 드롭다운으로
+  const daySel = document.getElementById('pbDayFilter');
+  const dayCnt = {}; dealsAll.forEach(r=>{ const d=r.date||''; dayCnt[d]=(dayCnt[d]||0)+1; });
+  const dayList = Object.keys(dayCnt).sort().reverse();
+  let dayVal = daySel ? daySel.value : '';
+  if(dayVal && !dayCnt[dayVal]) dayVal = '';
+  if(daySel){
+    daySel.innerHTML = '<option value="">전체 날짜 ('+dealsAll.length+')</option>' + dayList.map(d=>`<option value="${_esc(d)}">${_esc(d.slice(5))} (${dayCnt[d]}건)</option>`).join('');
+    daySel.value = dayVal;
+  }
+  const deals = dayVal ? dealsAll.filter(r=>(r.date||'')===dayVal) : dealsAll;
   const sum = pendingRows.filter(r=>_pbIsUnpaid(r.paid)).reduce((t,r)=>t+(Number(r.amount)||0),0);
   const overN = pendingRows.filter(r=>_pbOverdueDays(r)!=null).length;
   document.getElementById('pbUnpaidCount').textContent = top.length;
