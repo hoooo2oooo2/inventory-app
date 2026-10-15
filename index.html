@@ -115,11 +115,16 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .ni:hover{color:var(--tx);}
 .ni.active{color:var(--pr);border-bottom-color:var(--pr);font-weight:500;}
 .ni.dis{opacity:.35;cursor:default;}
-/* 소그룹 메뉴(CX팀): 그룹 라벨 칩 + 구분선, 폭이 모자라면 그룹 단위로 줄바꿈 */
+/* 소그룹 메뉴(CX팀): 클릭해서 펼치는 그룹 칩 + 구분선, 평상시 닫힘, 폭이 모자라면 그룹 단위로 줄바꿈 */
 #mainMenuNav.grouped{flex-wrap:wrap;overflow-x:visible;}
 .ni-group{display:flex;align-items:center;white-space:nowrap;padding-right:8px;margin-right:8px;border-right:1px solid var(--bd);}
 .ni-group:last-child{border-right:none;margin-right:0;}
-.ni-gl{font-size:11px;font-weight:700;color:var(--pr);background:var(--prl);border-radius:10px;padding:2px 9px;margin-right:4px;user-select:none;}
+.ni-group:not(.open) .ni{display:none !important;}
+.ni-gl{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--pr);background:var(--prl);border:1px solid transparent;border-radius:14px;padding:5px 11px;margin:6px 4px 6px 0;cursor:pointer;user-select:none;transition:background .15s,color .15s;}
+.ni-gl:hover{border-color:var(--pr);}
+.ni-gl .gl-arrow{font-size:10px;opacity:.8;}
+.ni-gl .gl-cur{font-weight:500;opacity:.95;}
+.ni-gl.has-active{background:var(--pr);color:#fff;}
 
 .nbadge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#DC2626;color:#fff;font-size:9px;font-weight:600;margin-left:3px;vertical-align:middle;}
 .pulse-wrap{display:inline-flex;align-items:center;position:relative;margin-left:3px;vertical-align:middle;}
@@ -8008,6 +8013,7 @@ const DEPTS = [
 ];
 let _activeDept = null;
 let _navOrig = null, _navGroupedDept = null; // 소그룹 메뉴: 원본 항목 순서 / 현재 그룹 구성된 부서
+const _navOpenGroups = new Set(); // 소그룹 열림 상태(저장 안 함 — 새로 열면 항상 닫힘). TDZ 방지로 _activeDept 옆에 선언
 function _menuLabel(id){ const m=MENUS.find(x=>x.id===id); return m?m.label:id; }
 function _deptVisibleMenus(deptId){
   const d=DEPTS.find(x=>x.id===deptId); if(!d) return [];
@@ -8073,7 +8079,8 @@ function _applyNavGroups(){
       const placed=new Set();
       const build=(label, ids)=>{
         const wrap=document.createElement('div'); wrap.className='ni-group';
-        const lb=document.createElement('span'); lb.className='ni-gl'; lb.textContent=label; wrap.appendChild(lb);
+        const lb=document.createElement('div'); lb.className='ni-gl'; lb.dataset.g=label; lb.onclick=()=>toggleNavGroup(label); wrap.appendChild(lb);
+        wrap.dataset.g=label;
         ids.forEach(id=>{ const el=document.getElementById('nav-'+id); if(el){ wrap.appendChild(el); placed.add(id); } });
         nav.appendChild(wrap);
       };
@@ -8083,11 +8090,39 @@ function _applyNavGroups(){
     }
     _navGroupedDept=want;
   }
-  // 보이는 항목이 하나도 없는 그룹(권한 없음)은 숨김
+  _syncNavGroups();
+}
+function toggleNavGroup(label){
+  if(_navOpenGroups.has(label)) _navOpenGroups.delete(label); else _navOpenGroups.add(label);
+  _syncNavGroups();
+}
+// 그룹 칩 표시 갱신: 화살표, (닫힘 상태에서) 현재 보고 있는 메뉴명·발주 알림 뱃지
+function _syncNavGroups(){
+  const nav=document.getElementById('mainMenuNav'); if(!nav) return;
   nav.querySelectorAll(':scope > .ni-group').forEach(g=>{
-    g.style.display=[...g.querySelectorAll('.ni')].some(e=>e.style.display!=='none') ? 'flex' : 'none';
+    const items=[...g.querySelectorAll('.ni')];
+    // 보이는 항목이 하나도 없는 그룹(권한 없음)은 숨김
+    g.style.display=items.some(e=>e.style.display!=='none') ? 'flex' : 'none';
+    const open=_navOpenGroups.has(g.dataset.g);
+    g.classList.toggle('open', open);
+    const lb=g.querySelector('.ni-gl'); if(!lb) return;
+    const cur=items.find(e=>e.classList.contains('active') && e.style.display!=='none');
+    lb.classList.toggle('has-active', !open && !!cur);
+    lb.textContent='';
+    const t=document.createElement('span'); t.textContent=g.dataset.g; lb.appendChild(t);
+    if(!open && cur){ const c=document.createElement('span'); c.className='gl-cur'; c.textContent='· '+cur.childNodes[0].textContent.trim().replace(/^[^\w가-힣]+/,''); lb.appendChild(c); }
+    const ar=document.createElement('span'); ar.className='gl-arrow'; ar.textContent=open?'▾':'▸'; lb.appendChild(ar);
+    if(!open){ // 접힌 그룹 안의 발주 알림이 가려지지 않도록 칩에 표시
+      const bd=g.querySelector('.nbadge'); const n=bd?bd.textContent.trim():'';
+      if(n && n!=='0'){ const b=document.createElement('span'); b.className='nbadge'; b.textContent=n; lb.appendChild(b); }
+    }
   });
 }
+// 발주 뱃지 숫자가 바뀌면(페이지 이동과 무관하게) 접힌 그룹 칩의 뱃지도 같이 갱신
+(function(){
+  const ob=document.getElementById('orderBadge');
+  if(ob && window.MutationObserver) new MutationObserver(()=>{ if(typeof _syncNavGroups==='function') _syncNavGroups(); }).observe(ob,{childList:true,characterData:true,subtree:true});
+})();
 function updateNavVisibility(){
   simFabSync();
   const u=window.__CURRENT_USER; if(!u) return;
