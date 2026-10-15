@@ -1210,6 +1210,7 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-seg button:last-child{border-right:none;}
 .piv-seg button.on{background:#3182F6;color:#fff;}
 .piv-seg button.on.piv-seg-warn{background:#DC2626;}
+.piv-seg button.on.piv-seg-req{background:#6D5BD0;}
 .piv-neg{color:#DC2626;}
 .piv-table tbody tr.piv-cancel,.piv-table tbody tr.piv-cancel:hover{background:rgba(220,38,38,.13);}
 .piv-table tbody tr.piv-cancel td{color:#DC2626;text-decoration:line-through;text-decoration-thickness:1.5px;}
@@ -1227,6 +1228,7 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-badge.piv-tt-아파트{background:#FCE7F3;color:#BE185D;}
 .piv-badge.piv-tt-군부대{background:#DCFCE7;color:#15803D;}
 .piv-badge.piv-tt-마을사업{background:#FEE2E2;color:#B91C1C;}
+.piv-badge.piv-req{background:#E0E7FF;color:#3730A3;}
 .piv-badge.piv-type{background:#EFF6FF;color:#2563EB;}
 .piv-sub{display:block;font-size:10.5px;color:var(--tx2);margin-top:2px;}
 .piv-act{border:1px solid var(--bd);background:var(--bg);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--tx2);cursor:pointer;font-family:inherit;}
@@ -4324,7 +4326,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
       <div class="field"><label>발행일자</label><input type="date" id="pivFIssueDate"></div>
       <div class="field"><label>발급여부</label>
-        <select id="pivFIssued"><option value="미발급">미발급</option><option value="발급완료">발급완료</option><option value="발급취소">발급취소</option></select></div>
+        <select id="pivFIssued"><option value="미발급">미발급</option><option value="발행요청">발행요청</option><option value="발급완료">발급완료</option><option value="발급취소">발급취소</option></select></div>
       <div class="field"><label>입금여부</label>
         <select id="pivFPaid" onchange="pivPaidChanged()"><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
 
@@ -33675,7 +33677,7 @@ async function tcbSaveDelete(id){
 //   · 'phone_invoices' 세금계산서 발행 건:
 //       {id,reqDate,staff,regNo,tradeType,company,ceo,addr,bizType,bizItem,email,
 //        items:[{code,name,qty,unitPrice}](등록시점 단가 스냅샷),costTotal,item(표시용 요약),amount,margin,
-//        receiptType('세금계산서'|'현금영수증'),issueDate,issued('미발급'|'발급완료'|'발급취소'),paid('미입금'|'입금완료'),dueDate(미입금일 때 입금예정일),note,createdAt,updatedAt}
+//        receiptType('세금계산서'|'현금영수증'),issueDate,issued('미발급'|'발행요청'|'발급완료'|'발급취소'),paid('미입금'|'입금완료'),dueDate(미입금일 때 입금예정일),note,createdAt,updatedAt}
 //   · 'phone_companies' 업체등록: {id,kind('사업자등록증'|'고유번호증'|'현금영수증'),regNo,company,ceo,addr,bizType,bizItem,email,createdAt,updatedAt}
 //   입금예정일 경과 알림: 담당자(staff = 로그인 name/username) 접속 중 오전 9시·오후 4시 시간대마다 1회(pivWatchTick)
 // ══════════════════════════════════════════════
@@ -33788,13 +33790,14 @@ function pivRenderFilterSeg(){
   const over = _pivRows.filter(r=>_pivOverdueDays(r)!=null);
   const sum = unpaid.reduce((t,r)=>t+(Number(r.amount)||0),0);
   const b = (k,label,cls)=>`<button class="${_pivPaidFilter===k?'on ':''}${cls||''}" onclick="pivSetPaidFilter('${k}')">${label}</button>`;
-  seg.innerHTML = b('all','전체 '+_pivRows.length) + b('unpaid',`미입금 ${unpaid.length}건 · ${_pivNum(sum)}원`) + b('overdue','예정일 경과 '+over.length,' piv-seg-warn');
+  seg.innerHTML = b('all','전체 '+_pivRows.length) + b('unpaid',`미입금 ${unpaid.length}건 · ${_pivNum(sum)}원`) + b('overdue','예정일 경과 '+over.length,' piv-seg-warn') + b('request','발행요청 '+_pivRows.filter(r=>r.issued==='발행요청').length,' piv-seg-req');
 }
 function _pivFiltered(){
   const q = (document.getElementById('pivSearch')?.value || '').trim().toLowerCase();
   return _pivRows.filter(r=>{
     if(_pivPaidFilter==='unpaid' && (r.paid==='입금완료' || r.issued==='발급취소')) return false;
     if(_pivPaidFilter==='overdue' && _pivOverdueDays(r)==null) return false;
+    if(_pivPaidFilter==='request' && r.issued!=='발행요청') return false;
     if(!q) return true;
     return [r.company,r.regNo,r.staff,r.item,r.ceo].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
   }).sort((a,b)=> String(b.reqDate||'').localeCompare(String(a.reqDate||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
@@ -33846,7 +33849,7 @@ function pivRender(){
         <td class="piv-r ${m<0?'piv-neg':''}">${_pivMarginRate(r)}</td>
         <td><span class="piv-badge piv-type">${_esc(r.receiptType||'')}</span></td>
         <td>${_esc(r.issueDate||'')}</td>
-        <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':(r.issued==='발급취소'?'piv-late':'piv-wait')}">${_esc(r.issued||'미발급')}</span></td>
+        <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':(r.issued==='발급취소'?'piv-late':(r.issued==='발행요청'?'piv-req':'piv-wait'))}">${_esc(r.issued||'미발급')}</span></td>
         <td>${paidCell}</td>
         ${clip(r.note)}
         <td>${canEdit ? `<button class="piv-act piv-del" onclick="event.stopPropagation();pivDelete('${r.id}')">삭제</button>` : ''}</td>
@@ -34075,6 +34078,10 @@ async function pivSave(confirmed){
   btn.disabled = false; btn.textContent = '저장';
   if(!ok) return;
   try{ await _pbSyncFromInvoice(savedRec); }catch(e){ console.warn('전화구매건 연동 반영 실패', e); }
+  if(savedRec && savedRec.issued==='발행요청'){
+    if(_pivIsAlertAdmin()) _pivReqLastCount = _pivRows.filter(r=>r.issued==='발행요청').length;   // 관리자 본인이 올린 건은 스스로에게 알리지 않음
+    else _pivReqBroadcast();
+  }
   closeModal('pivModal');
   pivRender();
   toast(editId ? '수정되었습니다.' : '등록되었습니다.');
@@ -34222,6 +34229,56 @@ function _pivAlertTarget(r){
   const u = window.__CURRENT_USER; if(!u) return false;
   return _pivIsAlertAdmin() || _pivIsMine(r);
 }
+// ── 계산서 발행요청 알림 (관리자 admin 전용) ──
+//  직원이 발급여부를 '발행요청'으로 저장하면 admin에게 "계산서 발행요청건이 N건 있습니다" 카드(닫기/바로가기)를 띄운다.
+//  · admin 접속 시: 요청이 남아 있으면 바로 띄움 · 접속 중: 실시간 방송/DB 변경으로 건수가 늘어날 때 띄움
+//  · 보조: 60초마다 계산서 목록 버전(updated_at)만 확인 (바뀐 경우에만 목록 로드)
+let _pivReqLastCount = 0;
+let _pivReqCh = null;
+let _pivReqVer;
+let _pivReqTimer = null;
+let _pivReqBusy = false;
+function _pivReqBroadcast(){
+  try{
+    const tx = sb.channel('piv-rt');
+    tx.subscribe(st=>{ if(st==='SUBSCRIBED'){ tx.send({type:'broadcast',event:'piv_req',payload:{t:Date.now()}}); setTimeout(()=>{ try{ sb.removeChannel(tx); }catch{} },1500); } });
+  }catch(e){ console.warn('발행요청 방송 실패', e); }
+}
+function pivReqSoon(){ clearTimeout(_pivReqTimer); _pivReqTimer = setTimeout(()=>pivReqCheck(false), 800); }
+async function pivReqCheck(initial){
+  if(!_pivIsAlertAdmin() || _pivReqBusy) return;
+  _pivReqBusy = true;
+  try{
+    const ver = await cloudKvVersion(PIV_KEY);
+    if(!initial && ver!==undefined && ver===_pivReqVer) return;
+    const d = await cloudKvLoad(PIV_KEY);
+    if(ver!==undefined) _pivReqVer = ver;
+    if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); }
+    const reqs = _pivRows.filter(r=>r.issued==='발행요청');
+    const prev = _pivReqLastCount; _pivReqLastCount = reqs.length;
+    if(!reqs.length){ ntfDismiss('piv_req'); return; }
+    if(!initial && reqs.length<=prev) return;   // 접속 중에는 건수가 늘었을 때만
+    const sorted = [...reqs].sort((a,b)=>String(b.reqDate||'').localeCompare(String(a.reqDate||'')));
+    const lines = sorted.slice(0,5).map(r=>`· [${r.staff||'-'}] ${r.company||''} · ${_pivNum(r.amount)}원 · ${r.receiptType||''}`);
+    if(sorted.length>5) lines.push(`외 ${sorted.length-5}건`);
+    ntfShow('piv_req', '🧾 계산서 발행요청',
+      `계산서 발행요청건이 ${reqs.length}건 있습니다.\n`+lines.join('\n'),
+      ()=>{ _pivTab='invoice'; _pivPaidFilter='request'; _pivPage=0; goMenu('phoneorder'); },
+      { confirmLabel:'바로가기', closeLabel:'닫기' });
+  }catch(e){ console.warn('발행요청 확인 실패', e); }
+  finally{ _pivReqBusy = false; }
+}
+function pivReqStart(){
+  if(!_pivIsAlertAdmin()) return;
+  pivReqCheck(true);
+  try{
+    _pivReqCh = sb.channel('piv-rt')
+      .on('broadcast', { event:'piv_req' }, pivReqSoon)
+      .on('postgres_changes', { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.phone_invoices' }, pivReqSoon)
+      .subscribe();
+  }catch(e){ console.warn('발행요청 realtime 구독 실패(폴링으로 대체)', e); }
+  setInterval(()=>{ if(!document.hidden) pivReqCheck(false); }, 60*1000);
+}
 function pivStartWatch(){
   if(_pivWatchStarted) return;
   const u = window.__CURRENT_USER; if(!u) return;
@@ -34230,6 +34287,7 @@ function pivStartWatch(){
   pivWatchTick();
   setInterval(pivWatchTick, 60*1000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pivWatchTick(); });
+  pivReqStart();
 }
 async function pivWatchTick(){
   if(document.hidden || !window.__CURRENT_USER) return;
