@@ -132,12 +132,18 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .ni .ni-star.on{opacity:1;color:#F59E0B;}
 /* ═══ 홈 화면(관리자 전용): 시계·달력 + 즐겨찾기 위젯(작게/보통/크게) ═══ */
 #page-home{padding:18px 20px 40px;}
-.hm-top{display:grid;grid-template-columns:minmax(240px,1fr) 700px;gap:14px;margin-bottom:22px;}
+.hm-top{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px;}   /* 시계·달력 카드를 같은 크기(700px)로 — 남는 오른쪽은 비워 둠 */
+.hm-top>.hm-card{flex:0 1 700px;max-width:100%;}
+.hm-w-par{font-size:10.5px;color:var(--tx2);margin:-5px 0 6px 23px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sub-star{display:inline-block;margin-left:5px;font-size:12px;line-height:1;color:var(--tx2);opacity:0;transition:opacity .15s,color .15s;cursor:pointer;}
+*:hover>.sub-star{opacity:.7;}
+.sub-star:hover{opacity:1 !important;color:#F59E0B;}
+.sub-star.on{opacity:1;color:#F59E0B;}
 .hm-cal-2{display:flex;flex-wrap:wrap;gap:6px 30px;justify-content:center;}
 .hm-mon{flex:1 1 250px;max-width:320px;min-width:250px;}
 .hm-mon-t{font-size:12.5px;font-weight:700;color:var(--tx);margin:2px 0 2px 2px;}
 .hm-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.hm-clock{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:22px 16px;min-height:210px;}
+.hm-clock{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:22px 16px;min-height:230px;}
 .hm-clock .hm-hello{font-size:13px;color:var(--tx2);}
 .hm-clock .hm-time{font-size:44px;font-weight:700;letter-spacing:-1px;color:var(--tx);font-variant-numeric:tabular-nums;}
 .hm-clock .hm-time small{font-size:18px;font-weight:600;margin-right:6px;color:var(--pr);}
@@ -195,7 +201,6 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-add{align-items:center;justify-content:center;gap:4px;color:var(--tx2);border-style:dashed;background:transparent;}
 .hm-add .plus{font-size:30px;line-height:1;}
 .hm-empty{grid-column:1/-1;padding:26px 10px;text-align:center;color:var(--tx2);font-size:13px;line-height:1.7;}
-@media(max-width:1100px){ .hm-top{grid-template-columns:1fr;} }
 @media(max-width:760px){ #page-home{padding:12px 12px 30px;} }
 
 .nbadge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#DC2626;color:#fff;font-size:9px;font-weight:600;margin-left:3px;vertical-align:middle;}
@@ -8194,7 +8199,39 @@ const HOME_ICONS={inv:'📦',sales:'📈',order:'🧾',insight:'📊',rg:'🚀',
 let _homeCfg=null, _homeEdit=false, _homeTimer=null, _homeRefreshT=null, _homeDrag=null, _homeLanded=false;
 let _homeCalY=new Date().getFullYear(), _homeCalM=new Date().getMonth();
 let _homeSalesCache=null;
-function _hmLabel(id){ return String(_menuLabel(id)).replace(/^[^\w가-힣]+/,'').trim(); }
+// 하위메뉴(화면 안의 탭)가 있는 메뉴 — 위젯 id는 '메뉴:하위' (예: 'revenue:unified'). 각 항목은 [하위id, '아이콘 이름']
+const HOME_SUBS={
+  revenue:[['summary','📊 요약'],['monthly','📅 월별'],['backdata','🗂 백데이터'],['upload','📤 데이터 업로드'],['unified','📋 통합'],['daily','📄 일일보고'],['adcenter','📢 광고센터'],['region','📍 지역·연령별 현황'],['ssa','🧭 판매·방문·고객분석']],
+  phoneorder:[['order','📞 전화구매건'],['invoice','🧾 세금계산서 발행'],['company','🏢 업체등록']],
+  price:[['single','🧮 단가 계산기'],['combo','🧩 조합 계산기']],
+  consign:[['products','📦 제품 세팅'],['orders','🧾 주문·거래 리스트']],
+  knowledge:[['ask','🔍 질문으로 찾기'],['browse','📂 카테고리로 보기']],
+  rgmgmt:[['log','📥 입고관리'],['analytics','📈 완판속도 분석'],['margin','💰 마진관리'],['returns','↩️ 고객반품 관리']],
+  review:[['analysis','📊 리뷰분석'],['data','📝 리뷰데이터'],['done','✅ 처리완료'],['blind','🚫 블라인드']],
+  family:[['order','📋 주문서'],['import','📦 수입 입고 관리']],
+  logicarrot:[['list','🥕 주문 리스트'],['sales','📊 당근 매출']],
+};
+// 하위 탭 버튼의 DOM id 접두어 (버튼 id = 접두어 + 하위id) — 탭 버튼에 ☆를 붙이는 데 사용
+const HOME_SUB_BTN={revenue:'rsni-',phoneorder:'pivStab-',price:'pcSub-',consign:'csStab-',knowledge:'kbTab-',rgmgmt:'rgmStab-',review:'rvwStab-',family:'foStab-',logicarrot:'lcrSub-'};
+function _hmParse(id){ const i=String(id).indexOf(':'); return i<0?{base:id,sub:null}:{base:id.slice(0,i),sub:id.slice(i+1)}; }
+function _hmSubDef(base,sub){ return (HOME_SUBS[base]||[]).find(x=>x[0]===sub)||null; }
+function _hmSubSplit(s){ const i=s.indexOf(' '); return {ico:s.slice(0,i), name:s.slice(i+1)}; }
+function _hmLabel(id){
+  const {base,sub}=_hmParse(id);
+  if(sub){ const d=_hmSubDef(base,sub); return d?_hmSubSplit(d[1]).name:sub; }
+  return String(_menuLabel(base)).replace(/^[^\w가-힣]+/,'').trim();
+}
+function _hmIcon(id){
+  const {base,sub}=_hmParse(id);
+  if(sub){ const d=_hmSubDef(base,sub); return d?_hmSubSplit(d[1]).ico:'⭐'; }
+  return HOME_ICONS[base]||'⭐';
+}
+// 위젯(메뉴 또는 하위메뉴)을 볼 수 있는 권한인지
+function _hmPerm(id){
+  const {base,sub}=_hmParse(id);
+  if(sub && base==='revenue') return _permOf('revenue.'+sub)!=='none';
+  return _menuPerm(base)!=='none';
+}
 function _hmN(n){ return Number(n||0).toLocaleString(); }
 function _hmPad(n){ return String(n).padStart(2,'0'); }
 function _hmYmd(d){ return d.getFullYear()+'-'+_hmPad(d.getMonth()+1)+'-'+_hmPad(d.getDate()); }
@@ -8206,7 +8243,13 @@ function _homeLocalGet(){ try{ return JSON.parse(localStorage.getItem(_homeKey()
 function _homeNorm(c){
   const seen=new Set();
   const ws=(c&&Array.isArray(c.widgets)?c.widgets:[])
-    .filter(x=>x && MENUS.some(m=>m.id===x.id) && !seen.has(x.id) && seen.add(x.id))
+    .filter(x=>{
+      if(!x || typeof x.id!=='string' || seen.has(x.id)) return false;
+      const {base,sub}=_hmParse(x.id);
+      if(!MENUS.some(m=>m.id===base)) return false;
+      if(sub && !_hmSubDef(base,sub)) return false;
+      seen.add(x.id); return true;
+    })
     .map(x=>({id:x.id, size:['S','M','L'].includes(x.size)?x.size:'M'}));
   return {widgets:ws};
 }
@@ -8253,6 +8296,18 @@ function _syncFavStars(){
     const on=fav.has(m.id);
     st.classList.toggle('on',on); st.textContent=on?'★':'☆';
     st.title=on?'즐겨찾기 해제 (홈 화면에서 제거)':'즐겨찾기 추가 (홈 화면에 위젯으로 표시)';
+  });
+  // 화면 안의 하위 탭 버튼(매출관리 > 통합 등)에도 ☆
+  Object.keys(HOME_SUBS).forEach(base=>{
+    HOME_SUBS[base].forEach(([sub])=>{
+      const el=document.getElementById(HOME_SUB_BTN[base]+sub); if(!el) return;
+      let st=el.querySelector(':scope > .sub-star');
+      if(!admin){ if(st) st.remove(); return; }
+      if(!st){ st=document.createElement('span'); st.className='sub-star'; st.onclick=e=>toggleHomeFav(base+':'+sub,e); el.appendChild(st); }
+      const on=fav.has(base+':'+sub);
+      st.classList.toggle('on',on); st.textContent=on?'★':'☆';
+      st.title=on?'즐겨찾기 해제 (홈 화면에서 제거)':'즐겨찾기 추가 (홈 화면에 위젯으로 표시)';
+    });
   });
 }
 
@@ -8346,10 +8401,13 @@ const HOME_PROVIDERS={
 const HOME_OPEN={
   phoneorder(act){ try{ _pivTab='invoice'; _pivPaidFilter=act||'all'; _pivPage=0; }catch(e){} },
 };
+// 하위메뉴 '세금계산서 발행'도 같은 요약 데이터 사용
+HOME_OPEN['phoneorder:invoice']=HOME_OPEN.phoneorder;
+HOME_PROVIDERS['phoneorder:invoice']=()=>{ const d=HOME_PROVIDERS.phoneorder(); return d.loading?d:{...d,title:'세금계산서 발행'}; };
 
 // ── 렌더링 ──
 function _hmWidgetHtml(w){
-  const id=w.id, label=_hmLabel(id), ico=HOME_ICONS[id]||'⭐';
+  const id=w.id, label=_hmLabel(id), ico=_hmIcon(id), pr=_hmParse(id);
   let d=null;
   if(HOME_PROVIDERS[id]){ try{ d=HOME_PROVIDERS[id](); }catch(e){ console.warn('홈 위젯 요약 실패', id, e); d=null; } }
   let body;
@@ -8367,7 +8425,7 @@ function _hmWidgetHtml(w){
   const sz=['S','M','L'].map(s=>`<button class="${w.size===s?'on':''}" title="${{S:'작게',M:'보통',L:'크게'}[s]}" onclick="homeSetSize('${id}','${s}')">${s}</button>`).join('');
   return `<div class="hm-card hm-w s-${w.size}" data-id="${id}" draggable="${_homeEdit?'true':'false'}" onclick="homeOpenWidget('${id}')">
     <div class="hm-w-ctl" onclick="event.stopPropagation()">${sz}<button title="앞으로" onclick="homeMove('${id}',-1)">◀</button><button title="뒤로" onclick="homeMove('${id}',1)">▶</button><button title="삭제" onclick="homeRemove('${id}')">✕</button></div>
-    <div class="hm-w-hd"><span class="hm-ico">${ico}</span><span>${_hmEsc((d&&d.title)||label)}</span><span class="hm-go">열기 ›</span></div>${body}</div>`;
+    <div class="hm-w-hd"><span class="hm-ico">${ico}</span><span>${_hmEsc((d&&d.title)||label)}</span><span class="hm-go">열기 ›</span></div>${pr.sub?`<div class="hm-w-par">${_hmEsc(_hmLabel(pr.base))}</div>`:''}${body}</div>`;
 }
 function renderHome(){
   const grid=document.getElementById('hmGrid'); if(!grid) return;
@@ -8376,7 +8434,7 @@ function renderHome(){
   const hello=document.getElementById('hmHello'); if(hello) hello.textContent=`${u?(u.name||u.username):''}님, 오늘도 좋은 하루 보내세요`;
   _homeTick(); if(!_homeTimer) _homeTimer=setInterval(_homeTick,1000);
   renderHomeCal();
-  const ws=_homeCfg.widgets.filter(w=>_menuPerm(w.id)!=='none');
+  const ws=_homeCfg.widgets.filter(w=>_hmPerm(w.id));
   grid.classList.toggle('hm-editing',_homeEdit);
   const eb=document.getElementById('hmEditBtn'); if(eb){ eb.classList.toggle('on',_homeEdit); eb.textContent=_homeEdit?'✓ 편집 완료':'✎ 편집'; }
   grid.innerHTML=(ws.length?'':`<div class="hm-empty">아직 즐겨찾기한 메뉴가 없습니다.<br>메뉴 이름 옆 <b>☆</b>를 누르거나 오른쪽 <b>＋ 위젯 추가</b>로 자주 쓰는 메뉴를 홈에 올려 보세요.</div>`)
@@ -8393,7 +8451,22 @@ function homeOpen(){
   homeLoadCfg().then(()=>{ if(currentPage==='home') renderHome(); _syncFavStars(); });
 }
 function goHome(){ if(_isAdminUser()) goPage('home'); }
-function homeOpenWidget(id,act){ if(_homeEdit) return; if(HOME_OPEN[id]) HOME_OPEN[id](act); goMenu(id); }
+function homeOpenWidget(id,act){
+  if(_homeEdit) return;
+  if(HOME_OPEN[id]) HOME_OPEN[id](act);
+  const {base,sub}=_hmParse(id);
+  if(!sub){ goMenu(base); return; }
+  // 하위메뉴: 해당 메뉴를 연 뒤 그 탭을 선택 (탭 버튼을 누른 것과 같은 동작)
+  if(base==='revenue') _revPage=sub;      // 매출관리는 데이터 로드 뒤 _revPage 탭을 그리므로 먼저 지정
+  if(base==='phoneorder') _pivTab=sub;
+  goMenu(base);
+  if(base==='revenue' && currentPage==='revenue'){   // 데이터 로드가 끝나기 전에도 선택한 탭이 바로 보이도록 먼저 표시만 맞춤
+    document.querySelectorAll('.rev-subnav .rsni').forEach(e=>e.classList.toggle('active', e.id==='rsni-'+sub));
+    document.querySelectorAll('#page-revenue .rpage').forEach(e=>e.classList.toggle('active', e.id==='rpage-'+sub));
+  }
+  const fn={price:'pcSwitchSub',consign:'csSwitchTab',knowledge:'kbSwitchMode',rgmgmt:'rgmSwitchTab',review:'rvwSwitchTab',family:'foSwitchTab',logicarrot:'lcrSwitchSub'}[base];
+  if(fn && currentPage===base && typeof window[fn]==='function') window[fn](sub);
+}
 function homeToggleEdit(){ _homeEdit=!_homeEdit; renderHome(); }
 
 // ── 시계 ──
@@ -8444,11 +8517,19 @@ function homeOpenAdd(){
   const ov=document.createElement('div'); ov.id='hmAddOv';
   ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;';
   ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  const addBtn=(id,sub)=>`<button class="hm-btn" style="${sub?'font-size:11.5px;padding:4px 10px;border-style:dashed;':''}" onclick="homeAdd('${id}');this.remove();">${_hmIcon(id)} ${_hmEsc(_hmLabel(id))}</button>`;
   const groups=DEPTS.map(d=>{
-    const items=d.menus.filter(id=>_menuPerm(id)!=='none' && !have.has(id));
-    if(!items.length) return '';
-    return `<div style="margin-bottom:12px;"><div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:6px;">${_hmEsc(d.label)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`
-      + items.map(id=>`<button class="hm-btn" onclick="homeAdd('${id}');this.remove();">${HOME_ICONS[id]||'⭐'} ${_hmEsc(_hmLabel(id))}</button>`).join('')+`</div></div>`;
+    // 메뉴 자체 + (하위메뉴가 있으면) 하위메뉴 칩을 한 줄에: [매출관리] └ 요약 월별 … — 이미 올린 것은 제외
+    const rows=d.menus.filter(id=>_menuPerm(id)!=='none').map(id=>{
+      const main=have.has(id)?'':addBtn(id,false);
+      const subs=(HOME_SUBS[id]||[]).map(([s])=>id+':'+s).filter(sid=>_hmPerm(sid) && !have.has(sid)).map(sid=>addBtn(sid,true)).join('');
+      if(!main && !subs) return '';
+      return HOME_SUBS[id]
+        ? `<div style="width:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:5px 0;border-top:1px dashed var(--bd);">${main||`<span style="font-size:12px;color:var(--tx2);">${_hmEsc(_hmLabel(id))}</span>`}${subs?`<span style="color:var(--tx2);font-size:12px;">└</span>${subs}`:''}</div>`
+        : main;
+    }).join('');
+    if(!rows) return '';
+    return `<div style="margin-bottom:12px;"><div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:6px;">${_hmEsc(d.label)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${rows}</div></div>`;
   }).join('');
   ov.innerHTML=`<div style="background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:16px;max-width:560px;width:100%;max-height:80vh;overflow:auto;padding:18px 20px;">
     <div style="display:flex;align-items:center;margin-bottom:12px;"><b style="flex:1;font-size:15px;">＋ 홈에 올릴 메뉴 선택</b><button class="hm-btn" onclick="document.getElementById('hmAddOv').remove()">닫기</button></div>
