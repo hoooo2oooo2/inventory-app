@@ -125,6 +125,72 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .ni-gl .gl-arrow{font-size:10px;opacity:.8;}
 .ni-gl .gl-cur{font-weight:500;opacity:.95;}
 .ni-gl.has-active{background:var(--pr);color:#fff;}
+/* 메뉴 즐겨찾기 별(☆/★) — 관리자 전용, 마우스를 올리면 나타나고 즐겨찾기한 메뉴는 항상 표시 */
+.ni .ni-star{display:inline-block;margin-left:5px;font-size:12px;line-height:1;color:var(--tx2);opacity:0;transition:opacity .15s,color .15s;}
+.ni:hover .ni-star{opacity:.7;}
+.ni .ni-star:hover{opacity:1;color:#F59E0B;}
+.ni .ni-star.on{opacity:1;color:#F59E0B;}
+/* ═══ 홈 화면(관리자 전용): 시계·달력 + 즐겨찾기 위젯(작게/보통/크게) ═══ */
+#page-home{padding:18px 20px 40px;}
+.hm-top{display:grid;grid-template-columns:minmax(240px,1fr) minmax(300px,1.3fr);gap:14px;margin-bottom:22px;}
+.hm-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.hm-clock{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:22px 16px;min-height:210px;}
+.hm-clock .hm-hello{font-size:13px;color:var(--tx2);}
+.hm-clock .hm-time{font-size:44px;font-weight:700;letter-spacing:-1px;color:var(--tx);font-variant-numeric:tabular-nums;}
+.hm-clock .hm-time small{font-size:18px;font-weight:600;margin-right:6px;color:var(--pr);}
+.hm-clock .hm-date{font-size:14px;color:var(--tx2);}
+.hm-cal{padding:14px 18px 16px;}
+.hm-cal-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.hm-cal-hd b{font-size:15px;color:var(--tx);flex:1;}
+.hm-cal-hd button{border:1px solid var(--bd);background:var(--bg2);color:var(--tx);border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;}
+.hm-cal-hd button:hover{border-color:var(--pr);color:var(--pr);}
+.hm-cal table{width:100%;border-collapse:collapse;table-layout:fixed;}
+.hm-cal th,.hm-cal td{border:none !important;background:transparent !important;}
+.hm-cal th{font-size:11px;font-weight:600;color:var(--tx2);padding:4px 0;}
+.hm-cal td{text-align:center;font-size:13px;padding:0;height:30px;color:var(--tx);}
+.hm-cal td span{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;}
+.hm-cal td.sun span{color:#DC2626;} .hm-cal td.sat span{color:#2563EB;}
+.hm-cal td.oth span{opacity:.35;}
+.hm-cal td.today span{background:var(--pr);color:#fff;font-weight:700;}
+.hm-sec-hd{display:flex;align-items:center;gap:8px;margin:0 2px 10px;}
+.hm-sec-hd h3{font-size:15px;margin:0;color:var(--tx);flex:1;}
+.hm-btn{border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:9px;padding:5px 12px;font-size:12px;cursor:pointer;}
+.hm-btn:hover{border-color:var(--pr);color:var(--pr);}
+.hm-btn.on{background:var(--pr);border-color:var(--pr);color:#fff;}
+.hm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));grid-auto-rows:158px;gap:14px;grid-auto-flow:dense;}
+.hm-w{position:relative;display:flex;flex-direction:column;padding:14px 16px;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;}
+.hm-w:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.09);border-color:var(--pr);}
+.hm-w.s-S{grid-column:span 1;grid-row:span 1;}
+.hm-w.s-M{grid-column:span 2;grid-row:span 1;}
+.hm-w.s-L{grid-column:span 2;grid-row:span 2;}
+.hm-w-hd{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--tx);margin-bottom:8px;white-space:nowrap;}
+.hm-w-hd .hm-ico{font-size:17px;}
+.hm-w-hd .hm-go{margin-left:auto;font-size:11px;font-weight:500;color:var(--tx2);}
+.hm-w-big{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.1;color:var(--tx);}
+.hm-w-big small{font-size:14px;font-weight:600;margin-left:2px;}
+.hm-w-cap{font-size:11.5px;color:var(--tx2);margin-top:3px;}
+.hm-kpis{display:flex;gap:10px;flex-wrap:wrap;}
+.hm-kpi{flex:1;min-width:54px;}
+.hm-kpi .v{font-size:22px;font-weight:700;line-height:1.15;color:var(--tx);}
+.hm-kpi .l{font-size:11px;color:var(--tx2);margin-top:1px;white-space:nowrap;}
+.hm-list{margin-top:10px;border-top:1px solid var(--bd);padding-top:6px;overflow:hidden;}
+.hm-li{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3.5px 0;color:var(--tx);}
+.hm-li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hm-li span:last-child{color:var(--tx2);white-space:nowrap;}
+.hm-tone-red{color:#DC2626 !important;} .hm-tone-orange{color:#EA580C !important;} .hm-tone-amber{color:#D97706 !important;} .hm-tone-green{color:#059669 !important;} .hm-tone-blue{color:var(--pr) !important;}
+.hm-launch{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--tx2);font-size:12px;}
+.hm-launch .big{font-size:30px;}
+.hm-w-ctl{display:none;position:absolute;top:6px;right:6px;gap:3px;background:var(--bg);border:1px solid var(--bd);border-radius:9px;padding:2px;z-index:2;}
+.hm-w:hover .hm-w-ctl,.hm-editing .hm-w-ctl{display:flex;}
+.hm-w-ctl button{border:none;background:transparent;color:var(--tx2);font-size:11px;font-weight:700;border-radius:6px;min-width:22px;height:22px;cursor:pointer;padding:0 4px;}
+.hm-w-ctl button:hover{background:var(--bg2);color:var(--tx);}
+.hm-w-ctl button.on{background:var(--pr);color:#fff;}
+.hm-editing .hm-w{cursor:grab;border-style:dashed;border-color:var(--pr);}
+.hm-w.hm-drag{opacity:.4;}
+.hm-add{align-items:center;justify-content:center;gap:4px;color:var(--tx2);border-style:dashed;background:transparent;}
+.hm-add .plus{font-size:30px;line-height:1;}
+.hm-empty{grid-column:1/-1;padding:26px 10px;text-align:center;color:var(--tx2);font-size:13px;line-height:1.7;}
+@media(max-width:760px){ .hm-top{grid-template-columns:1fr;} #page-home{padding:12px 12px 30px;} }
 
 .nbadge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#DC2626;color:#fff;font-size:9px;font-weight:600;margin-left:3px;vertical-align:middle;}
 .pulse-wrap{display:inline-flex;align-items:center;position:relative;margin-left:3px;vertical-align:middle;}
@@ -2755,6 +2821,24 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div class="ni" id="nav-logicarrot" onclick="goMenu('logicarrot')" style="display:none;">🥕 당근 판매</div>
   <div class="ni" id="nav-coupangad" onclick="goMenu('coupangad')" style="display:none;">👥 인사관리</div>
 </nav>
+</div>
+
+<!-- ═══ 홈 (관리자 전용: 시계·달력 + 즐겨찾기 위젯) ═══ -->
+<div class="page" id="page-home">
+  <div class="hm-top">
+    <div class="hm-card hm-clock">
+      <div class="hm-hello" id="hmHello"></div>
+      <div class="hm-time" id="hmTime"></div>
+      <div class="hm-date" id="hmDate"></div>
+    </div>
+    <div class="hm-card hm-cal" id="hmCal"></div>
+  </div>
+  <div class="hm-sec-hd">
+    <h3>⭐ 내 즐겨찾기</h3>
+    <button class="hm-btn" onclick="homeOpenAdd()">＋ 위젯 추가</button>
+    <button class="hm-btn" id="hmEditBtn" onclick="homeToggleEdit()">✎ 편집</button>
+  </div>
+  <div class="hm-grid" id="hmGrid"></div>
 </div>
 
 <!-- ═══ 쿠팡 광고 관리 (운영관리 — 독립 대시보드 iframe) ═══ -->
@@ -5923,7 +6007,6 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="rsni" id="rsni-adcenter" onclick="goRevPage('adcenter')">📢 광고센터</div>
     <div class="rsni" id="rsni-region" onclick="goRevPage('region')">📍 지역·연령별 현황</div>
     <div class="rsni" id="rsni-ssa" onclick="goRevPage('ssa')">🧭 판매·방문·고객분석</div>
-    <div class="rsni" id="rsni-bestseller" onclick="goRevPage('bestseller')">🏆 베스트셀러</div>
   </div>
   <div class="rmain">
 
@@ -7067,36 +7150,6 @@ html.mob-native .lcr-det-val{font-size:15px;}
       </div>
     </div>
 
-    <!-- ── 베스트셀러(채널별·기간별) ── -->
-    <div class="rpage" id="rpage-bestseller">
-      <div class="rev-filter rev-filter-sticky" style="flex-wrap:wrap;">
-        <span class="rev-filter-lbl">기간</span>
-        <div class="rev-filter-group" id="bestPeriodBtns"></div>
-        <span class="rev-filter-lbl" style="margin-left:6px;">판매처</span>
-        <div class="rev-filter-group" id="bestChBtns"></div>
-      </div>
-      <div class="rev-card" style="font-size:13.5px;line-height:1.6;color:var(--tx);" id="bestSummary">데이터를 불러오는 중...</div>
-      <div class="rev-tbl-card">
-        <div class="rev-tbl-head">
-          <span class="rev-tbl-title">🏆 판매량 TOP 30</span>
-          <span style="font-size:11px;color:var(--tx2);">상품명 기준 집계(운영관리 매출 통합 데이터) · 재고관리 등록 상품은 현재고를 함께 표시합니다</span>
-        </div>
-        <div class="rev-empty" id="bestEmpty" style="display:none;">해당 기간·판매처에 판매 데이터가 없습니다.</div>
-        <div class="tw"><table class="dt" id="bestTbl">
-          <thead><tr>
-            <th style="text-align:center;width:40px;">순위</th>
-            <th>상품명</th>
-            <th>구분</th>
-            <th>판매채널</th>
-            <th style="text-align:right;">판매수량</th>
-            <th style="text-align:right;">매출(정산금액)</th>
-            <th style="text-align:right;">재고관리 현재고</th>
-          </tr></thead>
-          <tbody id="bestTbody"></tbody>
-        </table></div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -7993,7 +8046,7 @@ const MENUS = [
 const REV_SUBS = [
   {id:'summary',label:'요약'}, {id:'monthly',label:'월별'}, {id:'backdata',label:'백데이터'},
   {id:'upload',label:'데이터업로드'}, {id:'unified',label:'통합'}, {id:'daily',label:'일일보고'}, {id:'adcenter',label:'광고센터'}, {id:'region',label:'지역·연령별'},
-  {id:'ssa',label:'판매·방문·고객분석'}, {id:'bestseller',label:'베스트셀러'}
+  {id:'ssa',label:'판매·방문·고객분석'}
 ];
 const PERM_LEVELS = [['none','없음'],['view','열람'],['edit','수정']];
 const _PERM_RANK = { none:0, view:1, edit:2 };
@@ -8123,6 +8176,252 @@ function _syncNavGroups(){
   const ob=document.getElementById('orderBadge');
   if(ob && window.MutationObserver) new MutationObserver(()=>{ if(typeof _syncNavGroups==='function') _syncNavGroups(); }).observe(ob,{childList:true,characterData:true,subtree:true});
 })();
+
+// ══════════════════════════════════════════════
+// 🏠 홈 화면 (관리자 전용) — 시계·달력 + 즐겨찾기 위젯(작게 S / 보통 M / 크게 L)
+//  · 즐겨찾기 구성은 cloudKv 'home_cfg_<아이디>' = { widgets:[{id,size}] } 에만 저장(업무 데이터는 읽기 전용으로만 사용)
+//  · 위젯 데이터는 이미 불러와 있는 메모리 데이터(products·receiveList·_dCache)만 사용 — 홈 때문에 추가 네트워크 조회 없음
+//  · 데이터 요약이 아직 없는 메뉴는 '바로가기' 위젯으로 표시(HOME_PROVIDERS에 함수를 추가하면 요약 데이터가 붙음)
+// ══════════════════════════════════════════════
+function _isAdminUser(){ const u=window.__CURRENT_USER; return !!u && u.username==='admin'; }
+const HOME_ICONS={inv:'📦',sales:'📈',order:'🧾',insight:'📊',rg:'🚀',hist:'🕘',revenue:'💰',price:'🧮',quote:'📄',family:'👪',consign:'🚚',accreq:'🧩',tcb:'💸',phoneorder:'📞',cost3day:'📦',review:'⭐',knowledge:'📚',rgmgmt:'🚀',rgrevenue:'🚀',collab:'🤝',calendar:'📋',rpt_yuhyun:'📝',rpt_bora:'📝',rpt_yeonjeong:'📝',moeum:'🧮',soldout:'🚫',logihome:'🏠',logistock:'📦',logibox:'📮',logicarrot:'🥕',coupangad:'👥'};
+let _homeCfg=null, _homeEdit=false, _homeTimer=null, _homeRefreshT=null, _homeDrag=null, _homeLanded=false;
+let _homeCalY=new Date().getFullYear(), _homeCalM=new Date().getMonth();
+let _homeSalesCache=null;
+function _hmLabel(id){ return String(_menuLabel(id)).replace(/^[^\w가-힣]+/,'').trim(); }
+function _hmN(n){ return Number(n||0).toLocaleString(); }
+function _hmPad(n){ return String(n).padStart(2,'0'); }
+function _hmYmd(d){ return d.getFullYear()+'-'+_hmPad(d.getMonth()+1)+'-'+_hmPad(d.getDate()); }
+function _hmEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── 설정 저장/불러오기 ──
+function _homeKey(){ return 'home_cfg_'+(window.__CURRENT_USER?window.__CURRENT_USER.username:'anon'); }
+function _homeLocalGet(){ try{ return JSON.parse(localStorage.getItem(_homeKey())||'null'); }catch{ return null; } }
+function _homeNorm(c){
+  const seen=new Set();
+  const ws=(c&&Array.isArray(c.widgets)?c.widgets:[])
+    .filter(x=>x && MENUS.some(m=>m.id===x.id) && !seen.has(x.id) && seen.add(x.id))
+    .map(x=>({id:x.id, size:['S','M','L'].includes(x.size)?x.size:'M'}));
+  return {widgets:ws};
+}
+async function homeLoadCfg(){
+  if(!_homeCfg) _homeCfg=_homeNorm(_homeLocalGet());   // 빠른 표시용 이 PC의 사본
+  const cloud=await cloudKvLoad(_homeKey());
+  if(cloud){ _homeCfg=_homeNorm(cloud); try{ localStorage.setItem(_homeKey(), JSON.stringify(_homeCfg)); }catch{} }
+  return _homeCfg;
+}
+// 변경은 먼저 화면에 반영(즉시 반응)하고, 저장 직전에 최신본을 다시 받아 같은 변경을 적용 — 여러 PC에서 동시에 바꿔도 덮어쓰지 않도록
+async function _homeMutate(fn){
+  if(!_homeCfg) _homeCfg=_homeNorm(_homeLocalGet());
+  fn(_homeCfg); _homeCfg=_homeNorm(_homeCfg);
+  renderHome(); _syncFavStars();
+  const cloud=await cloudKvLoad(_homeKey());
+  const cfg=_homeNorm(cloud||_homeCfg);
+  fn(cfg);
+  _homeCfg=_homeNorm(cfg);
+  try{ localStorage.setItem(_homeKey(), JSON.stringify(_homeCfg)); }catch{}
+  cloudKvSave(_homeKey(), _homeCfg, {force:true});
+  renderHome(); _syncFavStars();
+}
+function homeAdd(id){ return _homeMutate(c=>{ if(!c.widgets.some(w=>w.id===id)) c.widgets.push({id,size:'M'}); }); }
+function homeRemove(id){ return _homeMutate(c=>{ c.widgets=c.widgets.filter(w=>w.id!==id); }); }
+function homeSetSize(id,size){ return _homeMutate(c=>{ const w=c.widgets.find(x=>x.id===id); if(w) w.size=size; }); }
+function homeMove(id,dir){ return _homeMutate(c=>{ const i=c.widgets.findIndex(w=>w.id===id), j=i+dir; if(i<0||j<0||j>=c.widgets.length) return; const t=c.widgets[i]; c.widgets[i]=c.widgets[j]; c.widgets[j]=t; }); }
+function homeMoveTo(fromId,toId){ return _homeMutate(c=>{ const i=c.widgets.findIndex(w=>w.id===fromId); if(i<0) return; const [w]=c.widgets.splice(i,1); const j=c.widgets.findIndex(x=>x.id===toId); c.widgets.splice(j<0?c.widgets.length:j,0,w); }); }
+function toggleHomeFav(id,ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  if(!_isAdminUser()) return;
+  const has=(_homeCfg||_homeNorm(_homeLocalGet())).widgets.some(w=>w.id===id);
+  has ? homeRemove(id) : homeAdd(id);
+  toast(has ? '즐겨찾기에서 뺐습니다.' : '⭐ 즐겨찾기에 추가했습니다. 홈 화면에서 위젯으로 볼 수 있어요.');
+}
+// 메뉴 항목 옆 ☆/★ (관리자 전용)
+function _syncFavStars(){
+  const admin=_isAdminUser();
+  const fav=new Set(((_homeCfg||_homeNorm(_homeLocalGet())).widgets).map(w=>w.id));
+  MENUS.forEach(m=>{
+    const el=document.getElementById('nav-'+m.id); if(!el) return;
+    let st=el.querySelector(':scope > .ni-star');
+    if(!admin){ if(st) st.remove(); return; }
+    if(!st){ st=document.createElement('span'); st.className='ni-star'; st.onclick=e=>toggleHomeFav(m.id,e); el.appendChild(st); }
+    const on=fav.has(m.id);
+    st.classList.toggle('on',on); st.textContent=on?'★':'☆';
+    st.title=on?'즐겨찾기 해제 (홈 화면에서 제거)':'즐겨찾기 추가 (홈 화면에 위젯으로 표시)';
+  });
+}
+
+// ── 위젯 요약 데이터 제공자 (읽기 전용, 메모리 데이터만 사용) ──
+// 반환: {loading?, cap?, kpis:[{l,v,u?,tone?}], list:[{t,s}]}  — kpis[0]은 '작게' 위젯의 대표 숫자
+const HOME_PROVIDERS={
+  inv(){
+    if(!products.length) return {loading:true};
+    const act=products.filter(p=>!p.hidden&&!p.disc);
+    const cnt={정상:0,임박:0,긴급:0,부족:0};
+    act.forEach(p=>{ const s=getStatus(p); if(cnt[s]!==undefined) cnt[s]++; });
+    const risk=cnt.부족+cnt.긴급+cnt.임박;
+    const list=act.filter(p=>getStatus(p)!=='정상')
+      .map(p=>{ const er=getEffectiveReorder(p); return {p, r:er>0?p.stock/er:99}; })
+      .sort((a,b)=>a.r-b.r).slice(0,6).map(x=>({t:x.p.name, s:`재고 ${_hmN(x.p.stock)}개`}));
+    return {cap:`전체 ${_hmN(act.length)}개 제품 기준`, list, kpis:[
+      {l:'발주 검토 필요',v:risk,u:'개',tone:risk?'red':'green'},
+      {l:'즉시발주',v:cnt.부족,tone:cnt.부족?'red':null},
+      {l:'긴급',v:cnt.긴급,tone:cnt.긴급?'orange':null},
+      {l:'임박',v:cnt.임박,tone:cnt.임박?'amber':null},
+      {l:'정상',v:cnt.정상,tone:'green'}]};
+  },
+  order(){
+    if(!products.length) return {loading:true};
+    const urg=products.filter(p=>{ if(p.hidden||p.disc) return false; const er=getEffectiveReorder(p); return er>0 && p.stock<=er; })
+      .map(p=>({p, er:getEffectiveReorder(p)})).sort((a,b)=>a.p.stock/a.er-b.p.stock/b.er);
+    const imm=urg.filter(x=>x.p.stock<=x.er*0.3).length;
+    const pend=(receiveList||[]).filter(r=>(r.orderQty-(r.in1+r.in2))>0).length;
+    return {cap:'재고가 발주시점 이하인 제품 기준', kpis:[
+      {l:'발주 임박',v:urg.length,u:'개',tone:urg.length?'red':'green'},
+      {l:'즉시발주',v:imm,tone:imm?'orange':null},
+      {l:'입고 대기',v:pend,u:'건',tone:'blue'}],
+      list:urg.slice(0,6).map(x=>({t:x.p.name, s:`재고 ${_hmN(x.p.stock)} / 시점 ${_hmN(x.er)}`}))};
+  },
+  sales(){
+    const codes=Object.keys(_dCache||{});
+    if(!codes.length) return {loading:true};
+    if(_homeSalesCache && _homeSalesCache.ver===_dCacheVer && Date.now()-_homeSalesCache.at<60000) return _homeSalesCache.data;
+    let latest='';
+    codes.forEach(c=>{ for(const d in _dCache[c]) if(d>latest) latest=d; });
+    if(!latest) return {loading:true};
+    const ld=new Date(latest+'T00:00:00'); ld.setDate(ld.getDate()-6);
+    const wkStart=_hmYmd(ld), ym=latest.slice(0,7);
+    let day=0, week=0, month=0; const byCode={};
+    codes.forEach(c=>{
+      const m=_dCache[c];
+      for(const d in m){
+        const q=m[d]||0;
+        if(d===latest) day+=q;
+        if(d>=wkStart && d<=latest) week+=q;
+        if(d.slice(0,7)===ym){ month+=q; byCode[c]=(byCode[c]||0)+q; }
+      }
+    });
+    const list=Object.keys(byCode).sort((a,b)=>byCode[b]-byCode[a]).slice(0,6).map(c=>{
+      const p=products.find(x=>x.code===c); return {t:p?p.name:c, s:`${_hmN(byCode[c])}개`};
+    });
+    const data={cap:`${latest.slice(5).replace('-','/')}까지 반영 · 전 채널 합계`, list, kpis:[
+      {l:`${+latest.slice(5,7)}월 누계`,v:month,u:'개',tone:'blue'},
+      {l:'최근 7일',v:week},
+      {l:`${latest.slice(5).replace('-','/')} 하루`,v:day}]};
+    _homeSalesCache={ver:_dCacheVer, at:Date.now(), data};
+    return data;
+  },
+};
+
+// ── 렌더링 ──
+function _hmWidgetHtml(w){
+  const id=w.id, label=_hmLabel(id), ico=HOME_ICONS[id]||'⭐';
+  let d=null;
+  if(HOME_PROVIDERS[id]){ try{ d=HOME_PROVIDERS[id](); }catch(e){ console.warn('홈 위젯 요약 실패', id, e); d=null; } }
+  let body;
+  if(!d) body=`<div class="hm-launch"><div class="big">${ico}</div><div>클릭해서 열기</div></div>`;
+  else if(d.loading) body=`<div class="hm-launch"><div>불러오는 중…</div></div>`;
+  else if(w.size==='S'){
+    const k=d.kpis[0];
+    body=`<div class="hm-w-big hm-tone-${k.tone||'none'}">${_hmN(k.v)}${k.u?`<small>${k.u}</small>`:''}</div><div class="hm-w-cap">${_hmEsc(k.l)}</div>`;
+  } else {
+    const n=w.size==='L'?4:3;
+    body=`<div class="hm-kpis">${d.kpis.slice(0,n).map(k=>`<div class="hm-kpi"><div class="v hm-tone-${k.tone||'none'}">${_hmN(k.v)}${k.u?`<small style="font-size:12px;margin-left:1px;">${k.u}</small>`:''}</div><div class="l">${_hmEsc(k.l)}</div></div>`).join('')}</div>`
+      +(w.size==='M'&&d.cap?`<div class="hm-w-cap" style="margin-top:8px;">${_hmEsc(d.cap)}</div>`:'')
+      +(w.size==='L'?(d.list&&d.list.length?`<div class="hm-list">${d.list.map(r=>`<div class="hm-li"><span>${_hmEsc(r.t)}</span><span>${_hmEsc(r.s)}</span></div>`).join('')}</div>`:'')+(d.cap?`<div class="hm-w-cap" style="margin-top:auto;">${_hmEsc(d.cap)}</div>`:''):'');
+  }
+  const sz=['S','M','L'].map(s=>`<button class="${w.size===s?'on':''}" title="${{S:'작게',M:'보통',L:'크게'}[s]}" onclick="homeSetSize('${id}','${s}')">${s}</button>`).join('');
+  return `<div class="hm-card hm-w s-${w.size}" data-id="${id}" draggable="${_homeEdit?'true':'false'}" onclick="homeOpenWidget('${id}')">
+    <div class="hm-w-ctl" onclick="event.stopPropagation()">${sz}<button title="앞으로" onclick="homeMove('${id}',-1)">◀</button><button title="뒤로" onclick="homeMove('${id}',1)">▶</button><button title="삭제" onclick="homeRemove('${id}')">✕</button></div>
+    <div class="hm-w-hd"><span class="hm-ico">${ico}</span><span>${_hmEsc(label)}</span><span class="hm-go">열기 ›</span></div>${body}</div>`;
+}
+function renderHome(){
+  const grid=document.getElementById('hmGrid'); if(!grid) return;
+  if(!_homeCfg) _homeCfg=_homeNorm(_homeLocalGet());
+  const u=window.__CURRENT_USER;
+  const hello=document.getElementById('hmHello'); if(hello) hello.textContent=`${u?(u.name||u.username):''}님, 오늘도 좋은 하루 보내세요`;
+  _homeTick(); if(!_homeTimer) _homeTimer=setInterval(_homeTick,1000);
+  renderHomeCal();
+  const ws=_homeCfg.widgets.filter(w=>_menuPerm(w.id)!=='none');
+  grid.classList.toggle('hm-editing',_homeEdit);
+  const eb=document.getElementById('hmEditBtn'); if(eb){ eb.classList.toggle('on',_homeEdit); eb.textContent=_homeEdit?'✓ 편집 완료':'✎ 편집'; }
+  grid.innerHTML=(ws.length?'':`<div class="hm-empty">아직 즐겨찾기한 메뉴가 없습니다.<br>메뉴 이름 옆 <b>☆</b>를 누르거나 오른쪽 <b>＋ 위젯 추가</b>로 자주 쓰는 메뉴를 홈에 올려 보세요.</div>`)
+    + ws.map(_hmWidgetHtml).join('')
+    + `<div class="hm-card hm-w hm-add s-S" onclick="homeOpenAdd()"><div class="plus">＋</div><div style="font-size:12px;">위젯 추가</div></div>`;
+}
+function homeRefreshSoon(){
+  if(currentPage!=='home') return;
+  clearTimeout(_homeRefreshT);
+  _homeRefreshT=setTimeout(()=>{ if(currentPage==='home' && !_homeDrag) renderHome(); },300);
+}
+function homeOpen(){
+  renderHome();
+  homeLoadCfg().then(()=>{ if(currentPage==='home') renderHome(); _syncFavStars(); });
+}
+function goHome(){ if(_isAdminUser()) goPage('home'); }
+function homeOpenWidget(id){ if(_homeEdit) return; goMenu(id); }
+function homeToggleEdit(){ _homeEdit=!_homeEdit; renderHome(); }
+
+// ── 시계 ──
+function _homeTick(){
+  const t=document.getElementById('hmTime');
+  if(!t || currentPage!=='home'){ clearInterval(_homeTimer); _homeTimer=null; return; }
+  const d=new Date(); let h=d.getHours(); const ap=h<12?'오전':'오후'; h=h%12||12;
+  t.innerHTML=`<small>${ap}</small>${_hmPad(h)}:${_hmPad(d.getMinutes())}:${_hmPad(d.getSeconds())}`;
+  const dt=document.getElementById('hmDate');
+  if(dt) dt.textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`;
+}
+// ── 달력 ──
+function renderHomeCal(){
+  const el=document.getElementById('hmCal'); if(!el) return;
+  const y=_homeCalY, m=_homeCalM;
+  const start=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate(), prevDim=new Date(y,m,0).getDate();
+  const now=new Date(), isCur=(now.getFullYear()===y && now.getMonth()===m);
+  let rows='';
+  for(let r=0;r<6;r++){
+    let tds='';
+    for(let c=0;c<7;c++){
+      const n=r*7+c-start+1;
+      const oth=(n<1||n>dim);
+      const num=n<1?prevDim+n:(n>dim?n-dim:n);
+      const cls=[c===0?'sun':'',c===6?'sat':'',oth?'oth':'',(!oth&&isCur&&n===now.getDate())?'today':''].filter(Boolean).join(' ');
+      tds+=`<td class="${cls}"><span>${num}</span></td>`;
+    }
+    rows+=`<tr>${tds}</tr>`;
+  }
+  el.innerHTML=`<div class="hm-cal-hd"><b>${y}년 ${m+1}월</b><button onclick="homeCalNav(-1)">◀</button><button onclick="homeCalToday()">오늘</button><button onclick="homeCalNav(1)">▶</button></div>
+    <table><thead><tr>${'일월화수목금토'.split('').map((d,i)=>`<th style="${i===0?'color:#DC2626;':i===6?'color:#2563EB;':''}">${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+function homeCalNav(delta){
+  const d=new Date(_homeCalY,_homeCalM+delta,1); _homeCalY=d.getFullYear(); _homeCalM=d.getMonth(); renderHomeCal();
+}
+function homeCalToday(){ const n=new Date(); _homeCalY=n.getFullYear(); _homeCalM=n.getMonth(); renderHomeCal(); }
+
+// ── 위젯 추가 팝업 ──
+function homeOpenAdd(){
+  document.getElementById('hmAddOv')?.remove();
+  const have=new Set((_homeCfg||_homeNorm(_homeLocalGet())).widgets.map(w=>w.id));
+  const ov=document.createElement('div'); ov.id='hmAddOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  const groups=DEPTS.map(d=>{
+    const items=d.menus.filter(id=>_menuPerm(id)!=='none' && !have.has(id));
+    if(!items.length) return '';
+    return `<div style="margin-bottom:12px;"><div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:6px;">${_hmEsc(d.label)}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`
+      + items.map(id=>`<button class="hm-btn" onclick="homeAdd('${id}');this.remove();">${HOME_ICONS[id]||'⭐'} ${_hmEsc(_hmLabel(id))}</button>`).join('')+`</div></div>`;
+  }).join('');
+  ov.innerHTML=`<div style="background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:16px;max-width:560px;width:100%;max-height:80vh;overflow:auto;padding:18px 20px;">
+    <div style="display:flex;align-items:center;margin-bottom:12px;"><b style="flex:1;font-size:15px;">＋ 홈에 올릴 메뉴 선택</b><button class="hm-btn" onclick="document.getElementById('hmAddOv').remove()">닫기</button></div>
+    ${groups||'<div style="color:var(--tx2);font-size:13px;padding:14px 0;">추가할 수 있는 메뉴를 모두 올렸습니다.</div>'}</div>`;
+  document.body.appendChild(ov);
+}
+// 위젯 끌어서 순서 바꾸기 (편집 모드에서만 draggable)
+(function(){
+  const grid=document.getElementById('hmGrid'); if(!grid) return;
+  grid.addEventListener('dragstart',e=>{ const w=e.target.closest&&e.target.closest('.hm-w[data-id]'); if(!w||!_homeEdit) return; _homeDrag=w.dataset.id; w.classList.add('hm-drag'); e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain',_homeDrag); }catch{} });
+  grid.addEventListener('dragover',e=>{ if(_homeDrag) e.preventDefault(); });
+  grid.addEventListener('drop',e=>{ e.preventDefault(); const t=e.target.closest&&e.target.closest('.hm-w[data-id]'); const from=_homeDrag; _homeDrag=null; if(from && t && t.dataset.id!==from) homeMoveTo(from,t.dataset.id); else renderHome(); });
+  grid.addEventListener('dragend',()=>{ if(_homeDrag){ _homeDrag=null; renderHome(); } });
+})();
 function updateNavVisibility(){
   simFabSync();
   const u=window.__CURRENT_USER; if(!u) return;
@@ -8133,7 +8432,13 @@ function updateNavVisibility(){
   }
   // 부서 탭
   const deptNav=document.getElementById('deptNav');
-  if(deptNav) deptNav.innerHTML = visDepts.map(d=>`<div class="ni ${d.id===_activeDept?'active':''}" onclick="selectDept('${d.id}')">${d.label}</div>`).join('');
+  const onHome = currentPage==='home';
+  if(deptNav){
+    deptNav.innerHTML = (_isAdminUser()?`<div class="ni ${onHome?'active':''}" onclick="goHome()">🏠 홈</div>`:'')
+      + visDepts.map(d=>`<div class="ni ${(d.id===_activeDept && !onHome)?'active':''}" onclick="selectDept('${d.id}')">${d.label}</div>`).join('');
+    deptNav.style.borderBottom = onHome ? '0.5px solid var(--bd)' : 'none';   // 홈에서는 아래 메뉴 줄이 없으므로 구분선 표시
+  }
+  const mainNav=document.getElementById('mainMenuNav'); if(mainNav) mainNav.style.display = onHome ? 'none' : '';
   // 메뉴 항목: 권한 있고 + 활성 부서에 속한 것만 표시
   const deptMenus = _activeDept ? (DEPTS.find(d=>d.id===_activeDept).menus) : [];
   MENUS.forEach(m=>{
@@ -8142,6 +8447,7 @@ function updateNavVisibility(){
     el.classList.toggle('active', currentPage===m.id || (m.id==='rgrevenue' && currentPage==='revenue' && _revPage==='rocket'));
   });
   _applyNavGroups();
+  _syncFavStars();
   // 로켓그로스 탭에서 매출관리 화면에 들어온 경우(로켓그로스 매출), 매출관리 소분류탭 바는 숨김
   const revSubnav = document.querySelector('#page-revenue .rev-subnav');
   if(revSubnav) revSubnav.style.display = (_activeDept==='growth') ? 'none' : '';
@@ -8203,6 +8509,7 @@ function _menuPerm(menuId){
 }
 // 현재 보고 있는 화면의 권한 (매출관리는 현재 하위탭 기준)
 function _pagePerm(){
+  if(currentPage==='home') return 'edit';   // 홈은 관리자 전용 화면(권한표 대상 아님)
   if(currentPage==='revenue') return _permOf('revenue.'+(typeof _revPage!=='undefined'?_revPage:'summary'));
   return _permOf(currentPage);
 }
@@ -8238,6 +8545,8 @@ function applyPermissions(){
   }
   if(blank) blank.style.display='none';
   ['deptNav','mainMenuNav'].forEach(id=>{ const e=document.getElementById(id); if(e)e.style.display=''; });
+  // 관리자(admin)는 로그인 직후 홈 화면부터 시작 (최초 1회)
+  if(_isAdminUser() && !_homeLanded){ _homeLanded=true; goPage('home'); return; }
   // 현재 페이지 접근 불가 → 첫 허용 메뉴로 이동, 가능하면 현재 페이지 열기
   if(_pagePerm()==='none') goMenu(first.id);
   else goPage(currentPage);
@@ -11790,6 +12099,7 @@ async function loadAll(){
   salesYear=bestY; rgYear=bestY;
   buildYearSelects();
   renderInv(); updateFloat();
+  try{ homeRefreshSoon(); }catch(e){}   // 홈 화면이 먼저 열려 있었다면 로딩 완료 후 위젯 데이터 채우기
   // 초기 선택 없음 — 사용자가 직접 제품 클릭 시 그래프 표시
   salesSel=new Set();
   const rgProds=getRgProducts();
@@ -12542,8 +12852,9 @@ function _mobViewportSync(p){
 function _mobIsNative(){ return document.documentElement.classList.contains('mob-native'); }
 function goPage(p){
   _mobViewportSync(p);
+  if(p==='home' && !_isAdminUser()) return;   // 홈 화면은 관리자(admin) 전용
   // 권한 없는 메뉴 접근 차단 (매출관리는 로켓그로스 매출 권한만 있어도 진입 허용 — 로켓그로스 부서 딥링크용)
-  if(window.__CURRENT_USER && _menuPerm(p)==='none' && !(p==='revenue' && _permOf('revenue.rocket')!=='none')){ toast('접근 권한이 없는 메뉴입니다.'); return; }
+  if(window.__CURRENT_USER && p!=='home' && _menuPerm(p)==='none' && !(p==='revenue' && _permOf('revenue.rocket')!=='none')){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   // 리뷰관리 화면을 벗어나면 실시간 폴링 중단(다른 화면에서 불필요한 egress 방지) — 'review'로
   // 다시 들어오면 reviewInit()이 _rvwStartPoll()로 재시작함
   if(p!=='review') _rvwStopPoll();
@@ -12552,7 +12863,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['inv','sales','order','insight','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','rgmgmt','cost3day','review','knowledge','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logicarrot','coupangad'].forEach(x=>{
+  ['home','inv','sales','order','insight','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','rgmgmt','cost3day','review','knowledge','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logicarrot','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -12560,6 +12871,7 @@ function goPage(p){
   if(p==='coupangad'){ const f=document.getElementById('coupangAdFrame'); if(f && !f.getAttribute('src')){ f.addEventListener('load', ()=>_taskWireIframeF9(f)); f.setAttribute('src','coupang-ad-dashboard.html?v=20260709a'); } }
   // 품절관리: 처음 열 때만 iframe 로드(지연 로딩)
   if(p==='soldout'){ const f=document.getElementById('soldoutFrame'); if(f && !f.getAttribute('src')){ f.addEventListener('load', ()=>_taskWireIframeF9(f)); f.setAttribute('src','soldout-mgmt.html?v=20260831a'); } }
+  if(p==='home') homeOpen();
   if(p==='calendar') loadCalPage();
   if(_pageId==='collab') loadCollabPage();
   if(p==='logihome') loadLogiHome();
@@ -12611,7 +12923,7 @@ function goPage(p){
   if(window.__CURRENT_USER) updateNavVisibility();
   _applyWriteLockUI();
   // 캘린더 페이지에서는 상단 엑셀 업로드 버튼 숨김 (해당 없음) — _applyWriteLockUI 이후 적용
-  if(_pageId==='calendar'||_pageId==='collab'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logicarrot'||_pageId==='coupangad'||_pageId==='soldout'||_pageId==='knowledge'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
+  if(_pageId==='home'||_pageId==='calendar'||_pageId==='collab'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logicarrot'||_pageId==='coupangad'||_pageId==='soldout'||_pageId==='knowledge'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
 }
 
 // ══════════════════════════════════════════════
@@ -17820,7 +18132,6 @@ function _renderRevCurrentPage(){
   if(_revPage==='rocket')   renderRgPage();
   if(_revPage==='region')   renderRegionPage();
   if(_revPage==='ssa')      renderSsaPage();
-  if(_revPage==='bestseller') renderBestsellerPage();
 }
 
 // ── 택배비 CRUD (Supabase cloud 저장 + localStorage 백업) ──
@@ -18853,98 +19164,6 @@ function sortCh(arr){
   });
 }
 
-// ══════════════ 베스트셀러(채널별·기간별) ══════════════
-// 매출관리 통합(_revData)을 상품명(modelName) 기준으로 집계해 기간·판매처별 판매량 순위를 보여준다.
-// daily_sales(재고관리)가 채널 커버리지는 더 넓지만 "어느 판매처에서" 잘 팔리는지는 안 보여주므로,
-// 이 화면은 재고 수량 계산과는 무관하게(계산에 영향 없음) "어디서 뭐가 잘 팔리는지" 참고용으로만
-// 쓴다. 재고관리 등록 상품(products)과는 이름으로만 매칭해 현재고를 참고 표시한다(코드 네임스페이스가
-// 서로 달라 코드 매칭은 신뢰할 수 없음 — 2026-09 확인).
-const BEST_PERIODS = [
-  {id:'month', label:'이번달'}, {id:'d30', label:'최근30일'}, {id:'d90', label:'최근90일'},
-  {id:'year', label:'올해'}, {id:'lastyear', label:'작년'}
-];
-let _bestPeriod='d30', _bestCh='ALL';
-function setBestPeriod(id){ _bestPeriod=id; renderBestsellerPage(); }
-function setBestCh(ch){ _bestCh=ch; renderBestsellerPage(); }
-function _bestDateRange(periodId){
-  const today=new Date(); today.setHours(0,0,0,0);
-  if(periodId==='month') return {start:fmtDate(new Date(today.getFullYear(),today.getMonth(),1)), end:fmtDate(today)};
-  if(periodId==='d30')   return {start:fmtDate(new Date(today.getTime()-29*86400000)), end:fmtDate(today)};
-  if(periodId==='d90')   return {start:fmtDate(new Date(today.getTime()-89*86400000)), end:fmtDate(today)};
-  if(periodId==='year')  return {start:fmtDate(new Date(today.getFullYear(),0,1)), end:fmtDate(today)};
-  if(periodId==='lastyear') return {start:fmtDate(new Date(today.getFullYear()-1,0,1)), end:fmtDate(new Date(today.getFullYear()-1,11,31))};
-  return {start:fmtDate(today), end:fmtDate(today)};
-}
-function renderBestsellerPage(){
-  const {start,end}=_bestDateRange(_bestPeriod);
-  const years=[...new Set([Number(start.slice(0,4)), Number(end.slice(0,4))])];
-  const missing=years.filter(y=>!_revYearsLoaded.has(y));
-  if(missing.length){ Promise.all(missing.map(y=>ensureRevYear(y))).then(renderBestsellerPage); return; }
-
-  const periodBtnsEl=document.getElementById('bestPeriodBtns');
-  if(periodBtnsEl) periodBtnsEl.innerHTML=BEST_PERIODS.map(p=>
-    `<button class="rfbtn${_bestPeriod===p.id?' active':''}" onclick="setBestPeriod('${p.id}')">${p.label}</button>`).join('');
-  const chs=sortCh([...new Set(_revData.filter(r=>years.includes(r.year)).map(r=>r.ch).filter(Boolean))]);
-  const chBtnsEl=document.getElementById('bestChBtns');
-  if(chBtnsEl) chBtnsEl.innerHTML=`<button class="rfbtn${_bestCh==='ALL'?' active':''}" onclick="setBestCh('ALL')">전체</button>`
-    +chs.map(c=>`<button class="rfbtn${_bestCh===c?' active':''}" onclick="setBestCh('${c}')">${c}</button>`).join('');
-
-  const rows=_revData.filter(r=>{
-    if(!r.date || !r.year) return false;
-    const full=r.year+'-'+r.date;   // r.date는 'MM-DD'만 저장돼있어 연도를 붙여야 정확히 비교됨
-    if(full<start || full>end) return false;
-    if(_bestCh!=='ALL' && r.ch!==_bestCh) return false;
-    return true;
-  });
-  const agg={};
-  rows.forEach(r=>{
-    const key=r.modelName||r.itemCode||'미상';
-    if(!agg[key]) agg[key]={name:key, qty:0, amount:0, chSet:new Set()};
-    agg[key].qty+=(r.orderQty||0);
-    agg[key].amount+=(r.settlement||0);
-    if(r.ch) agg[key].chSet.add(r.ch);
-  });
-  const list=Object.values(agg).filter(v=>v.qty>0).sort((a,b)=>b.qty-a.qty);
-  list.forEach(v=>{ v.matched=products.find(x=>!x.hidden && x.name===v.name) || null; });
-
-  const days=Math.max(1, Math.round((new Date(end)-new Date(start))/86400000)+1);
-  const periodLabel=(BEST_PERIODS.find(p=>p.id===_bestPeriod)||{}).label||'';
-  const chLabel=_bestCh==='ALL'?'전체 채널':_bestCh;
-  const sumEl=document.getElementById('bestSummary');
-  if(sumEl){
-    if(!list.length) sumEl.textContent=`${periodLabel}·${chLabel} 기준으로 판매 데이터가 없습니다.`;
-    else{
-      const top=list[0];
-      sumEl.innerHTML=`📊 <b>${periodLabel}</b>(${start}~${end}) · <b>${_esc(chLabel)}</b> 기준 가장 많이 팔린 상품은 <b>${_esc(top.name)}</b>이며, <b>${top.qty.toLocaleString()}개</b> 판매(매출 ${Math.round(top.amount).toLocaleString()}원)됐습니다. 상위 ${Math.min(30,list.length)}개 상품을 아래 표에서 확인하세요.`;
-    }
-  }
-
-  const tbody=document.getElementById('bestTbody');
-  const empty=document.getElementById('bestEmpty');
-  const tbl=document.getElementById('bestTbl');
-  if(!list.length){ if(tbody) tbody.innerHTML=''; if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return; }
-  if(empty) empty.style.display='none'; if(tbl) tbl.style.display='';
-
-  if(tbody) tbody.innerHTML=list.slice(0,30).map((v,i)=>{
-    const p=v.matched;
-    const avgDay=v.qty/days;
-    const stockDays=(p && avgDay>0)?Math.floor(p.stock/avgDay):null;
-    const lowStock=stockDays!=null && stockDays<=14;
-    const stockCell=p
-      ? `<span style="${lowStock?'color:#DC2626;font-weight:700;':'font-weight:600;'}">${p.stock.toLocaleString()}개${lowStock?' ⚠부족의심':''}</span>${stockDays!=null?`<div style="font-size:10.5px;color:var(--tx2);margin-top:2px;">이 판매속도로 약 ${stockDays}일분</div>`:''}`
-      : `<span style="color:var(--tx2);">재고관리 미등록</span>`;
-    return `<tr>
-      <td style="text-align:center;font-weight:700;color:${i<3?'#EA580C':'var(--tx2)'};">${i+1}</td>
-      <td style="font-weight:600;">${_esc(v.name)}</td>
-      <td>${p?(p.type||'기타'):'-'}</td>
-      <td style="font-size:11px;color:var(--tx2);">${[...v.chSet].join(', ')}</td>
-      <td style="text-align:right;font-weight:600;">${v.qty.toLocaleString()}개</td>
-      <td style="text-align:right;">${Math.round(v.amount).toLocaleString()}원</td>
-      <td style="text-align:right;">${stockCell}</td>
-    </tr>`;
-  }).join('');
-}
-
 // ── 광고비(광고센터) 데이터 ── { 'channel|YYYY-MM-DD': 금액 }
 let _adSpend = {};
 let _adLoaded = false;
@@ -18988,7 +19207,7 @@ function goRevPage(p){
     p = f.id;
   }
   _revPage = p;
-  ['summary','monthly','backdata','upload','unified','daily','rocket','adcenter','region','ssa','bestseller'].forEach(x=>{
+  ['summary','monthly','backdata','upload','unified','daily','rocket','adcenter','region','ssa'].forEach(x=>{
     document.getElementById('rsni-'+x)?.classList.toggle('active',x===p);
     document.getElementById('rpage-'+x)?.classList.toggle('active',x===p);
   });
@@ -27588,6 +27807,7 @@ function _deadlineLabel(days){
 }
 
 function updateFloat(){
+  try{ homeRefreshSoon(); }catch(e){}   // 홈 화면이 열려 있으면 위젯 요약 갱신
   const urg=products.filter(p=>{
     if(p.hidden||p.disc) return false;
     const er=getEffectiveReorder(p);
