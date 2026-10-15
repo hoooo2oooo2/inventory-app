@@ -115,6 +115,11 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .ni:hover{color:var(--tx);}
 .ni.active{color:var(--pr);border-bottom-color:var(--pr);font-weight:500;}
 .ni.dis{opacity:.35;cursor:default;}
+/* 소그룹 메뉴(CX팀): 그룹 라벨 칩 + 구분선, 폭이 모자라면 그룹 단위로 줄바꿈 */
+#mainMenuNav.grouped{flex-wrap:wrap;overflow-x:visible;}
+.ni-group{display:flex;align-items:center;white-space:nowrap;padding-right:8px;margin-right:8px;border-right:1px solid var(--bd);}
+.ni-group:last-child{border-right:none;margin-right:0;}
+.ni-gl{font-size:11px;font-weight:700;color:var(--pr);background:var(--prl);border-radius:10px;padding:2px 9px;margin-right:4px;user-select:none;}
 
 .nbadge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#DC2626;color:#fff;font-size:9px;font-weight:600;margin-left:3px;vertical-align:middle;}
 .pulse-wrap{display:inline-flex;align-items:center;position:relative;margin-left:3px;vertical-align:middle;}
@@ -7988,13 +7993,19 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','insight','price','quote','family','consign','accreq','tcb','phoneorder','cost3day','review','knowledge'] },
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','insight','price','quote','family','consign','accreq','tcb','phoneorder','cost3day','review','knowledge'],
+    groups:[
+      { label:'재고·발주', menus:['inv','sales','order','family','insight'] },
+      { label:'CX업무',    menus:['phoneorder','price','quote','review','knowledge','consign'] },
+      { label:'기타',      menus:['accreq','cost3day','tcb'] },
+    ] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout'] },
   { id:'logi',   label:'물류팀',    menus:['logihome','logistock','logibox','logicarrot'] },
   { id:'ops',    label:'운영관리',   menus:['revenue','hist','coupangad'] },
   { id:'growth', label:'로켓그로스', menus:['rg','rgmgmt','rgrevenue'] },
 ];
 let _activeDept = null;
+let _navOrig = null, _navGroupedDept = null; // 소그룹 메뉴: 원본 항목 순서 / 현재 그룹 구성된 부서
 function _menuLabel(id){ const m=MENUS.find(x=>x.id===id); return m?m.label:id; }
 function _deptVisibleMenus(deptId){
   const d=DEPTS.find(x=>x.id===deptId); if(!d) return [];
@@ -8045,6 +8056,36 @@ function goMenu(menuId){
   goPage(menuId);
 }
 function renderFavBar(){ /* 즐겨찾기 기능 비활성화 */ }
+// 부서에 groups가 정의돼 있으면 하위메뉴를 소그룹(라벨 칩 + 구분선)으로 묶어 표시. 항목 노드(id=nav-*)는 이동만 하고 그대로 유지.
+function _applyNavGroups(){
+  const nav=document.getElementById('mainMenuNav'); if(!nav) return;
+  if(!_navOrig) _navOrig=[...nav.children];
+  const d=DEPTS.find(x=>x.id===_activeDept);
+  const groups=d && d.groups;
+  const want=groups?_activeDept:null;
+  if(_navGroupedDept!==want){
+    _navOrig.forEach(n=>nav.appendChild(n));                       // 항목을 원래 순서로 복원
+    nav.querySelectorAll(':scope > .ni-group').forEach(g=>g.remove());
+    nav.classList.toggle('grouped', !!groups);
+    if(groups){
+      const placed=new Set();
+      const build=(label, ids)=>{
+        const wrap=document.createElement('div'); wrap.className='ni-group';
+        const lb=document.createElement('span'); lb.className='ni-gl'; lb.textContent=label; wrap.appendChild(lb);
+        ids.forEach(id=>{ const el=document.getElementById('nav-'+id); if(el){ wrap.appendChild(el); placed.add(id); } });
+        nav.appendChild(wrap);
+      };
+      groups.forEach(g=>build(g.label, g.menus));
+      const rest=d.menus.filter(id=>!placed.has(id));              // 그룹에 안 넣은 메뉴는 '기타'로 자동 편입
+      if(rest.length) build('기타', rest);
+    }
+    _navGroupedDept=want;
+  }
+  // 보이는 항목이 하나도 없는 그룹(권한 없음)은 숨김
+  nav.querySelectorAll(':scope > .ni-group').forEach(g=>{
+    g.style.display=[...g.querySelectorAll('.ni')].some(e=>e.style.display!=='none') ? 'flex' : 'none';
+  });
+}
 function updateNavVisibility(){
   simFabSync();
   const u=window.__CURRENT_USER; if(!u) return;
@@ -8063,6 +8104,7 @@ function updateNavVisibility(){
     el.style.display = (_menuPerm(m.id)!=='none' && deptMenus.includes(m.id)) ? '' : 'none';
     el.classList.toggle('active', currentPage===m.id || (m.id==='rgrevenue' && currentPage==='revenue' && _revPage==='rocket'));
   });
+  _applyNavGroups();
   // 로켓그로스 탭에서 매출관리 화면에 들어온 경우(로켓그로스 매출), 매출관리 소분류탭 바는 숨김
   const revSubnav = document.querySelector('#page-revenue .rev-subnav');
   if(revSubnav) revSubnav.style.display = (_activeDept==='growth') ? 'none' : '';
