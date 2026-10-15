@@ -4421,9 +4421,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
       <div class="field"><label>발행일자</label><input type="date" id="pivFIssueDate"></div>
       <div class="field"><label>발급여부</label>
-        <select id="pivFIssued"><option value="미발급">미발급</option><option value="발행요청">발행요청</option><option value="발급완료">발급완료</option><option value="발급취소">발급취소</option></select></div>
+        <select id="pivFIssued" onchange="pivIssuedChanged()"><option value="미발급">미발급</option><option value="발행요청">발행요청</option><option value="발급완료">발급완료</option><option value="발급취소">발급취소</option></select></div>
       <div class="field"><label>입금여부</label>
-        <select id="pivFPaid" onchange="pivPaidChanged()"><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
+        <select id="pivFPaid" onchange="pivPaidChanged()"><option value="" hidden>— (발급취소)</option><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
 
       <div class="field piv-span3" id="pivLinkWrap" style="display:none;"><label>🔗 연동된 전화구매건 (입금완료되면 함께 입금완료 처리됩니다)</label><div class="piv-hint" id="pivLinkInfo" style="margin:0;color:var(--tx);"></div></div>
       <div class="field" id="pivDueWrap"><label>입금예정일 *</label><input type="date" id="pivFDueDate"></div>
@@ -34125,7 +34125,8 @@ function pivRender(){
       const m = Number(r.margin)||0;
       const od = _pivOverdueDays(r);
       let paidCell;
-      if(r.paid==='입금완료') paidCell = '<span class="piv-badge piv-ok">입금완료</span>';
+      if(r.issued==='발급취소' && r.paid!=='입금완료') paidCell = '<span class="piv-sub">-</span>';
+      else if(r.paid==='입금완료') paidCell = '<span class="piv-badge piv-ok">입금완료</span>';
       else if(od!=null) paidCell = `<span class="piv-badge piv-late">미입금 · ${od}일 경과</span><span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`;
       else paidCell = `<span class="piv-badge piv-wait">미입금</span>${r.dueDate?`<span class="piv-sub">예정 ${_esc(r.dueDate)}</span>`:''}`;
       return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''} ${r.issued==='발급취소'?'piv-cancel':''}" ${canEdit?`onclick="pivOpenModal('${r.id}')"`:''}>
@@ -34188,6 +34189,18 @@ function pivReceiptChanged(){
 function pivPaidChanged(){
   const unpaid = document.getElementById('pivFPaid').value==='미입금';
   document.getElementById('pivDueWrap').style.display = unpaid ? '' : 'none';
+}
+// 발급취소면 입금여부 선택·입금예정일 없이 저장된다 (입금여부는 비워지고 입력칸은 잠김)
+function pivIssuedChanged(){
+  const paid = document.getElementById('pivFPaid');
+  if(document.getElementById('pivFIssued').value==='발급취소'){
+    paid.value = ''; paid.disabled = true;
+    document.getElementById('pivFDueDate').value = '';
+  } else {
+    paid.disabled = false;
+    if(!paid.value) paid.value = '미입금';
+  }
+  pivPaidChanged();
 }
 function _pivFindCompany(regNo){
   const d = _pivDigits(regNo);
@@ -34319,6 +34332,7 @@ function pivOpenModal(id){
   _pivSetEmail(r.email); _pivSet('Addr', r.addr); _pivSet('BizType', r.bizType); _pivSet('BizItem', r.bizItem);
   _pivSet('Amount', r.amount); _pivSet('Margin', r.margin); _pivSet('IssueDate', r.issueDate);
   _pivSet('Issued', r.issued || '미발급'); _pivSet('Paid', r.paid || '미입금'); _pivSet('DueDate', r.dueDate); _pivSet('Note', r.note);
+  document.getElementById('pivFPaid').disabled = false;
   document.getElementById('pivFRepairOn').checked = !!r.repairOn;
   document.getElementById('pivFShipOn').checked = !!r.shipOn;
   { const links = r.pbLinks||[]; document.getElementById('pivLinkWrap').style.display = links.length ? '' : 'none';
@@ -34328,7 +34342,7 @@ function pivOpenModal(id){
   document.getElementById('pivRegHint').textContent = '';
   document.getElementById('pivFRegNoLbl').textContent = (r.receiptType==='현금영수증') ? '등록번호 (현금영수증번호)' : '등록번호 (사업자번호)';
   pivApplyLock();
-  pivPaidChanged();
+  pivIssuedChanged();   // 발급취소 건이면 입금여부 잠금
   pivRenderItems();
   document.getElementById('pivCostTotal').textContent = _pivNum(_pivCost())+'원';
   document.getElementById('pivFCostView').value = _pivItems.length ? _pivNum(_pivCost())+'원' : '';
@@ -34354,6 +34368,7 @@ async function pivSave(confirmed){
   rec.item = parts.join(', ');
   if(!rec.reqDate){ toast('요청일자를 입력하세요.'); return; }
   if(!rec.company){ toast('상호를 입력하세요.'); return; }
+  if(rec.issued==='발급취소'){ rec.paid = ''; rec.dueDate = ''; }   // 발급취소는 입금여부·입금예정일 없이 저장
   if(rec.paid==='미입금' && !rec.dueDate){ toast('미입금 건은 입금예정일을 지정해주세요.'); return; }
   // 업체등록에서 불러온 업체면 저장 전에 한 번 더 확인
   if(_pivMatchedCo && confirmed!==true){
