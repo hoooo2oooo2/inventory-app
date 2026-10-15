@@ -132,7 +132,10 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .ni .ni-star.on{opacity:1;color:#F59E0B;}
 /* ═══ 홈 화면(관리자 전용): 시계·달력 + 즐겨찾기 위젯(작게/보통/크게) ═══ */
 #page-home{padding:18px 20px 40px;}
-.hm-top{display:grid;grid-template-columns:minmax(240px,1fr) minmax(300px,1.3fr);gap:14px;margin-bottom:22px;}
+.hm-top{display:grid;grid-template-columns:minmax(240px,1fr) 700px;gap:14px;margin-bottom:22px;}
+.hm-cal-2{display:flex;flex-wrap:wrap;gap:6px 30px;justify-content:center;}
+.hm-mon{flex:1 1 250px;max-width:320px;min-width:250px;}
+.hm-mon-t{font-size:12.5px;font-weight:700;color:var(--tx);margin:2px 0 2px 2px;}
 .hm-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
 .hm-clock{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:22px 16px;min-height:210px;}
 .hm-clock .hm-hello{font-size:13px;color:var(--tx2);}
@@ -147,8 +150,8 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-cal table{width:100%;border-collapse:collapse;table-layout:fixed;}
 .hm-cal th,.hm-cal td{border:none !important;background:transparent !important;}
 .hm-cal th{font-size:11px;font-weight:600;color:var(--tx2);padding:4px 0;}
-.hm-cal td{text-align:center;font-size:13px;padding:0;height:30px;color:var(--tx);}
-.hm-cal td span{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;}
+.hm-cal td{text-align:center;font-size:12.5px;padding:0;height:27px;color:var(--tx);}
+.hm-cal td span{display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;border-radius:50%;}
 .hm-cal td.sun span{color:#DC2626;} .hm-cal td.sat span{color:#2563EB;}
 .hm-cal td.oth span{opacity:.35;}
 .hm-cal td.today span{background:var(--pr);color:#fff;font-weight:700;}
@@ -166,6 +169,8 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-w-hd{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--tx);margin-bottom:8px;white-space:nowrap;}
 .hm-w-hd .hm-ico{font-size:17px;}
 .hm-w-hd .hm-go{margin-left:auto;font-size:11px;font-weight:500;color:var(--tx2);}
+.hm-w-hd>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.hm-w.s-S .hm-go{display:none;}
 .hm-w-big{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.1;color:var(--tx);}
 .hm-w-big small{font-size:14px;font-weight:600;margin-left:2px;}
 .hm-w-cap{font-size:11.5px;color:var(--tx2);margin-top:3px;}
@@ -190,7 +195,8 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-add{align-items:center;justify-content:center;gap:4px;color:var(--tx2);border-style:dashed;background:transparent;}
 .hm-add .plus{font-size:30px;line-height:1;}
 .hm-empty{grid-column:1/-1;padding:26px 10px;text-align:center;color:var(--tx2);font-size:13px;line-height:1.7;}
-@media(max-width:760px){ .hm-top{grid-template-columns:1fr;} #page-home{padding:12px 12px 30px;} }
+@media(max-width:1100px){ .hm-top{grid-template-columns:1fr;} }
+@media(max-width:760px){ #page-home{padding:12px 12px 30px;} }
 
 .nbadge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#DC2626;color:#fff;font-size:9px;font-weight:600;margin-left:3px;vertical-align:middle;}
 .pulse-wrap{display:inline-flex;align-items:center;position:relative;margin-left:3px;vertical-align:middle;}
@@ -8310,6 +8316,35 @@ const HOME_PROVIDERS={
     _homeSalesCache={ver:_dCacheVer, at:Date.now(), data};
     return data;
   },
+  // 전화구매건 관리 — 세금계산서 발행 목록 요약 (발행요청 / 미발급 / 입금예정일 경과 / 미입금)
+  // _pivRows 등은 아래쪽 두 번째 <script>에 선언돼 있어 로그인 직후 아주 이른 시점에는 접근이 안 될 수 있음 → 그때는 '불러오는 중'
+  phoneorder(){
+    try{
+      if(!_pivLoaded) return {loading:true};
+      const rows=_pivRows;
+      const req=rows.filter(r=>r.issued==='발행요청');
+      const notIssued=rows.filter(r=>(r.issued||'미발급')==='미발급');
+      const over=rows.filter(r=>_pivOverdueDays(r)!=null).sort((a,b)=>_pivOverdueDays(b)-_pivOverdueDays(a));
+      const unpaid=rows.filter(r=>r.paid!=='입금완료' && r.issued!=='발급취소');
+      const unpaidSum=unpaid.reduce((t,r)=>t+(Number(r.amount)||0),0);
+      const showRows=over.length?over:req;
+      return {title:'전화구매건 · 세금계산서',
+        cap:`미입금 ${_hmN(unpaid.length)}건 · 합계 ${_hmN(unpaidSum)}원`,
+        kpis:[
+          {l:'발행요청',v:req.length,u:'건',tone:req.length?'orange':null,act:'request'},
+          {l:'미발급',v:notIssued.length,u:'건',tone:notIssued.length?'amber':null,act:'all'},
+          {l:'입금예정일 경과',v:over.length,u:'건',tone:over.length?'red':'green',act:'overdue'},
+          {l:'미입금 전체',v:unpaid.length,u:'건',act:'unpaid'}],
+        list:showRows.length ? showRows.slice(0,6).map(r=>({
+          t:`${r.company||'-'}${r.staff?' · '+r.staff:''}`,
+          s:over.length?`${_pivOverdueDays(r)}일 경과 · ${_hmN(r.amount)}원`:`${_hmN(r.amount)}원`}))
+          : [{t:'✅ 발행요청·입금예정일 경과 건이 없습니다', s:''}]};
+    }catch(e){ return {loading:true}; }
+  },
+};
+// 위젯/KPI를 눌러 메뉴로 이동할 때 먼저 해 둘 화면 상태(예: 세금계산서 탭 + 해당 필터)
+const HOME_OPEN={
+  phoneorder(act){ try{ _pivTab='invoice'; _pivPaidFilter=act||'all'; _pivPage=0; }catch(e){} },
 };
 
 // ── 렌더링 ──
@@ -8325,14 +8360,14 @@ function _hmWidgetHtml(w){
     body=`<div class="hm-w-big hm-tone-${k.tone||'none'}">${_hmN(k.v)}${k.u?`<small>${k.u}</small>`:''}</div><div class="hm-w-cap">${_hmEsc(k.l)}</div>`;
   } else {
     const n=w.size==='L'?4:3;
-    body=`<div class="hm-kpis">${d.kpis.slice(0,n).map(k=>`<div class="hm-kpi"><div class="v hm-tone-${k.tone||'none'}">${_hmN(k.v)}${k.u?`<small style="font-size:12px;margin-left:1px;">${k.u}</small>`:''}</div><div class="l">${_hmEsc(k.l)}</div></div>`).join('')}</div>`
+    body=`<div class="hm-kpis">${d.kpis.slice(0,n).map(k=>`<div class="hm-kpi"${k.act!=null?` style="cursor:pointer;" onclick="event.stopPropagation();homeOpenWidget('${id}','${k.act}')"`:''}><div class="v hm-tone-${k.tone||'none'}">${_hmN(k.v)}${k.u?`<small style="font-size:12px;margin-left:1px;">${k.u}</small>`:''}</div><div class="l">${_hmEsc(k.l)}</div></div>`).join('')}</div>`
       +(w.size==='M'&&d.cap?`<div class="hm-w-cap" style="margin-top:8px;">${_hmEsc(d.cap)}</div>`:'')
       +(w.size==='L'?(d.list&&d.list.length?`<div class="hm-list">${d.list.map(r=>`<div class="hm-li"><span>${_hmEsc(r.t)}</span><span>${_hmEsc(r.s)}</span></div>`).join('')}</div>`:'')+(d.cap?`<div class="hm-w-cap" style="margin-top:auto;">${_hmEsc(d.cap)}</div>`:''):'');
   }
   const sz=['S','M','L'].map(s=>`<button class="${w.size===s?'on':''}" title="${{S:'작게',M:'보통',L:'크게'}[s]}" onclick="homeSetSize('${id}','${s}')">${s}</button>`).join('');
   return `<div class="hm-card hm-w s-${w.size}" data-id="${id}" draggable="${_homeEdit?'true':'false'}" onclick="homeOpenWidget('${id}')">
     <div class="hm-w-ctl" onclick="event.stopPropagation()">${sz}<button title="앞으로" onclick="homeMove('${id}',-1)">◀</button><button title="뒤로" onclick="homeMove('${id}',1)">▶</button><button title="삭제" onclick="homeRemove('${id}')">✕</button></div>
-    <div class="hm-w-hd"><span class="hm-ico">${ico}</span><span>${_hmEsc(label)}</span><span class="hm-go">열기 ›</span></div>${body}</div>`;
+    <div class="hm-w-hd"><span class="hm-ico">${ico}</span><span>${_hmEsc((d&&d.title)||label)}</span><span class="hm-go">열기 ›</span></div>${body}</div>`;
 }
 function renderHome(){
   const grid=document.getElementById('hmGrid'); if(!grid) return;
@@ -8358,7 +8393,7 @@ function homeOpen(){
   homeLoadCfg().then(()=>{ if(currentPage==='home') renderHome(); _syncFavStars(); });
 }
 function goHome(){ if(_isAdminUser()) goPage('home'); }
-function homeOpenWidget(id){ if(_homeEdit) return; goMenu(id); }
+function homeOpenWidget(id,act){ if(_homeEdit) return; if(HOME_OPEN[id]) HOME_OPEN[id](act); goMenu(id); }
 function homeToggleEdit(){ _homeEdit=!_homeEdit; renderHome(); }
 
 // ── 시계 ──
@@ -8371,25 +8406,31 @@ function _homeTick(){
   if(dt) dt.textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`;
 }
 // ── 달력 ──
-function renderHomeCal(){
-  const el=document.getElementById('hmCal'); if(!el) return;
-  const y=_homeCalY, m=_homeCalM;
-  const start=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate(), prevDim=new Date(y,m,0).getDate();
+function _homeMonthHtml(y,m){
+  const start=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate();
   const now=new Date(), isCur=(now.getFullYear()===y && now.getMonth()===m);
   let rows='';
-  for(let r=0;r<6;r++){
+  for(let r=0;r<6;r++){   // 두 달의 줄 수가 달라도 높이가 맞도록 항상 6줄
     let tds='';
     for(let c=0;c<7;c++){
       const n=r*7+c-start+1;
-      const oth=(n<1||n>dim);
-      const num=n<1?prevDim+n:(n>dim?n-dim:n);
-      const cls=[c===0?'sun':'',c===6?'sat':'',oth?'oth':'',(!oth&&isCur&&n===now.getDate())?'today':''].filter(Boolean).join(' ');
-      tds+=`<td class="${cls}"><span>${num}</span></td>`;
+      if(n<1||n>dim){ tds+='<td></td>'; continue; }   // 앞뒤 달 날짜는 비워서 두 달이 헷갈리지 않게
+      const cls=[c===0?'sun':'',c===6?'sat':'',(isCur&&n===now.getDate())?'today':''].filter(Boolean).join(' ');
+      tds+=`<td class="${cls}"><span>${n}</span></td>`;
     }
     rows+=`<tr>${tds}</tr>`;
   }
-  el.innerHTML=`<div class="hm-cal-hd"><b>${y}년 ${m+1}월</b><button onclick="homeCalNav(-1)">◀</button><button onclick="homeCalToday()">오늘</button><button onclick="homeCalNav(1)">▶</button></div>
-    <table><thead><tr>${'일월화수목금토'.split('').map((d,i)=>`<th style="${i===0?'color:#DC2626;':i===6?'color:#2563EB;':''}">${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+  return `<div class="hm-mon"><div class="hm-mon-t">${y}년 ${m+1}월</div>
+    <table><thead><tr>${'일월화수목금토'.split('').map((d,i)=>`<th style="${i===0?'color:#DC2626;':i===6?'color:#2563EB;':''}">${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+// 이번 달 + 다음 달을 나란히 표시 (◀ ▶는 한 달씩 이동)
+function renderHomeCal(){
+  const el=document.getElementById('hmCal'); if(!el) return;
+  const y=_homeCalY, m=_homeCalM;
+  const nx=new Date(y,m+1,1), ny=nx.getFullYear(), nm=nx.getMonth();
+  const title=(ny===y)?`${y}년 ${m+1}월 – ${nm+1}월`:`${y}년 ${m+1}월 – ${ny}년 ${nm+1}월`;
+  el.innerHTML=`<div class="hm-cal-hd"><b>📅 ${title}</b><button onclick="homeCalNav(-1)">◀</button><button onclick="homeCalToday()">오늘</button><button onclick="homeCalNav(1)">▶</button></div>
+    <div class="hm-cal-2">${_homeMonthHtml(y,m)}${_homeMonthHtml(ny,nm)}</div>`;
 }
 function homeCalNav(delta){
   const d=new Date(_homeCalY,_homeCalM+delta,1); _homeCalY=d.getFullYear(); _homeCalM=d.getMonth(); renderHomeCal();
@@ -33996,6 +34037,7 @@ async function pivLoad(){
   _pivRows = Array.isArray(d) ? d : [];
   _pivLoaded = true;
   pivRender();
+  try{ homeRefreshSoon(); }catch(e){}   // 홈 화면 전화구매건 위젯 갱신
 }
 async function pivCoLoad(){
   const d = await cloudKvLoad(PIV_CO_KEY);
@@ -34508,7 +34550,7 @@ async function pivReqCheck(initial){
     if(!initial && ver!==undefined && ver===_pivReqVer) return;
     const d = await cloudKvLoad(PIV_KEY);
     if(ver!==undefined) _pivReqVer = ver;
-    if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); }
+    if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); try{ homeRefreshSoon(); }catch(e){} }
     const reqs = _pivRows.filter(r=>r.issued==='발행요청');
     const prev = _pivReqLastCount; _pivReqLastCount = reqs.length;
     if(!reqs.length){ ntfDismiss('piv_req'); return; }
@@ -34552,7 +34594,7 @@ async function pivWatchTick(){
   let shown = ''; try{ shown = localStorage.getItem(_pivSlotStoreKey()) || ''; }catch{}
   if(shown===slot) return;
   const d = await cloudKvLoad(PIV_KEY);
-  if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); }
+  if(Array.isArray(d)){ _pivRows = d; _pivLoaded = true; if(document.getElementById('page-phoneorder')?.classList.contains('active')) pivRender(); try{ homeRefreshSoon(); }catch(e){} }
   const isMaster = _pivIsAlertAdmin();   // 전체 건을 받는 관리자에게만 '담당 OOO' 표시
   // 전화구매건(미입금 + 입금예정일 경과)도 같은 시간대 알림에 합쳐서 보여준다 — 실패해도 세금계산서 알림은 계속
   let pbList = null; try{ pbList = await _pbFetchUnpaid(); }catch(e){}
