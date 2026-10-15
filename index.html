@@ -1143,8 +1143,13 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .tcb-del-btn:hover{color:#DC2626;}
 .po-cat-tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}  /* 택배사 보상목록 사고유형 태그에서 공용 */
 /* 📞 전화구매건 관리 */
-.piv-wrap{max-width:1760px;margin:0 auto;height:calc(100vh - 140px);display:flex;flex-direction:column;box-sizing:border-box;}
-.piv-tab{display:none;flex:1;min-height:0;flex-direction:column;padding:14px 18px;box-sizing:border-box;}
+.piv-wrap{max-width:none;margin:0;height:calc(100vh - 110px);display:flex;flex-direction:row;box-sizing:border-box;}
+.piv-side{flex:0 0 150px;display:flex;flex-direction:column;gap:6px;padding:16px 10px 0 16px;box-sizing:border-box;}
+.piv-side button{width:100%;text-align:left;padding:11px 12px;border:1px solid var(--bd);background:var(--bg);color:var(--tx2);border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+.piv-side button:hover{border-color:#3182F6;color:#3182F6;}
+.piv-side button.active{background:#3182F6;border-color:#3182F6;color:#fff;}
+@media(max-width:900px){ .piv-wrap{flex-direction:column;} .piv-side{flex:none;flex-direction:row;flex-wrap:wrap;padding:8px 12px 0;} .piv-side button{width:auto;} }
+.piv-tab{display:none;flex:1;min-height:0;min-width:0;flex-direction:column;padding:14px 18px;box-sizing:border-box;}
 .piv-tab.active{display:flex;}
 .piv-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0;}
 .piv-table-scroll{flex:1;min-height:0;overflow-x:auto;overflow-y:auto;border:1px solid var(--bd);border-radius:12px;background:var(--bg);}
@@ -1177,6 +1182,9 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .pb-summary .piv-badge{font-size:11.5px;padding:3px 10px;}
 .pb-split{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;}
 .pb-panel{min-height:0;display:flex;flex-direction:column;}
+.pb-panel.pb-top{flex:0 1 auto;max-height:36%;}
+.pb-panel.pb-top .piv-table-scroll{flex:0 1 auto;}
+.pb-panel.pb-bottom{flex:1 1 0;}
 .pb-panel-head{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .pb-table tbody tr.piv-click:hover{background:var(--bg2);}
 .piv-st{background:#E0E7FF;color:#3730A3;}
@@ -4106,10 +4114,10 @@ html.mob-native .lcr-det-val{font-size:15px;}
 <!-- ═══ 전화구매건 관리 (CX팀) — 하위메뉴: 전화구매건 / 세금계산서 발행 / 업체등록 ═══ -->
 <div class="page" id="page-phoneorder">
  <div class="piv-wrap">
-  <div class="fo-subtabs">
-    <button class="fo-stab" id="pivStab-order" onclick="pivSwitchTab('order')">📞 전화구매건</button>
-    <button class="fo-stab active" id="pivStab-invoice" onclick="pivSwitchTab('invoice')">🧾 세금계산서 발행</button>
-    <button class="fo-stab" id="pivStab-company" onclick="pivSwitchTab('company')">🏢 업체등록</button>
+  <div class="piv-side">
+    <button id="pivStab-order" onclick="pivSwitchTab('order')">📞 전화구매건</button>
+    <button class="active" id="pivStab-invoice" onclick="pivSwitchTab('invoice')">🧾 세금계산서 발행</button>
+    <button id="pivStab-company" onclick="pivSwitchTab('company')">🏢 업체등록</button>
   </div>
 
   <!-- ─── 전화구매건 (위: 미입금건 관리 / 아래: 거래건) ─── -->
@@ -4131,11 +4139,11 @@ html.mob-native .lcr-det-val{font-size:15px;}
     </div>
     <div class="pb-summary" id="pbSummary"></div>
     <div class="pb-split">
-      <div class="pb-panel" style="flex:2;">
+      <div class="pb-panel pb-top">
         <div class="pb-panel-head">⏰ 미입금건 관리 <span class="cs-count" id="pbUnpaidCount">0</span><span class="piv-hint" id="pbUnpaidSum" style="margin:0;"></span></div>
         <div class="piv-table-scroll"><table class="piv-table pb-table"><thead id="pbHeadU"></thead><tbody id="pbBodyU"></tbody></table></div>
       </div>
-      <div class="pb-panel" style="flex:3;">
+      <div class="pb-panel pb-bottom">
         <div class="pb-panel-head">📦 거래건 <span class="cs-count" id="pbDealCount">0</span><span class="piv-hint" id="pbDealHint" style="margin:0;"></span>
           <select id="pbDayFilter" class="cs-search" style="width:150px;margin-left:auto;padding:4px 8px;cursor:pointer;" onchange="pbDayChanged()" title="날짜별로 골라 보기"><option value="">전체 날짜</option></select></div>
         <div class="piv-table-scroll"><table class="piv-table pb-table"><thead id="pbHeadD"></thead><tbody id="pbBodyD"></tbody></table></div>
@@ -27586,7 +27594,7 @@ function floatInitDrag(){
 }
 function simFabSync(){
   const b=document.getElementById('simFab'); if(!b) return;
-  const ok=!!window.__CURRENT_USER && _menuPerm('insight')!=='none';
+  const ok=!!window.__CURRENT_USER && window.__CURRENT_USER.username==='admin' && _menuPerm('insight')!=='none';   // 관리자(admin) 전용
   b.style.display=ok?'flex':'none';
   if(!ok) document.getElementById('simPop')?.classList.remove('open');
 }
