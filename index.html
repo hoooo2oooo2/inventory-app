@@ -29190,8 +29190,9 @@ function _rpTimeToMinutes(t){ return RP_TIME_MINUTES[t] || 0; }
 function _collabFmtMinutes(mins){
   mins = Math.max(0, Math.round(mins||0));
   if(!mins) return '-';
-  const days=Math.floor(mins/1440), hrs=Math.floor((mins%1440)/60), m=mins%60;
-  let s=''; if(days)s+=days+'일 '; if(hrs)s+=hrs+'시간 '; if(m||!s)s+=m+'분';
+  // 일 단위로 넘기지 않고 합계 시간으로 표시 (예: 1일 22시간 20분 → 46시간 20분)
+  const hrs=Math.floor(mins/60), m=mins%60;
+  let s=''; if(hrs)s+=hrs+'시간 '; if(m||!s)s+=m+'분';
   return s.trim();
 }
 // 프로젝트/업무(task)에 업무보고서로 등록된 소요시간을 날짜별로 집계 — 담당자 본인 업무보고서의 연동 블럭만 집계
