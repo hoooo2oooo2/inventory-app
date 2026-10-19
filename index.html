@@ -2723,6 +2723,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <button class="btn btn-sm" onclick="closeModal('collabDoneModal')">✕ 닫기</button>
     </div>
     <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">완료된 업무는 완료 당일엔 보드에 남고, <b>다음날 자동으로 이 목록으로 이동</b>됩니다.</div>
+    <div id="collabDoneTabs" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;"></div>
     <div id="collabDoneBody" style="max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 </div>
@@ -29508,9 +29509,18 @@ async function collabDelWeekly(ev, id){
 }
 
 // ── 완료목록 모달 ──
-function collabOpenDone(){
+let _collabDoneFilter = '전체'; // '전체' | 유현 | 보라 | 연정
+function collabSetDoneFilter(who){ collabOpenDone(who); }
+function collabOpenDone(who){
+  // 직원 페이지에서 열면 그 직원 완료목록, 협업업무에서 열면 전체로 시작
+  _collabDoneFilter = who || _designScopePerson || '전체';
+  const tabs = document.getElementById('collabDoneTabs');
+  if(tabs) tabs.innerHTML = ['전체','유현','보라','연정'].map(n=>{
+    const on = n===_collabDoneFilter;
+    return `<button class="btn btn-sm" onclick="collabSetDoneFilter('${n}')" style="${on?'background:#3182F6;color:#fff;border-color:#3182F6;':''}font-weight:700;">${n}</button>`;
+  }).join('');
   const done = _collabTasks
-    .filter(t=>t.status==='done' && t.completed_at)
+    .filter(t=>t.status==='done' && t.completed_at && (_collabDoneFilter==='전체' || t.assignee===_collabDoneFilter))
     .sort((a,b)=> new Date(b.completed_at) - new Date(a.completed_at));
   const body = document.getElementById('collabDoneBody');
   if(done.length===0){
@@ -30579,7 +30589,7 @@ function rpShowInlinePopup(afterLineId){
   form.innerHTML=`<select id="rpBpWipSel" class="rp-bp-cat" onchange="rpWipSelChange(this,false)">${_rpBuildSelOpts()}</select>
     <select id="rpBpTime" class="rp-bp-cat">${timeOpts}</select>
     <button class="rp-bp-save" onclick="rpBlockSave()">저장</button>
-    <button class="rp-bp-cancel" onclick="rpHideInlinePopup()">✕</button>`;
+    <button class="rp-bp-cancel" onclick="if(confirm('삭제하시겠습니까?')) rpHideInlinePopup()">✕</button>`;
   line.after(form);
   setTimeout(()=>{ document.getElementById('rpBpWipSel')?.focus(); },30);
 }
