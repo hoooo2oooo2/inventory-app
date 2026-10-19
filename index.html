@@ -267,7 +267,7 @@ html.mob-native .wc-rs{display:none;}
 .hm-w-cap{font-size:11.5px;color:var(--tx2);margin-top:3px;}
 .hm-kpis{display:flex;gap:10px;flex-wrap:wrap;}
 .hm-kpi{flex:1;min-width:54px;}
-.hm-kpi .v{font-size:22px;font-weight:700;line-height:1.15;color:var(--tx);}
+.hm-kpi .v{font-size:22px;font-weight:700;line-height:1.15;color:var(--tx);white-space:nowrap;}
 .hm-kpi .l{font-size:11px;color:var(--tx2);margin-top:1px;white-space:nowrap;}
 .hm-list{margin-top:10px;border-top:1px solid var(--bd);padding-top:6px;overflow:hidden;}
 .hm-li{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3.5px 0;color:var(--tx);}
@@ -8498,6 +8498,169 @@ const HOME_OPEN={
 HOME_OPEN['phoneorder:invoice']=HOME_OPEN.phoneorder;
 HOME_PROVIDERS['phoneorder:invoice']=()=>{ const d=HOME_PROVIDERS.phoneorder(); return d.loading?d:{...d,title:'세금계산서 발행'}; };
 
+// ══ 위젯 데이터 로더 — 즐겨찾기(홈에 올린) 위젯의 데이터만 읽고, 마지막으로 받은 버전과 같으면 다시 받지 않으며, 몇 분 간격으로만 갱신 ══
+//  · 각 메뉴의 데이터는 cloudKv(work_calendar)에 저장돼 있어 updated_at(버전)만 먼저 조회 → 바뀐 경우에만 본문을 받음(egress 절약)
+//  · 홈 화면이 열려 있고 탭이 보이는 동안만 5분(HOME_TTL) 주기로 확인. 홈을 벗어나면 읽지 않음.
+//  · 읽기 전용 — 이 코드는 어떤 데이터도 저장하지 않음
+const HOME_TTL=5*60*1000;
+const HOME_DATA={}, HOME_LOADED={}, HOME_ERR={}, _homeInflight={};
+let _homeLoadTimer=null;
+async function homeKv(kind){
+  const c=HOME_DATA[kind];
+  const v=await cloudKvVersion(kind);
+  if(v===undefined) return c?c.data:null;                 // 버전 조회 실패 → 기존 값 유지
+  if(c && c.ver===v) return c.data;                        // 변경 없음 → 다시 받지 않음
+  let d=null;
+  if(v!==null){ d=await cloudKvLoad(kind); if(d===null) return c?c.data:null; }
+  HOME_DATA[kind]={data:d===null?[]:d, ver:v};
+  return HOME_DATA[kind].data;
+}
+// 전화구매건(pb_*, 건별 저장) 버전: 건수 + 가장 최근 수정시각 (행 1개만 조회)
+async function homePbVer(){
+  try{
+    const {data,count,error}=await sb.from('work_calendar').select('updated_at',{count:'exact'}).eq('person','__app__').like('kind','pb\\_%').order('updated_at',{ascending:false}).limit(1);
+    if(error) return undefined;
+    return count+'|'+((data&&data[0])?data[0].updated_at:'');
+  }catch(e){ return undefined; }
+}
+const HOME_LOADERS={
+  quote:()=>homeKv('qt_saved'),
+  consign:()=>Promise.all([homeKv('consign_orders'),homeKv('consign_vendors')]),
+  accreq:()=>homeKv('accessory_requests'),
+  tcb:()=>homeKv('courier_comp_list'),
+  review:async()=>{
+    const idx=await homeKv('review_idx');
+    const months=(idx&&Array.isArray(idx.months))?idx.months.slice().sort().slice(-2):[];
+    const mm={}; for(const m of months) mm[m]=(await homeKv('review_m_'+m))||{};
+    const manage=await homeKv('review_manage');
+    HOME_DATA.__review={months,mm,manage:(manage&&!Array.isArray(manage))?manage:{}};
+  },
+  insight:async()=>{   // 발주 인사이트 화면과 같은 계산(insightBuildRows)을 재사용 — 3분 캐시되는 시뮬레이터 로더를 공유
+    const rows=await simEnsureRows();
+    try{ await _insightEnsureSeasonalCheckData(); }catch(e){}
+    HOME_DATA.__insight={rows, at:Date.now()};
+  },
+  'phoneorder:order':async()=>{
+    const v=await homePbVer(); const c=HOME_DATA.__pb;
+    if(v!==undefined && c && c.ver===v) return;
+    const l=await _pbFetchUnpaid(); if(l) HOME_DATA.__pb={rows:l,ver:v};
+  },
+};
+function homeLoadAll(force){
+  if(!_isAdminUser() || document.hidden) return;
+  ((_homeCfg&&_homeCfg.widgets)||[]).forEach(w=>{
+    if(!_hmPerm(w.id)) return;
+    const L=HOME_LOADERS[w.id]; if(!L) return;
+    if(!force && HOME_LOADED[w.id] && Date.now()-HOME_LOADED[w.id]<HOME_TTL) return;
+    if(_homeInflight[w.id]) return;
+    _homeInflight[w.id]=true;
+    Promise.resolve().then(L)
+      .then(()=>{ HOME_LOADED[w.id]=Date.now(); HOME_ERR[w.id]=false; })
+      .catch(e=>{ console.warn('홈 위젯 데이터 로드 실패', w.id, e); HOME_ERR[w.id]=true; HOME_LOADED[w.id]=Date.now()-HOME_TTL+60000; })   // 1분 뒤 재시도
+      .finally(()=>{ _homeInflight[w.id]=false; homeRefreshSoon(); });
+  });
+}
+function _hmKv(kind){ const c=HOME_DATA[kind]; return c?c.data:undefined; }
+function _hmCur(){ const d=new Date(); return {ym:d.getFullYear()+'-'+_hmPad(d.getMonth()+1), ymd:_hmYmd(d)}; }
+function _hmNum(v){ const n=Number(String(v==null?'':v).replace(/[^\d.-]/g,'')); return isNaN(n)?0:n; }
+HOME_PROVIDERS.quote=function(){
+  const a=_hmKv('qt_saved'); if(!Array.isArray(a)) return {loading:true};
+  const d=new Date(), ym=d.getFullYear()+'.'+_hmPad(d.getMonth()+1), td=ym+'.'+_hmPad(d.getDate());
+  const mon=a.filter(e=>String(e.savedAt||'').startsWith(ym)).length, today=a.filter(e=>String(e.savedAt||'').startsWith(td)).length;
+  return {cap:`저장된 견적 전체 ${_hmN(a.length)}건`, kpis:[{l:'이번 달 저장',v:mon,u:'건',tone:'blue'},{l:'오늘 저장',v:today,u:'건'},{l:'전체 저장',v:a.length,u:'건'}],
+    list:a.slice().sort((x,y)=>(y.ts||0)-(x.ts||0)).slice(0,6).map(e=>({t:`${e.company||'-'}${e.name?' · '+e.name:''}`, s:String(e.savedAt||'').slice(5,10).replace('.','/')}))};
+};
+HOME_PROVIDERS.consign=function(){
+  const O=_hmKv('consign_orders'), V=_hmKv('consign_vendors'); if(!Array.isArray(O)) return {loading:true};
+  const vname=id=>((Array.isArray(V)?V:[]).find(v=>v.id===id)||{}).name||'';
+  const cost=o=>Array.isArray(o.items)?o.items.reduce((s,it)=>s+(it.vatTotal||0),0):(o.vatTotal||((o.vatUnit||0)*(o.qty||0)));
+  const {ym}=_hmCur(), mon=O.filter(o=>String(o.date||'').startsWith(ym));
+  const noSettle=O.filter(o=>!((o.settlement||0)>0));
+  let settle=0, margin=0; mon.forEach(o=>{ if((o.settlement||0)>0){ settle+=o.settlement; margin+=o.settlement-cost(o)-(o.shipping||0); } });
+  return {cap:`전체 주문 ${_hmN(O.length)}건 · 정산금액이 비어 있으면 '미입력'으로 집계`, lMax:4, kpis:[
+      {l:'정산 미입력',v:noSettle.length,u:'건',tone:noSettle.length?'orange':'green'},
+      {l:'이번 달 주문',v:mon.length,u:'건',tone:'blue'},
+      {l:'이번 달 정산',v:settle,u:'원'},
+      {l:'이번 달 마진',v:margin,u:'원',tone:margin<0?'red':'green'}],
+    list:noSettle.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,6).map(o=>({t:`${String(o.date||'').slice(5)} ${o.customer||'-'}`, s:vname(o.vendorId)||'정산 미입력'}))};
+};
+HOME_PROVIDERS.accreq=function(){
+  const R=_hmKv('accessory_requests'); if(!Array.isArray(R)) return {loading:true};
+  const wait=R.filter(r=>!r.status), by=s=>R.filter(r=>r.status===s).length;
+  return {cap:`전체 요청 ${_hmN(R.length)}건 · 상태가 비어 있으면 '처리 대기'`, lMax:4, kpis:[
+      {l:'처리 대기',v:wait.length,u:'건',tone:wait.length?'orange':'green'},{l:'보류',v:by('보류'),u:'건',tone:by('보류')?'amber':null},
+      {l:'입고완료',v:by('입고완료'),u:'건',tone:'green'},{l:'불가',v:by('불가'),u:'건'}],
+    list:wait.slice().sort((a,b)=>String(b.reqDate||'').localeCompare(String(a.reqDate||''))).slice(0,6).map(r=>({t:`${r.productName||'-'}${r.part?' · '+r.part:''}`, s:`${r.qty!==''&&r.qty!=null?r.qty+'개 · ':''}${String(r.reqDate||'').slice(5)}`}))};
+};
+HOME_PROVIDERS.tcb=function(){
+  const R=_hmKv('courier_comp_list'); if(!Array.isArray(R)) return {loading:true};
+  const {ym}=_hmCur(), open=R.filter(r=>!r.remitDate), amt=r=>_hmNum(r.agreeAmount)||_hmNum(r.productAmount);
+  return {cap:`전체 ${_hmN(R.length)}건 · 송금일이 없으면 '진행 중'`, lMax:4, kpis:[
+      {l:'진행 중(송금 전)',v:open.length,u:'건',tone:open.length?'orange':'green'},
+      {l:'송금 대기 금액',v:open.reduce((s,r)=>s+amt(r),0),u:'원'},
+      {l:'이번 달 접수',v:R.filter(r=>String(r.pickupDate||'').startsWith(ym)).length,u:'건',tone:'blue'},
+      {l:'송금 완료',v:R.length-open.length,u:'건',tone:'green'}],
+    list:open.slice().sort((a,b)=>String(a.pickupDate||'').localeCompare(String(b.pickupDate||''))).slice(0,6).map(r=>({t:`${r.receiverName||r.senderName||'-'}${r.accidentType?' · '+r.accidentType:''}`, s:`${String(r.pickupDate||'').slice(5)} · ${_hmN(amt(r))}원`}))};
+};
+HOME_PROVIDERS.review=function(){
+  const D=HOME_DATA.__review; if(!D) return {loading:true};
+  const {ym}=_hmCur(); let rows=[]; D.months.forEach(m=>{ rows=rows.concat(Object.values(D.mm[m]||{})); });
+  const mon=rows.filter(r=>String(r.reviewDate||'').startsWith(ym));
+  const low=mon.filter(r=>Number(r.rating)<=2);
+  const todo=r=>((D.manage[r.reviewId]||{}).status||'진행전')!=='처리완료';
+  const lowTodo=low.filter(todo);
+  const avg=mon.length?Math.round(mon.reduce((s,r)=>s+(Number(r.rating)||0),0)/mon.length*10)/10:0;
+  return {cap:`이번 달 기준(${ym}) · 처리 미완료 = 처리완료가 아닌 저평점`, lMax:4, kpis:[
+      {l:'미처리 저평점',v:lowTodo.length,u:'건',tone:lowTodo.length?'red':'green'},
+      {l:'이번 달 리뷰',v:mon.length,u:'건',tone:'blue'},
+      {l:'저평점(★1~2)',v:low.length,u:'건',tone:low.length?'orange':null},
+      {l:'평균 별점',v:avg,u:'점'}],
+    list:lowTodo.slice().sort((a,b)=>String(b.reviewDate||'').localeCompare(String(a.reviewDate||''))).slice(0,6).map(r=>({t:`★${r.rating} ${r.productName||r.reviewId||''}`, s:String(r.reviewDate||'').slice(5,10)}))};
+};
+HOME_PROVIDERS.insight=function(){
+  const D=HOME_DATA.__insight; if(!D) return {loading:true};
+  const cnt={부족:0,긴급:0,임박:0,정상:0}; let winter=0, seasonal=0, over=0, vol=0;
+  D.rows.forEach(r=>{
+    if(cnt[r.status]!=null) cnt[r.status]++;
+    if(r.overstock) over++;
+    if(r.surge||r.drop) vol++;
+    if(r.seasonPre&&r.seasonPre.status==='flag'){
+      let done=r.seasonPre.neededQty<=0; try{ done=done||insightIsSeasonalChecked(r.p.id); }catch(e){}
+      if(!done){ if(r.seasonPre.kind==='winter') winter++; else if(r.seasonPre.kind==='other') seasonal++; }
+    }
+  });
+  const rank={부족:0,긴급:1,임박:2};
+  const hh=new Date(D.at);
+  return {cap:`발주 인사이트 화면과 같은 계산 · ${_hmPad(hh.getHours())}:${_hmPad(hh.getMinutes())} 기준`, lMax:6, kpis:[
+      {l:'즉시발주',v:cnt.부족,u:'개',tone:cnt.부족?'red':'green'},{l:'긴급',v:cnt.긴급,u:'개',tone:cnt.긴급?'orange':null},{l:'임박',v:cnt.임박,u:'개',tone:cnt.임박?'amber':null},
+      {l:'구정재고 대비',v:winter,u:'개',tone:winter?'blue':null},{l:'계절성수기 대비',v:seasonal,u:'개',tone:seasonal?'blue':null},{l:'재고과잉',v:over,u:'개'},{l:'급변 감지',v:vol,u:'개'}],
+    list:D.rows.filter(r=>rank[r.status]!=null).sort((a,b)=>(rank[a.status]-rank[b.status])||((a.daysLeft==null?9999:a.daysLeft)-(b.daysLeft==null?9999:b.daysLeft))).slice(0,6)
+      .map(r=>({t:r.p.name, s:`${r.status} · ${r.daysLeft!=null?Math.round(r.daysLeft)+'일분':'일수 미산출'}`}))};
+};
+HOME_PROVIDERS['phoneorder:order']=function(){
+  try{
+    const D=HOME_DATA.__pb; if(!D) return {loading:true};
+    const P=D.rows, unpaid=P.filter(r=>_pbIsUnpaid(r.paid));
+    const over=P.filter(r=>_pbOverdueDays(r)!=null).sort((a,b)=>_pbOverdueDays(b)-_pbOverdueDays(a));
+    const invNo=P.filter(r=>PB_INVOICE_PENDING.includes(_pbNormInvoice(r.invoice)));
+    const sum=unpaid.reduce((s,r)=>s+(_pbAmountNum(r.amount)||0),0);
+    const show=over.length?over:unpaid;
+    return {title:'전화구매건 · 미입금·미발행', cap:`미입금 합계 ${_hmN(sum)}원 · 미입금건 관리 기준`, lMax:4, kpis:[
+        {l:'입금예정일 경과',v:over.length,u:'건',tone:over.length?'red':'green'},
+        {l:'미입금',v:unpaid.length,u:'건',tone:unpaid.length?'orange':'green'},
+        {l:'계산서·현금 미발행',v:invNo.length,u:'건',tone:invNo.length?'amber':null},
+        {l:'위쪽 관리 대상',v:P.length,u:'건'}],
+      list:show.slice(0,6).map(r=>({t:`${r.recipient||'-'}${r.staff?' · '+r.staff:''}`, s:over.length?`${_pbOverdueDays(r)}일 경과 · ${_hmN(_pbAmountNum(r.amount)||0)}원`:`${_hmN(_pbAmountNum(r.amount)||0)}원`}))};
+  }catch(e){ return {loading:true}; }
+};
+HOME_PROVIDERS.hist=function(){
+  if(!Array.isArray(historyLog)) return {loading:true};
+  const d=new Date(), t=_hmYmd(d), y=_hmYmd(new Date(d.getTime()-86400000));
+  const cnt=s=>historyLog.filter(h=>String(h.time||'').startsWith(s)).length;
+  return {cap:'최근 200건까지 불러온 변동이력 기준', lMax:3, kpis:[{l:'오늘 변동',v:cnt(t),u:'건',tone:'blue'},{l:'어제 변동',v:cnt(y),u:'건'},{l:'불러온 이력',v:historyLog.length,u:'건'}],
+    list:historyLog.slice(0,6).map(h=>({t:`${h.menu||''} · ${h.name||h.code||''}`, s:String(h.time||'').slice(5,16)}))};
+};
+
 // ── 렌더링 ──
 function _hmWidgetHtml(w){
   const id=w.id, label=_hmLabel(id), ico=_hmIcon(id), pr=_hmParse(id);
@@ -8505,12 +8668,12 @@ function _hmWidgetHtml(w){
   if(HOME_PROVIDERS[id]){ try{ d=HOME_PROVIDERS[id](); }catch(e){ console.warn('홈 위젯 요약 실패', id, e); d=null; } }
   let body;
   if(!d) body=`<div class="hm-launch"><div class="big">${ico}</div><div>클릭해서 열기</div></div>`;
-  else if(d.loading) body=`<div class="hm-launch"><div>불러오는 중…</div></div>`;
+  else if(d.loading) body=`<div class="hm-launch"><div>${HOME_ERR[id]?'데이터를 불러오지 못했습니다 — 1분 뒤 다시 시도':'불러오는 중…'}</div></div>`;
   else if(w.size==='S'){
     const k=d.kpis[0];
     body=`<div class="hm-w-big hm-tone-${k.tone||'none'}">${_hmN(k.v)}${k.u?`<small>${k.u}</small>`:''}</div><div class="hm-w-cap">${_hmEsc(k.l)}</div>`;
   } else {
-    const n=w.size==='L'?4:3;
+    const n=w.size==='L'?(d.lMax||4):3;
     body=`<div class="hm-kpis">${d.kpis.slice(0,n).map(k=>`<div class="hm-kpi"${k.act!=null?` style="cursor:pointer;" onclick="event.stopPropagation();homeOpenWidget('${id}','${k.act}')"`:''}><div class="v hm-tone-${k.tone||'none'}">${_hmN(k.v)}${k.u?`<small style="font-size:12px;margin-left:1px;">${k.u}</small>`:''}</div><div class="l">${_hmEsc(k.l)}</div></div>`).join('')}</div>`
       +(w.size==='M'&&d.cap?`<div class="hm-w-cap" style="margin-top:8px;">${_hmEsc(d.cap)}</div>`:'')
       +(w.size==='L'?(d.list&&d.list.length?`<div class="hm-list">${d.list.map(r=>`<div class="hm-li"><span>${_hmEsc(r.t)}</span><span>${_hmEsc(r.s)}</span></div>`).join('')}</div>`:'')+(d.cap?`<div class="hm-w-cap" style="margin-top:auto;">${_hmEsc(d.cap)}</div>`:''):'');
@@ -8533,6 +8696,7 @@ function renderHome(){
   grid.innerHTML=(ws.length?'':`<div class="hm-empty">아직 즐겨찾기한 메뉴가 없습니다.<br>메뉴 이름 옆 <b>☆</b>를 누르거나 오른쪽 <b>＋ 위젯 추가</b>로 자주 쓰는 메뉴를 홈에 올려 보세요.</div>`)
     + ws.map(_hmWidgetHtml).join('')
     + `<div class="hm-card hm-w hm-add s-S" onclick="homeOpenAdd()"><div class="plus">＋</div><div style="font-size:12px;">위젯 추가</div></div>`;
+  homeLoadAll();   // 올려 둔 위젯의 데이터만 읽음(주기·버전 확인 규칙은 HOME_TTL / homeKv 참고)
 }
 function homeRefreshSoon(){
   if(currentPage!=='home') return;
@@ -8542,7 +8706,13 @@ function homeRefreshSoon(){
 function homeOpen(){
   renderHome();
   homeLoadCfg().then(()=>{ if(currentPage==='home') renderHome(); _syncFavStars(); });
+  // 홈이 열려 있고 탭이 보이는 동안만 주기적으로 확인(실제 읽기는 HOME_TTL 경과 시에만)
+  if(!_homeLoadTimer) _homeLoadTimer=setInterval(()=>{
+    if(currentPage!=='home'){ clearInterval(_homeLoadTimer); _homeLoadTimer=null; return; }
+    homeLoadAll();
+  },60000);
 }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && currentPage==='home') homeLoadAll(); });
 function goHome(){ if(_isAdminUser()) goPage('home'); }
 function homeOpenWidget(id,act){
   if(_homeEdit) return;
