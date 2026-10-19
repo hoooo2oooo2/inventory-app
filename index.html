@@ -132,8 +132,36 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .ni .ni-star.on{opacity:1;color:#F59E0B;}
 /* ═══ 홈 화면(관리자 전용): 시계·달력 + 즐겨찾기 위젯(작게/보통/크게) ═══ */
 #page-home{padding:18px 20px 40px;}
-.hm-top{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:22px;}   /* 시계·달력 카드를 같은 크기(700px)로 — 남는 오른쪽은 비워 둠 */
-.hm-top>.hm-card{flex:0 1 700px;max-width:100%;}
+/* ── 홈 레이아웃(2026-10-19 재배치): 인사·시각 헤더 → [오늘 할 일 | 지금 확인할 것 | 달력] → 즐겨찾기 위젯 ── */
+.hm-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:2px 2px 16px;}
+.hm-head .hm-hello{font-size:22px;font-weight:700;color:var(--tx);letter-spacing:-.4px;}
+.hm-head .hm-date{font-size:13px;color:var(--tx2);margin-top:4px;}
+.hm-head .hm-time{font-size:26px;font-weight:700;letter-spacing:-.5px;color:var(--tx);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.hm-head .hm-time small{font-size:13px;font-weight:600;margin-right:5px;color:var(--pr);}
+.hm-top{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr) 600px;gap:16px;margin-bottom:28px;align-items:stretch;}
+.hm-top>.hm-card{height:304px;overflow:hidden;}
+.hm-pane{padding:16px 18px 12px;display:flex;flex-direction:column;}
+.hm-pane-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0;}
+.hm-pane-hd b{font-size:14px;color:var(--tx);} .hm-pane-hd .hm-sub{font-size:11.5px;color:var(--tx2);flex:1;}
+.hm-ic{border:1px solid var(--bd);background:var(--bg2);color:var(--tx2);border-radius:8px;min-width:28px;height:28px;cursor:pointer;font-size:13px;padding:0 6px;}
+.hm-ic:hover{border-color:var(--pr);color:var(--pr);}
+.hm-pane-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+.hm-trow{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--bd);}
+.hm-trow .tt{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+.hm-trow.done .tt{text-decoration:line-through;color:var(--tx2);}
+.hm-trow .tm{font-size:11.5px;color:var(--tx2);white-space:nowrap;} .hm-trow .tm.over{color:#DC2626;font-weight:700;} .hm-trow .tm.warn{color:#EA580C;font-weight:600;}
+.hm-sig{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:10px;cursor:pointer;margin-bottom:3px;}
+.hm-sig:hover{background:var(--bg2);}
+.hm-sig .ico{font-size:17px;width:24px;text-align:center;flex-shrink:0;}
+.hm-sig .lb{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tx);} .hm-sig .lb small{display:block;font-weight:400;color:var(--tx2);font-size:11px;}
+.hm-sig .bd{min-width:40px;text-align:center;border-radius:12px;padding:2px 10px;font-size:13px;font-weight:700;white-space:nowrap;}
+.hm-bd-red{background:rgba(220,38,38,.12);color:#DC2626;} .hm-bd-orange{background:rgba(234,88,12,.12);color:#EA580C;} .hm-bd-amber{background:rgba(217,119,6,.13);color:#D97706;} .hm-bd-blue{background:rgba(49,130,246,.13);color:#3182F6;}
+.hm-sig.zero{opacity:.55;padding:5px 8px;} .hm-sig.zero .bd{background:transparent;color:var(--tx2);font-weight:500;}
+.hm-bar{flex:none;height:6px;background:var(--bd);border-radius:3px;overflow:hidden;margin:0 0 6px;} .hm-bar i{display:block;height:100%;background:#00A86B;transition:width .3s;}
+.hm-ok{padding:26px 6px;text-align:center;color:var(--tx2);font-size:12.5px;line-height:1.8;}
+.hm-chk{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--bd);cursor:pointer;font-size:13px;}
+@media(max-width:1560px){ .hm-top{grid-template-columns:1fr 1fr;} .hm-top>.hm-cal{grid-column:1/-1;height:auto;} }
+@media(max-width:900px){ .hm-top{grid-template-columns:1fr;} .hm-top>.hm-card{height:auto;max-height:360px;} }
 .hm-w-par{font-size:10.5px;color:var(--tx2);margin:-5px 0 6px 23px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sub-star{display:inline-block;margin-left:5px;font-size:12px;line-height:1;color:var(--tx2);opacity:0;transition:opacity .15s,color .15s;cursor:pointer;}
 *:hover>.sub-star{opacity:.7;}
@@ -143,11 +171,6 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-mon{flex:1 1 250px;max-width:320px;min-width:250px;}
 .hm-mon-t{font-size:12.5px;font-weight:700;color:var(--tx);margin:2px 0 2px 2px;}
 .hm-card{background:var(--bg);border:1px solid var(--bd);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.hm-clock{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:22px 16px;min-height:230px;}
-.hm-clock .hm-hello{font-size:13px;color:var(--tx2);}
-.hm-clock .hm-time{font-size:44px;font-weight:700;letter-spacing:-1px;color:var(--tx);font-variant-numeric:tabular-nums;}
-.hm-clock .hm-time small{font-size:18px;font-weight:600;margin-right:6px;color:var(--pr);}
-.hm-clock .hm-date{font-size:14px;color:var(--tx2);}
 .hm-cal{padding:14px 18px 16px;}
 .hm-cal-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .hm-cal-hd b{font-size:15px;color:var(--tx);flex:1;}
@@ -2922,12 +2945,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
 <!-- ═══ 홈 (관리자 전용: 시계·달력 + 즐겨찾기 위젯) ═══ -->
 <div class="page" id="page-home">
+  <div class="hm-head">
+    <div><div class="hm-hello" id="hmHello"></div><div class="hm-date" id="hmDate"></div></div>
+    <div class="hm-time" id="hmTime"></div>
+  </div>
   <div class="hm-top">
-    <div class="hm-card hm-clock">
-      <div class="hm-hello" id="hmHello"></div>
-      <div class="hm-time" id="hmTime"></div>
-      <div class="hm-date" id="hmDate"></div>
-    </div>
+    <div class="hm-card hm-pane" id="hmTodo"></div>
+    <div class="hm-card hm-pane" id="hmAlerts"></div>
     <div class="hm-card hm-cal" id="hmCal"></div>
   </div>
   <div class="hm-sec-hd">
@@ -8344,7 +8368,9 @@ function _homeNorm(c){
       seen.add(x.id); return true;
     })
     .map(x=>({id:x.id, size:['S','M','L'].includes(x.size)?x.size:'M'}));
-  return {widgets:ws};
+  // signals: '지금 확인할 것'에 표시할 항목(이 계정이 직접 선택). 없으면(undefined) 권한이 있는 항목 전부
+  const sig=(c&&Array.isArray(c.signals))?c.signals.filter(x=>typeof x==='string'&&HOME_SIGNALS.some(s=>s.id===x)):undefined;
+  return sig?{widgets:ws,signals:sig}:{widgets:ws};
 }
 async function homeLoadCfg(){
   if(!_homeCfg) _homeCfg=_homeNorm(_homeLocalGet());   // 빠른 표시용 이 PC의 사본
@@ -8548,16 +8574,19 @@ const HOME_LOADERS={
 };
 function homeLoadAll(force){
   if(!_isAdminUser() || document.hidden) return;
-  ((_homeCfg&&_homeCfg.widgets)||[]).forEach(w=>{
-    if(!_hmPerm(w.id)) return;
-    const L=HOME_LOADERS[w.id]; if(!L) return;
-    if(!force && HOME_LOADED[w.id] && Date.now()-HOME_LOADED[w.id]<HOME_TTL) return;
-    if(_homeInflight[w.id]) return;
-    _homeInflight[w.id]=true;
+  // 읽을 대상 = 홈에 올린 위젯 + '지금 확인할 것'에서 선택한 항목이 쓰는 데이터 (그 밖의 메뉴는 읽지 않음)
+  const keys=new Set();
+  ((_homeCfg&&_homeCfg.widgets)||[]).forEach(w=>{ if(_hmPerm(w.id)&&HOME_LOADERS[w.id]) keys.add(w.id); });
+  try{ homeActiveSignals().forEach(s=>{ if(s.loader&&HOME_LOADERS[s.loader]) keys.add(s.loader); }); }catch(e){}
+  keys.forEach(key=>{
+    const L=HOME_LOADERS[key];
+    if(!force && HOME_LOADED[key] && Date.now()-HOME_LOADED[key]<HOME_TTL) return;
+    if(_homeInflight[key]) return;
+    _homeInflight[key]=true;
     Promise.resolve().then(L)
-      .then(()=>{ HOME_LOADED[w.id]=Date.now(); HOME_ERR[w.id]=false; })
-      .catch(e=>{ console.warn('홈 위젯 데이터 로드 실패', w.id, e); HOME_ERR[w.id]=true; HOME_LOADED[w.id]=Date.now()-HOME_TTL+60000; })   // 1분 뒤 재시도
-      .finally(()=>{ _homeInflight[w.id]=false; homeRefreshSoon(); });
+      .then(()=>{ HOME_LOADED[key]=Date.now(); HOME_ERR[key]=false; })
+      .catch(e=>{ console.warn('홈 위젯 데이터 로드 실패', key, e); HOME_ERR[key]=true; HOME_LOADED[key]=Date.now()-HOME_TTL+60000; })   // 1분 뒤 재시도
+      .finally(()=>{ _homeInflight[key]=false; homeRefreshSoon(); });
   });
 }
 function _hmKv(kind){ const c=HOME_DATA[kind]; return c?c.data:undefined; }
@@ -8661,6 +8690,99 @@ HOME_PROVIDERS.hist=function(){
     list:historyLog.slice(0,6).map(h=>({t:`${h.menu||''} · ${h.name||h.code||''}`, s:String(h.time||'').slice(5,16)}))};
 };
 
+// ══ 지금 확인할 것 — 처리가 필요한 신호를 한 카드에 모아 보여 줌. 어떤 항목을 볼지는 계정마다 직접 선택(⚙) ══
+//  · 선택한 항목이 쓰는 데이터만 읽음(homeLoadAll). 기본값 = 이 계정이 볼 권한이 있는 항목 전부
+//  · 숫자는 위젯과 같은 계산(HOME_PROVIDERS)을 재사용 → 위젯·카드 숫자가 어긋나지 않음
+function _hmSig(provId,kpiIdx){ try{ const d=HOME_PROVIDERS[provId](); if(!d||d.loading) return null; const k=d.kpis[kpiIdx]; return k?k.v:null; }catch(e){ return null; } }
+const HOME_SIGNALS=[
+  {id:'stock_urgent', ico:'🧾', label:'즉시 발주가 필요한 제품', sub:'재고관리 기준(재고 30% 이하)', target:'order', tone:'red', unit:'개',
+    n:()=>{ if(!products.length) return null; return products.filter(p=>!p.hidden&&!p.disc&&getStatus(p)==='부족').length; }},
+  {id:'inv_request', ico:'🧾', label:'세금계산서 발행요청', sub:'전화구매건 › 세금계산서 발행', target:'phoneorder:invoice', act:'request', tone:'orange', unit:'건', n:()=>_hmSig('phoneorder',0)},
+  {id:'inv_overdue', ico:'⏰', label:'세금계산서 입금예정일 경과', sub:'전화구매건 › 세금계산서 발행', target:'phoneorder:invoice', act:'overdue', tone:'red', unit:'건', n:()=>_hmSig('phoneorder',2)},
+  {id:'phone_overdue', ico:'📞', label:'전화구매 입금예정일 경과', sub:'전화구매건 › 미입금건 관리', target:'phoneorder:order', loader:'phoneorder:order', tone:'red', unit:'건', n:()=>_hmSig('phoneorder:order',0)},
+  {id:'review_low', ico:'⭐', label:'미처리 저평점 리뷰', sub:'리뷰관리(이번 달)', target:'review', loader:'review', tone:'orange', unit:'건', n:()=>_hmSig('review',0)},
+  {id:'acc_wait', ico:'🧩', label:'부속요청 처리 대기', sub:'부속요청 게시판', target:'accreq', loader:'accreq', tone:'amber', unit:'건', n:()=>_hmSig('accreq',0)},
+  {id:'cs_nosettle', ico:'🚚', label:'위탁배송 정산 미입력', sub:'위탁 배송건', target:'consign', loader:'consign', tone:'amber', unit:'건', n:()=>_hmSig('consign',0)},
+  {id:'tcb_open', ico:'💸', label:'택배 보상 진행 중', sub:'택배사 보상목록(송금 전)', target:'tcb', loader:'tcb', tone:'blue', unit:'건', n:()=>_hmSig('tcb',0)},
+];
+function _hmSigAllowed(s){ try{ return _hmPerm(s.target); }catch(e){ return false; } }
+function homeActiveSignals(){
+  const cfg=_homeCfg||_homeNorm(_homeLocalGet());
+  const allowed=HOME_SIGNALS.filter(_hmSigAllowed);
+  return cfg.signals ? allowed.filter(s=>cfg.signals.includes(s.id)) : allowed;
+}
+function renderHomeAlerts(){
+  const el=document.getElementById('hmAlerts'); if(!el) return;
+  const keepSt=(el.querySelector('.hm-pane-body')||{}).scrollTop||0;
+  const act=homeActiveSignals();
+  const rows=act.map(s=>({s, n:s.n()}));
+  const hot=rows.filter(r=>r.n!=null&&r.n>0).sort((a,b)=>({red:0,orange:1,amber:2,blue:3}[a.s.tone]-({red:0,orange:1,amber:2,blue:3}[b.s.tone])));
+  const wait=rows.filter(r=>r.n==null), zero=rows.filter(r=>r.n===0);
+  let body='';
+  if(!act.length) body=`<div class="hm-ok">보여 줄 항목이 없습니다.<br>오른쪽 위 <b>⚙</b>에서 확인할 항목을 골라 주세요.</div>`;
+  else{
+    body+=hot.map(r=>`<div class="hm-sig" onclick="homeOpenWidget('${r.s.target}','${r.s.act||''}')"><span class="ico">${r.s.ico}</span><span class="lb">${_hmEsc(r.s.label)}<small>${_hmEsc(r.s.sub)}</small></span><span class="bd hm-bd-${r.s.tone}">${_hmN(r.n)}${r.s.unit}</span></div>`).join('');
+    if(!hot.length && !wait.length) body+=`<div class="hm-ok">✅ 지금 처리할 항목이 없습니다.</div>`;
+    body+=wait.map(r=>`<div class="hm-sig zero"><span class="ico">${r.s.ico}</span><span class="lb">${_hmEsc(r.s.label)}</span><span class="bd">${HOME_ERR[r.s.loader]?'확인 실패':'확인 중…'}</span></div>`).join('');
+    body+=zero.map(r=>`<div class="hm-sig zero" onclick="homeOpenWidget('${r.s.target}','${r.s.act||''}')"><span class="ico">${r.s.ico}</span><span class="lb">${_hmEsc(r.s.label)}</span><span class="bd">✓ 0${r.s.unit}</span></div>`).join('');
+  }
+  const total=hot.reduce((a,r)=>a+r.n,0);
+  el.innerHTML=`<div class="hm-pane-hd"><b>🔔 지금 확인할 것</b><span class="hm-sub">${hot.length?`처리 필요 ${hot.length}종 · ${_hmN(total)}건`:''}</span><button class="hm-ic" onclick="homeOpenSignals()" title="이 카드에 표시할 항목 선택">⚙</button></div><div class="hm-pane-body">${body}</div>`;
+  const nb=el.querySelector('.hm-pane-body'); if(nb) nb.scrollTop=keepSt;   // 다시 그려도 스크롤 위치 유지
+}
+function homeToggleSignal(id){
+  return _homeMutate(c=>{
+    const allowed=HOME_SIGNALS.filter(_hmSigAllowed).map(s=>s.id);
+    const cur=Array.isArray(c.signals)?c.signals.slice():allowed;
+    const i=cur.indexOf(id); if(i<0) cur.push(id); else cur.splice(i,1);
+    c.signals=cur;
+  }).then(()=>{ document.getElementById('hmSigOv')&&homeOpenSignals(true); });
+}
+function homeOpenSignals(rerender){
+  document.getElementById('hmSigOv')?.remove();
+  const act=new Set(homeActiveSignals().map(s=>s.id));
+  const ov=document.createElement('div'); ov.id='hmSigOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div style="background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:16px;max-width:460px;width:100%;max-height:80vh;overflow:auto;padding:18px 20px;">
+    <div style="display:flex;align-items:center;margin-bottom:4px;"><b style="flex:1;font-size:15px;">🔔 지금 확인할 것 — 표시할 항목</b><button class="hm-btn" onclick="document.getElementById('hmSigOv').remove()">닫기</button></div>
+    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">내 업무에 필요한 항목만 골라 두세요. 이 선택은 <b>내 계정에만</b> 저장되고, 고른 항목의 데이터만 읽어 옵니다.</div>
+    ${HOME_SIGNALS.filter(_hmSigAllowed).map(s=>`<label class="hm-chk"><input type="checkbox" ${act.has(s.id)?'checked':''} onchange="homeToggleSignal('${s.id}')"><span style="font-size:16px;">${s.ico}</span><span style="flex:1;"><b>${_hmEsc(s.label)}</b><br><small style="color:var(--tx2);">${_hmEsc(s.sub)}</small></span></label>`).join('')}</div>`;
+  document.body.appendChild(ov);
+}
+
+// ══ 오늘 할 일 — 업무캘린더(📋)의 오늘 업무를 홈에서 바로 보고 체크 ══
+function renderHomeTodo(){
+  const el=document.getElementById('hmTodo'); if(!el) return;
+  const keepSt=(el.querySelector('.hm-pane-body')||{}).scrollTop||0;
+  const ds=_wcToday();
+  const ready=(typeof _wc!=='undefined') && _wc.mon && _wc.mon[ds.slice(0,7)]!==undefined && _wc.ver && _wc.ver[WC_FIXED_KIND]!==undefined;
+  const hd=(sub)=>`<div class="hm-pane-hd"><b>✅ 오늘 할 일</b><span class="hm-sub">${sub}</span><button class="hm-ic" onclick="homeOpenWc()" title="업무캘린더 열기 (추가·수정)">📋 열기</button></div>`;
+  if(!ready){ el.innerHTML=hd('')+`<div class="hm-pane-body"><div class="hm-ok">${(typeof _wc!=='undefined'&&_wc.err)?'업무캘린더 데이터를 불러오지 못했습니다.':'불러오는 중…'}</div></div>`; return; }
+  const ts=_wcTasks(ds), fx=_wcFixedFor(ds);
+  const items=[
+    ...ts.map(t=>({k:'t',id:t.id,title:t.title,time:t.dueTime,done:!!t.done,pri:t.priority})),
+    ...fx.map(f=>({k:'f',id:f.id,title:f.title,time:f.dueTime,done:!!(f.doneDates&&f.doneDates[ds]),pri:f.priority,pin:true}))
+  ];
+  const doneN=items.filter(i=>i.done).length, pct=items.length?Math.round(doneN/items.length*100):0;
+  items.sort((a,b)=>(a.done-b.done)||((a.time||'99:99').localeCompare(b.time||'99:99'))||(a.pin?1:0)-(b.pin?1:0));
+  const show=items.slice(0,40);
+  const rowHtml=i=>{
+    const ti=(!i.done&&i.time)?_wcTimer(i.time,ds):null;
+    return `<div class="hm-trow${i.done?' done':''}"><div class="wc-chk${i.done?' on':''}" onclick="homeTodoToggle('${i.k}','${i.id}')" title="완료 체크"></div><div class="tt" onclick="homeOpenWc()" title="${_hmEsc(i.title)}">${i.pin?'📌 ':''}${_hmEsc(i.title)}</div>${i.time&&!i.done?`<span class="tm${ti&&ti.cls==='over'?' over':ti&&ti.cls?' warn':''}">⏱ ${i.time}${ti&&ti.cls==='over'?' · '+ti.text:''}</span>`:''}</div>`;
+  };
+  el.innerHTML=hd(items.length?`${doneN}/${items.length} 완료 (${pct}%)`:'')
+    +(items.length?`<div class="hm-bar"><i style="width:${pct}%"></i></div>`:'')
+    +`<div class="hm-pane-body">${items.length?show.map(rowHtml).join(''):`<div class="hm-ok">오늘 등록된 할 일이 없습니다.<br>📋 열기에서 추가해 보세요.</div>`}</div>`;
+  const nb=el.querySelector('.hm-pane-body'); if(nb) nb.scrollTop=keepSt;   // 다시 그려도 스크롤 위치 유지
+}
+async function homeTodoToggle(kind,id){
+  const ds=_wcToday();
+  if(kind==='f') await wcToggleFixed(id,ds); else await wcToggle1(id,ds);
+  renderHomeTodo();
+}
+function homeOpenWc(){ const p=document.getElementById('wcPop'); if(p&&!p.classList.contains('open')) wcToggle(); }
+
 // ── 렌더링 ──
 function _hmWidgetHtml(w){
   const id=w.id, label=_hmLabel(id), ico=_hmIcon(id), pr=_hmParse(id);
@@ -8687,9 +8809,10 @@ function renderHome(){
   const grid=document.getElementById('hmGrid'); if(!grid) return;
   if(!_homeCfg) _homeCfg=_homeNorm(_homeLocalGet());
   const u=window.__CURRENT_USER;
-  const hello=document.getElementById('hmHello'); if(hello) hello.textContent=`${u?(u.name||u.username):''}님, 오늘도 좋은 하루 보내세요`;
+  const hour=new Date().getHours(), greet=hour<11?'좋은 아침이에요 ☀️':hour<18?'좋은 오후예요 👋':'오늘도 수고 많으셨어요 🌙';
+  const hello=document.getElementById('hmHello'); if(hello) hello.textContent=`${u?(u.name||u.username):''}님, ${greet}`;
   _homeTick(); if(!_homeTimer) _homeTimer=setInterval(_homeTick,1000);
-  renderHomeCal();
+  renderHomeCal(); renderHomeTodo(); renderHomeAlerts();
   const ws=_homeCfg.widgets.filter(w=>_hmPerm(w.id));
   grid.classList.toggle('hm-editing',_homeEdit);
   const eb=document.getElementById('hmEditBtn'); if(eb){ eb.classList.toggle('on',_homeEdit); eb.textContent=_homeEdit?'✓ 편집 완료':'✎ 편집'; }
@@ -8739,7 +8862,8 @@ function _homeTick(){
   const d=new Date(); let h=d.getHours(); const ap=h<12?'오전':'오후'; h=h%12||12;
   t.innerHTML=`<small>${ap}</small>${_hmPad(h)}:${_hmPad(d.getMinutes())}:${_hmPad(d.getSeconds())}`;
   const dt=document.getElementById('hmDate');
-  if(dt) dt.textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`;
+  const hol=(typeof WC_HOLIDAYS!=='undefined')?WC_HOLIDAYS[_hmYmd(d)]:'';
+  if(dt) dt.textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일${hol?' · '+hol:''}`;
 }
 // ── 달력 ──
 function _homeMonthHtml(y,m){
@@ -8988,6 +9112,7 @@ function _wcTimer(due,ds){
 
 // ── 화면 ──
 function wcRender(){
+  try{ homeRefreshSoon(); }catch(e){}   // 홈의 '오늘 할 일'도 같이 갱신
   const body=document.getElementById('wcBody'); if(!body) return;
   // 다시 그려도 입력 중이던 내용이 지워지지 않도록 보관했다가 복원 (양식을 새로 열거나 닫을 때는 복원하지 않음)
   const restore=!_wc.skipRestore, skipDate=_wc.skipDate; _wc.skipRestore=false; _wc.skipDate=false;
