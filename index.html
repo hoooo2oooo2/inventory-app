@@ -3899,7 +3899,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <!-- 하단 -->
         <div class="qt-foot">
           <div class="qt-foot-note">특 기 사 항</div>
-          <div class="qt-foot-bank">㈜신성종합무역
+          <div class="qt-foot-bank" id="qt-bank" contenteditable="true" spellcheck="false" title="클릭하여 특기사항 수정">㈜신성종합무역
 농협 301-0305-5175-21</div>
           <div class="qt-foot-contact">
             <div class="qt-fc-lbl">연락처</div><input id="qt-contact" placeholder="연락처">
@@ -14575,6 +14575,8 @@ function qtUpdateTotals(){
   if(tEl) tEl.textContent=total.toLocaleString('ko-KR')+'원';
 }
 
+const QT_BANK_DEFAULT='㈜신성종합무역\n농협 301-0305-5175-21';
+function qtSetBank(v){ const el=document.getElementById('qt-bank'); if(el) el.innerText=(v!==undefined&&v!==null&&String(v).trim()!=='')?v:QT_BANK_DEFAULT; }
 function qtReset(){
   if(_qtRows.some(r=>r.name||r.model||r.qty||r.unit||r.note) || document.getElementById('qt-name').value){
     if(!confirm('현재 작성 중인 견적서를 초기화할까요?')) return;
@@ -14582,6 +14584,7 @@ function qtReset(){
   _qtRows=[]; _qtEditId=null;
   const titleEl=document.getElementById('qt-title'); if(titleEl) titleEl.innerText='견적서';
   const phraseEl=document.getElementById('qt-phrase'); if(phraseEl) phraseEl.innerText='아래와 같이 거래합니다.';
+  qtSetBank();
   ['qt-name','qt-company','qt-contact','qt-fax','qt-manager'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const vat=document.getElementById('qt-vat'); if(vat) vat.value='포함';
   const t=new Date();
@@ -14617,6 +14620,7 @@ function qtConfirmSave(){
     tradeDate:_qtDate,
     docTitle:(document.getElementById('qt-title')?.innerText||'견적서').trim()||'견적서',
     docPhrase:(document.getElementById('qt-phrase')?.innerText||'아래와 같이 거래합니다.').trim(),
+    docBank:(document.getElementById('qt-bank')?.innerText||QT_BANK_DEFAULT).trim()||QT_BANK_DEFAULT,
     company:document.getElementById('qt-company').value.trim(),
     contact:document.getElementById('qt-contact').value.trim(),
     fax:document.getElementById('qt-fax').value.trim(),
@@ -14692,6 +14696,7 @@ function qtLoadSaved(id){
   _qtEditId=id;
   const titleEl=document.getElementById('qt-title'); if(titleEl) titleEl.innerText=e.docTitle||'견적서';
   const phraseEl=document.getElementById('qt-phrase'); if(phraseEl) phraseEl.innerText=e.docPhrase||'아래와 같이 거래합니다.';
+  qtSetBank(e.docBank);
   document.getElementById('qt-name').value=(e.docName!==undefined?e.docName:e.name)||'';
   document.getElementById('qt-company').value=e.company||'';
   document.getElementById('qt-contact').value=e.contact||'';
@@ -33735,6 +33740,7 @@ function csRinoFillQuoteFromImport(vendor, date, shipFee, orderCount, prodList){
   _qtEditId = null;
   const titleEl=document.getElementById('qt-title'); if(titleEl) titleEl.innerText='거래명세서';
   const phraseEl=document.getElementById('qt-phrase'); if(phraseEl) phraseEl.innerText='아래와 같이 거래합니다.';
+  qtSetBank();
   const nameEl=document.getElementById('qt-name'); if(nameEl) nameEl.value = '태양광 퇴치기';   // 리노우 건 견적명 고정
   const compEl=document.getElementById('qt-company'); if(compEl) compEl.value = vendor.name;
   _qtDate = date;
