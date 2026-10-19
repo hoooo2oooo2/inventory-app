@@ -31106,6 +31106,19 @@ function collabDragStart(ev, id){
 function collabDragEnd(ev){
   ev.currentTarget.classList.remove('dragging');
   document.querySelectorAll('.drop-on').forEach(c=>c.classList.remove('drop-on'));
+  // 디자인팀 직원 페이지: 카드를 진행중 박스 밖으로 끌어낸 경우(드롭 대상 없음)에만 진행예정 이동 여부를 확인 — 박스 안에서 살짝 끈 것은 무시
+  const id = _collabDragId;
+  if(_designScopePerson && id && !String(id).startsWith('plan:') && ev.dataTransfer && ev.dataTransfer.dropEffect==='none'){
+    const box = document.getElementById('planDropZone')?.getBoundingClientRect();
+    const outside = box && (ev.clientX<box.left || ev.clientX>box.right || ev.clientY<box.top || ev.clientY>box.bottom);
+    if(outside){
+      const t = _collabTasks.find(x=>x.id===id);
+      setTimeout(()=>{
+        if(t && confirm(`"${t.title}" 진행중 프로젝트를 진행예정 프로젝트로 옮기겠습니까?`)) collabSendToPlan(id);
+        else renderCollab();
+      }, 0);
+    }
+  }
 }
 function collabDragOver(ev){
   if(!_collabDragId) return;
@@ -31154,6 +31167,8 @@ async function collabCardDrop(ev, targetId){
 function planDropOver(ev){
   // plan 카드 자체나 드래그 없을 때 무시
   if(!_collabDragId || String(_collabDragId).startsWith('plan:')) return;
+  // 디자인팀 직원 페이지: 진행중 박스 자체는 드롭 대상이 아님(박스 밖으로 끌어낼 때만 dragend에서 확인 팝업)
+  if(_designScopePerson) return;
   ev.preventDefault(); ev.dataTransfer.dropEffect='move';
   document.getElementById('planDropZone')?.classList.add('drop-on');
 }
