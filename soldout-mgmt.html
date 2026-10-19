@@ -684,6 +684,8 @@ window.addEventListener('beforeunload', (e)=>{ if(_soPending>0 || _soUnsaved){ e
 /* 다른 직원이 저장한 내용을 열어둔 화면에도 반영 — 가벼운 updated_at만 확인하고 바뀐 경우에만 전체를 읽는다 */
 async function soSyncCheck(){
   if(!SO_SB || _soReadOnly || _soPending>0 || _soUnsaved || document.hidden) return;
+  // 다른 메뉴로 넘어가 이 iframe이 가려져 있으면(크기 0) 확인하지 않는다 — egress 절약
+  if(!document.documentElement.clientWidth || !document.documentElement.clientHeight) return;
   if(document.querySelector('.overlay.show')) return;
   const ae = document.activeElement;
   if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.id!=='quickSearch') return;
@@ -1796,7 +1798,8 @@ async function addSiteRow(){
 async function init(){
   await loadState();
   render();
-  setInterval(soSyncCheck, 45000);
+  setInterval(soSyncCheck, 180000);   // 메뉴가 보일 때만 3분 간격(가벼운 updated_at 조회)
+  try{ let _wasHidden=false; new ResizeObserver(()=>{ const hid=!document.documentElement.clientWidth; if(_wasHidden && !hid) soSyncCheck(); _wasHidden=hid; }).observe(document.documentElement); }catch(e){}
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) soSyncCheck(); });
   window.addEventListener('focus', soSyncCheck);
 
