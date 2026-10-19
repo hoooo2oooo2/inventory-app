@@ -181,12 +181,19 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .wc-fab{position:fixed;bottom:20px;right:130px;z-index:200;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:20px;background:#00A86B;color:#fff;box-shadow:0 4px 16px rgba(0,168,107,.42);transition:transform .15s;touch-action:none;}
 .wc-fab:hover{transform:scale(1.07);}
 .wc-fab .wc-dot{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#DC2626;color:#fff;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;}
-.wc-pop{position:fixed;bottom:76px;right:16px;width:440px;height:640px;min-width:340px;min-height:420px;max-width:calc(100vw - 16px);max-height:calc(100vh - 90px);z-index:211;display:none;flex-direction:column;background:var(--bg);border:1.5px solid #00A86B;border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.28);overflow:hidden;resize:both;}
+.wc-pop{position:fixed;bottom:76px;right:16px;width:440px;height:640px;min-width:340px;min-height:420px;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);z-index:211;display:none;flex-direction:column;background:var(--bg);border:1.5px solid #00A86B;border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.28);overflow:hidden;}
+/* 크기 조절: 가장자리·모서리를 끌면 가로·세로를 늘리고 줄일 수 있음(크기는 이 PC에 저장) */
+.wc-rs{position:absolute;z-index:6;touch-action:none;}
+.wc-rs.rs-n{top:0;left:14px;right:14px;height:6px;cursor:ns-resize;} .wc-rs.rs-s{bottom:0;left:14px;right:14px;height:7px;cursor:ns-resize;}
+.wc-rs.rs-e{right:0;top:14px;bottom:14px;width:7px;cursor:ew-resize;} .wc-rs.rs-w{left:0;top:14px;bottom:14px;width:6px;cursor:ew-resize;}
+.wc-rs.rs-ne{top:0;right:0;width:14px;height:14px;cursor:nesw-resize;} .wc-rs.rs-nw{top:0;left:0;width:14px;height:14px;cursor:nwse-resize;}
+.wc-rs.rs-se{bottom:0;right:0;width:16px;height:16px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,168,107,.55) 50%,rgba(0,168,107,.55) 56%,transparent 56%,transparent 66%,rgba(0,168,107,.55) 66%,rgba(0,168,107,.55) 72%,transparent 72%);} .wc-rs.rs-sw{bottom:0;left:0;width:14px;height:14px;cursor:nesw-resize;}
+.wc-pop.wc-sizing{user-select:none;}
 .wc-pop.open{display:flex;}
 .wc-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#00A86B;color:#fff;font-size:14px;flex-shrink:0;cursor:move;user-select:none;}
 .wc-hd button{border:none;background:none;color:#fff;font-size:16px;cursor:pointer;line-height:1;padding:2px 5px;opacity:.9;}
 .wc-hd button:hover{opacity:1;}
-.wc-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:10px 12px 14px;font-size:13px;color:var(--tx);}
+.wc-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:10px 12px 14px;font-size:13px;color:var(--tx);margin:0 7px 7px 6px;}
 .wc-nav{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
 .wc-nav b{flex:1;font-size:15px;}
 .wc-nav button,.wc-btn{border:1px solid var(--bd);background:var(--bg2);color:var(--tx);border-radius:8px;padding:4px 9px;font-size:12px;cursor:pointer;font-family:inherit;}
@@ -247,7 +254,8 @@ textarea.wc-in{resize:vertical;min-height:80px;line-height:1.5;}
 .wc-sr{display:flex;gap:7px;padding:7px 4px;border-bottom:1px solid var(--bd);cursor:pointer;} .wc-sr:hover{background:var(--bg2);}
 .wc-sr small{display:block;color:#00A86B;font-weight:700;font-size:11px;} .wc-sr span{font-size:12px;color:var(--tx2);line-height:1.4;}
 .wc-box{border:1px solid var(--bd);border-radius:10px;padding:9px 11px;margin:8px 0;background:var(--bg2);font-size:12px;line-height:1.7;}
-html.mob-native .wc-pop{bottom:0;right:0;left:0;width:auto;max-width:none;height:88vh;max-height:88vh;border-radius:16px 16px 0 0;resize:none;}
+html.mob-native .wc-pop{bottom:0;right:0;left:0;width:auto;max-width:none;height:88vh;max-height:88vh;border-radius:16px 16px 0 0;}
+html.mob-native .wc-rs{display:none;}
 .hm-w-big{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.1;color:var(--tx);}
 .hm-w-big small{font-size:14px;font-weight:600;margin-left:2px;}
 .hm-w-cap{font-size:11.5px;color:var(--tx2);margin-top:3px;}
@@ -7252,7 +7260,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 <!-- ═══ 📋 업무캘린더 미니 창 (관리자 전용) ═══ -->
 <button class="wc-fab" id="wcFab" onclick="wcToggle()" title="업무캘린더 — 다른 메뉴를 쓰면서 함께 열어둘 수 있는 떠 있는 창">📋<span class="wc-dot" id="wcDot"></span></button>
 <div class="wc-pop" id="wcPop">
-  <div class="wc-hd" id="wcHd"><b>📋 업무캘린더</b><span style="display:flex;align-items:center;gap:2px;"><button id="wcBellBtn" onclick="wcAskNotify()" title="브라우저 알림 켜기">🔕</button><button onclick="wcView('import')" title="기존 업무캘린더 프로그램 파일 가져오기">⬆</button><button onclick="wcToggle()" aria-label="닫기">✕</button></span></div>
+  <div class="wc-hd" id="wcHd"><b>📋 업무캘린더</b><span style="display:flex;align-items:center;gap:2px;"><button id="wcBellBtn" onclick="wcAskNotify()" title="브라우저 알림 켜기">🔕</button><button onclick="wcView('import')" title="기존 업무캘린더 프로그램 파일 가져오기">⬆</button><button onclick="wcResetSize()" title="창 크기·위치를 처음대로">↺</button><button onclick="wcToggle()" aria-label="닫기">✕</button></span></div>
   <div class="wc-body" id="wcBody"></div>
 </div>
 
@@ -8735,7 +8743,7 @@ async function wcToggle(){
   const open=!pop.classList.contains('open');
   pop.classList.toggle('open',open);
   if(!open) return;
-  _floatRestore(pop,'wc_pop');
+  _floatRestore(pop,'wc_pop'); wcApplySize();
   if(!_wc.sel){ const n=new Date(); _wc.vy=n.getFullYear(); _wc.vm=n.getMonth(); _wc.sel=_wcToday(); }
   wcRender();
   const ym=`${_wc.vy}-${_wcPad(_wc.vm+1)}`;
@@ -9109,6 +9117,57 @@ async function wcImportRun(){
   imp.log=(fail?'⚠️ 중간에 저장이 멈췄습니다. 이미 저장된 것은 유지되며, 같은 파일을 다시 선택해 가져오면 나머지만 추가됩니다.<br>':'✅ 가져오기가 끝났습니다.<br>')+log.join('<br>');
   _wc.allLoaded=false; wcRender(); if(!fail) wcLoadView();
 }
+
+// ── 창 크기 조절(가로·세로) — 가장자리/모서리를 끌어서 늘리고 줄임. 크기는 이 PC(브라우저)에 저장되어 껐다 켜도 유지 ──
+const WC_DEF_W=440, WC_DEF_H=640, WC_MIN_W=340, WC_MIN_H=420;
+function _wcSavedSize(){ try{ const s=JSON.parse(localStorage.getItem('wc_pop_size')||'null'); if(s&&isFinite(s.w)&&isFinite(s.h)) return s; }catch(e){} return null; }
+function wcApplySize(){
+  const pop=document.getElementById('wcPop'); if(!pop||document.documentElement.classList.contains('mob-native')) return;
+  const s=_wcSavedSize();
+  const w=Math.round(Math.min(Math.max(s?s.w:WC_DEF_W, WC_MIN_W), Math.max(WC_MIN_W, innerWidth-8)));
+  const h=Math.round(Math.min(Math.max(s?s.h:WC_DEF_H, WC_MIN_H), Math.max(WC_MIN_H, innerHeight-8)));
+  pop.style.width=w+'px'; pop.style.height=h+'px';
+  // 화면 밖으로 나가지 않게 위치 보정 (처음 자리 기준 오른쪽 아래에 맞춰져 있으면 위가 잘릴 수 있음)
+  const r=pop.getBoundingClientRect();
+  if(r.top<4 || r.left<4 || r.right>innerWidth+1 || r.bottom>innerHeight+1) _floatPlace(pop, Math.min(Math.max(4,r.left),Math.max(4,innerWidth-w-4)), Math.min(Math.max(4,r.top),Math.max(4,innerHeight-h-4)));
+}
+function wcResetSize(){
+  const pop=document.getElementById('wcPop'); if(!pop) return;
+  try{ localStorage.removeItem('wc_pop_size'); localStorage.removeItem('floatpos_wc_pop'); }catch(e){}
+  ['left','top','right','bottom','width','height'].forEach(p=>{ pop.style[p]=''; });
+  wcApplySize(); toast('업무캘린더 창 크기·위치를 처음대로 되돌렸습니다.');
+}
+(function(){
+  const pop=document.getElementById('wcPop'); if(!pop) return;
+  ['n','s','e','w','ne','nw','se','sw'].forEach(d=>{ const h=document.createElement('div'); h.className='wc-rs rs-'+d; h.dataset.d=d; pop.appendChild(h); });
+  let st=null;
+  pop.addEventListener('pointerdown',e=>{
+    const h=e.target.closest&&e.target.closest('.wc-rs'); if(!h) return;
+    const r=pop.getBoundingClientRect();
+    st={d:h.dataset.d, x:e.clientX, y:e.clientY, l:r.left, t:r.top, w:r.width, h:r.height};
+    pop.style.left=r.left+'px'; pop.style.top=r.top+'px'; pop.style.right='auto'; pop.style.bottom='auto';   // 위·왼쪽 기준으로 전환
+    pop.classList.add('wc-sizing');
+    try{ h.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault(); e.stopPropagation();
+  });
+  pop.addEventListener('pointermove',e=>{
+    if(!st) return;
+    const dx=e.clientX-st.x, dy=e.clientY-st.y, d=st.d;
+    let l=st.l, t=st.t, w=st.w, h=st.h;
+    if(d.includes('e')) w=Math.min(Math.max(st.w+dx,WC_MIN_W), innerWidth-st.l);
+    if(d.includes('s')) h=Math.min(Math.max(st.h+dy,WC_MIN_H), innerHeight-st.t);
+    if(d.includes('w')){ w=Math.min(Math.max(st.w-dx,WC_MIN_W), st.l+st.w); l=st.l+st.w-w; }
+    if(d.includes('n')){ h=Math.min(Math.max(st.h-dy,WC_MIN_H), st.t+st.h); t=st.t+st.h-h; }
+    pop.style.width=Math.round(w)+'px'; pop.style.height=Math.round(h)+'px'; pop.style.left=Math.round(l)+'px'; pop.style.top=Math.round(t)+'px';
+  });
+  const end=()=>{
+    if(!st) return; st=null; pop.classList.remove('wc-sizing');
+    const r=pop.getBoundingClientRect();
+    try{ localStorage.setItem('wc_pop_size',JSON.stringify({w:Math.round(r.width),h:Math.round(r.height)})); localStorage.setItem('floatpos_wc_pop',JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)})); }catch(e){}
+  };
+  pop.addEventListener('pointerup',end); pop.addEventListener('pointercancel',end);
+  window.addEventListener('resize',()=>{ if(pop.classList.contains('open')) wcApplySize(); });
+})();
 function updateNavVisibility(){
   simFabSync();
   const u=window.__CURRENT_USER; if(!u) return;
