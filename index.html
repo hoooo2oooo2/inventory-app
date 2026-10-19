@@ -8908,7 +8908,7 @@ function wcSync(){
 }
 async function wcBoot(){
   const now=new Date(); _wc.vy=now.getFullYear(); _wc.vm=now.getMonth(); _wc.sel=_wcToday();
-  try{ floatDraggable(document.getElementById('wcFab'),'wc_fab'); floatDraggable(document.getElementById('wcPop'),'wc_pop',document.getElementById('wcHd'),{skip:()=>document.documentElement.classList.contains('mob-native')}); }catch(e){}
+  try{ floatDraggable(document.getElementById('wcPop'),'wc_pop',document.getElementById('wcHd'),{skip:()=>document.documentElement.classList.contains('mob-native')}); }catch(e){}
   await Promise.all([wcEnsureMonths([_wcToday().slice(0,7)]), wcLoadMeta()]);
   wcBellSync(); wcCheckAlerts();
   if(!_wc.timer) _wc.timer=setInterval(()=>{ wcCheckAlerts(); const p=document.getElementById('wcPop'); if(p&&p.classList.contains('open')&&_wc.view==='main'&&!(document.activeElement&&p.contains(document.activeElement)&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) wcRender(); },30000);
@@ -28817,8 +28817,10 @@ function floatResetPositions(){
   toast('버튼·팝업 위치를 처음 자리로 되돌렸어요.');
 }
 function floatInitDrag(){
-  floatDraggable(document.getElementById('simFab'),'sim_fab');
-  floatDraggable(document.getElementById('trkFab'),'trk_fab');
+  // 오른쪽 아래 둥근 버튼 3개(🚚 송장조회 · 🧮 발주 시뮬레이터 · 📋 업무캘린더)는 간격에 맞춰 고정 — 더 이상 끌어서 옮기지 않음(2026-10-19 요청).
+  // 예전에 끌어서 저장돼 있던 위치는 지워서 원래 자리로 되돌림. 팝업창(시뮬레이터·업무캘린더)은 제목줄을 끌어서 옮길 수 있음.
+  ['sim_fab','trk_fab','wc_fab'].forEach(k=>{ try{ localStorage.removeItem('floatpos_'+k); }catch(_){} });
+  ['simFab','trkFab','wcFab'].forEach(i=>{ const el=document.getElementById(i); if(el){ el.style.left=''; el.style.top=''; el.style.right=''; el.style.bottom=''; } });
   floatDraggable(document.getElementById('simPop'),'sim_pop', document.querySelector('#simPop .sim-hd'), {skip:()=>document.documentElement.classList.contains('mob-native')});
 }
 function simFabSync(){
