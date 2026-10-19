@@ -498,6 +498,99 @@ const SO_SB = (window.supabase && window.supabase.createClient)
       { auth:{ storage:_soAuthStorage, persistSession:true, autoRefreshToken:true } })
   : null;
 const SO_KV_KIND = 'soldout_mgmt';
+// ── 동시 편집 안전 저장 ─────────────────────────────────────────────
+// 이전 방식: 화면을 연 시점의 전체 데이터를 통째로 덮어써서, 그 사이 다른 직원이 저장한 신규 상품·상품번호가
+//           (저장 시점에 오래된 화면 기준으로) 사라졌다. 또 저장 실패(error)를 확인하지 않아 조용히 누락됐다.
+// 현재 방식: 저장할 때마다 서버 최신본을 다시 읽어, "내가 화면을 받은 시점 대비 바꾼 부분만" 최신본에 합쳐서 저장한다
+//           (3-way 병합: 상품 추가/삭제/수정, 사이트 칸 단위). 쓰기는 updated_at 조건부 + 읽어서 검증, 충돌 시 재시도.
+// ==SO-MERGE-BEGIN==
+function _soClone(o){ return o===undefined ? undefined : JSON.parse(JSON.stringify(o)); }
+function _soStable(o){
+  if(o===undefined) o = null;
+  if(o===null || typeof o!=='object') return JSON.stringify(o);
+  if(Array.isArray(o)) return '['+o.map(_soStable).join(',')+']';
+  return '{'+Object.keys(o).sort().filter(k=>o[k]!==undefined).map(k=>JSON.stringify(k)+':'+_soStable(o[k])).join(',')+'}';
+}
+function _soEq(a,b){ return _soStable(a)===_soStable(b); }
+/* 비교용 칸 정규화 — 화면 그리기(getCell)가 만드는 빈 기본 칸은 "없음"과 같게 본다 */
+function _soCanonCell(c){
+  if(!c) return null;
+  const n = {...c, x:!!c.x, soldout:!!c.soldout, numbers:c.numbers||[], history:c.history||[]};
+  if(!n.x && !n.soldout && !n.numbers.length && !n.history.length) return null;
+  return n;
+}
+function _soCanonProduct(p){
+  const sd = {};
+  Object.entries(p.siteData||{}).forEach(([k,v])=>{ const c=_soCanonCell(v); if(c) sd[k]=c; });
+  return {...p, siteData:sd};
+}
+function _soMergeProduct(rp, bp, lp){
+  const keys = new Set([...Object.keys(lp), ...Object.keys(bp||{})]); keys.delete('siteData');
+  keys.forEach(k=>{
+    if(!_soEq(lp[k], bp ? bp[k] : undefined)){
+      if(lp[k]===undefined) delete rp[k]; else rp[k] = _soClone(lp[k]);
+    }
+  });
+  const ls = lp.siteData||{}, bs = (bp && bp.siteData) || {};
+  if(!rp.siteData) rp.siteData = {};
+  new Set([...Object.keys(ls), ...Object.keys(bs)]).forEach(sid=>{
+    if(!_soEq(_soCanonCell(ls[sid]), _soCanonCell(bs[sid]))){
+      if(ls[sid]===undefined) delete rp.siteData[sid]; else rp.siteData[sid] = _soClone(ls[sid]);
+    }
+  });
+}
+/* remote(서버 최신) 위에, base(내가 받아둔 시점) 대비 local(지금 내 화면)에서 바뀐 부분만 얹은 결과를 돌려준다 */
+function soMerge(remote, base, local){
+  remote = _soClone(remote) || {};
+  base = base || {}; local = local || {};
+  const out = { sites: remote.sites || [], products: remote.products || [], deletePw: remote.deletePw };
+
+  // 사이트
+  const bS = new Map((base.sites||[]).map(s=>[s.id,s]));
+  const lS = new Map((local.sites||[]).map(s=>[s.id,s]));
+  out.sites = out.sites.filter(s=> !(bS.has(s.id) && !lS.has(s.id)));            // 내가 삭제한 사이트
+  lS.forEach((s,id)=>{
+    const b = bS.get(id);
+    if(!b){ if(!out.sites.some(x=>x.id===id)) out.sites.push(_soClone(s)); }     // 내가 추가한 사이트
+    else if(!_soEq(s,b)){ const i = out.sites.findIndex(x=>x.id===id); if(i>=0) out.sites[i] = _soClone(s); } // 이름 변경
+  });
+  const bOrd = (base.sites||[]).map(s=>s.id).filter(id=>lS.has(id));
+  const lOrd = (local.sites||[]).map(s=>s.id).filter(id=>bS.has(id));
+  if(!_soEq(bOrd, lOrd)){                                                          // 내가 순서를 바꾼 경우만 내 순서 적용
+    const byId = new Map(out.sites.map(s=>[s.id,s]));
+    const ordered = (local.sites||[]).map(s=>byId.get(s.id)).filter(Boolean);
+    const seen = new Set(ordered.map(s=>s.id));
+    out.sites = ordered.concat(out.sites.filter(s=>!seen.has(s.id)));
+  }
+
+  // 상품
+  const bP = new Map((base.products||[]).map(p=>[p.id,p]));
+  const lP = (local.products||[]);
+  const lPm = new Map(lP.map(p=>[p.id,p]));
+  out.products = out.products.filter(p=> !(bP.has(p.id) && !lPm.has(p.id)));       // 내가 삭제한 상품
+  const rm = new Map(out.products.map(p=>[p.id,p]));
+  const firstCommon = lP.findIndex(p=>bP.has(p.id));
+  const fronts = [], ends = [];
+  lP.forEach((p,i)=>{
+    const b = bP.get(p.id);
+    if(!b){                                                                         // 내가 추가한 상품
+      const ex = rm.get(p.id);
+      if(ex) _soMergeProduct(ex, null, p);
+      else (firstCommon<0 || i<firstCommon ? fronts : ends).push(_soClone(p));
+    } else if(!_soEq(_soCanonProduct(p), _soCanonProduct(b))){
+      const ex = rm.get(p.id);
+      if(ex) _soMergeProduct(ex, b, p);                                             // 내가 수정한 칸만 반영 (남이 삭제한 상품은 삭제 유지)
+    }
+  });
+  out.products = fronts.concat(out.products, ends);
+  if(base.deletePw !== local.deletePw && local.deletePw) out.deletePw = local.deletePw;
+  return out;
+}
+// ==SO-MERGE-END==
+
+const SO_TABLE = 'work_calendar';
+function _soMs(s){ const t = Date.parse(s); return isNaN(t) ? null : t; }
+function _soSleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function _soLooksLikeAccidentalWipe(oldData, newData){
   try{
     const oldLen = JSON.stringify(oldData ?? null).length;
@@ -506,23 +599,104 @@ function _soLooksLikeAccidentalWipe(oldData, newData){
     return newLen < oldLen * 0.1;
   }catch{ return false; }
 }
-async function soCloudSave(obj, opts={}){
-  if(!SO_SB) return;
-  try{
-    if(!opts.force){
-      const { data: prevRow } = await SO_SB.from('work_calendar').select('data').eq('person','__app__').eq('kind',SO_KV_KIND).maybeSingle();
-      if(_soLooksLikeAccidentalWipe(prevRow?.data, obj)){
-        console.warn('⚠️ soCloudSave 안전장치: 기존 데이터보다 급격히 작아져 저장을 건너뜀 (의도된 경우 force:true)');
-        return;
-      }
-    }
-    await SO_SB.from('work_calendar').upsert({person:'__app__',kind:SO_KV_KIND,data:obj,updated_at:new Date().toISOString()},{onConflict:'person,kind'});
-  }catch(e){ console.warn('soCloudSave 실패', e); }
+function _soKvQuery(cols){ return SO_SB.from(SO_TABLE).select(cols).eq('person','__app__').eq('kind',SO_KV_KIND).maybeSingle(); }
+/* 서버 행 읽기 — 실패는 반드시 throw (예전엔 실패를 null로 삼켜서 시드 데이터로 덮어쓸 위험이 있었다) */
+async function soFetchRow(){ const {data,error} = await _soKvQuery('data,updated_at'); if(error) throw error; return data || null; }
+async function soFetchStamp(){ const {data,error} = await _soKvQuery('updated_at'); if(error) throw error; return data ? data.updated_at : null; }
+
+let _soBase = { sites:[], products:[], deletePw:'' };   // 마지막으로 서버와 맞춘 상태(병합 기준점)
+let _soStampMs = null;                                   // 그때의 서버 updated_at
+let _soReadOnly = false;                                 // 불러오기 실패 시 저장 차단(시드 덮어쓰기 방지)
+let _soPending = 0;                                      // 진행 중인 저장 수
+let _soUnsaved = false;                                  // 마지막 저장 실패 → 미반영 변경이 남아있을 수 있음
+let _soSaveChain = Promise.resolve(true);
+
+function _soSnapshot(){ return _soClone({ sites:state.sites, products:state.products, deletePw:state.deletePw }); }
+function _soAdopt(d){
+  if(d.sites && d.sites.length) state.sites = d.sites;
+  state.products = d.products || [];
+  if(d.deletePw) state.deletePw = d.deletePw;
+  state.products.forEach(p=>{ if(!p.siteData) p.siteData = {}; });
 }
-async function soCloudLoad(){
-  if(!SO_SB) return null;
-  try{ const {data,error}=await SO_SB.from('work_calendar').select('data').eq('person','__app__').eq('kind',SO_KV_KIND).maybeSingle(); if(error) return null; return data?data.data:null; }
-  catch(e){ return null; }
+
+async function _soVerify(stamp){ const cur = await soFetchStamp(); return !!cur && _soMs(cur)===_soMs(stamp); }
+async function _soWrite(row, merged, stamp){
+  const payload = { data:merged, updated_at:stamp };
+  if(!row){
+    const {error} = await SO_SB.from(SO_TABLE).upsert({person:'__app__',kind:SO_KV_KIND,...payload},{onConflict:'person,kind'});
+    if(error) throw error;
+    return _soVerify(stamp);
+  }
+  // 읽은 뒤 다른 직원이 먼저 저장했다면 updated_at이 달라 이 업데이트는 적용되지 않는다 → 호출부가 다시 읽어 병합
+  let q = SO_SB.from(SO_TABLE).update(payload).eq('person','__app__').eq('kind',SO_KV_KIND);
+  q = row.updated_at ? q.eq('updated_at', row.updated_at) : q.is('updated_at', null);
+  const {error} = await q;
+  if(error) throw error;
+  if(await _soVerify(stamp)) return true;
+  // 아무도 먼저 쓰지 않았는데 조건이 안 맞은 경우(타임스탬프 표기 차이 등)만 조건 없이 한 번 더 시도
+  const cur = await soFetchStamp();
+  if(cur && _soMs(cur)===_soMs(row.updated_at)){
+    const {error:e2} = await SO_SB.from(SO_TABLE).update(payload).eq('person','__app__').eq('kind',SO_KV_KIND);
+    if(e2) throw e2;
+    return _soVerify(stamp);
+  }
+  return false;
+}
+
+async function _soSaveOnce(opts){
+  if(!SO_SB) return false;
+  if(_soReadOnly){ showToast('⚠ 데이터를 불러오지 못한 상태라 저장하지 않았습니다. 새로고침 해주세요.'); return false; }
+  const localAtSave = _soSnapshot();
+  let lastErr = null;
+  for(let attempt=0; attempt<6; attempt++){
+    try{
+      const row = await soFetchRow();
+      const remote = row && row.data ? row.data : null;
+      const merged = remote ? soMerge(remote, _soBase, localAtSave) : localAtSave;
+      if(!opts.force && remote && _soLooksLikeAccidentalWipe(remote, merged)){
+        console.warn('⚠️ 저장 안전장치: 기존 데이터보다 급격히 작아져 저장을 건너뜀');
+        showToast('⚠ 데이터가 비정상적으로 줄어들어 저장하지 않았습니다.');
+        return false;
+      }
+      const stamp = new Date().toISOString();
+      if(await _soWrite(row, merged, stamp)){
+        _soBase = _soClone(merged); _soStampMs = _soMs(stamp); _soUnsaved = false;
+        // 저장하는 동안 내가 더 바꾼 것이 있으면 그 위에 다시 얹고, 남이 바꾼 것은 내 화면에 반영
+        _soAdopt(soMerge(merged, localAtSave, _soSnapshot()));
+        return true;
+      }
+    }catch(e){ lastErr = e; console.warn('저장 시도 실패', attempt, e); }
+    await _soSleep(150 + Math.random()*400);
+  }
+  _soUnsaved = true;
+  console.error('저장 실패', lastErr);
+  showToast('⚠ 저장에 실패했습니다. 네트워크/로그인 상태를 확인하고 다시 시도해주세요.');
+  return false;
+}
+function saveState(opts){
+  _soPending++;
+  const run = ()=> _soSaveOnce(opts||{}).finally(()=>{ _soPending--; });
+  _soSaveChain = _soSaveChain.then(run, run);
+  return _soSaveChain;
+}
+window.addEventListener('beforeunload', (e)=>{ if(_soPending>0 || _soUnsaved){ e.preventDefault(); e.returnValue=''; } });
+
+/* 다른 직원이 저장한 내용을 열어둔 화면에도 반영 — 가벼운 updated_at만 확인하고 바뀐 경우에만 전체를 읽는다 */
+async function soSyncCheck(){
+  if(!SO_SB || _soReadOnly || _soPending>0 || _soUnsaved || document.hidden) return;
+  if(document.querySelector('.overlay.show')) return;
+  const ae = document.activeElement;
+  if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.id!=='quickSearch') return;
+  try{
+    const cur = await soFetchStamp();
+    if(!cur || _soMs(cur)===_soStampMs) return;
+    const row = await soFetchRow();
+    if(!row || !row.data || _soPending>0 || _soUnsaved || document.querySelector('.overlay.show')) return;
+    _soAdopt(row.data);
+    _soBase = _soSnapshot();
+    _soStampMs = _soMs(row.updated_at);
+    render();
+  }catch(e){ /* 다음 주기에 재시도 */ }
 }
 
 function uid(p){ return p + Math.random().toString(36).slice(2,9); }
@@ -587,24 +761,27 @@ function seed(){
 function shiftDate(n){ const d = new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
 
 async function loadState(){
-  try{
-    const parsed = await soCloudLoad();
-    if(parsed){
-      if(parsed.sites && parsed.sites.length) state.sites = parsed.sites;
-      if(parsed.products) state.products = parsed.products;
-      if(parsed.deletePw) state.deletePw = parsed.deletePw;
-      state.products.forEach(p=>{ if(!p.siteData) p.siteData = {}; });
-      return;
-    }
-  }catch(e){}
+  if(!SO_SB){ seed(); _soReadOnly = true; return; }
+  let row = null, ok = false;
+  for(let i=0; i<3 && !ok; i++){
+    try{ row = await soFetchRow(); ok = true; }
+    catch(e){ console.warn('불러오기 실패', i, e); await _soSleep(400*(i+1)); }
+  }
+  if(!ok){
+    // 불러오지 못했을 때 시드 데이터로 덮어쓰지 않도록 저장을 막는다
+    _soReadOnly = true;
+    document.body.insertAdjacentHTML('afterbegin', '<div style="background:#fee2e2;color:#991b1b;padding:10px 14px;font-weight:600;border-bottom:1px solid #fca5a5">⚠ 데이터를 불러오지 못했습니다. 저장은 차단된 상태입니다. <button onclick="location.reload()" style="margin-left:8px;padding:2px 10px">새로고침</button></div>');
+    return;
+  }
+  if(row && row.data){
+    _soAdopt(row.data);
+    _soBase = _soSnapshot();
+    _soStampMs = _soMs(row.updated_at);
+    return;
+  }
+  // 서버에 행이 아직 없을 때만 최초 시드 생성
   seed();
   await saveState();
-}
-async function saveState(){
-  try{ await soCloudSave({
-    sites:state.sites, products:state.products, deletePw:state.deletePw
-  }); }
-  catch(e){ console.error('저장 실패', e); showToast('⚠ 저장에 실패했습니다.'); }
 }
 
 function showToast(msg){
@@ -1308,7 +1485,7 @@ function openDeleteAllModal(){
 function closeDeleteAllModal(){ document.getElementById('deleteAllOverlay').classList.remove('show'); }
 async function confirmDeleteAllYes(){
   state.products = [];
-  await saveState();
+  await saveState({force:true});
   closeDeleteAllModal();
   render();
   showToast('전체 데이터가 삭제되었습니다.');
@@ -1619,6 +1796,9 @@ async function addSiteRow(){
 async function init(){
   await loadState();
   render();
+  setInterval(soSyncCheck, 45000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) soSyncCheck(); });
+  window.addEventListener('focus', soSyncCheck);
 
   function doQuickSearch(){
     state.searchQuery = document.getElementById('quickSearch').value;
