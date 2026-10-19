@@ -6366,7 +6366,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div style="display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;">
         <div>
           <p style="font-size:13px;font-weight:600;margin-bottom:4px;">📤 판매 데이터 업로드</p>
-          <p style="font-size:11px;color:var(--tx2);">판매처별 엑셀 파일을 드래그하거나 클릭해서 등록 후 업로드 버튼을 누르세요.</p>
+          <p style="font-size:11px;color:var(--tx2);">판매처별 엑셀 파일을 드래그하거나 클릭해서 등록 후 업로드 버튼을 누르세요.<br>이미 등록된 날짜에 누락 건만 올릴 때는 <b>업로드 날짜를 해당 날짜로 지정</b>하고, 확인창에서 <b>'기존 유지하고 추가 등록'</b>을 선택하세요.</p>
         </div>
         <div style="display:flex;align-items:center;gap:10px;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;padding:10px 16px;flex-shrink:0;">
           <span style="font-size:12px;font-weight:600;">📅 업로드 날짜</span>
@@ -27619,6 +27619,79 @@ async function parseChannelFile(file, channelName){
   return { rows, missing };
 }
 
+// 이미 등록된 날짜·판매처에 다시 업로드할 때 처리 방식 선택: 'append'(기존 유지+새 건만 추가) / 'overwrite' / 'skip'
+function askRevUpExistMode(ch, dateLabel, existCnt, newCnt){
+  return new Promise(resolve=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;display:flex;align-items:center;justify-content:center;padding:16px;';
+    const done=m=>{ ov.remove(); resolve(m); };
+    ov.innerHTML=`
+      <div style="background:var(--bg);color:var(--tx);border-radius:14px;width:100%;max-width:440px;padding:20px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px;">⚠️ 이미 등록된 데이터가 있습니다</div>
+        <div style="font-size:12px;color:var(--tx2);line-height:1.6;margin-bottom:14px;">
+          [${ch}] ${dateLabel} — 기존 <b style="color:var(--tx);">${existCnt}건</b> / 이번 파일 <b style="color:var(--tx);">${newCnt}건</b>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button data-m="append" style="text-align:left;border:none;border-radius:9px;padding:10px 14px;font-size:12px;cursor:pointer;background:#2563EB;color:#fff;">
+            <b>➕ 기존 유지하고 추가 등록</b><br><span style="font-size:11px;opacity:.9;">기존 데이터는 그대로 두고, 이미 있는 건(주문번호·상품·수량 동일)을 제외한 새 건만 추가합니다</span>
+          </button>
+          <button data-m="overwrite" style="text-align:left;border:none;border-radius:9px;padding:10px 14px;font-size:12px;cursor:pointer;background:#FEE2E2;color:#991B1B;">
+            <b>🗑 기존 삭제 후 새로 등록 (덮어쓰기)</b><br><span style="font-size:11px;">기존 ${existCnt}건이 삭제됩니다</span>
+          </button>
+          <button data-m="skip" style="border:0.5px solid var(--bd);border-radius:9px;padding:9px 14px;font-size:12px;cursor:pointer;background:var(--bg);color:var(--tx);">이 판매처 건너뛰기</button>
+        </div>
+      </div>`;
+    ov.querySelectorAll('button[data-m]').forEach(b=>b.onclick=()=>done(b.dataset.m));
+    document.body.appendChild(ov);
+  });
+}
+
+// 추가 등록용: 기존 DB와 겹치는 건 제외 + 기존 합배송 그룹에 붙는 건은 배송비·출고건수 중복 방지
+async function buildAppendRows(ch, ymSet, rows){
+  const exist=[];
+  for(const ym of ymSet){
+    const [y,d]=ym.split('|');
+    for(let from=0;;from+=1000){
+      const {data,error}=await sb.from('revenue')
+        .select('id,year,sale_date,channel,order_no,item_no,item_code,order_qty,receiver,phone1,address,shipping_fee,ship_qty')
+        .eq('year',Number(y)).eq('sale_date',d).eq('channel',ch).order('id').range(from,from+999);
+      if(error) throw error;
+      exist.push(...(data||[]));
+      if(!data || data.length<1000) break;
+    }
+  }
+  const dupKey=r=>`${r.year}|${r.sale_date}|${r.order_no||''}|${r.item_no||''}|${r.item_code||''}|${r.order_qty||0}|${r.order_no?'':(r.receiver||'')}`;
+  const cnt=new Map();
+  exist.forEach(r=>{ const k=dupKey(r); cnt.set(k,(cnt.get(k)||0)+1); });
+  const fresh=[]; let dup=0;
+  for(const r of rows){
+    const k=dupKey(r), c=cnt.get(k)||0;
+    if(c>0){ cnt.set(k,c-1); dup++; } else fresh.push(r);
+  }
+  // 기존 합배송 그룹(판매일+판매처+수취인+연락처1+주소 동일)에 붙는 새 건 → 배송비·출고건수 1건 원칙 유지
+  const gkey=r=>`${r.year}|${r.sale_date}|${r.channel}|${r.receiver||''}|${r.phone1||''}|${r.address||''}`;
+  const groups=new Map();
+  exist.forEach(r=>{
+    const g=groups.get(gkey(r))||{ship:false,fee:false};
+    if(Number(r.ship_qty)>0) g.ship=true;
+    if(Number(r.shipping_fee)>0) g.fee=true;
+    groups.set(gkey(r),g);
+  });
+  for(const r of fresh){
+    const g=groups.get(gkey(r));
+    if(!g) continue;
+    const perUnit=!!(_shipMap[`${r.channel}|${r.item_no}`]||{}).perUnit;
+    if(perUnit) continue;
+    if(g.ship) r.ship_qty=0;
+    if(g.fee && r.shipping_fee>0){
+      r.shipping_fee=0;
+      r.margin=Math.round(r.settlement-r.cost_price);
+      r.margin_rate=r.settlement>0?Math.round(r.margin/r.settlement*10000)/10000:0;
+    }
+  }
+  return {rows:fresh, dup};
+}
+
 // 업로드 실행
 async function submitRevUpload(){
   const files=Object.entries(_revUpFiles);
@@ -27634,7 +27707,7 @@ async function submitRevUpload(){
   const btn = document.querySelector('.rev-submit');
   if(btn){ btn.disabled=true; btn.textContent='처리 중...'; }
 
-  let totalRows=0, allMissing=[], errors=[];
+  let totalRows=0, allMissing=[], errors=[], infos=[];
 
   try{
     // ── 1단계: 전체 파일 파싱·검증 (저장 전) ──
@@ -27679,19 +27752,28 @@ async function submitRevUpload(){
         const {count}=await sb.from('revenue').select('*',{count:'exact',head:true}).eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
         existCnt+=count||0;
       }
+      let insRows = rows;
       if(existCnt>0){
         const dateLabel = ymSet.length===1 ? ymSet[0].replace('|','-') : `${ymSet.length}개 날짜`;
-        const ok = confirm(`⚠️ 이미 [${ch}] ${dateLabel} 데이터가 ${existCnt}건 등록되어 있습니다.\n\n[확인] 기존 ${existCnt}건 삭제 후 새로 등록 (덮어쓰기)\n[취소] 이 채널 건너뛰기`);
-        if(!ok){ skipped.push(`${ch}(${existCnt}건 유지)`); continue; }
-        for(const ym of ymSet){
-          const [y,d]=ym.split('|');
-          await sb.from('revenue').delete().eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+        const mode = await askRevUpExistMode(ch, dateLabel, existCnt, rows.length);
+        if(mode==='skip'){ skipped.push(`${ch}(${existCnt}건 유지)`); continue; }
+        if(mode==='append'){
+          // 기존 데이터는 그대로 두고, 이미 있는 건(주문번호·상품번호·코드·수량 동일)은 제외한 새 건만 추가
+          const ap = await buildAppendRows(ch, ymSet, rows);
+          insRows = ap.rows;
+          if(ap.dup>0) infos.push(`[${ch}] 이미 등록된 ${ap.dup}건은 중복이라 제외`);
+          if(insRows.length===0){ infos.push(`[${ch}] 추가할 새 건이 없습니다 (기존 ${existCnt}건 유지)`); continue; }
+        } else {
+          for(const ym of ymSet){
+            const [y,d]=ym.split('|');
+            await sb.from('revenue').delete().eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+          }
         }
       }
-      await insertRevenueRows(rows);
-      totalRows += rows.length;
+      await insertRevenueRows(insRows);
+      totalRows += insRows.length;
       insertedChannels.add(ch);
-      console.log(`${ch}: ${rows.length}건 업로드 완료`);
+      console.log(`${ch}: ${insRows.length}건 업로드 완료`);
     }
     if(skipped.length) errors.push('건너뜀: '+skipped.join(', '));
 
@@ -27712,16 +27794,18 @@ async function submitRevUpload(){
     if(totalRows > 0) await reloadRevLoadedYears(); // 업로드 반영(적재된 연도 + 범위 갱신). 업로드가 새 연도면 범위에 잡힘
 
     let msg = `✅ ${totalRows}건 업로드 완료`;
+    if(infos.length) msg += `\n\n${infos.join('\n')}`;
     if(errors.length) msg += `\n\n${errors.join('\n')}`;
     if(!errors.length) alert(msg);
-    else showUploadResult(totalRows, [], errors);
+    else showUploadResult(totalRows, [], errors, infos);
   } finally {
     if(btn){ btn.disabled=false; btn.textContent='선택한 파일 업로드'; }
   }
 }
 
 // 업로드 결과 팝업 (백데이터 누락 안내)
-function showUploadResult(totalRows, missing, errors){
+function showUploadResult(totalRows, missing, errors, infos){
+  infos = infos || [];
   const missHtml = missing.length ? `
     <div style="margin-top:12px;">
       <div style="font-size:12px;font-weight:600;color:#DC2626;margin-bottom:6px;">
@@ -27748,6 +27832,7 @@ function showUploadResult(totalRows, missing, errors){
         <button onclick="this.closest('[style*=fixed]').remove()" style="border:none;background:none;font-size:16px;cursor:pointer;color:var(--tx2);">✕</button>
       </div>
       <div style="font-size:13px;color:var(--tx);">✅ <b>${totalRows.toLocaleString()}건</b> 정상 업로드</div>
+      ${infos.length?`<div style="margin-top:8px;font-size:11px;color:var(--tx2);">${infos.map(e=>`ℹ️ ${e}`).join('<br>')}</div>`:''}
       ${missHtml}${errHtml}
       <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
         ${missing.length?`<button class="btn btn-pr btn-sm" onclick="goRevPage('backdata');this.closest('[style*=fixed]').remove()">백데이터 관리 →</button>`:''}
