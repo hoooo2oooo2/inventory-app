@@ -177,6 +177,77 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-w-hd .hm-go{margin-left:auto;font-size:11px;font-weight:500;color:var(--tx2);}
 .hm-w-hd>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;}
 .hm-w.s-S .hm-go{display:none;}
+/* ═══ 📋 업무캘린더 미니 창 (관리자 전용, 떠 있는 창) ═══ */
+.wc-fab{position:fixed;bottom:20px;right:130px;z-index:200;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:20px;background:#00A86B;color:#fff;box-shadow:0 4px 16px rgba(0,168,107,.42);transition:transform .15s;touch-action:none;}
+.wc-fab:hover{transform:scale(1.07);}
+.wc-fab .wc-dot{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#DC2626;color:#fff;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;}
+.wc-pop{position:fixed;bottom:76px;right:16px;width:440px;height:640px;min-width:340px;min-height:420px;max-width:calc(100vw - 16px);max-height:calc(100vh - 90px);z-index:211;display:none;flex-direction:column;background:var(--bg);border:1.5px solid #00A86B;border-radius:14px;box-shadow:0 10px 36px rgba(0,0,0,.28);overflow:hidden;resize:both;}
+.wc-pop.open{display:flex;}
+.wc-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#00A86B;color:#fff;font-size:14px;flex-shrink:0;cursor:move;user-select:none;}
+.wc-hd button{border:none;background:none;color:#fff;font-size:16px;cursor:pointer;line-height:1;padding:2px 5px;opacity:.9;}
+.wc-hd button:hover{opacity:1;}
+.wc-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:10px 12px 14px;font-size:13px;color:var(--tx);}
+.wc-nav{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.wc-nav b{flex:1;font-size:15px;}
+.wc-nav button,.wc-btn{border:1px solid var(--bd);background:var(--bg2);color:var(--tx);border-radius:8px;padding:4px 9px;font-size:12px;cursor:pointer;font-family:inherit;}
+.wc-nav button:hover,.wc-btn:hover{border-color:#00A86B;color:#00A86B;}
+.wc-btn.pr{background:#00A86B;border-color:#00A86B;color:#fff;font-weight:600;}
+.wc-btn.pr:hover{filter:brightness(1.06);color:#fff;}
+.wc-btn.dg:hover{border-color:#DC2626;color:#DC2626;}
+.wc-tools{display:flex;gap:5px;margin:2px 0 8px;}
+.wc-tools button{flex:1;border:1px solid var(--bd);background:var(--bg2);color:var(--tx2);border-radius:9px;padding:6px 2px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;position:relative;}
+.wc-tools button:hover{border-color:#00A86B;color:#00A86B;}
+.wc-tools button.has{border-color:#00A86B;color:#00A86B;background:rgba(0,168,107,.1);}
+.wc-wd{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10.5px;font-weight:600;color:var(--tx2);}
+.wc-wd span:first-child{color:#DC2626;} .wc-wd span:last-child{color:#2563EB;}
+.wc-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+.wc-cell{display:flex;flex-direction:column;align-items:center;padding:0;cursor:pointer;user-select:none;min-height:33px;}
+.wc-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.wc-cell:hover .wc-num{background:var(--bg2);}
+.wc-cell.oth .wc-num{opacity:.4;}
+.wc-cell.sun .wc-num,.wc-cell.hol .wc-num{color:#DC2626;} .wc-cell.sat .wc-num{color:#2563EB;}
+.wc-cell.sel .wc-num{background:rgba(0,168,107,.18);color:#00A86B;font-weight:700;}
+.wc-cell.today .wc-num{background:#00A86B;color:#fff !important;font-weight:700;}
+.wc-hl{font-size:8.5px;color:#DC2626;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.1;}
+.wc-dots{height:5px;margin-top:1px;} .wc-dots i{display:inline-block;width:5px;height:5px;border-radius:50%;}
+.wc-d-all{background:#00A86B;} .wc-d-part{background:#FF9F0A;} .wc-d-none{background:#3182F6;}
+.wc-stats{display:flex;gap:8px;margin:8px 0 6px;font-size:11.5px;color:var(--tx2);}
+.wc-stats b{color:var(--tx);}
+.wc-day{font-size:15px;font-weight:700;margin:6px 0 4px;}
+.wc-prog{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.wc-bar{flex:1;height:6px;background:var(--bd);border-radius:3px;overflow:hidden;} .wc-bar i{display:block;height:100%;background:#00A86B;transition:width .3s;}
+.wc-form{border:1px solid var(--bd);background:var(--bg2);border-radius:10px;padding:8px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px;}
+.wc-in{width:100%;border:1.5px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);padding:6px 9px;font-size:13px;outline:none;font-family:inherit;box-sizing:border-box;}
+.wc-in:focus{border-color:#00A86B;}
+textarea.wc-in{resize:vertical;min-height:80px;line-height:1.5;}
+.wc-frow{display:flex;gap:6px;align-items:center;} .wc-frow .wc-in{flex:1;min-width:0;}
+.wc-gh{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;color:var(--tx2);margin:10px 0 5px;}
+.wc-gh button{border:none;background:none;color:#9C6ADE;font-size:11px;font-weight:700;cursor:pointer;}
+.wc-card{display:flex;gap:9px;align-items:flex-start;border:1.5px solid var(--bd);background:var(--bg);border-radius:11px;padding:8px 10px;margin-bottom:6px;}
+.wc-card.fx{border-left:3px solid #9C6ADE;} .wc-card.done{opacity:.6;} .wc-card.over{border-color:#DC2626;}
+.wc-chk{width:20px;height:20px;border-radius:50%;border:2px solid var(--bd);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.wc-chk:hover{border-color:#00A86B;} .wc-chk.on{background:#00A86B;border-color:#00A86B;} .wc-chk.on::after{content:'✓';color:#fff;font-size:11px;font-weight:900;}
+.wc-cb{flex:1;min-width:0;}
+.wc-r1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.wc-tt{font-weight:600;flex:1;min-width:0;word-break:break-all;} .wc-card.done .wc-tt{text-decoration:line-through;color:var(--tx2);}
+.wc-bdg{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:10px;white-space:nowrap;}
+.wc-b-high{background:rgba(220,38,38,.14);color:#DC2626;} .wc-b-medium{background:rgba(49,130,246,.14);color:#3182F6;} .wc-b-low{background:rgba(128,128,128,.16);color:var(--tx2);} .wc-b-done{background:rgba(0,168,107,.16);color:#00A86B;}
+.wc-tm{font-size:11.5px;color:var(--tx2);}
+.wc-r2{display:flex;justify-content:space-between;align-items:center;margin-top:3px;font-size:11.5px;color:var(--tx2);}
+.wc-timer.warn{color:#EA580C;} .wc-timer.danger,.wc-timer.over{color:#DC2626;font-weight:700;}
+.wc-memo{font-size:11.5px;color:var(--tx2);margin-top:3px;line-height:1.5;white-space:pre-wrap;word-break:break-all;}
+.wc-act{display:flex;gap:3px;opacity:0;transition:opacity .15s;} .wc-card:hover .wc-act{opacity:1;}
+.wc-act button{border:none;background:var(--bg2);color:var(--tx2);border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:12px;} .wc-act button:hover{color:var(--tx);}
+.wc-empty{padding:18px 6px;text-align:center;color:var(--tx2);font-size:12.5px;line-height:1.7;}
+.wc-sec{font-size:13px;font-weight:700;margin:4px 0 8px;display:flex;align-items:center;gap:8px;} .wc-sec .wc-btn{font-size:11.5px;}
+.wc-hint{font-size:11.5px;color:var(--tx2);line-height:1.6;margin:6px 0;}
+.wc-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;}
+.wc-chip{border:1.5px solid var(--bd);border-radius:16px;padding:4px 11px;cursor:pointer;font-size:12px;user-select:none;} .wc-chip.on{background:rgba(0,168,107,.16);border-color:#00A86B;color:#00A86B;font-weight:700;}
+.wc-row2{display:flex;justify-content:space-between;padding:4px 2px;border-bottom:1px solid var(--bd);font-size:12px;} .wc-row2.has b{color:#00A86B;}
+.wc-sr{display:flex;gap:7px;padding:7px 4px;border-bottom:1px solid var(--bd);cursor:pointer;} .wc-sr:hover{background:var(--bg2);}
+.wc-sr small{display:block;color:#00A86B;font-weight:700;font-size:11px;} .wc-sr span{font-size:12px;color:var(--tx2);line-height:1.4;}
+.wc-box{border:1px solid var(--bd);border-radius:10px;padding:9px 11px;margin:8px 0;background:var(--bg2);font-size:12px;line-height:1.7;}
+html.mob-native .wc-pop{bottom:0;right:0;left:0;width:auto;max-width:none;height:88vh;max-height:88vh;border-radius:16px 16px 0 0;resize:none;}
 .hm-w-big{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.1;color:var(--tx);}
 .hm-w-big small{font-size:14px;font-weight:600;margin-left:2px;}
 .hm-w-cap{font-size:11.5px;color:var(--tx2);margin-top:3px;}
@@ -7178,6 +7249,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
   </div>
 </div>
 
+<!-- ═══ 📋 업무캘린더 미니 창 (관리자 전용) ═══ -->
+<button class="wc-fab" id="wcFab" onclick="wcToggle()" title="업무캘린더 — 다른 메뉴를 쓰면서 함께 열어둘 수 있는 떠 있는 창">📋<span class="wc-dot" id="wcDot"></span></button>
+<div class="wc-pop" id="wcPop">
+  <div class="wc-hd" id="wcHd"><b>📋 업무캘린더</b><span style="display:flex;align-items:center;gap:2px;"><button id="wcBellBtn" onclick="wcAskNotify()" title="브라우저 알림 켜기">🔕</button><button onclick="wcView('import')" title="기존 업무캘린더 프로그램 파일 가져오기">⬆</button><button onclick="wcToggle()" aria-label="닫기">✕</button></span></div>
+  <div class="wc-body" id="wcBody"></div>
+</div>
+
 <!-- ═══ 🧮 발주 시뮬레이터 — 사이렌 자리 ═══ -->
 <button class="sim-fab" id="simFab" onclick="simToggle()" title="발주 시뮬레이터 — 주문할 수량이 충분한지 확인">🧮</button>
 <div class="sim-pop" id="simPop">
@@ -8545,6 +8623,492 @@ function homeOpenAdd(){
   grid.addEventListener('drop',e=>{ e.preventDefault(); const t=e.target.closest&&e.target.closest('.hm-w[data-id]'); const from=_homeDrag; _homeDrag=null; if(from && t && t.dataset.id!==from) homeMoveTo(from,t.dataset.id); else renderHome(); });
   grid.addEventListener('dragend',()=>{ if(_homeDrag){ _homeDrag=null; renderHome(); } });
 })();
+
+// ══════════════════════════════════════════════
+// 📋 업무캘린더 미니 창 (관리자 admin 전용) — 컴퓨터에 설치해 쓰던 '업무 캘린더' 프로그램(할 일·고정업무·메모장·업무보고서·점심금액)을
+//   재고앱 위에 떠 있는 창으로 옮긴 것. 다른 메뉴를 쓰면서 동시에 열어둘 수 있음.
+//  · 저장: cloudKv(work_calendar, person='__app__') — 할 일은 월별로 쪼개 'wc_admin_t_YYYY-MM', 나머지는 'wc_admin_fixed|notes|reports|lunch'
+//         (예전 프로그램 데이터와는 연동되지 않음 — 기존 파일은 ⬆ 가져오기로 한 번 불러옴, 같은 id는 건너뛰므로 다시 가져와도 중복 안 됨)
+//  · 저장 전 버전(updated_at)만 확인해 최신본을 보장(변경 없으면 다시 다운로드 안 함 → egress 절약)
+//  · 알림: 브라우저 알림(Notification) — 마감 30분 전/10분 전/마감/미완료. 이 PC에서 이미 알린 기록은 localStorage에 보관
+// ══════════════════════════════════════════════
+const WC_FIXED_KIND='wc_admin_fixed', WC_NOTES_KIND='wc_admin_notes', WC_REPORTS_KIND='wc_admin_reports', WC_LUNCH_KIND='wc_admin_lunch';
+const WC_LUNCH_STAFF=['실장님','상훈','이모','가영','지민','연정','보라','유현','규리','종범'];
+const WC_HOLIDAYS={'2025-01-01':'신정','2025-01-28':'설날 연휴','2025-01-29':'설날','2025-01-30':'설날 연휴','2025-03-01':'삼일절','2025-03-03':'대체공휴일','2025-05-05':'어린이날·부처님오신날','2025-05-06':'대체공휴일','2025-06-06':'현충일','2025-08-15':'광복절','2025-10-03':'개천절','2025-10-05':'추석 연휴','2025-10-06':'추석','2025-10-07':'추석 연휴','2025-10-08':'대체공휴일','2025-10-09':'한글날','2025-12-25':'크리스마스',
+'2026-01-01':'신정','2026-02-16':'설날 연휴','2026-02-17':'설날','2026-02-18':'설날 연휴','2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일','2026-06-06':'현충일','2026-08-15':'광복절','2026-08-17':'대체공휴일','2026-09-24':'추석 연휴','2026-09-25':'추석','2026-09-26':'추석 연휴','2026-09-28':'대체공휴일','2026-10-03':'개천절','2026-10-05':'대체공휴일','2026-10-09':'한글날','2026-12-25':'크리스마스',
+'2027-01-01':'신정','2027-02-05':'설날 연휴','2027-02-06':'설날','2027-02-07':'설날 연휴','2027-02-08':'대체공휴일','2027-03-01':'삼일절','2027-05-05':'어린이날','2027-05-13':'부처님오신날','2027-06-06':'현충일','2027-08-15':'광복절','2027-08-16':'대체공휴일','2027-09-14':'추석 연휴','2027-09-15':'추석','2027-09-16':'추석 연휴','2027-10-03':'개천절','2027-10-04':'대체공휴일','2027-10-09':'한글날','2027-10-11':'대체공휴일','2027-12-25':'크리스마스'};
+const _wc={ view:'main', sel:null, vy:0, vm:0, mon:{}, ver:{}, fixed:[], notes:{}, reports:{}, lunch:{price:8000,lunch:{}},
+  form:null, fixedForm:null, showCal:true, booted:false, timer:null, lcY:0, lcM:0, lcSel:null, imp:null, searchQ:'', err:false, allLoaded:false };
+const _wcPad=n=>String(n).padStart(2,'0');
+function _wcToday(){ const d=new Date(); return d.getFullYear()+'-'+_wcPad(d.getMonth()+1)+'-'+_wcPad(d.getDate()); }
+function _wcLocal(ds){ const [y,m,d]=ds.split('-').map(Number); return new Date(y,m-1,d); }
+function _wcKor(ds){ const d=_wcLocal(ds), h=WC_HOLIDAYS[ds]; return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일${h?' · '+h:''}`; }
+function _wcId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function _wcEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _wcTKey(ym){ return 'wc_admin_t_'+ym; }
+function _wcAddMonth(ym,delta){ const [y,m]=ym.split('-').map(Number); const d=new Date(y,m-1+delta,1); return d.getFullYear()+'-'+_wcPad(d.getMonth()+1); }
+function _wcFixedFor(ds){ const dow=_wcLocal(ds).getDay(); if(dow===0||dow===6) return []; return _wc.fixed.filter(f=>f.startDate<=ds); }   // 고정 업무는 평일만, 등록일 이후 매일
+function _wcTasks(ds){ return ((_wc.mon[ds.slice(0,7)]||{})[ds])||[]; }
+
+// ── 저장소 (읽기: 버전 확인 후 필요할 때만 / 쓰기: 항상 최신본 위에 적용) ──
+async function _wcLoadKind(kind, dflt){
+  const v=await cloudKvVersion(kind);
+  if(v===undefined) throw new Error('conn');
+  let d=null;
+  if(v!==null){ d=await cloudKvLoad(kind); if(d===null) throw new Error('conn'); }
+  _wc.ver[kind]=v;
+  return d===null ? dflt() : d;
+}
+async function wcEnsureMonths(yms){
+  for(const ym of yms){
+    if(_wc.mon[ym]!==undefined) continue;
+    try{ const d=await _wcLoadKind(_wcTKey(ym), ()=>({})); _wc.mon[ym]=(d&&typeof d==='object'&&!Array.isArray(d))?d:{}; }
+    catch(e){ _wc.err=true; }
+  }
+}
+async function wcLoadMeta(){
+  const defs=[[WC_FIXED_KIND,'fixed',()=>[]],[WC_NOTES_KIND,'notes',()=>({})],[WC_REPORTS_KIND,'reports',()=>({})],[WC_LUNCH_KIND,'lunch',()=>({price:8000,lunch:{}})]];
+  for(const [k,f,d] of defs){ try{ _wc[f]=await _wcLoadKind(k,d); }catch(e){ _wc.err=true; } }
+  if(!Array.isArray(_wc.fixed)) _wc.fixed=[];
+  if(!_wc.lunch||typeof _wc.lunch!=='object') _wc.lunch={price:8000,lunch:{}};
+  if(typeof _wc.lunch.price!=='number') _wc.lunch.price=8000;
+  if(!_wc.lunch.lunch) _wc.lunch.lunch={};
+}
+// kind의 데이터를 최신으로 맞춘 뒤 fn으로 고쳐 저장. get/set은 메모리 보관 위치.
+async function _wcMutate(kind, get, set, fn, dflt){
+  const v=await cloudKvVersion(kind);
+  if(v===undefined){ toast('서버 연결을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'); return false; }
+  let cur=get();
+  if(v!==_wc.ver[kind]){   // 다른 PC에서 바뀌었거나 아직 못 불러온 경우 → 최신본을 받아 그 위에 적용
+    try{ cur=await _wcLoadKind(kind,dflt); }catch(e){ toast('서버에서 최신 내용을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'); return false; }
+  }
+  fn(cur); set(cur);
+  await cloudKvSave(kind, cur, {force:true});
+  const nv=await cloudKvVersion(kind); if(nv!==undefined) _wc.ver[kind]=nv;
+  return true;
+}
+const _wcMonOps=(ym)=>[ _wcTKey(ym), ()=>_wc.mon[ym]||{}, v=>{ _wc.mon[ym]=v; }, ()=>({}) ];
+function wcMutMonth(ym,fn){ const [k,g,s,d]=_wcMonOps(ym); return _wcMutate(k,g,s,fn,d); }
+function wcMutFixed(fn){ return _wcMutate(WC_FIXED_KIND,()=>_wc.fixed,v=>{_wc.fixed=Array.isArray(v)?v:[];},fn,()=>[]); }
+function wcMutNotes(fn){ return _wcMutate(WC_NOTES_KIND,()=>_wc.notes,v=>{_wc.notes=v||{};},fn,()=>({})); }
+function wcMutReports(fn){ return _wcMutate(WC_REPORTS_KIND,()=>_wc.reports,v=>{_wc.reports=v||{};},fn,()=>({})); }
+function wcMutLunch(fn){ return _wcMutate(WC_LUNCH_KIND,()=>_wc.lunch,v=>{_wc.lunch=v||{price:8000,lunch:{}};if(!_wc.lunch.lunch)_wc.lunch.lunch={};},fn,()=>({price:8000,lunch:{}})); }
+
+// 다른 PC에서 바뀐 것 반영 (버전 한 번에 조회 → 바뀐 것만 다시 받음)
+async function wcRefresh(){
+  const kinds=[WC_FIXED_KIND,WC_NOTES_KIND,WC_REPORTS_KIND,WC_LUNCH_KIND,...Object.keys(_wc.mon).map(_wcTKey)];
+  const vs=await cloudKvVersions(kinds); if(vs===undefined) return;
+  let changed=false;
+  for(const k of kinds){
+    const nv=vs[k]===undefined?null:vs[k];
+    if(nv===(_wc.ver[k]===undefined?null:_wc.ver[k]) && _wc.ver[k]!==undefined) continue;
+    try{
+      if(k===WC_FIXED_KIND){ _wc.fixed=await _wcLoadKind(k,()=>[]); }
+      else if(k===WC_NOTES_KIND){ _wc.notes=await _wcLoadKind(k,()=>({})); }
+      else if(k===WC_REPORTS_KIND){ _wc.reports=await _wcLoadKind(k,()=>({})); }
+      else if(k===WC_LUNCH_KIND){ _wc.lunch=await _wcLoadKind(k,()=>({price:8000,lunch:{}})); if(!_wc.lunch.lunch)_wc.lunch.lunch={}; }
+      else { const ym=k.slice('wc_admin_t_'.length); _wc.mon[ym]=await _wcLoadKind(k,()=>({})); }
+      changed=true;
+    }catch(e){}
+  }
+  if(changed) wcRender();
+}
+
+// ── 시작/표시 ──
+function wcSync(){
+  const fab=document.getElementById('wcFab'); if(!fab) return;
+  const ok=_isAdminUser();
+  fab.style.display=ok?'flex':'none';
+  if(!ok){ document.getElementById('wcPop')?.classList.remove('open'); return; }
+  if(!_wc.booted){ _wc.booted=true; setTimeout(wcBoot,1500); }
+}
+async function wcBoot(){
+  const now=new Date(); _wc.vy=now.getFullYear(); _wc.vm=now.getMonth(); _wc.sel=_wcToday();
+  try{ floatDraggable(document.getElementById('wcFab'),'wc_fab'); floatDraggable(document.getElementById('wcPop'),'wc_pop',document.getElementById('wcHd'),{skip:()=>document.documentElement.classList.contains('mob-native')}); }catch(e){}
+  await Promise.all([wcEnsureMonths([_wcToday().slice(0,7)]), wcLoadMeta()]);
+  wcBellSync(); wcCheckAlerts();
+  if(!_wc.timer) _wc.timer=setInterval(()=>{ wcCheckAlerts(); const p=document.getElementById('wcPop'); if(p&&p.classList.contains('open')&&_wc.view==='main'&&!(document.activeElement&&p.contains(document.activeElement)&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) wcRender(); },30000);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && document.getElementById('wcPop')?.classList.contains('open')) wcRefresh(); });
+}
+async function wcToggle(){
+  const pop=document.getElementById('wcPop'); if(!pop||!_isAdminUser()) return;
+  const open=!pop.classList.contains('open');
+  pop.classList.toggle('open',open);
+  if(!open) return;
+  _floatRestore(pop,'wc_pop');
+  if(!_wc.sel){ const n=new Date(); _wc.vy=n.getFullYear(); _wc.vm=n.getMonth(); _wc.sel=_wcToday(); }
+  wcRender();
+  const ym=`${_wc.vy}-${_wcPad(_wc.vm+1)}`;
+  await Promise.all([wcEnsureMonths([_wcAddMonth(ym,-1),ym,_wcAddMonth(ym,1)]), wcLoadMeta()]);
+  wcRender(); wcRefresh();
+}
+function wcView(v){ _wc.view=v; _wc.skipRestore=true; if(v==='search'&&!_wc.allLoaded) wcLoadAll(); if(v==='lunch'){ _wc.lcY=_wc.vy; _wc.lcM=_wc.vm; _wc.lcSel=_wc.sel; } wcRender(); }
+function wcHome(){ _wc.view='main'; _wc.form=null; _wc.fixedForm=null; _wc.skipRestore=true; wcRender(); }
+async function wcLoadAll(){
+  try{
+    const { data, error } = await sb.from('work_calendar').select('kind').eq('person','__app__').like('kind','wc_admin_t_%');
+    if(error) throw error;
+    await wcEnsureMonths((data||[]).map(r=>r.kind.slice('wc_admin_t_'.length)));
+    _wc.allLoaded=true; if(_wc.view==='search') wcRender();
+  }catch(e){ toast('전체 기간 데이터를 불러오지 못했습니다.'); }
+}
+
+// ── 알림(브라우저 Notification) ──
+function wcBellSync(){
+  const b=document.getElementById('wcBellBtn'); if(!b) return;
+  const ok=('Notification' in window) && Notification.permission==='granted';
+  b.textContent=ok?'🔔':'🔕'; b.title=ok?'브라우저 알림 켜짐 (마감 30분 전·10분 전·마감·미완료)':'브라우저 알림 켜기 (눌러서 허용)';
+}
+function wcAskNotify(){
+  if(!('Notification' in window)){ toast('이 브라우저는 알림을 지원하지 않습니다.'); return; }
+  if(Notification.permission==='granted'){ toast('🔔 브라우저 알림이 이미 켜져 있습니다.'); return; }
+  if(Notification.permission==='denied'){ toast('알림이 차단돼 있습니다. 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꿔 주세요.'); return; }
+  Notification.requestPermission().then(()=>{ wcBellSync(); if(Notification.permission==='granted'){ toast('🔔 알림을 켰습니다.'); try{ new Notification('업무캘린더 알림 켜짐',{body:'마감 시간 전에 이렇게 알려드립니다.'}); }catch(e){} } });
+}
+function _wcAlerted(){ try{ return JSON.parse(localStorage.getItem('wc_alerted_v1')||'{}'); }catch(e){ return {}; } }
+function _wcAlertedSave(o){ try{ const cut=Date.now()-5*86400000; Object.keys(o).forEach(k=>{ if((o[k]&&o[k].t||0)<cut) delete o[k]; }); localStorage.setItem('wc_alerted_v1',JSON.stringify(o)); }catch(e){} }
+function wcNotify(title,body){
+  toast(title+' '+body);
+  try{ if('Notification' in window && Notification.permission==='granted') new Notification(title,{body, tag:'wc_'+title+body}); }catch(e){}
+}
+function wcCheckAlerts(){
+  if(!_isAdminUser()) return;
+  const now=new Date(), ds=_wcToday(), al=_wcAlerted();
+  const items=[..._wcTasks(ds).filter(t=>!t.done && t.dueTime).map(t=>({key:t.id+'|'+ds,title:t.title,due:t.dueTime})),
+               ..._wcFixedFor(ds).filter(f=>!(f.doneDates&&f.doneDates[ds]) && f.dueTime).map(f=>({key:f.id+'|'+ds,title:f.title,due:f.dueTime}))];
+  let dirty=false, pending=0;
+  items.forEach(it=>{
+    const [h,m]=it.due.split(':').map(Number);
+    const diff=Math.floor((new Date(now.getFullYear(),now.getMonth(),now.getDate(),h,m)-now)/60000);
+    const f=al[it.key]||(al[it.key]={t:Date.now()});
+    if(diff<=30&&diff>10&&!f.m30){ wcNotify('⏰ 마감 30분 전',`"${it.title}" 마감까지 30분 남았습니다.`); f.m30=1; dirty=true; }
+    if(diff<=10&&diff>0&&!f.m10){ wcNotify('🔴 마감 10분 전',`"${it.title}" 마감까지 ${diff}분 남았습니다!`); f.m10=1; dirty=true; }
+    if(diff<=0&&diff>-3&&!f.due){ wcNotify('⚠️ 마감 시간!',`"${it.title}" 마감 시간이 됐습니다!`); f.due=1; dirty=true; }
+    if(diff<-3&&!f.over){ wcNotify('❗ 미완료 작업',`"${it.title}"을(를) 아직 완료하지 않았습니다.`); f.over=1; dirty=true; }
+    if(diff<=30) pending++;
+  });
+  if(dirty) _wcAlertedSave(al);
+  const dot=document.getElementById('wcDot'); if(dot){ dot.style.display=pending?'flex':'none'; dot.textContent=pending; }
+}
+function _wcTimer(due,ds){
+  if(!due) return null;
+  const now=new Date(), d=_wcLocal(ds), [h,m]=due.split(':').map(Number);
+  const diff=Math.floor((new Date(d.getFullYear(),d.getMonth(),d.getDate(),h,m)-now)/60000);
+  if(diff>60) return {text:`${Math.floor(diff/60)}시간${diff%60?` ${diff%60}분`:''} 후`,cls:''};
+  if(diff>30) return {text:`${diff}분 후`,cls:''};
+  if(diff>10) return {text:`${diff}분 후 마감`,cls:'warn'};
+  if(diff>0) return {text:`${diff}분 후 마감!`,cls:'danger'};
+  if(diff===0) return {text:'지금 마감!',cls:'danger'};
+  const a=Math.abs(diff); return {text:a>=60?`${Math.floor(a/60)}시간 ${a%60}분 초과`:`${a}분 초과`,cls:'over'};
+}
+
+// ── 화면 ──
+function wcRender(){
+  const body=document.getElementById('wcBody'); if(!body) return;
+  // 다시 그려도 입력 중이던 내용이 지워지지 않도록 보관했다가 복원 (양식을 새로 열거나 닫을 때는 복원하지 않음)
+  const restore=!_wc.skipRestore, skipDate=_wc.skipDate; _wc.skipRestore=false; _wc.skipDate=false;
+  const saved={}; ['wcQT','wcQDate','wcQTime','wcQPri','wcQMemo','wcFT','wcFDate','wcFTime','wcFPri','wcFMemo','wcSQ','wcRW','wcRT','wcRI','wcNote'].forEach(id=>{ const e=document.getElementById(id); if(e) saved[id]=e.value; });
+  const views={main:_wcMainHtml, note:_wcNoteHtml, report:_wcReportHtml, lunch:_wcLunchHtml, search:_wcSearchHtml, import:_wcImportHtml};
+  body.innerHTML=(views[_wc.view]||_wcMainHtml)();
+  if(restore) Object.keys(saved).forEach(id=>{ if(skipDate&&id==='wcQDate') return; const e=document.getElementById(id); if(e && saved[id]!=='') e.value=saved[id]; });
+  if(_wc.err && _wc.view==='main') body.insertAdjacentHTML('afterbegin','<div class="wc-box" style="border-color:#DC2626;color:#DC2626;">⚠️ 일부 데이터를 서버에서 불러오지 못했습니다. 저장은 안전하게 보류됩니다. 잠시 뒤 창을 닫았다 다시 열어 주세요.</div>');
+}
+function _wcBack(title){ return `<div class="wc-sec"><button class="wc-btn" onclick="wcHome()">← 돌아가기</button><span>${title}</span></div>`; }
+function _wcCalHtml(){
+  const Y=_wc.vy, M=_wc.vm, tStr=_wcToday();
+  const first=new Date(Y,M,1).getDay(), last=new Date(Y,M+1,0).getDate(), prevLast=new Date(Y,M,0).getDate();
+  const cells=[];
+  for(let i=first-1;i>=0;i--) cells.push({y:M===0?Y-1:Y,m:M===0?12:M,d:prevLast-i,o:true});
+  for(let d=1;d<=last;d++) cells.push({y:Y,m:M+1,d,o:false});
+  while(cells.length<42){ const ny=M===11?Y+1:Y, nm=M===11?1:M+2; cells.push({y:ny,m:nm,d:cells.length-first-last+1,o:true}); }
+  return `<div class="wc-wd">${'일월화수목금토'.split('').map(x=>`<span>${x}</span>`).join('')}</div><div class="wc-grid">`+cells.map(c=>{
+    const ds=`${c.y}-${_wcPad(c.m)}-${_wcPad(c.d)}`, dow=new Date(c.y,c.m-1,c.d).getDay();
+    const ts=_wcTasks(ds), fx=_wcFixedFor(ds), tot=ts.length+fx.length, dn=ts.filter(t=>t.done).length+fx.filter(f=>f.doneDates&&f.doneDates[ds]).length;
+    const hol=WC_HOLIDAYS[ds]||'';
+    const cls=['wc-cell',c.o?'oth':'',ds===tStr?'today':'',(ds===_wc.sel&&ds!==tStr)?'sel':'',dow===0?'sun':'',dow===6?'sat':'',hol?'hol':''].filter(Boolean).join(' ');
+    return `<div class="${cls}" onclick="wcPick('${ds}')"${hol?` title="${_wcEsc(hol)}"`:''}><div class="wc-num">${c.d}</div>${hol?`<div class="wc-hl">${_wcEsc(hol)}</div>`:''}<div class="wc-dots">${tot?`<i class="${dn===tot?'wc-d-all':dn>0?'wc-d-part':'wc-d-none'}"></i>`:''}</div></div>`;
+  }).join('')+'</div>';
+}
+function _wcStats(){
+  let tot=0, dn=0; const last=new Date(_wc.vy,_wc.vm+1,0).getDate();
+  for(let d=1;d<=last;d++){ const ds=`${_wc.vy}-${_wcPad(_wc.vm+1)}-${_wcPad(d)}`; const ts=_wcTasks(ds), fx=_wcFixedFor(ds); tot+=ts.length+fx.length; dn+=ts.filter(t=>t.done).length+fx.filter(f=>f.doneDates&&f.doneDates[ds]).length; }
+  return {tot,dn,pend:tot-dn};
+}
+function _wcCard(t,ds,fixed){
+  const isDone=fixed?!!(t.doneDates&&t.doneDates[ds]):!!t.done;
+  const ti=(!isDone&&t.dueTime)?_wcTimer(t.dueTime,ds):null, over=ti&&ti.cls==='over';
+  const pri=t.priority||'medium', pl={high:'높음',medium:'보통',low:'낮음'}[pri];
+  const chk=fixed?`wcToggleFixed('${t.id}','${ds}')`:`wcToggle1('${t.id}','${ds}')`;
+  const ed=fixed?`wcEditFixed('${t.id}')`:`wcEdit('${t.id}','${ds}')`, del=fixed?`wcDelFixed('${t.id}')`:`wcDel('${t.id}','${ds}')`;
+  return `<div class="wc-card${fixed?' fx':''}${isDone?' done':''}${over?' over':''}"><div class="wc-chk${isDone?' on':''}" onclick="${chk}"></div><div class="wc-cb">
+    <div class="wc-r1">${fixed?'<span>📌</span>':''}<div class="wc-tt">${_wcEsc(t.title)}</div>${isDone?'<span class="wc-bdg wc-b-done">완료</span>':`<span class="wc-bdg wc-b-${pri}">${pl}</span>`}${t.dueTime&&!isDone?`<span class="wc-tm">⏱ ${t.dueTime}</span>`:''}</div>
+    <div class="wc-r2"><div class="wc-timer ${ti?ti.cls:''}">${ti?(over?'❗ ':ti.cls==='danger'?'🔴 ':ti.cls==='warn'?'⚠️ ':'⏳ ')+ti.text:''}</div><div class="wc-act"><button onclick="${ed}" title="수정">✎</button><button onclick="${del}" title="삭제">🗑</button></div></div>
+    ${t.memo?`<div class="wc-memo">${_wcEsc(t.memo)}</div>`:''}</div></div>`;
+}
+function _wcMainHtml(){
+  const ds=_wc.sel||_wcToday(), st=_wcStats();
+  const ts=_wcTasks(ds), fx=_wcFixedFor(ds);
+  const dn=ts.filter(t=>t.done).length+fx.filter(f=>f.doneDates&&f.doneDates[ds]).length, tot=ts.length+fx.length, pct=tot?Math.round(dn/tot*100):0;
+  const note=!!(_wc.notes[ds]&&String(_wc.notes[ds]).trim()), r=_wc.reports[ds]||{}, rep=!!(r.workDone||r.tomorrow||r.issues);
+  const lunchM=Object.keys(_wc.lunch.lunch||{}).some(k=>k.startsWith(`${_wc.vy}-${_wcPad(_wc.vm+1)}-`)&&(_wc.lunch.lunch[k]||[]).length);
+  const f=_wc.form, edit=!!f;
+  const formVals=edit?(_wcTasks(f.ds).find(x=>x.id===f.id)||{}):{};
+  let h=`<div class="wc-nav"><button onclick="wcMonth(-1)">◀</button><b>${_wc.vy}년 ${_wc.vm+1}월</b><button onclick="wcMonth(1)">▶</button><button onclick="wcToday()">오늘</button><button onclick="wcCalToggle()">${_wc.showCal?'달력 접기':'달력 펼치기'}</button></div>`;
+  if(_wc.showCal) h+=_wcCalHtml();
+  h+=`<div class="wc-stats">이번 달 <span>전체 <b>${st.tot}</b></span><span>완료 <b style="color:#00A86B">${st.dn}</b></span><span>미완료 <b style="color:#EA580C">${st.pend}</b></span></div>`;
+  h+=`<div class="wc-tools"><button class="${note?'has':''}" onclick="wcView('note')">📝 메모장</button><button class="${rep?'has':''}" onclick="wcView('report')">📋 업무보고서</button><button class="${lunchM?'has':''}" onclick="wcView('lunch')">🍱 점심금액</button><button onclick="wcView('search')">🔍 검색</button></div>`;
+  h+=`<div class="wc-day">${_wcKor(ds)}</div><div class="wc-prog"><div class="wc-bar"><i style="width:${pct}%"></i></div><span class="wc-tm">${tot?`${dn}/${tot} 완료 (${pct}%)`:'할 일 없음'}</span></div>`;
+  h+=`<div class="wc-form"><div class="wc-frow"><input class="wc-in" id="wcQT" value="${_wcEsc(formVals.title||'')}" placeholder="${edit?'할 일 수정':'새 할 일 — 입력 후 Enter'}" onkeydown="if(event.key==='Enter')wcSubmit()"><button class="wc-btn pr" style="white-space:nowrap;" onclick="wcSubmit()">${edit?'수정':'추가'}</button>${edit?'<button class="wc-btn" onclick="wcCancelForm()">취소</button>':''}</div>
+    <div class="wc-frow"><input class="wc-in" type="date" id="wcQDate" value="${edit?f.ds:ds}"><input class="wc-in" type="time" id="wcQTime" value="${_wcEsc(formVals.dueTime||'')}"><select class="wc-in" id="wcQPri">${[['high','높음'],['medium','보통'],['low','낮음']].map(([v,l])=>`<option value="${v}"${(formVals.priority||'medium')===v?' selected':''}>${l}</option>`).join('')}</select></div>
+    <input class="wc-in" id="wcQMemo" value="${_wcEsc(formVals.memo||'')}" placeholder="메모 (선택)"></div>`;
+  h+=`<div class="wc-gh"><span>📌 고정 업무${fx.length?' · '+fx.length:''}</span><button onclick="wcOpenFixed()">+ 고정업무 추가</button></div>`;
+  if(_wc.fixedForm){
+    const ff=_wc.fixedForm, fv=ff.id?(_wc.fixed.find(x=>x.id===ff.id)||{}):{};
+    h+=`<div class="wc-form"><input class="wc-in" id="wcFT" data-keep="1" value="${_wcEsc(fv.title||'')}" placeholder="고정 업무 이름 (평일마다 반복)" onkeydown="if(event.key==='Enter')wcSubmitFixed()">
+      <div class="wc-frow"><input class="wc-in" type="date" id="wcFDate" data-keep="1" value="${fv.startDate||ds}"><input class="wc-in" type="time" id="wcFTime" data-keep="1" value="${_wcEsc(fv.dueTime||'')}"><select class="wc-in" id="wcFPri" data-keep="1">${[['high','높음'],['medium','보통'],['low','낮음']].map(([v,l])=>`<option value="${v}"${(fv.priority||'medium')===v?' selected':''}>${l}</option>`).join('')}</select></div>
+      <input class="wc-in" id="wcFMemo" data-keep="1" value="${_wcEsc(fv.memo||'')}" placeholder="메모 (선택)">
+      <div class="wc-frow"><button class="wc-btn pr" onclick="wcSubmitFixed()">${ff.id?'수정하기':'추가하기'}</button><button class="wc-btn" onclick="wcCloseFixed()">취소</button></div></div>`;
+  }
+  h+=fx.length?fx.map(x=>_wcCard(x,ds,true)).join(''):`<div class="wc-hint">등록된 고정 업무가 없습니다.</div>`;
+  if(!ts.length) h+=`<div class="wc-empty">🗒️ 할 일이 없습니다<br>위 입력창에 적고 Enter를 눌러 추가해 보세요</div>`;
+  else{
+    const p=ts.filter(t=>!t.done), c=ts.filter(t=>t.done);
+    if(p.length) h+=`<div class="wc-gh"><span>진행 중 · ${p.length}</span></div>${p.map(t=>_wcCard(t,ds,false)).join('')}`;
+    if(c.length) h+=`<div class="wc-gh"><span>완료됨 · ${c.length}</span></div>${c.map(t=>_wcCard(t,ds,false)).join('')}`;
+  }
+  return h;
+}
+// ── 날짜·달력 조작 ──
+function wcPick(ds){ _wc.sel=ds; _wc.skipDate=true; const [y,m]=ds.split('-').map(Number); if(y!==_wc.vy||m-1!==_wc.vm){ _wc.vy=y; _wc.vm=m-1; wcLoadView(); } wcRender(); }
+function wcMonth(d){ const n=new Date(_wc.vy,_wc.vm+d,1); _wc.vy=n.getFullYear(); _wc.vm=n.getMonth(); wcRender(); wcLoadView(); }
+function wcToday(){ const n=new Date(); _wc.vy=n.getFullYear(); _wc.vm=n.getMonth(); _wc.sel=_wcToday(); wcRender(); wcLoadView(); }
+function wcCalToggle(){ _wc.showCal=!_wc.showCal; wcRender(); }
+async function wcLoadView(){ const ym=`${_wc.vy}-${_wcPad(_wc.vm+1)}`; await wcEnsureMonths([_wcAddMonth(ym,-1),ym,_wcAddMonth(ym,1)]); wcRender(); }
+
+// ── 할 일 추가/수정/삭제/완료 ──
+async function wcSubmit(){
+  const t=document.getElementById('wcQT'); const title=(t.value||'').trim();
+  if(!title){ t.focus(); t.style.borderColor='#DC2626'; setTimeout(()=>{ t.style.borderColor=''; },1400); return; }
+  const ds=document.getElementById('wcQDate').value||_wc.sel||_wcToday();
+  const dueTime=document.getElementById('wcQTime').value||null, memo=(document.getElementById('wcQMemo').value||'').trim(), priority=document.getElementById('wcQPri').value||'medium';
+  const ym=ds.slice(0,7); await wcEnsureMonths([ym]);
+  const f=_wc.form; let ok=false;
+  if(f){
+    const oym=f.ds.slice(0,7);
+    if(oym===ym){
+      ok=await wcMutMonth(ym,m=>{ const arr=m[f.ds]||[]; const x=arr.find(a=>a.id===f.id); if(!x) return;
+        x.title=title; x.dueTime=dueTime; x.memo=memo; x.priority=priority;
+        if(ds!==f.ds){ arr.splice(arr.indexOf(x),1); if(!arr.length) delete m[f.ds]; (m[ds]=m[ds]||[]).push(x); } });
+    } else {
+      let moved=null;
+      ok=await wcMutMonth(oym,m=>{ const arr=m[f.ds]||[]; const i=arr.findIndex(a=>a.id===f.id); if(i<0) return; moved=arr.splice(i,1)[0]; if(!arr.length) delete m[f.ds]; });
+      if(ok&&moved){ moved.title=title; moved.dueTime=dueTime; moved.memo=memo; moved.priority=priority; ok=await wcMutMonth(ym,m=>{ (m[ds]=m[ds]||[]).push(moved); }); }
+    }
+  } else {
+    ok=await wcMutMonth(ym,m=>{ (m[ds]=m[ds]||[]).push({id:_wcId(),title,dueTime,priority,memo,done:false,doneAt:null,createdAt:new Date().toISOString()}); });
+  }
+  if(!ok) return;
+  _wc.form=null; _wc.sel=ds; const [y,mo]=ds.split('-').map(Number); _wc.vy=y; _wc.vm=mo-1;
+  _wc.skipRestore=true;   // 입력칸 비우기
+  wcRender(); wcCheckAlerts(); if(!f) toast(`✨ "${title}" 추가됨`);
+}
+function wcEdit(id,ds){ _wc.form={id,ds}; _wc.skipRestore=true; wcRender(); setTimeout(()=>document.getElementById('wcQT')?.focus(),50); }
+function wcCancelForm(){ _wc.form=null; _wc.skipRestore=true; wcRender(); }
+async function wcToggle1(id,ds){
+  let nowDone=false;
+  const ok=await wcMutMonth(ds.slice(0,7),m=>{ const t=(m[ds]||[]).find(a=>a.id===id); if(!t) return; t.done=!t.done; t.doneAt=t.done?new Date().toISOString():null; nowDone=t.done; });
+  if(ok){ wcRender(); wcCheckAlerts(); if(nowDone) toast('✅ 완료!'); }
+}
+async function wcDel(id,ds){
+  if(!confirm('이 할 일을 삭제할까요?')) return;
+  const ok=await wcMutMonth(ds.slice(0,7),m=>{ const arr=m[ds]; if(!arr) return; const i=arr.findIndex(a=>a.id===id); if(i<0) return; arr.splice(i,1); if(!arr.length) delete m[ds]; });
+  if(ok){ wcRender(); wcCheckAlerts(); }
+}
+// ── 고정 업무 ──
+function wcOpenFixed(){ _wc.fixedForm={id:null}; wcRender(); setTimeout(()=>document.getElementById('wcFT')?.focus(),50); }
+function wcEditFixed(id){ _wc.fixedForm={id}; _wc.skipRestore=true; wcRender(); setTimeout(()=>document.getElementById('wcFT')?.focus(),50); }
+function wcCloseFixed(){ _wc.fixedForm=null; wcRender(); }
+async function wcSubmitFixed(){
+  const t=document.getElementById('wcFT'); const title=(t.value||'').trim();
+  if(!title){ t.focus(); t.style.borderColor='#DC2626'; setTimeout(()=>{ t.style.borderColor=''; },1400); return; }
+  const startDate=document.getElementById('wcFDate').value||_wc.sel||_wcToday(), dueTime=document.getElementById('wcFTime').value||null, memo=(document.getElementById('wcFMemo').value||'').trim(), priority=document.getElementById('wcFPri').value||'medium';
+  const id=_wc.fixedForm&&_wc.fixedForm.id;
+  const ok=await wcMutFixed(arr=>{
+    if(id){ const f=arr.find(x=>x.id===id); if(f){ f.title=title; f.startDate=startDate; f.dueTime=dueTime; f.memo=memo; f.priority=priority; } }
+    else arr.push({id:_wcId(),title,startDate,dueTime,priority,memo,doneDates:{},createdAt:new Date().toISOString()});
+  });
+  if(ok){ _wc.fixedForm=null; wcRender(); wcCheckAlerts(); toast(id?'✏️ 수정됨':'📌 고정 업무 추가됨'); }
+}
+async function wcToggleFixed(id,ds){
+  let nowDone=false;
+  const ok=await wcMutFixed(arr=>{ const f=arr.find(x=>x.id===id); if(!f) return; if(!f.doneDates) f.doneDates={}; if(f.doneDates[ds]) delete f.doneDates[ds]; else f.doneDates[ds]=true; nowDone=!!f.doneDates[ds]; });
+  if(ok){ wcRender(); wcCheckAlerts(); if(nowDone) toast('✅ 완료!'); }
+}
+async function wcDelFixed(id){
+  const f=_wc.fixed.find(x=>x.id===id); if(!f) return;
+  if(!confirm(`"${f.title}" 고정 업무를 삭제할까요?\n등록일 이후 모든 날짜에서 사라집니다.`)) return;
+  const ok=await wcMutFixed(arr=>{ const i=arr.findIndex(x=>x.id===id); if(i>=0) arr.splice(i,1); });
+  if(ok){ wcRender(); wcCheckAlerts(); }
+}
+// ── 메모장 / 업무보고서 ──
+function _wcNoteHtml(){
+  const ds=_wc.sel||_wcToday();
+  return `${_wcBack('📝 메모장')}<div class="wc-hint">${_wcKor(ds)}</div><textarea class="wc-in" id="wcNote" style="min-height:300px;" placeholder="이 날짜의 메모를 자유롭게 적으세요">${_wcEsc(_wc.notes[ds]||'')}</textarea><div class="wc-frow" style="margin-top:8px;"><button class="wc-btn pr" onclick="wcSaveNote()">저장</button></div>`;
+}
+async function wcSaveNote(){
+  const ds=_wc.sel||_wcToday(), v=document.getElementById('wcNote').value;
+  const ok=await wcMutNotes(n=>{ if(v.trim()) n[ds]=v; else delete n[ds]; });
+  if(ok){ toast('📝 메모가 저장되었습니다.'); wcHome(); }
+}
+function _wcReportHtml(){
+  const ds=_wc.sel||_wcToday(), r=_wc.reports[ds]||{};
+  const ta=(id,label,val,ph)=>`<div class="wc-hint" style="margin-bottom:2px;"><b>${label}</b></div><textarea class="wc-in" id="${id}" data-keep="1" style="min-height:90px;" placeholder="${ph}">${_wcEsc(val||'')}</textarea>`;
+  return `${_wcBack('📋 업무 보고서')}<div class="wc-hint">${_wcKor(ds)}</div><div class="wc-frow" style="margin-bottom:6px;"><button class="wc-btn" onclick="wcFillReport()">할 일에서 불러오기</button></div>
+    ${ta('wcRW','✅ 오늘 한 일',r.workDone,'오늘 처리한 업무')}${ta('wcRT','📌 내일 할 일',r.tomorrow,'내일 처리할 업무')}${ta('wcRI','⚠️ 이슈·특이사항',r.issues,'문제점, 공유할 내용')}
+    <div class="wc-frow" style="margin-top:8px;"><button class="wc-btn pr" onclick="wcSaveReport()">저장</button></div>`;
+}
+function wcFillReport(){
+  const ds=_wc.sel||_wcToday(), ts=_wcTasks(ds);
+  const done=ts.filter(t=>t.done).map(t=>`- ${t.title}`).join('\n'), pend=ts.filter(t=>!t.done).map(t=>`- ${t.title}`).join('\n');
+  if(!done&&!pend){ toast('이 날짜에 등록된 할 일이 없습니다.'); return; }
+  const w=document.getElementById('wcRW'), t=document.getElementById('wcRT');
+  if(done) w.value=w.value?w.value+'\n'+done:done;
+  if(pend) t.value=t.value?t.value+'\n'+pend:pend;
+}
+async function wcSaveReport(){
+  const ds=_wc.sel||_wcToday();
+  const workDone=document.getElementById('wcRW').value.trim(), tomorrow=document.getElementById('wcRT').value.trim(), issues=document.getElementById('wcRI').value.trim();
+  const ok=await wcMutReports(o=>{ if(workDone||tomorrow||issues) o[ds]={workDone,tomorrow,issues,updatedAt:new Date().toISOString()}; else delete o[ds]; });
+  if(ok){ toast('📋 업무 보고서가 저장되었습니다.'); wcHome(); }
+}
+// ── 점심금액 ──
+function _wcLunchHtml(){
+  const Y=_wc.lcY, M=_wc.lcM, tStr=_wcToday(), L=_wc.lunch;
+  const first=new Date(Y,M,1).getDay(), last=new Date(Y,M+1,0).getDate(), prevLast=new Date(Y,M,0).getDate(), cells=[];
+  for(let i=first-1;i>=0;i--) cells.push({y:M===0?Y-1:Y,m:M===0?12:M,d:prevLast-i,o:true});
+  for(let d=1;d<=last;d++) cells.push({y:Y,m:M+1,d,o:false});
+  while(cells.length<42){ const ny=M===11?Y+1:Y, nm=M===11?1:M+2; cells.push({y:ny,m:nm,d:cells.length-first-last+1,o:true}); }
+  const grid=cells.map(c=>{ const ds=`${c.y}-${_wcPad(c.m)}-${_wcPad(c.d)}`, dow=new Date(c.y,c.m-1,c.d).getDay(), cnt=(L.lunch[ds]||[]).length;
+    const cls=['wc-cell',c.o?'oth':'',ds===tStr?'today':'',(ds===_wc.lcSel&&ds!==tStr)?'sel':'',dow===0?'sun':'',dow===6?'sat':''].filter(Boolean).join(' ');
+    return `<div class="${cls}" style="min-height:32px;" onclick="wcLunchPick('${ds}')"><div class="wc-num">${c.d}</div><div class="wc-dots">${cnt?'<i class="wc-d-all"></i>':''}</div></div>`; }).join('');
+  const prefix=`${Y}-${_wcPad(M+1)}-`; const counts={}; WC_LUNCH_STAFF.forEach(n=>counts[n]=0); let total=0;
+  Object.keys(L.lunch).forEach(ds=>{ if(!ds.startsWith(prefix)) return; (L.lunch[ds]||[]).forEach(n=>{ total++; if(counts[n]!==undefined) counts[n]++; }); });
+  const checked=new Set(L.lunch[_wc.lcSel]||[]);
+  return `${_wcBack('🍱 점심금액')}
+    <div class="wc-nav"><button onclick="wcLunchMonth(-1)">◀</button><b>${Y}년 ${M+1}월</b><button onclick="wcLunchMonth(1)">▶</button></div>
+    <div class="wc-wd">${'일월화수목금토'.split('').map(x=>`<span>${x}</span>`).join('')}</div><div class="wc-grid">${grid}</div>
+    <div class="wc-frow" style="margin:8px 0;"><span class="wc-hint" style="margin:0;">1인분 금액</span><input class="wc-in" type="number" id="wcLPrice" data-keep="1" value="${L.price}" style="max-width:110px;" oninput="wcLunchPriceInput(this.value)" onchange="wcLunchPriceSave()"><span class="wc-hint" style="margin:0;">원</span></div>
+    <div class="wc-box"><b>${M+1}월 합계 ${(total*(L.price||0)).toLocaleString('ko-KR')}원</b> · 총 ${total}인분</div>
+    <div class="wc-hint"><b>${_wcKor(_wc.lcSel)}</b> — 먹은 사람을 눌러 체크</div>
+    <div class="wc-chips">${WC_LUNCH_STAFF.map(n=>`<div class="wc-chip${checked.has(n)?' on':''}" onclick="wcLunchToggle('${_wc.lcSel}','${n}')">${n}</div>`).join('')}</div>
+    <div class="wc-gh"><span>${M+1}월 사람별 정산</span></div>
+    ${WC_LUNCH_STAFF.map(n=>`<div class="wc-row2${counts[n]?' has':''}"><span>${n} <small style="color:var(--tx2)">${counts[n]}회</small></span><b>${(counts[n]*(L.price||0)).toLocaleString('ko-KR')}원</b></div>`).join('')}`;
+}
+function wcLunchPick(ds){ _wc.lcSel=ds; wcRender(); }
+function wcLunchMonth(d){ const n=new Date(_wc.lcY,_wc.lcM+d,1); _wc.lcY=n.getFullYear(); _wc.lcM=n.getMonth(); wcRender(); }
+async function wcLunchToggle(ds,name){
+  const ok=await wcMutLunch(L=>{ const arr=L.lunch[ds]||[]; const i=arr.indexOf(name); if(i<0) arr.push(name); else arr.splice(i,1); if(arr.length) L.lunch[ds]=arr; else delete L.lunch[ds]; });
+  if(ok) wcRender();
+}
+function wcLunchPriceInput(v){ const n=parseInt(v,10); _wc.lunch.price=isNaN(n)?0:n; }
+async function wcLunchPriceSave(){ const p=_wc.lunch.price; const ok=await wcMutLunch(L=>{ L.price=p; }); if(ok) wcRender(); }
+// ── 검색 ──
+function _wcSearchHtml(){
+  const q=(_wc.searchQ||'').trim().toLowerCase(); let list='';
+  if(q){
+    const res=[];
+    Object.keys(_wc.mon).forEach(ym=>{ const m=_wc.mon[ym]||{}; Object.keys(m).forEach(ds=>(m[ds]||[]).forEach(t=>{ if(`${t.title} ${t.memo||''}`.toLowerCase().includes(q)) res.push({ds,type:'할일',icon:t.done?'✅':'🔲',text:t.title}); })); });
+    _wc.fixed.forEach(f=>{ if(`${f.title} ${f.memo||''}`.toLowerCase().includes(q)) res.push({ds:f.startDate,type:'고정업무',icon:'📌',text:f.title}); });
+    Object.keys(_wc.notes).forEach(ds=>{ const c=_wc.notes[ds]||''; if(c.toLowerCase().includes(q)) res.push({ds,type:'메모',icon:'📝',text:_wcSnip(c,q)}); });
+    Object.keys(_wc.reports).forEach(ds=>{ const r=_wc.reports[ds]||{}, hay=`${r.workDone||''} ${r.tomorrow||''} ${r.issues||''}`; if(hay.toLowerCase().includes(q)) res.push({ds,type:'보고서',icon:'📋',text:_wcSnip(hay,q)}); });
+    res.sort((a,b)=>b.ds.localeCompare(a.ds));
+    list=res.length?res.slice(0,40).map(r=>`<div class="wc-sr" onclick="wcJump('${r.ds}')"><span>${r.icon}</span><div><small>${+r.ds.slice(5,7)}/${+r.ds.slice(8,10)} · ${r.type}</small><span>${_wcEsc(r.text)}</span></div></div>`).join(''):'<div class="wc-empty">검색 결과가 없습니다</div>';
+  }
+  return `${_wcBack('🔍 검색')}<input class="wc-in" id="wcSQ" data-keep="1" value="${_wcEsc(_wc.searchQ)}" placeholder="할 일·메모·보고서 검색" oninput="wcSearchInput(this.value)" autocomplete="off">${_wc.allLoaded?'':'<div class="wc-hint">전체 기간 데이터를 불러오는 중…</div>'}<div id="wcSRes">${list}</div>`;
+}
+function _wcSnip(text,q){ const i=text.toLowerCase().indexOf(q); if(i<0) return text.length>50?text.slice(0,50)+'…':text; const s=Math.max(0,i-22), e=Math.min(text.length,i+q.length+22); return (s>0?'…':'')+text.slice(s,e)+(e<text.length?'…':''); }
+function wcSearchInput(v){ _wc.searchQ=v; const keep=document.activeElement&&document.activeElement.id==='wcSQ'; const body=document.getElementById('wcBody'); const html=_wcSearchHtml(); const tmp=document.createElement('div'); tmp.innerHTML=html; document.getElementById('wcSRes').innerHTML=tmp.querySelector('#wcSRes').innerHTML; }
+function wcJump(ds){ _wc.sel=ds; const [y,m]=ds.split('-').map(Number); _wc.vy=y; _wc.vm=m-1; _wc.searchQ=''; wcHome(); wcLoadView(); }
+// ── 기존 프로그램 파일 가져오기 ──
+function _wcImportHtml(){
+  const imp=_wc.imp;
+  let h=`${_wcBack('⬆ 기존 프로그램 파일 가져오기')}
+    <div class="wc-hint">컴퓨터의 업무 캘린더 프로그램 데이터 파일을 골라 주세요.<br>폴더: <b>C:\\Users\\(사용자)\\AppData\\Roaming\\WorkCalendar</b><br>파일: tasks.json(할 일) · fixed.json(고정업무) · notes.json(메모) · reports.json(보고서) · lunch.json(점심금액)<br>여러 개를 한 번에 선택할 수 있습니다. (backups 폴더 파일은 고르지 마세요)</div>
+    <input type="file" id="wcImpFile" multiple accept=".json,application/json" onchange="wcImportPick(this.files)" style="font-size:12px;">`;
+  if(imp){
+    if(imp.err) h+=`<div class="wc-box" style="color:#DC2626;">${_wcEsc(imp.err)}</div>`;
+    if(imp.sum) h+=`<div class="wc-box">${imp.sum}</div>`;
+    if(imp.sum && !imp.done) h+=`<div class="wc-hint">• 이미 저장된 같은 항목(같은 id·같은 날짜)은 건너뛰고 <b>없는 것만 추가</b>합니다. 같은 파일을 다시 가져와도 중복되지 않습니다.<br>• "가져오기 실행"을 누르는 순간 서버에 저장됩니다.</div><div class="wc-frow"><button class="wc-btn pr" onclick="wcImportRun()"${_wc.importing?' disabled':''}>${_wc.importing?'가져오는 중…':'가져오기 실행'}</button><button class="wc-btn" onclick="wcImportReset()">취소</button></div>`;
+    if(imp.log) h+=`<div class="wc-box" style="border-color:#00A86B;">${imp.log}</div>`;
+  }
+  return h;
+}
+function _wcDetect(j){
+  if(Array.isArray(j)) return 'fixed';
+  if(j&&typeof j==='object'){
+    if('lunch' in j||'price' in j) return 'lunch';
+    const vals=Object.values(j); if(!vals.length) return null;
+    if(vals.every(v=>Array.isArray(v))) return 'tasks';
+    if(vals.every(v=>typeof v==='string')) return 'notes';
+    if(vals.every(v=>v&&typeof v==='object'&&('workDone' in v||'tomorrow' in v||'issues' in v))) return 'reports';
+  }
+  return null;
+}
+async function wcImportPick(files){
+  const out={tasks:null,fixed:null,notes:null,reports:null,lunch:null}, bad=[];
+  for(const f of files){
+    let j; try{ j=JSON.parse((await f.text()).replace(/^\uFEFF/,'')); }catch(e){ bad.push(`${f.name} — JSON 파일이 아닙니다`); continue; }
+    const n=f.name.toLowerCase();
+    const nameKind=n.startsWith('tasks')?'tasks':n.startsWith('fixed')?'fixed':n.startsWith('notes')?'notes':n.startsWith('reports')?'reports':n.startsWith('lunch')?'lunch':null;
+    const kind=_wcDetect(j)||nameKind;   // 내용 모양을 우선, 빈 파일이면 파일명으로
+    if(!kind){ bad.push(`${f.name} — 종류를 알 수 없어 건너뜀`); continue; }
+    out[kind]=j;
+  }
+  const lines=[]; let months=new Set();
+  if(out.tasks){ let n=0,days=0; Object.keys(out.tasks).forEach(ds=>{ const a=out.tasks[ds]; if(Array.isArray(a)&&a.length){ n+=a.length; days++; months.add(ds.slice(0,7)); } }); const ds=Object.keys(out.tasks).sort(); lines.push(`📅 할 일 <b>${n}건</b> (${days}일, ${[...months].length}개월 · ${ds[0]||''} ~ ${ds[ds.length-1]||''})`); }
+  if(out.fixed) lines.push(`📌 고정 업무 <b>${out.fixed.length}건</b>`);
+  if(out.notes) lines.push(`📝 메모 <b>${Object.keys(out.notes).length}일</b>`);
+  if(out.reports) lines.push(`📋 업무 보고서 <b>${Object.keys(out.reports).length}일</b>`);
+  if(out.lunch) lines.push(`🍱 점심금액 <b>${Object.keys(out.lunch.lunch||{}).length}일</b> · 1인분 ${(out.lunch.price||0).toLocaleString('ko-KR')}원`);
+  _wc.imp={data:out, err:bad.join('<br>')||'', sum:lines.length?lines.join('<br>'):'', done:false, log:''};
+  if(!lines.length && !bad.length) _wc.imp.err='가져올 수 있는 내용이 없습니다.';
+  wcRender();
+}
+function wcImportReset(){ _wc.imp=null; _wc.importing=false; wcRender(); }
+async function wcImportRun(){
+  const imp=_wc.imp; if(!imp||!imp.data||_wc.importing) return;
+  if(!confirm('선택한 파일 내용을 서버에 저장합니다. 이미 있는 항목은 건너뛰고 없는 것만 추가합니다. 진행할까요?')) return;
+  _wc.importing=true; wcRender();
+  const d=imp.data, log=[]; let fail=false;
+  try{
+    if(d.tasks){
+      const byMonth={}; Object.keys(d.tasks).forEach(ds=>{ const a=d.tasks[ds]; if(Array.isArray(a)&&a.length&&/^\d{4}-\d{2}-\d{2}$/.test(ds)) (byMonth[ds.slice(0,7)]=byMonth[ds.slice(0,7)]||{})[ds]=a; });
+      let added=0, skipped=0;
+      for(const ym of Object.keys(byMonth).sort()){
+        const ok=await wcMutMonth(ym,m=>{
+          const have=new Set(Object.values(m).flat().map(t=>t&&t.id));   // 이미 저장된 id는 건너뜀 (같은 파일을 다시 가져와도 중복 없음)
+          Object.keys(byMonth[ym]).forEach(ds=>byMonth[ym][ds].forEach(t=>{
+            if(!t||typeof t.title!=='string'||!t.id||!/^[\w-]+$/.test(String(t.id))||have.has(t.id)){ skipped++; return; }
+            const c={...t}; delete c.alerted; (m[ds]=m[ds]||[]).push(c); have.add(t.id); added++;
+          }));
+        });
+        if(!ok){ fail=true; break; }
+      }
+      log.push(`📅 할 일: 추가 ${added}건, 이미 있어 건너뜀 ${skipped}건`);
+    }
+    if(!fail&&d.fixed){
+      let added=0, merged=0;
+      const ok=await wcMutFixed(arr=>{ d.fixed.forEach(f=>{ if(!f||!f.id||!/^[\w-]+$/.test(String(f.id))||typeof f.title!=='string') return; const ex=arr.find(x=>x.id===f.id); if(!ex){ const c={...f}; delete c.alerted; arr.push(c); added++; } else { ex.doneDates={...(f.doneDates||{}),...(ex.doneDates||{})}; merged++; } }); });
+      if(!ok) fail=true; else log.push(`📌 고정 업무: 추가 ${added}건, 이미 있어 완료기록만 합침 ${merged}건`);
+    }
+    if(!fail&&d.notes){ let added=0; const ok=await wcMutNotes(n=>{ Object.keys(d.notes).forEach(ds=>{ if(typeof d.notes[ds]==='string'&&d.notes[ds].trim()&&!n[ds]){ n[ds]=d.notes[ds]; added++; } }); }); if(!ok) fail=true; else log.push(`📝 메모: 추가 ${added}일`); }
+    if(!fail&&d.reports){ let added=0; const ok=await wcMutReports(o=>{ Object.keys(d.reports).forEach(ds=>{ if(!o[ds]){ o[ds]=d.reports[ds]; added++; } }); }); if(!ok) fail=true; else log.push(`📋 업무 보고서: 추가 ${added}일`); }
+    if(!fail&&d.lunch){ let added=0; const ok=await wcMutLunch(L=>{ const hadAny=Object.keys(L.lunch).length>0; if(!hadAny && typeof d.lunch.price==='number') L.price=d.lunch.price; Object.keys(d.lunch.lunch||{}).forEach(ds=>{ const cur=new Set(L.lunch[ds]||[]); (d.lunch.lunch[ds]||[]).forEach(n=>{ if(!cur.has(n)){ cur.add(n); added++; } }); if(cur.size) L.lunch[ds]=[...cur]; }); }); if(!ok) fail=true; else log.push(`🍱 점심금액: 추가 ${added}인분 기록`); }
+  }catch(e){ console.warn('wc import', e); fail=true; }
+  _wc.importing=false; imp.done=true;
+  imp.log=(fail?'⚠️ 중간에 저장이 멈췄습니다. 이미 저장된 것은 유지되며, 같은 파일을 다시 선택해 가져오면 나머지만 추가됩니다.<br>':'✅ 가져오기가 끝났습니다.<br>')+log.join('<br>');
+  _wc.allLoaded=false; wcRender(); if(!fail) wcLoadView();
+}
 function updateNavVisibility(){
   simFabSync();
   const u=window.__CURRENT_USER; if(!u) return;
@@ -8571,6 +9135,7 @@ function updateNavVisibility(){
   });
   _applyNavGroups();
   _syncFavStars();
+  try{ wcSync(); }catch(e){ console.warn('wcSync', e); }   // 관리자 전용 업무캘린더 미니 창 버튼
   // 로켓그로스 탭에서 매출관리 화면에 들어온 경우(로켓그로스 매출), 매출관리 소분류탭 바는 숨김
   const revSubnav = document.querySelector('#page-revenue .rev-subnav');
   if(revSubnav) revSubnav.style.display = (_activeDept==='growth') ? 'none' : '';
