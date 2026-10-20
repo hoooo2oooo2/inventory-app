@@ -1474,7 +1474,7 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .pb-panel.pb-top .pb-table thead th{background:var(--pb-top-h);} .pb-panel.pb-bottom .pb-table thead th{background:var(--pb-bot-h);}
 .pb-panel.pb-top .pb-panel-head{background:var(--pb-top-h);} .pb-panel.pb-bottom .pb-panel-head{background:var(--pb-bot-h);}
 /* 엑셀처럼 칸마다 선 + 두 표의 열 폭 통일(fixed) */
-.pb-table{table-layout:fixed;min-width:1400px;border-collapse:separate;border-spacing:0;}
+.pb-table{table-layout:fixed;border-collapse:separate;border-spacing:0;}
 .pb-table th,.pb-table td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);}
 .pb-table thead th{border-top:none;font-size:11.5px;color:var(--tx);white-space:normal;line-height:1.3;padding:8px 4px;}
 .pb-table tbody td{padding:7px 8px;vertical-align:middle;overflow:hidden;border-bottom:1px solid var(--grid) !important;}
@@ -36091,12 +36091,12 @@ async function pivWatchTick(){
 const PB_CATEGORIES = ['구매','누락','불량','오배송','파손'];
 const PB_CAT_CLS = { '구매':'pb-cat-a', '누락':'pb-cat-b', '불량':'pb-cat-c', '오배송':'pb-cat-d', '파손':'pb-cat-e' };
 // 표에 보이는 열(순서·폭%). 배송메모·공란·수취인연락처2는 표에서 숨김 — 데이터·수정 팝업·엑셀 업로드는 그대로(2026-10-20 요청)
-//  ell = 한 줄로 보이고 길면 …(마우스를 올리면 전체), full = 줄바꿈해서 전체 표시
-const PB_VIEW = [
-  {k:'category',h:'거래구분',w:4},{k:'staff',h:'담당자',w:4.5},{k:'date',h:'날짜',w:6},{k:'recipient',h:'수취인',w:7},{k:'phone1',h:'수취인연락처',w:7.5},
-  {k:'zip',h:'우편번호',w:4},{k:'addr',h:'기본주소',w:11,ell:1},{k:'product',h:'상품명',w:15.3,full:1},{k:'qty',h:'수량',w:3},{k:'shipMethod',h:'배송방법',w:4},
-  {k:'freight',h:'운임구분',w:4},{k:'code',h:'패밀리상품코드',w:7},{k:'amount',h:'총금액',w:6},{k:'paid',h:'입금여부',w:7.5},{k:'invoice',h:'계산서 발급여부',w:8},
-  {k:'note',h:'비고란',w:9,ell:1},{k:'_',h:'관리',w:4.3}
+//  ell = 한 줄로 보이고 길면 …(마우스를 올리면 전체)
+const PB_VIEW = [   // w = 열 폭(px). 실제 데이터 글자 폭(12px 기준: 상품명 최대 252·연락처 96·수취인 95%가 135 이하)에 맞춰 한 줄로 보이게 잡음
+  {k:'category',h:'거래구분',w:62},{k:'staff',h:'담당자',w:70},{k:'date',h:'날짜',w:84},{k:'recipient',h:'수취인',w:140,ell:1},{k:'phone1',h:'수취인연락처',w:116},
+  {k:'zip',h:'우편번호',w:62},{k:'addr',h:'기본주소',w:210,ell:1},{k:'product',h:'상품명',w:272,ell:1},{k:'qty',h:'수량',w:46},
+  {k:'code',h:'패밀리상품코드',w:96},{k:'amount',h:'총금액',w:84},{k:'paid',h:'입금여부',w:112},{k:'invoice',h:'계산서 발급여부',w:124},
+  {k:'note',h:'비고란',w:160,ell:1},{k:'_',h:'관리',w:64}
 ];
 const PB_COLS = [
   {k:'category',h:'거래구분'},{k:'staff',h:'담당자'},{k:'date',h:'날짜'},{k:'recipient',h:'수취인'},{k:'phone1',h:'수취인연락처1'},{k:'phone2',h:'수취인연락처2'},
@@ -36171,10 +36171,11 @@ function pbInit(){
     _pbInited = true;
     // 두 표(미입금건 관리 / 거래건)가 같은 열 폭을 쓰도록 colgroup을 똑같이 넣음 → 머리글 간격이 항상 일치
     const head = '<tr>'+PB_VIEW.map(c=>`<th>${c.h}</th>`).join('')+'</tr>';
-    const cg = '<colgroup>'+PB_VIEW.map(c=>`<col style="width:${c.w}%">`).join('')+'</colgroup>';
+    const cg = '<colgroup>'+PB_VIEW.map(c=>`<col style="width:${c.w}px">`).join('')+'</colgroup>';
+    const minW = PB_VIEW.reduce((t,c)=>t+c.w,0)+'px';
     ['U','D'].forEach(k=>{
       const th=document.getElementById('pbHead'+k); th.innerHTML = head;
-      th.parentElement.querySelector('colgroup')?.remove(); th.parentElement.insertAdjacentHTML('afterbegin', cg);
+      th.parentElement.querySelector('colgroup')?.remove(); th.parentElement.insertAdjacentHTML('afterbegin', cg); th.parentElement.style.minWidth = minW;
     });
     document.getElementById('pbMonth').value = _pivToday().slice(0,7);
     pbBindDrop();
@@ -36324,14 +36325,12 @@ function _pbRowHtml(r, canEdit, isTop){
     <td>${r.category?`<span class="piv-badge ${PB_CAT_CLS[r.category]||'piv-type'}">${_esc(r.category)}</span>`:''}</td>
     <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff, _pbAll)}">${_esc(r.staff)}</span>`:''}</td>
     <td>${_esc(r.date||'')}</td>
-    <td class="pb-full">${_esc(r.recipient||'')}</td>
+    ${ell(r.recipient)}
     <td>${_esc(r.phone1||'')}</td>
     <td>${_esc(r.zip||'')}</td>
     ${ell(r.addr)}
-    <td class="pb-full" title="${_esc(r.product||'')}">${_esc(r.product||'')}</td>
+    ${ell(r.product)}
     <td>${_esc(r.qty==null?'':r.qty)}</td>
-    <td>${_esc(r.shipMethod||'')}</td>
-    <td>${_esc(r.freight||'')}</td>
     <td>${_esc(r.code||'')}</td>
     <td class="piv-r">${r.amount!=null?_pivNum(r.amount):''}</td>
     <td>${paid}</td>
