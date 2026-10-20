@@ -6299,7 +6299,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <!-- KPI 4개 -->
       <div class="rev-kpi">
         <div class="rev-kpi-card">
-          <div class="rev-kpi-lbl">🔥 이번달 정산금액</div>
+          <div class="rev-kpi-lbl">🔥 이번달 매출</div>
           <div class="rev-kpi-val" id="revKpi0">—</div>
           <div class="rev-kpi-sub" style="color:var(--tx2);">데이터 없음</div>
         </div>
@@ -6323,7 +6323,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="rev-chart-grid">
         <div class="rev-card">
           <div class="rev-card-title">
-            <span>📊 월별 정산금액·마진 추이</span>
+            <span>📊 월별 매출·마진 추이</span>
             <span style="font-size:11px;color:var(--tx2);" id="revChartRange"></span>
           </div>
           <div class="rev-chart-wrap"><canvas id="revTrendChart"></canvas></div>
@@ -6343,20 +6343,20 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <div class="rev-tbl-card">
           <div class="rev-tbl-head">
             <span class="rev-tbl-title">🏆 이번달 TOP10 상품</span>
-            <span style="font-size:11px;color:var(--tx2);">정산금액 기준</span>
+            <span style="font-size:11px;color:var(--tx2);">매출 기준</span>
           </div>
           <div class="rev-empty" id="revTop10Empty">업로드된 데이터가 없습니다</div>
           <div class="tw"><table class="dt" id="revTop10Tbl" style="display:none;">
             <thead><tr>
               <th style="width:32px;">#</th><th>상품명</th>
-              <th style="text-align:right;">주문수량</th><th style="text-align:right;">정산금액</th>
+              <th style="text-align:right;">주문수량</th><th style="text-align:right;">매출</th>
               <th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
             </tr></thead>
             <tbody id="revTop10Tbody"></tbody>
           </table></div>
         </div>
         <div class="rev-card">
-          <div class="rev-card-title"><span>📦 판매처별 정산금액</span></div>
+          <div class="rev-card-title"><span>📦 판매처별 매출</span></div>
           <div id="revSumChBars"><div class="rev-empty" style="padding:20px;">업로드된 데이터가 없습니다</div></div>
         </div>
       </div>
@@ -6366,7 +6366,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <div class="rev-empty" id="revMonthlySumEmpty">업로드된 데이터가 없습니다</div>
         <div class="tw"><table class="dt" id="revMonthlyTbl" style="display:none;">
           <thead><tr>
-            <th>월</th><th style="text-align:right;">정산금액</th><th style="text-align:right;">마진</th>
+            <th>월</th><th style="text-align:right;">매출</th><th style="text-align:right;">마진</th>
             <th style="text-align:right;">마진율</th><th style="text-align:right;">주문건수</th><th style="text-align:right;">전월대비</th>
           </tr></thead>
           <tbody id="revMonthlyTbody"></tbody>
@@ -21985,6 +21985,7 @@ function renderRevSummary(){
   const lastMonth = _revData.filter(r=>r.year===prevY && r.date && r.date.startsWith(String(prevM).padStart(2,'0')));
 
   const sum = arr=>({
+    sale:   arr.reduce((s,r)=>s+(r.salePrice||0),0),   // 매출(판매금액)
     settle: arr.reduce((s,r)=>s+(r.settlement||0),0),
     margin: arr.reduce((s,r)=>s+(r.margin||0),0),
     cnt:    arr.length
@@ -21998,7 +21999,9 @@ function renderRevSummary(){
   const rgCurFin = rgSumSettlementMargin(`${cy}-${ymStr(cm)}-01`, `${cy}-${ymStr(cm)}-31`);
   const rgPrvFin = rgSumSettlementMargin(`${prevY}-${ymStr(prevM)}-01`, `${prevY}-${ymStr(prevM)}-31`);
   const settleDisp = cur.settle + rgCurFin.settlement, settlePrvDisp = prv.settle + rgPrvFin.settlement;
+  const saleDisp = cur.sale + rgCurFin.revenue, salePrvDisp = prv.sale + rgPrvFin.revenue;   // 매출(판매금액) = 판매가 합 + 로켓그로스 매출
   const marginDisp = cur.margin + rgCurFin.margin, marginPrvDisp = prv.margin + rgPrvFin.margin;
+  // 마진율은 기존대로 정산금액 기준(마진/정산금액) — 매출 표시로 바꿔도 마진율 산식은 그대로
   const marginRate = settleDisp>0?(marginDisp/settleDisp*100):0;
   const prevRate   = settlePrvDisp>0?(marginPrvDisp/settlePrvDisp*100):0;
 
@@ -22013,7 +22016,7 @@ function renderRevSummary(){
 
   // KPI 카드
   const kpis=[
-    {id:'revKpi0',val:fmt(settleDisp),sub:diff(settleDisp,settlePrvDisp)||`전월 ${fmt(settlePrvDisp)}`},
+    {id:'revKpi0',val:fmt(saleDisp),sub:diff(saleDisp,salePrvDisp)||`전월 ${fmt(salePrvDisp)}`},
     {id:'revKpi1',val:fmt(marginDisp),sub:diff(marginDisp,marginPrvDisp)||`전월 ${fmt(marginPrvDisp)}`},
     {id:'revKpi2',val:marginRate.toFixed(1)+'%',sub:`전월 ${prevRate.toFixed(1)}%`},
     {id:'revKpi3',val:cur.cnt.toLocaleString()+'건',sub:diff(cur.cnt,prv.cnt)||`전월 ${prv.cnt.toLocaleString()}건`},
@@ -22031,7 +22034,8 @@ function renderRevSummary(){
     if(!r.year||!r.date) return;
     const mon = r.date.substring(0,2);
     const key = `${r.year}-${mon}`;
-    if(!byYM[key]) byYM[key]={settle:0,margin:0,cnt:0};
+    if(!byYM[key]) byYM[key]={sale:0,settle:0,margin:0,cnt:0};
+    byYM[key].sale += r.salePrice||0;
     byYM[key].settle += r.settlement||0;
     byYM[key].margin += r.margin||0;
     byYM[key].cnt++;
@@ -22042,10 +22046,11 @@ function renderRevSummary(){
     byYM[key].margin -= sumAdSpend({year:Number(yy), month:Number(mm)});
   });
   // 로켓그로스만 있고 다른 채널은 없는 달도 월 목록에 포함시키고, 모든 달에 로켓그로스 정산금액·마진 합산
-  rgMonthsAll.forEach(ym=>{ if(!byYM[ym]) byYM[ym]={settle:0,margin:0,cnt:0}; });
+  rgMonthsAll.forEach(ym=>{ if(!byYM[ym]) byYM[ym]={sale:0,settle:0,margin:0,cnt:0}; });
   Object.keys(byYM).forEach(key=>{
     const [yy,mm]=key.split('-');
     const fin=rgSumSettlementMargin(`${yy}-${mm}-01`, `${yy}-${mm}-31`);
+    byYM[key].sale+=fin.revenue;
     byYM[key].settle+=fin.settlement;
     byYM[key].margin+=fin.margin;
   });
@@ -22065,7 +22070,7 @@ function renderRevSummary(){
         data:{
           labels:ymKeys.map(k=>{const[y,m]=k.split('-');return `${y.slice(2)}/${m}`;}),
           datasets:[
-            {type:'bar',label:'정산금액',data:ymKeys.map(k=>Math.round(byYM[k].settle/10000)),
+            {type:'bar',label:'매출',data:ymKeys.map(k=>Math.round(byYM[k].sale/10000)),
              backgroundColor:'rgba(49,130,246,0.25)',borderColor:'rgba(49,130,246,0.6)',borderWidth:1,
              borderRadius:4,borderSkipped:false,yAxisID:'y',
              datalabels:{anchor:'end',align:'end',color:'#3182F6',font:{size:10,weight:'600'},
@@ -22100,11 +22105,11 @@ function renderRevSummary(){
   const byCh={};
   thisMonth.forEach(r=>{
     const ch=r.ch||'기타';
-    if(!byCh[ch]) byCh[ch]={settle:0,cnt:0};
-    byCh[ch].settle+=r.settlement||0; byCh[ch].cnt++;
+    if(!byCh[ch]) byCh[ch]={sale:0,cnt:0};
+    byCh[ch].sale+=r.salePrice||0; byCh[ch].cnt++;
   });
-  if(rgCurFin.settlement>0) byCh['로켓그로스']={settle:rgCurFin.settlement,cnt:0};
-  const chEntries=Object.entries(byCh).sort((a,b)=>b[1].settle-a[1].settle);
+  if(rgCurFin.revenue>0) byCh['로켓그로스']={sale:rgCurFin.revenue,cnt:0};
+  const chEntries=Object.entries(byCh).sort((a,b)=>b[1].sale-a[1].sale);
   const CH_COLORS=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
 
   // 도넛
@@ -22118,7 +22123,7 @@ function renderRevSummary(){
       _revDnutChart=new Chart(dnutCtx.getContext('2d'),{
         type:'doughnut',
         data:{labels:chEntries.map(([k])=>k),datasets:[{
-          data:chEntries.map(([,v])=>Math.round(v.settle/10000)),
+          data:chEntries.map(([,v])=>Math.round(v.sale/10000)),
           backgroundColor:CH_COLORS.slice(0,chEntries.length),borderWidth:2,borderColor:'#fff'
         }]},
         options:{responsive:true,maintainAspectRatio:false,
@@ -22133,8 +22138,8 @@ function renderRevSummary(){
           <div class="rev-ch-name" style="display:flex;align-items:center;gap:6px;">
             <span style="width:10px;height:10px;border-radius:50%;background:${CH_COLORS[i]};display:inline-block;flex-shrink:0;"></span>${k}
           </div>
-          <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v.settle/chEntries[0][1].settle*100)}%;background:${CH_COLORS[i]};"></div></div>
-          <div class="rev-ch-val">${fmt(v.settle)}</div>
+          <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v.sale/chEntries[0][1].sale*100)}%;background:${CH_COLORS[i]};"></div></div>
+          <div class="rev-ch-val">${fmt(v.sale)}</div>
         </div>`).join('');
     } else {
       if(dnutEmpty) dnutEmpty.style.display='block';
@@ -22148,8 +22153,8 @@ function renderRevSummary(){
     ? chEntries.map(([k,v],i)=>`
       <div class="rev-ch-row">
         <div class="rev-ch-name">${k}</div>
-        <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v.settle/chEntries[0][1].settle*100)}%;background:${CH_COLORS[i%CH_COLORS.length]};"></div></div>
-        <div class="rev-ch-val">${fmt(v.settle)}</div>
+        <div class="rev-ch-track"><div class="rev-ch-fill" style="width:${Math.round(v.sale/chEntries[0][1].sale*100)}%;background:${CH_COLORS[i%CH_COLORS.length]};"></div></div>
+        <div class="rev-ch-val">${fmt(v.sale)}</div>
       </div>`).join('')
     : '<div class="rev-empty" style="padding:20px;">데이터 없음</div>';
 
@@ -22157,18 +22162,19 @@ function renderRevSummary(){
   const byProd={};
   thisMonth.forEach(r=>{
     const k=r.modelName||r.itemCode||'미상';
-    if(!byProd[k]) byProd[k]={qty:0,settle:0,margin:0};
-    byProd[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName); byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
+    if(!byProd[k]) byProd[k]={qty:0,sale:0,settle:0,margin:0};
+    byProd[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName); byProd[k].sale+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
   (_rgProdCache[`${cy}-${ymStr(cm)}`]||[]).forEach(r=>{
     const k=rgResolveName(r.optionId)||r.productName;
-    if(!byProd[k]) byProd[k]={qty:0,settle:0,margin:0};
+    if(!byProd[k]) byProd[k]={qty:0,sale:0,settle:0,margin:0};
     const fin=rgCalcRowFinance(r);
     byProd[k].qty += (r.qty||0)*rgQtyMultiplier(r.optionId);
+    byProd[k].sale += r.revenue||0;
     byProd[k].settle += fin.settlement;
     if(fin.margin!=null) byProd[k].margin += fin.margin;
   });
-  const top10=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle).slice(0,10);
+  const top10=Object.entries(byProd).sort((a,b)=>b[1].sale-a[1].sale).slice(0,10);
   const t10Tbl=document.getElementById('revTop10Tbl');
   const t10Empty=document.getElementById('revTop10Empty');
   const t10Body=document.getElementById('revTop10Tbody');
@@ -22181,7 +22187,7 @@ function renderRevSummary(){
           <td><span class="rank-badge ${i<3?['rank-1','rank-2','rank-3'][i]:''}">${i+1}</span></td>
           <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;">${name}</td>
           <td style="text-align:right;">${v.qty.toLocaleString()}</td>
-          <td style="text-align:right;font-weight:600;">${fmt(v.settle)}</td>
+          <td style="text-align:right;font-weight:600;">${fmt(v.sale)}</td>
           <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':v.margin<0?'rev-margin-neg':''}">${fmt(v.margin)}</td>
           <td style="text-align:right;color:var(--tx2);">${v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-'}</td>
         </tr>`).join('');
@@ -22202,10 +22208,10 @@ function renderRevSummary(){
       const v=byYM[k];
       const prev=arr[i+1]?byYM[arr[i+1]]:null;
       const rate=v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-';
-      const gr=prev&&prev.settle?((v.settle-prev.settle)/prev.settle*100).toFixed(1):null;
+      const gr=prev&&prev.sale?((v.sale-prev.sale)/prev.sale*100).toFixed(1):null;
       return `<tr>
         <td style="font-weight:600;">${k}</td>
-        <td style="text-align:right;">${fmt(v.settle)}</td>
+        <td style="text-align:right;">${fmt(v.sale)}</td>
         <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':''}">${fmt(v.margin)}</td>
         <td style="text-align:right;">${rate}</td>
         <td style="text-align:right;">${v.cnt.toLocaleString()}건</td>
@@ -23132,7 +23138,7 @@ function rgCalcRowFinance(r){
 // 날짜범위(from~to, 'YYYY-MM-DD' 포함) 내 모든 로드된 월 샤드에서 정산금액·마진 합계
 // (마진은 원가를 아는 옵션만 합산 — unmatchedRevenue로 제외된 매출 규모를 알려줌)
 function rgSumSettlementMargin(dateFrom, dateTo){
-  let settlement=0, margin=0, unmatchedRevenue=0;
+  let settlement=0, margin=0, unmatchedRevenue=0, revenue=0;
   const fromYm=dateFrom.slice(0,7), toYm=dateTo.slice(0,7);
   Object.keys(_rgProdCache).forEach(ym=>{
     if(ym<fromYm||ym>toYm) return;
@@ -23140,11 +23146,12 @@ function rgSumSettlementMargin(dateFrom, dateTo){
       if(r.date<dateFrom||r.date>dateTo) return;
       const fin=rgCalcRowFinance(r);
       settlement+=fin.settlement;
+      revenue+=(r.revenue||0);
       if(fin.margin!=null) margin+=fin.margin;
       else unmatchedRevenue+=(r.revenue||0);
     });
   });
-  return {settlement, margin, unmatchedRevenue};
+  return {settlement, margin, unmatchedRevenue, revenue};
 }
 // 선택 연/월(옵션: 일)의 rg_products 샤드가 로드돼 있는지 보장
 async function rgEnsureMonthsForYm(...yms){
