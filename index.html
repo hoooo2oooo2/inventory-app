@@ -8940,8 +8940,11 @@ function renderHomeTodo(){
   const ready=admin
     ? ((typeof _wc!=='undefined') && _wc.mon && _wc.mon[ds.slice(0,7)]!==undefined && _wc.ver && _wc.ver[WC_FIXED_KIND]!==undefined)
     : _td.loaded;
-  const hd=(sub)=>`<div class="hm-pane-hd"><b>✅ 오늘 할 일</b><span class="hm-sub">${sub}</span><button class="hm-ic hm-pr" onclick="homeToggleAdd()" title="할 일 추가">${_homeAddOpen?'✕ 닫기':'＋ 추가'}</button></div>`;
-  const addRow=_homeAddOpen?`<div class="hm-add-row"><input id="hmAddT" class="hm-in" placeholder="할 일 입력 후 Enter" onkeydown="if(event.key==='Enter')homeAddTask()"><input id="hmAddTm" class="hm-in hm-in-s" type="time" title="마감 시각(선택)"><button class="hm-ic hm-pr" onclick="homeAddTask()">추가</button></div>`:'';
+  // admin: 기존 업무캘린더 창을 여는 [📋 열기] / 그 외 계정: 카드에서 바로 적는 [＋ 추가]
+  const hd=(sub)=>`<div class="hm-pane-hd"><b>✅ 오늘 할 일</b><span class="hm-sub">${sub}</span>${admin
+    ?`<button class="hm-ic" onclick="homeOpenWc()" title="업무캘린더 열기 (추가·수정)">📋 열기</button>`
+    :`<button class="hm-ic hm-pr" onclick="homeToggleAdd()" title="할 일 추가">${_homeAddOpen?'✕ 닫기':'＋ 추가'}</button>`}</div>`;
+  const addRow=(!admin&&_homeAddOpen)?`<div class="hm-add-row"><input id="hmAddT" class="hm-in" placeholder="할 일 입력 후 Enter" onkeydown="if(event.key==='Enter')homeAddTask()"><input id="hmAddTm" class="hm-in hm-in-s" type="time" title="마감 시각(선택)"><button class="hm-ic hm-pr" onclick="homeAddTask()">추가</button></div>`:'';
   if(!ready){ el.innerHTML=hd('')+addRow+`<div class="hm-pane-body"><div class="hm-ok">${(admin?(typeof _wc!=='undefined'&&_wc.err):_td.err)?'할 일을 불러오지 못했습니다. 잠시 후 다시 시도됩니다.':'불러오는 중…'}</div></div>`; return; }
   let items;
   if(admin){
@@ -8958,13 +8961,13 @@ function renderHomeTodo(){
     const ti=(!i.done&&i.time&&!i.late)?_wcTimer(i.time,ds):null;
     const when=i.late?`<span class="tm over" title="${i.late}에 등록한 할 일">이월 ${+i.late.slice(5,7)}/${+i.late.slice(8,10)}</span>`
       :(i.time&&!i.done?`<span class="tm${ti&&ti.cls==='over'?' over':ti&&ti.cls?' warn':''}">⏱ ${i.time}${ti&&ti.cls==='over'?' · '+ti.text:''}</span>`:'');
-    return `<div class="hm-trow${i.done?' done':''}"><div class="wc-chk${i.done?' on':''}" onclick="homeTodoToggle('${i.k}','${i.id}')" title="완료 체크"></div><div class="tt" title="${_hmEsc(i.title)}">${i.pin?'📌 ':''}${_hmEsc(i.title)}</div>${when}${i.del?`<button class="hm-x" onclick="homeTodoDelete('${i.id}')" title="삭제">✕</button>`:''}</div>`;
+    return `<div class="hm-trow${i.done?' done':''}"><div class="wc-chk${i.done?' on':''}" onclick="homeTodoToggle('${i.k}','${i.id}')" title="완료 체크"></div><div class="tt"${admin?' onclick="homeOpenWc()" style="cursor:pointer;"':' style="cursor:default;"'} title="${_hmEsc(i.title)}">${i.pin?'📌 ':''}${_hmEsc(i.title)}</div>${when}${i.del?`<button class="hm-x" onclick="homeTodoDelete('${i.id}')" title="삭제">✕</button>`:''}</div>`;
   };
   el.innerHTML=hd(items.length?`${doneN}/${items.length} 완료 (${pct}%)`:'')+addRow
     +(items.length?`<div class="hm-bar"><i style="width:${pct}%"></i></div>`:'')
     +`<div class="hm-pane-body">${items.length?items.slice(0,60).map(rowHtml).join(''):`<div class="hm-ok">오늘 등록된 할 일이 없습니다.<br><b>＋ 추가</b>로 오늘 할 일을 적어 보세요.</div>`}</div>`;
   const nb=el.querySelector('.hm-pane-body'); if(nb) nb.scrollTop=keepSt;
-  if(_homeAddOpen){ const a=document.getElementById('hmAddT'), tm=document.getElementById('hmAddTm'); if(a&&keepT) a.value=keepT; if(tm&&keepTm) tm.value=keepTm; }
+  if(!admin&&_homeAddOpen){ const a=document.getElementById('hmAddT'), tm=document.getElementById('hmAddTm'); if(a&&keepT) a.value=keepT; if(tm&&keepTm) tm.value=keepTm; }
 }
 function homeOpenWc(){ const p=document.getElementById('wcPop'); if(p&&!p.classList.contains('open')) wcToggle(); }
 
