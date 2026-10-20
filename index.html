@@ -6351,7 +6351,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
             <span>📊 월별 매출·마진 추이</span>
             <span style="font-size:11px;color:var(--tx2);" id="revChartRange"></span>
           </div>
-          <div class="rev-chart-wrap"><canvas id="revTrendChart"></canvas></div>
+          <div class="rev-chart-wrap" style="height:320px;"><canvas id="revTrendChart"></canvas></div>
           <div class="rev-empty" id="revTrendEmpty" style="padding:20px;">업로드된 데이터가 없습니다</div>
         </div>
         <div class="rev-card">
@@ -22102,7 +22102,7 @@ function renderRevSummary(){
     c2.save();
     c2.setLineDash([5,4]); c2.strokeStyle='#F97316'; c2.lineWidth=1.5;
     c2.beginPath(); c2.moveTo(x,ca.top); c2.lineTo(x,ca.bottom); c2.stroke();
-    c2.setLineDash([]); c2.fillStyle='#F97316'; c2.font='600 11px sans-serif'; c2.textBaseline='top';
+    c2.setLineDash([]); c2.fillStyle='#F97316'; c2.font='700 13px sans-serif'; c2.textBaseline='top';
     const [yy,mm]=firstAdYm.split('-');
     c2.textAlign='left'; c2.fillText(`▶ ${yy}년 ${Number(mm)}월부터 광고비 기입`,x+6,ca.top+4);
     if(adStartIdx>0){ c2.textAlign='right'; c2.fillStyle=_axColor(); c2.fillText('광고비 미기입 구간(마진에 광고비 미반영) ◀',x-6,ca.top+4); }
@@ -22125,17 +22125,17 @@ function renderRevSummary(){
             {type:'bar',label:'매출',data:ymKeys.map(k=>Math.round(byYM[k].sale/10000)),
              backgroundColor:'rgba(49,130,246,0.25)',borderColor:'rgba(49,130,246,0.6)',borderWidth:1,
              borderRadius:4,borderSkipped:false,yAxisID:'y',
-             datalabels:{anchor:'end',align:'end',color:'#3182F6',font:{size:10,weight:'600'},
+             datalabels:{anchor:'end',align:'end',color:'#3182F6',font:{size:13,weight:'700'},
                formatter:v=>fmtMan(v)}},
             {type:'line',label:'마진',data:ymKeys.map(k=>Math.round(byYM[k].margin/10000)),
              borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.08)',tension:0.3,
              pointBackgroundColor:'#059669',pointRadius:5,pointHoverRadius:7,fill:true,yAxisID:'y',
-             datalabels:{anchor:'top',align:'top',offset:4,color:'#059669',font:{size:10,weight:'700'},
+             datalabels:{anchor:'top',align:'top',offset:4,color:'#059669',font:{size:13,weight:'700'},
                formatter:v=>fmtMan(v)}},
             {type:'line',label:'광고비',data:ymKeys.map(k=>Math.round((byYM[k].ad||0)/10000)),
              borderColor:'#F97316',backgroundColor:'rgba(249,115,22,0.08)',borderDash:[4,3],tension:0.3,
              pointBackgroundColor:'#F97316',pointRadius:4,pointHoverRadius:6,fill:false,yAxisID:'y',
-             datalabels:{anchor:'bottom',align:'bottom',offset:4,color:'#F97316',font:{size:10,weight:'700'},
+             datalabels:{anchor:'bottom',align:'bottom',offset:4,color:'#F97316',font:{size:13,weight:'700'},
                formatter:v=>v>0?fmtMan(v):''}},
           ]
         },
@@ -22143,13 +22143,13 @@ function renderRevSummary(){
         options:{responsive:true,maintainAspectRatio:false,
           layout:{padding:{top:28}},
           plugins:{
-            legend:{display:true,position:'top',labels:{font:{size:11}}},
+            legend:{display:true,position:'top',labels:{font:{size:14,weight:'600'},boxWidth:26,padding:14}},
             tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmtMan(c.parsed.y)}원`}},
             datalabels:{display:true}
           },
           scales:{
-            x:{grid:{display:false},ticks:{color:_axColor(),font:{size:11}}},
-            y:{min:-Math.round(trendMax*0.08),suggestedMax:Math.round(trendMax*1.2),grid:{color:'rgba(100,100,120,.1)'},ticks:{color:_axColor(),font:{size:11},callback:v=>v<0?'':fmtMan(v)}}
+            x:{grid:{display:false},ticks:{color:_axColor(),font:{size:13,weight:'600'}}},
+            y:{min:-Math.round(trendMax*0.08),suggestedMax:Math.round(trendMax*1.2),grid:{color:'rgba(100,100,120,.1)'},ticks:{color:_axColor(),font:{size:12,weight:'600'},callback:v=>v<0?'':fmtMan(v)}}
           }
         }
       });
