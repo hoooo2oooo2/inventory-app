@@ -55,9 +55,9 @@ button,input,select,textarea{color:inherit;}
 :root[data-theme="dark"] input:-webkit-autofill,:root[data-theme="dark"] textarea:-webkit-autofill,:root[data-theme="dark"] select:-webkit-autofill{-webkit-text-fill-color:var(--tx) !important;caret-color:var(--tx);box-shadow:0 0 0 1000px var(--bg2) inset !important;}
 select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);}
 select option{background:var(--bg);color:var(--tx);}
-:root{--pr:#3182F6;--prl:#EEF4FF;--bg:#fff;--bg2:#F7F8FA;--bd:rgba(0,0,0,0.08);--tx:#191919;--tx2:#888;}
+:root{--grid:rgba(0,0,0,.17);--pb-top-h:#FEF3C7;--pb-bot-h:#E6F0FE;--pr:#3182F6;--prl:#EEF4FF;--bg:#fff;--bg2:#F7F8FA;--bd:rgba(0,0,0,0.08);--tx:#191919;--tx2:#888;}
 /* 다크모드는 로그인한 전체 계정이 토글로 사용 — data-theme="dark"는 토글을 눌렀을 때 JS가 세팅함(아래 참고) */
-:root[data-theme="dark"]{--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;color-scheme:dark;}
+:root[data-theme="dark"]{--grid:rgba(255,255,255,.2);--pb-top-h:#3B3320;--pb-bot-h:#1F2B40;--pr:#5B9BFF;--prl:rgba(91,155,255,0.16);--bg:#1B1C1F;--bg2:#222327;--bd:rgba(255,255,255,0.1);--tx:#EDEDED;--tx2:#9A9A9E;color-scheme:dark;}
 body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
 .theme-toggle{display:none;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:20px;padding:3px;cursor:pointer;}
@@ -1466,12 +1466,27 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .pb-summary .pb-sum-title{font-weight:700;margin-right:4px;}
 .pb-summary .pb-sum-total{font-weight:700;background:var(--bg);border:1px solid var(--bd);border-radius:9px;padding:4px 10px;}
 .pb-summary .piv-badge{font-size:11.5px;padding:3px 10px;}
-.pb-split{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;}
-.pb-panel{min-height:0;display:flex;flex-direction:column;}
+.pb-split{flex:1;min-height:0;display:flex;flex-direction:column;gap:18px;}
+.pb-panel{min-height:0;display:flex;flex-direction:column;border:1px solid var(--grid);border-radius:12px;overflow:hidden;background:var(--bg);}
+/* 미입금건 관리(주황) / 거래건(파랑) — 띠·머리글 색으로 한눈에 구분 */
+.pb-panel.pb-top{border-left:6px solid #F59E0B;} .pb-panel.pb-bottom{border-left:6px solid #3182F6;}
+.pb-panel .piv-table-scroll{border:none;border-radius:0;}
+.pb-panel.pb-top .pb-table thead th{background:var(--pb-top-h);} .pb-panel.pb-bottom .pb-table thead th{background:var(--pb-bot-h);}
+.pb-panel.pb-top .pb-panel-head{background:var(--pb-top-h);} .pb-panel.pb-bottom .pb-panel-head{background:var(--pb-bot-h);}
+/* 엑셀처럼 칸마다 선 + 두 표의 열 폭 통일(fixed) */
+.pb-table{table-layout:fixed;min-width:1400px;border-collapse:separate;border-spacing:0;}
+.pb-table th,.pb-table td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);}
+.pb-table thead th{border-top:none;font-size:11.5px;color:var(--tx);white-space:normal;line-height:1.3;padding:8px 4px;}
+.pb-table tbody td{padding:7px 8px;vertical-align:middle;overflow:hidden;border-bottom:1px solid var(--grid) !important;}
+.pb-table tbody tr:last-child td{border-bottom:1px solid var(--grid) !important;}
+.pb-table tbody tr:nth-child(even){background:rgba(127,127,127,.045);}
+.pb-table td.pb-ell{text-align:left;white-space:nowrap;text-overflow:ellipsis;}
+.pb-table td.pb-full{text-align:left;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;line-height:1.45;}
+.pb-table td.cs-empty{text-align:center;white-space:normal;}
 .pb-panel.pb-top{flex:0 1 auto;max-height:36%;}
 .pb-panel.pb-top .piv-table-scroll{flex:0 1 auto;}
 .pb-panel.pb-bottom{flex:1 1 0;}
-.pb-panel-head{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.pb-panel-head{font-size:14px;font-weight:700;color:var(--tx);margin:0;padding:10px 14px;border-bottom:1px solid var(--grid);display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .pb-table tbody tr.piv-click:hover{background:var(--bg2);}
 .piv-st{background:#E0E7FF;color:#3730A3;}
 .piv-st.piv-st-0{background:#DBEAFE;color:#1D4ED8;}
@@ -36075,6 +36090,14 @@ async function pivWatchTick(){
 //  DB 읽기/쓰기는 _pbFetch*/_pbUpsert/_pbRemove 함수 안에서만 한다(검증 시 이 함수들만 가로채면 실DB 쓰기 방지).
 const PB_CATEGORIES = ['구매','누락','불량','오배송','파손'];
 const PB_CAT_CLS = { '구매':'pb-cat-a', '누락':'pb-cat-b', '불량':'pb-cat-c', '오배송':'pb-cat-d', '파손':'pb-cat-e' };
+// 표에 보이는 열(순서·폭%). 배송메모·공란·수취인연락처2는 표에서 숨김 — 데이터·수정 팝업·엑셀 업로드는 그대로(2026-10-20 요청)
+//  ell = 한 줄로 보이고 길면 …(마우스를 올리면 전체), full = 줄바꿈해서 전체 표시
+const PB_VIEW = [
+  {k:'category',h:'거래구분',w:4},{k:'staff',h:'담당자',w:4.5},{k:'date',h:'날짜',w:6},{k:'recipient',h:'수취인',w:7},{k:'phone1',h:'수취인연락처',w:7.5},
+  {k:'zip',h:'우편번호',w:4},{k:'addr',h:'기본주소',w:11,ell:1},{k:'product',h:'상품명',w:15.3,full:1},{k:'qty',h:'수량',w:3},{k:'shipMethod',h:'배송방법',w:4},
+  {k:'freight',h:'운임구분',w:4},{k:'code',h:'패밀리상품코드',w:7},{k:'amount',h:'총금액',w:6},{k:'paid',h:'입금여부',w:7.5},{k:'invoice',h:'계산서 발급여부',w:8},
+  {k:'note',h:'비고란',w:9,ell:1},{k:'_',h:'관리',w:4.3}
+];
 const PB_COLS = [
   {k:'category',h:'거래구분'},{k:'staff',h:'담당자'},{k:'date',h:'날짜'},{k:'recipient',h:'수취인'},{k:'phone1',h:'수취인연락처1'},{k:'phone2',h:'수취인연락처2'},
   {k:'zip',h:'우편번호'},{k:'addr',h:'기본주소'},{k:'product',h:'상품명'},{k:'qty',h:'수량'},{k:'shipMethod',h:'배송방법'},
@@ -36146,9 +36169,13 @@ function _pbSplitDup(rows, date, existing){
 function pbInit(){
   if(!_pbInited){
     _pbInited = true;
-    const head = '<tr>'+PB_COLS.map(c=>`<th>${c.h}</th>`).join('')+'<th style="width:50px;">관리</th></tr>';
-    document.getElementById('pbHeadU').innerHTML = head;
-    document.getElementById('pbHeadD').innerHTML = head;
+    // 두 표(미입금건 관리 / 거래건)가 같은 열 폭을 쓰도록 colgroup을 똑같이 넣음 → 머리글 간격이 항상 일치
+    const head = '<tr>'+PB_VIEW.map(c=>`<th>${c.h}</th>`).join('')+'</tr>';
+    const cg = '<colgroup>'+PB_VIEW.map(c=>`<col style="width:${c.w}%">`).join('')+'</colgroup>';
+    ['U','D'].forEach(k=>{
+      const th=document.getElementById('pbHead'+k); th.innerHTML = head;
+      th.parentElement.querySelector('colgroup')?.remove(); th.parentElement.insertAdjacentHTML('afterbegin', cg);
+    });
     document.getElementById('pbMonth').value = _pivToday().slice(0,7);
     pbBindDrop();
   }
@@ -36273,7 +36300,7 @@ function pbRender(){
   const canEdit = _pivCanEdit();
   const maxP = Math.max(1, Math.ceil(deals.length/PB_PAGE_SIZE));
   if(_pbPage > maxP-1) _pbPage = maxP-1;
-  const empty = (t)=>`<tr><td colspan="${PB_COLS.length+1}" class="cs-empty">${t}</td></tr>`;
+  const empty = (t)=>`<tr><td colspan="${PB_VIEW.length}" class="cs-empty">${t}</td></tr>`;
   document.getElementById('pbBodyU').innerHTML = !_pbLoaded ? empty('불러오는 중…') : (top.length ? top.map(r=>_pbRowHtml(r,canEdit,true)).join('') : empty('미입금 · 미발행 건이 없습니다.'));
   document.getElementById('pbBodyD').innerHTML = !_pbLoaded ? empty('불러오는 중…') : (deals.length ? deals.slice(_pbPage*PB_PAGE_SIZE,(_pbPage+1)*PB_PAGE_SIZE).map(r=>_pbRowHtml(r,canEdit,false)).join('') : empty('이 달의 거래건이 없습니다. 엑셀 업로드 또는 수기 입력으로 추가하세요.'));
   document.getElementById('pbPager').innerHTML = _rgmPagerHtml(_pbPage, PB_PAGE_SIZE, deals.length, 'pbGoto');
@@ -36292,26 +36319,24 @@ function _pbRowHtml(r, canEdit, isTop){
   }
   const inv = _pbNormInvoice(r.invoice);
   const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?`<span class="piv-sub">${cancelled?'🔗 연동 계산서 발급취소됨':'🔗 계산서 연동'}</span>`:''}` : '';
+  const ell = v=>`<td class="pb-ell" title="${_esc(v||'')}">${_esc(v||'')}</td>`;
   return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
     <td>${r.category?`<span class="piv-badge ${PB_CAT_CLS[r.category]||'piv-type'}">${_esc(r.category)}</span>`:''}</td>
     <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff, _pbAll)}">${_esc(r.staff)}</span>`:''}</td>
     <td>${_esc(r.date||'')}</td>
-    ${wr(r.recipient)}
+    <td class="pb-full">${_esc(r.recipient||'')}</td>
     <td>${_esc(r.phone1||'')}</td>
-    <td>${_esc(r.phone2||'')}</td>
     <td>${_esc(r.zip||'')}</td>
-    ${wr(r.addr,true)}
-    ${wr(r.product,true)}
+    ${ell(r.addr)}
+    <td class="pb-full" title="${_esc(r.product||'')}">${_esc(r.product||'')}</td>
     <td>${_esc(r.qty==null?'':r.qty)}</td>
     <td>${_esc(r.shipMethod||'')}</td>
     <td>${_esc(r.freight||'')}</td>
-    ${wr(r.shipMemo)}
-    ${wr(r.blank)}
     <td>${_esc(r.code||'')}</td>
     <td class="piv-r">${r.amount!=null?_pivNum(r.amount):''}</td>
     <td>${paid}</td>
     <td>${invCell}</td>
-    ${wr(r.note)}
+    ${ell(r.note)}
     <td>${canEdit?`<button class="piv-act piv-del" onclick="event.stopPropagation();pbDelete('${r.id}')">삭제</button>`:''}</td>
   </tr>`;
 }
