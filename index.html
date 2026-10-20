@@ -1364,12 +1364,23 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .rt-table td.rt-nw{white-space:nowrap;}
 .rt-table .rt-w-s{min-width:66px;}
 .rt-table .rt-w-m{min-width:100px;}
-.rt-table .rt-w-l{min-width:150px;max-width:300px;}
-.rt-table .rt-w-xl{min-width:170px;max-width:340px;}
+.rt-table .rt-w-l{min-width:125px;max-width:300px;}
+.rt-table .rt-w-xl{min-width:150px;max-width:340px;}
+.rt-table .rt-w-trk{min-width:210px;}
 .rt-table tbody tr.rt-done td{background:#DCFCE7;color:#14532D;border-bottom-color:#BBF7D0;}
 .rt-table tbody tr.rt-done:hover td{background:#BBF7D0;}
-.rt-ell{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 auto 0 0;}
-.rt-ell.rt-ell-s{max-width:170px;}
+.rt-ell{max-width:165px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 auto 0 0;}
+.rt-ell.rt-ell-s{max-width:125px;}
+.rt-trk{display:flex;align-items:center;gap:4px;justify-content:center;}
+.rt-trk .rt-car{width:68px;font-size:12.5px;padding:5px 2px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:inherit;}
+.rt-trk .rt-trk-in{width:122px;font-size:13px;padding:6px 7px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:inherit;outline:none;}
+.rt-trk .rt-trk-in:focus{border-color:#3182F6;}
+.rt-trk .rt-trk-save{display:none;border:none;background:#3182F6;color:#fff;border-radius:6px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.rt-trk.dirty .rt-trk-save{display:inline-block;}
+.rt-trk.dirty .rt-trk-in{border-color:#3182F6;}
+.rt-tst{display:inline-block;padding:4px 12px;border-radius:13px;font-size:13px;font-weight:700;white-space:nowrap;}
+.rt-sub{display:block;font-size:11.5px;margin-top:3px;opacity:.78;color:inherit;white-space:nowrap;}
+.rt-refresh{border:none;background:none;cursor:pointer;font-size:13px;padding:0 0 0 4px;color:inherit;}
 .rt-hfilter{display:block;margin:5px auto 0;width:92px;font-size:12.5px;font-weight:600;padding:3px 4px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:inherit;cursor:pointer;}
 .rt-hfilter.on{border-color:#3182F6;color:#3182F6;font-weight:800;}
 .rt-view{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;}
@@ -4534,6 +4545,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>요청수량</label><input type="text" id="rtFQty" autocomplete="off"></div>
       <div class="field piv-span3"><label>증상</label><textarea id="rtFSymptom"></textarea></div>
       <div class="field piv-span3"><label>처리내용</label><textarea id="rtFMemo"></textarea></div>
+      <div class="field"><label>택배사 (반송장)</label><select id="rtFCarrier"></select></div>
+      <div class="field"><label>반송장번호</label><input type="text" id="rtFTrackNo" inputmode="numeric" autocomplete="off" placeholder="숫자만 (9~15자리)"></div>
+      <div class="field"><label>배송상태</label><select id="rtFTrkMode"><option value="auto">자동 조회</option><option value="cancel">수거취소 (조회 중단)</option></select></div>
       <div class="field"><label>완료여부</label><select id="rtFDone"><option value="0">미완료</option><option value="1">완료</option></select></div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('rtModal')">취소</button>
@@ -36578,6 +36592,7 @@ const RT_COLS = [
   {k:'cat',h:'구분',cls:'rt-w-s'},{k:'staff',h:'접수자',cls:'rt-w-s'},{k:'date',h:'접수일',cls:'rt-w-m'},{k:'buyDate',h:'구매일',cls:'rt-w-m'},
   {k:'ship',h:'배송비',cls:'rt-w-s'},{k:'recipient',h:'수취인명',cls:'rt-w-s'},{k:'phone',h:'연락처',cls:'rt-w-m'},{k:'addr',h:'주소',cls:'rt-w-l'},
   {k:'product',h:'상품명',cls:'rt-w-xl'},{k:'qty',h:'요청수량',cls:'rt-w-s'},{k:'symptom',h:'증상',cls:'rt-w-l'},{k:'memo',h:'처리내용',cls:'rt-w-l'},
+  {k:'trk',h:'반송장번호',cls:'rt-w-trk'},{k:'trkst',h:'배송상태',cls:'rt-w-m'},
   {k:'done',h:'완료여부',cls:'rt-w-s'}
 ];
 const RT_CATS = ['반품','교환','맞교환','수리','오배송','파손'];
@@ -36587,6 +36602,15 @@ const RT_CAT_STYLE = {   // 구분 배지 색 — 배경·글자색을 함께 �
   '오배송':'background:#FFEDD5;color:#C2410C;', '파손':'background:#FEE2E2;color:#B91C1C;'
 };
 const RT_PAGE_SIZE = 50;
+// 반송장 택배사(스마트택배 코드) — 당근 배송추적과 같은 코드표
+const RT_CARRIERS = [['04','CJ대한통운','CJ'],['08','롯데택배','롯데'],['05','한진택배','한진'],['06','로젠택배','로젠'],['01','우체국택배','우체국']];
+// 배송상태: 수거지시 → 수거중 → 완료 / 수거취소 / 수거안됨(재수거 필요). 배경·글자색을 함께 고정(초록 완료행·다크모드에서도 읽히도록)
+const RT_TRK_ST = {
+  order:['수거지시','background:#DBEAFE;color:#1D4ED8;'], moving:['수거중','background:#FEF3C7;color:#B45309;'],
+  done:['완료','background:#16A34A;color:#fff;'], cancel:['수거취소','background:#E2E8F0;color:#334155;'],
+  fail:['수거안됨','background:#FEE2E2;color:#B91C1C;']
+};
+const RT_FAIL_MS = 72*3600*1000;   // 반송장 등록 후 3일이 지나도 집화 안 되면 수거안됨(서버와 같은 기준)
 let _rtTab = 'pickup';
 let _rtInited = false;
 let _rtLoaded = false;
@@ -36596,6 +36620,7 @@ let _rtAll = [];          // 위 둘을 합친 목록
 let _rtFilter = 'all';    // all | open | done
 let _rtCatFilter = '';    // 헤더 구분 필터('' = 전체)
 let _rtViewId = null;
+let _rtTrack = {};        // 서버(return-track)가 조회해 기록한 상태 {접수id:{no,code,status,checkedAt,where,kind,...}} — 화면은 읽기만
 let _rtPage = 0;
 let _rtEditId = null;
 let _rtSaving = false;
@@ -36674,7 +36699,7 @@ async function _rtRemove(id){
 
 async function rtReload(){
   const ym = document.getElementById('rtMonth').value || _pivToday().slice(0,7);
-  const [o, m] = await Promise.all([_rtFetchOpen(), _rtFetchMonth(ym)]);
+  const [o, m] = await Promise.all([_rtFetchOpen(), _rtFetchMonth(ym), rtLoadTrack()]);
   if(o===null || m===null){ toast('수거접수 건을 불러오지 못했습니다. 잠시 후 새로고침해주세요.'); if(!_rtLoaded) return; }
   else { _rtOpen = o; _rtMonthRows = m; }
   _rtLoaded = true;
@@ -36691,6 +36716,73 @@ function rtSearchChanged(){ _rtPage = 0; rtRender(); }
 function rtCatFilterChanged(){ _rtCatFilter = document.getElementById('rtCatFilter').value; _rtPage = 0; rtRender(); }
 function rtSetFilter(f){ _rtFilter = f; _rtPage = 0; rtRender(); }
 function rtGoto(p){ _rtPage = Math.max(0,p); rtRender(); document.querySelector('#rtTab-pickup .piv-table-scroll')?.scrollTo({top:0}); }
+// ── 반송장 배송상태 ──
+function _rtCarName(code, short){ const c = RT_CARRIERS.find(x=>x[0]===(code||'04')); return c ? c[short?2:1] : (code||''); }
+async function _rtLoadTrackRaw(){ return await cloudKvLoad('rtk_track'); }
+async function rtLoadTrack(){
+  const d = await _rtLoadTrackRaw();
+  if(d && typeof d==='object' && !Array.isArray(d)) _rtTrack = d;   // 읽기 실패(null)면 기존 값 유지
+}
+function rtTrackInfo(r){
+  if(!r.trackNo) return null;
+  if(r.cancel) return { st:'cancel', t:null };
+  const t = _rtTrack[r.id], ok = !!t && t.no===r.trackNo && (t.code||'04')===(r.carrier||'04');   // 반송장이 바뀐 뒤의 옛 상태는 무시
+  let st = ok ? t.status : 'order';
+  if(st==='order' && Date.now()-Date.parse(r.trackNoAt||r.createdAt||'') > RT_FAIL_MS) st = 'fail';
+  return { st, t: ok ? t : null };
+}
+function rtTrackBadge(r, canEdit){
+  const i = rtTrackInfo(r);
+  if(!i) return '<span style="color:var(--tx2);font-size:12.5px;">—</span>';
+  const [label, css] = RT_TRK_ST[i.st] || RT_TRK_ST.order, t = i.t;
+  const tip = t ? [t.kind, t.where, t.err&&('⚠ '+t.err)].filter(Boolean).join(' · ') : '';
+  const chk = t && t.checkedAt ? '조회 '+t.checkedAt.slice(5,16).replace('T',' ') : (i.st==='order'||i.st==='moving' ? '미조회' : '');
+  const sub = i.st==='fail' ? '재수거 필요' : (i.st==='cancel' ? '' : chk);
+  const btn = (canEdit && (i.st==='order'||i.st==='moving')) ? `<button class="rt-refresh" title="지금 조회" onclick="event.stopPropagation();rtTrackNow('${r.id}',this)">🔄</button>` : '';
+  return `<span class="rt-tst" style="${css}" title="${_esc(tip)}">${label}</span>${btn}${sub?`<span class="rt-sub">${_esc(sub)}</span>`:''}`;
+}
+function rtTrkDirty(el){
+  const w = el.closest('.rt-trk'); if(!w) return;
+  const no = w.querySelector('.rt-trk-in').value.replace(/\D/g,'');
+  w.classList.toggle('dirty', no!==w.dataset.no || w.querySelector('.rt-car').value!==w.dataset.car);
+}
+async function rtTrkSave(id, el){
+  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  const w = el.closest('.rt-trk');
+  const no = w.querySelector('.rt-trk-in').value.replace(/\D/g,'');
+  const car = w.querySelector('.rt-car').value;
+  if(no && (no.length<9 || no.length>15)){ toast('반송장번호는 숫자 9~15자리로 입력하세요.'); return; }
+  const btn = w.querySelector('.rt-trk-save'); btn.disabled = true; btn.textContent = '저장 중…';
+  const latest = await _rtFetchByIds([id]);   // 서버 최신본에 반송장만 얹는다
+  if(latest===null || !latest[0]){ btn.disabled = false; btn.textContent = '저장'; toast('최신 내용을 확인하지 못했습니다. 새로고침 후 다시 시도하세요.'); return; }
+  const base = latest[0];
+  const changed = (base.trackNo||'')!==no || (base.carrier||'04')!==car;
+  if(changed){
+    const now = new Date().toISOString();
+    const ok = await _rtUpsert([{ ...base, trackNo:no, carrier:car, trackNoAt: no?now:'', cancel:false, updatedAt:now }]);   // 새 반송장 = 재수거 → 취소 해제·등록시각 새로
+    if(!ok){ btn.disabled = false; btn.textContent = '저장'; toast('저장에 실패했습니다. 다시 시도해주세요.'); return; }
+  }
+  await rtReload();
+  toast(!no ? '반송장번호가 삭제되었습니다.' : `✅ ${_rtCarName(car)} ${no} 저장 완료 — 배송상태를 조회합니다…`);
+  if(changed && no) rtTrackNow(id);
+}
+async function _rtInvokeTrack(body){ return await sb.functions.invoke('return-track', { body }); }
+let _rtTrackBusy = false;
+async function rtTrackNow(id, btnEl){
+  if(_rtTrackBusy) return;
+  _rtTrackBusy = true;
+  if(btnEl) btnEl.textContent = '⏳';
+  try{
+    const { data, error } = await _rtInvokeTrack({ ids: id?[id]:null, force:true });
+    if(error) throw error;
+    await rtLoadTrack(); rtRender();
+    toast(`🚚 배송상태 조회 완료 — ${data?.checked??0}건 조회${data?.errors?`, 조회결과 없음/오류 ${data.errors}건`:''}${data?.blocked?` · 무료 한도 초과로 ${data.blocked}건 보류`:''}`);
+  }catch(e){
+    console.warn('return-track 호출 실패', e);
+    toast('배송 조회 실패: 서버 조회 기능(return-track)이 아직 설정되지 않았거나 응답이 없습니다.');
+    rtRender();
+  }finally{ _rtTrackBusy = false; }
+}
 function _rtFind(id){ return _rtAll.find(x=>x.id===id); }
 function _rtSort(a,b){ return String(b.date||'').localeCompare(String(a.date||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')); }
 function _rtMatch(r, q){
@@ -36705,6 +36797,7 @@ function rtRender(){
   const ym = document.getElementById('rtMonth').value || '';
   const openN = _rtAll.filter(r=>!r.done).length;                        // 전체 기간 미완료
   const monthRows = _rtMonthRows;
+  const failN = _rtAll.filter(r=>!r.done && (rtTrackInfo(r)||{}).st==='fail').length;
   const monthDone = monthRows.filter(r=>r.done).length;
   // 목록: 미완료는 월과 무관하게 포함, 완료 건은 선택한 월 것만
   let list = _rtAll.filter(r=> !r.done || String(r.date||'').startsWith(ym));
@@ -36732,6 +36825,7 @@ function rtRender(){
     `<span class="rt-pill rt-pill-wait">미완료 ${openN}건</span>`
     + `<span class="rt-pill rt-pill-n">${mm} 접수 ${monthRows.length}건</span>`
     + `<span class="rt-pill rt-pill-ok">${mm} 완료 ${monthDone}건</span>`
+    + (failN ? `<span class="rt-pill" style="background:#FEE2E2;color:#B91C1C;">수거안됨 ${failN}건 · 재수거 필요</span>` : '')
     + `<span class="rt-hint">미완료 건은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용 확인 · 완료여부 배지를 누르면 완료/미완료 전환(완료는 초록색)</span>`;
 
   const canEdit = _rtCanEdit();
@@ -36751,6 +36845,9 @@ function _rtRowHtml(r, canEdit){
   const done = r.done
     ? `<button class="rt-donebtn rt-ok" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 미완료로 되돌립니다"`:'disabled'}>✔ 완료</button>`
     : `<button class="rt-donebtn rt-wait" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 완료 처리합니다"`:'disabled'}>⏳ 미완료</button>`;
+  const trkCell = canEdit
+    ? `<div class="rt-trk" data-no="${_esc(r.trackNo||'')}" data-car="${_esc(r.carrier||'04')}"><select class="rt-car" onchange="rtTrkDirty(this)">${RT_CARRIERS.map(c=>`<option value="${c[0]}" ${c[0]===(r.carrier||'04')?'selected':''}>${c[2]}</option>`).join('')}</select><input class="rt-trk-in" inputmode="numeric" placeholder="반송장번호" value="${_esc(r.trackNo||'')}" oninput="rtTrkDirty(this)" onkeydown="if(event.key==='Enter')rtTrkSave('${r.id}',this)"><button class="rt-trk-save" onclick="rtTrkSave('${r.id}',this)">저장</button></div>`
+    : (r.trackNo ? `${_esc(_rtCarName(r.carrier,true))} ${_esc(r.trackNo)}` : '');
   return `<tr class="rt-click${r.done?' rt-done':''}" onclick="rtOpenView('${r.id}')">
     <td class="rt-nw">${cat}</td>
     <td class="rt-nw">${_esc(r.staff||'')}</td>
@@ -36764,6 +36861,8 @@ function _rtRowHtml(r, canEdit){
     <td class="rt-nw">${_esc(r.qty==null?'':r.qty)}</td>
     ${ell(r.symptom,true)}
     ${ell(r.memo,true)}
+    <td class="rt-nw" onclick="event.stopPropagation()">${trkCell}</td>
+    <td class="rt-nw">${rtTrackBadge(r,canEdit)}</td>
     <td class="rt-nw">${done}</td>
     <td>${canEdit?`<button class="rt-del" onclick="event.stopPropagation();rtDelete('${r.id}')">삭제</button>`:''}</td>
   </tr>`;
@@ -36781,7 +36880,10 @@ function rtOpenView(id){
     + v('구매일',r.buyDate) + v('배송비',_rtFmtShip(r.ship)) + v('수취인명',r.recipient)
     + v('연락처',r.phone) + v('주소',r.addr,'rt-v2')
     + v('상품명',r.product,'rt-v2') + v('요청수량',r.qty)
-    + v('증상',r.symptom,'rt-v3') + v('처리내용',r.memo,'rt-v3');
+    + v('증상',r.symptom,'rt-v3') + v('처리내용',r.memo,'rt-v3')
+    + v('반송장번호', r.trackNo ? _rtCarName(r.carrier)+' '+r.trackNo : '', 'rt-v2')
+    + (() => { const i = rtTrackInfo(r); if(!i) return v('배송상태',''); const t = i.t;
+        return v('배송상태', RT_TRK_ST[i.st][0] + (i.st==='fail' ? ' · 재수거 필요' : '') + (t&&t.where ? '\n'+[t.where,t.kind].filter(Boolean).join(' · ') : '') + (t&&t.checkedAt ? '\n조회 '+t.checkedAt.slice(0,16).replace('T',' ') : '')); })();
   document.getElementById('rtViewDone').innerHTML = r.done ? '<span class="rt-pill rt-pill-ok">✔ 완료</span>' : '<span class="rt-pill rt-pill-wait">⏳ 미완료</span>';
   document.getElementById('rtViewEditBtn').style.display = _rtCanEdit() ? '' : 'none';
   openModal('rtViewModal');
@@ -36807,6 +36909,10 @@ function rtOpenModal(id){
     document.getElementById('rtF'+suffix).value = v==null ? '' : v;
   });
   _pbSetSelect('rtFCat', r.cat || '', RT_CATS, '선택');
+  document.getElementById('rtFCarrier').innerHTML = RT_CARRIERS.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join('');
+  document.getElementById('rtFCarrier').value = r.carrier || '04';
+  document.getElementById('rtFTrackNo').value = r.trackNo || '';
+  document.getElementById('rtFTrkMode').value = r.cancel ? 'cancel' : 'auto';
   document.getElementById('rtFDone').value = r.done ? '1' : '0';
   openModal('rtModal');
   setTimeout(()=>document.getElementById('rtFRecipient')?.focus(), 100);
@@ -36821,21 +36927,29 @@ async function rtSave(){
   if(!rec.recipient){ toast('수취인명을 입력하세요.'); return; }
   rec.phone = _rtFmtPhone(rec.phone);
   rec.ship = String(rec.ship||'').replace(/,/g,'').trim();
+  const trackNo = document.getElementById('rtFTrackNo').value.replace(/\D/g,'');
+  const carrier = document.getElementById('rtFCarrier').value || '04';
+  if(trackNo && (trackNo.length<9 || trackNo.length>15)){ toast('반송장번호는 숫자 9~15자리로 입력하세요.'); return; }
+  const cancelSel = document.getElementById('rtFTrkMode').value==='cancel';
   const done = document.getElementById('rtFDone').value==='1';
   const btn = document.getElementById('rtSaveBtn');
   _rtSaving = true; btn.disabled = true; btn.textContent = '저장 중…';
   const fail = (msg)=>{ _rtSaving = false; btn.disabled = false; btn.textContent = '저장'; toast(msg); };
   const now = new Date().toISOString();
-  let full;
+  let full, trkChangedFlag = false;
   if(_rtEditId){
     // 다른 PC에서 그 사이 바뀐 값을 덮어쓰지 않도록 서버 최신본에 이 화면에서 편집한 항목만 얹는다
     const latest = await _rtFetchByIds([_rtEditId]);
     if(latest===null){ fail('저장하기 전 최신 내용을 확인하지 못했습니다. 다시 시도해주세요.'); return; }
     const base = latest[0] || _rtFind(_rtEditId) || {};
     const wasDone = !!base.done;
-    full = { ...base, ...rec, id:_rtEditId, done, doneAt: done ? (wasDone ? (base.doneAt||now) : now) : '', updatedAt:now };
+    const trkChanged = (base.trackNo||'')!==trackNo || (base.carrier||'04')!==carrier;
+    trkChangedFlag = trkChanged;
+    full = { ...base, ...rec, id:_rtEditId, done, doneAt: done ? (wasDone ? (base.doneAt||now) : now) : '', updatedAt:now,
+      trackNo, carrier, trackNoAt: trackNo ? (trkChanged ? now : (base.trackNoAt||now)) : '', cancel: trkChanged && !cancelSel ? false : cancelSel };
   } else {
-    full = { ...rec, id:_pivNewId('rt'), done, doneAt: done ? now : '', source:'manual', createdAt:now, updatedAt:now };
+    full = { ...rec, id:_pivNewId('rt'), done, doneAt: done ? now : '', source:'manual', createdAt:now, updatedAt:now,
+      trackNo, carrier, trackNoAt: trackNo ? now : '', cancel: cancelSel };
   }
   const ok = await _rtUpsert([full]);
   if(!ok){ fail('저장에 실패했습니다. 다시 시도해주세요.'); return; }
@@ -36845,6 +36959,8 @@ async function rtSave(){
   const el = document.getElementById('rtMonth'); if(el && rec.date.slice(0,7)!==el.value && /^\d{4}-\d{2}/.test(rec.date)) el.value = rec.date.slice(0,7);
   await rtReload();
   toast(_rtEditId ? '수정되었습니다.' : '등록되었습니다.');
+  // 반송장이 새로 들어갔거나 바뀌었으면(수거취소·완료 건 제외) 바로 1회 조회
+  if(trackNo && !full.cancel && !full.done && (!_rtEditId || trkChangedFlag)) rtTrackNow(full.id);
 }
 async function rtToggleDone(id){
   if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
