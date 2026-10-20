@@ -1344,6 +1344,46 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .tcb-del-btn{border:none;background:none;cursor:pointer;font-size:13px;padding:2px 4px;line-height:1;color:var(--tx2);}
 .tcb-del-btn:hover{color:#DC2626;}
 .po-cat-tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:700;white-space:nowrap;}  /* 택배사 보상목록 사고유형 태그에서 공용 */
+/* 🔄 반품관리 (CX팀) — 레이아웃은 전화구매건(piv-*)을 재사용, 표만 큰 글씨로 따로 정의 */
+.rt-title{font-size:19px;font-weight:800;letter-spacing:-.3px;}
+.rt-sumbar{flex-shrink:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13.5px;color:var(--tx);}
+.rt-sumbar b{font-weight:800;}
+.rt-sumbar .rt-hint{margin-left:auto;font-size:12px;color:var(--tx2);}
+.rt-pill{display:inline-block;padding:3px 11px;border-radius:12px;font-size:12.5px;font-weight:700;white-space:nowrap;}
+.rt-pill.rt-pill-wait{background:#FEF3C7;color:#B45309;}
+.rt-pill.rt-pill-ok{background:#DCFCE7;color:#15803D;}
+.rt-pill.rt-pill-n{background:#E2E8F0;color:#334155;}
+.rt-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}
+.rt-table thead th{position:sticky;top:0;z-index:3;background:var(--bg2);padding:13px 8px;text-align:center;border-bottom:2px solid var(--bd);font-size:13.5px;font-weight:800;color:var(--tx);white-space:nowrap;}
+.rt-table tbody td{padding:12px 8px;border-bottom:1px solid var(--bd);color:var(--tx);text-align:center;vertical-align:middle;line-height:1.55;}
+.rt-table tbody tr:hover td{background:var(--bg2);}
+.rt-table tbody tr:last-child td{border-bottom:none;}
+.rt-table tbody tr.rt-click{cursor:pointer;}
+.rt-table td.rt-l{text-align:left;}
+.rt-table td.rt-wrapc{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;}
+.rt-table td.rt-nw{white-space:nowrap;}
+.rt-table .rt-w-s{min-width:66px;}
+.rt-table .rt-w-m{min-width:100px;}
+.rt-table .rt-w-l{min-width:150px;max-width:300px;}
+.rt-table .rt-w-xl{min-width:170px;max-width:340px;}
+.rt-table tbody tr.rt-done td{color:var(--tx2);}
+.rt-donebtn{border:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;padding:5px 13px;border-radius:14px;white-space:nowrap;}
+.rt-donebtn.rt-wait{background:#FEF3C7;color:#B45309;}
+.rt-donebtn.rt-ok{background:#DCFCE7;color:#15803D;}
+.rt-donebtn:hover{filter:brightness(.95);}
+.rt-donebtn[disabled]{cursor:default;}
+.rt-del{border:1px solid var(--bd);background:var(--bg);border-radius:7px;padding:4px 10px;font-size:12.5px;color:var(--tx2);cursor:pointer;font-family:inherit;}
+.rt-del:hover{border-color:#DC2626;color:#DC2626;}
+.rt-toolbar .cs-search,.rt-toolbar .piv-seg button{font-size:13px;}
+.rt-toolbar .cs-search{padding:9px 12px;}
+.rt-toolbar .cs-add-btn{font-size:13px;padding:9px 16px;}
+.rt-toolbar .cs-mini-btn{font-size:13px;padding:7px 11px;}
+#rtModal .modal{max-width:880px;padding:24px 26px;}
+#rtModal .modal h3{font-size:18px;margin-bottom:18px;}
+#rtModal .field label{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px;}
+#rtModal .field input,#rtModal .field select,#rtModal .field textarea{font-size:14.5px;padding:9px 11px;}
+#rtModal textarea{resize:vertical;min-height:78px;font-family:inherit;line-height:1.5;}
+.rt-soon{flex:1;display:flex;align-items:center;justify-content:center;color:var(--tx2);font-size:15px;line-height:1.8;text-align:center;}
 /* 📞 전화구매건 관리 */
 .piv-wrap{max-width:none;margin:0;height:calc(100vh - 110px);display:flex;flex-direction:row;box-sizing:border-box;}
 .piv-side{flex:0 0 176px;display:flex;flex-direction:column;gap:6px;padding:16px 10px 0 16px;box-sizing:border-box;}
@@ -2930,6 +2970,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div class="ni" id="nav-accreq" onclick="goMenu('accreq')">🧩 부속요청 게시판</div>
   <div class="ni" id="nav-tcb" onclick="goMenu('tcb')">💸 택배사 보상목록</div>
   <div class="ni" id="nav-phoneorder" onclick="goMenu('phoneorder')">📞 전화구매건 관리</div>
+  <div class="ni" id="nav-retmgmt" onclick="goMenu('retmgmt')">🔄 반품관리</div>
   <div class="ni" id="nav-rgmgmt" onclick="goMenu('rgmgmt')">🚀 로켓그로스 관리</div>
   <div class="ni" id="nav-rgrevenue" onclick="goGrowthRevenue()">🚀 로켓그로스 매출</div>
   <div class="ni" id="nav-cost3day" onclick="goMenu('cost3day')">📦 3일 비용계산</div>
@@ -4419,6 +4460,72 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="piv-pager" id="pivCoPager"></div>
   </div>
  </div>
+</div>
+
+<!-- ═══ 🔄 반품관리 (CX팀) — 하위메뉴: 수거접수 / 쿠팡 반품·교환 ═══ -->
+<div class="page" id="page-retmgmt">
+ <div class="piv-wrap">
+  <div class="piv-side">
+    <button class="active" id="rtStab-pickup" onclick="rtSwitchTab('pickup')">📦 수거접수</button>
+    <button id="rtStab-coupang" onclick="rtSwitchTab('coupang')">🔁 쿠팡 반품·교환</button>
+  </div>
+
+  <!-- ─── 수거접수 ─── -->
+  <div class="piv-tab active" id="rtTab-pickup">
+    <div class="piv-toolbar rt-toolbar">
+      <div class="cs-title rt-title">📦 수거접수 <span class="cs-count" id="rtCount">0</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="piv-seg" id="rtFilterSeg"></div>
+        <div class="pb-monthbar" title="접수일 기준 조회 월 (미완료 건은 월과 상관없이 항상 표시)">
+          <button class="cs-mini-btn" onclick="rtShiftMonth(-1)">◀</button>
+          <input type="month" id="rtMonth" class="cs-search" style="width:150px;" onchange="rtMonthChanged()"/>
+          <button class="cs-mini-btn" onclick="rtShiftMonth(1)">▶</button>
+        </div>
+        <input class="cs-search" id="rtSearch" placeholder="수취인·연락처·주소·상품명·증상 검색" autocomplete="off" oninput="rtSearchChanged()"/>
+        <button class="cs-mini-btn" onclick="rtReload()">🔄 새로고침</button>
+        <button class="cs-add-btn" id="rtAddBtn" style="background:#059669;" onclick="rtOpenModal()">＋ 수거접수 등록</button>
+      </div>
+    </div>
+    <div class="rt-sumbar" id="rtSumBar"></div>
+    <div class="piv-table-scroll">
+      <table class="rt-table">
+        <thead id="rtHead"></thead>
+        <tbody id="rtBody"></tbody>
+      </table>
+    </div>
+    <div class="piv-pager" id="rtPager"></div>
+  </div>
+
+  <!-- ─── 쿠팡 반품·교환 (준비 중) ─── -->
+  <div class="piv-tab" id="rtTab-coupang">
+    <div class="piv-toolbar rt-toolbar"><div class="cs-title rt-title">🔁 쿠팡 반품·교환</div></div>
+    <div class="rt-soon">수거접수 메뉴 완성 후 이어서 만들 예정입니다.<br>조금만 기다려 주세요.</div>
+  </div>
+ </div>
+</div>
+
+<!-- 반품관리 > 수거접수: 등록/수정 모달 -->
+<div class="modal-overlay" id="rtModal">
+  <div class="modal">
+    <h3 id="rtModalTitle">📦 수거접수 등록</h3>
+    <div class="piv-grid">
+      <div class="field"><label>구분</label><input type="text" id="rtFCat" list="rtCatList" autocomplete="off" placeholder="선택 또는 직접 입력"><datalist id="rtCatList"><option value="반품"></option><option value="교환"></option><option value="환불"></option><option value="AS"></option></datalist></div>
+      <div class="field"><label>접수자</label><input type="text" id="rtFStaff" autocomplete="off"></div>
+      <div class="field"><label>접수일 *</label><input type="date" id="rtFDate"></div>
+      <div class="field"><label>구매일</label><input type="date" id="rtFBuyDate"></div>
+      <div class="field"><label>배송비</label><input type="text" id="rtFShip" list="rtShipList" autocomplete="off" placeholder="금액 또는 선불/착불"><datalist id="rtShipList"><option value="선불"></option><option value="착불"></option><option value="무료"></option></datalist></div>
+      <div class="field"><label>수취인명 *</label><input type="text" id="rtFRecipient" autocomplete="off"></div>
+      <div class="field"><label>연락처</label><input type="text" id="rtFPhone" autocomplete="off" onblur="rtPhoneBlur()" placeholder="010-0000-0000"></div>
+      <div class="field piv-span2"><label>주소</label><input type="text" id="rtFAddr" autocomplete="off"></div>
+      <div class="field piv-span2"><label>상품명</label><input type="text" id="rtFProduct" autocomplete="off"></div>
+      <div class="field"><label>요청수량</label><input type="text" id="rtFQty" autocomplete="off"></div>
+      <div class="field piv-span3"><label>증상</label><textarea id="rtFSymptom"></textarea></div>
+      <div class="field piv-span3"><label>처리내용</label><textarea id="rtFMemo"></textarea></div>
+      <div class="field"><label>완료여부</label><select id="rtFDone"><option value="0">미완료</option><option value="1">완료</option></select></div>
+    </div>
+    <div class="ma"><button class="btn" onclick="closeModal('rtModal')">취소</button>
+      <button class="btn btn-pr" id="rtSaveBtn" onclick="rtSave()">저장</button></div>
+  </div>
 </div>
 
 <!-- 전화구매건: 엑셀 업로드 모달 -->
@@ -7996,7 +8103,7 @@ let currentPage='inv';   // 현재 페이지 (권한 판정에서 사용 → 인
 //   (실제 권한은 계정마다 메뉴별로 개별 저장됨 → 한 명이 여러 팀 메뉴 가능)
 // ══════════════════════════════════════════════
 const TEAM_PRESETS = {
-  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', insight:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', accreq:'edit', tcb:'edit', review:'edit', rgmgmt:'edit', knowledge:'edit' } },
+  cx:     { name:'CX팀',    perms:{ inv:'edit', sales:'edit', order:'edit', insight:'edit', rg:'edit', price:'edit', quote:'edit', family:'edit', consign:'edit', accreq:'edit', tcb:'edit', retmgmt:'edit', review:'edit', rgmgmt:'edit', knowledge:'edit' } },
   design: { name:'디자인팀', perms:{ collab:'edit', calendar:'edit', moeum:'edit', soldout:'edit' } },
   logi:   { name:'물류팀',   perms:{ logihome:'edit', logistock:'edit', logibox:'edit', logicarrot:'edit' } },
   ops:    { name:'운영관리',  perms:{ 'revenue.summary':'edit','revenue.monthly':'edit','revenue.backdata':'edit','revenue.upload':'edit','revenue.unified':'edit','revenue.daily':'edit','revenue.adcenter':'edit', hist:'edit', coupangad:'edit' } },
@@ -8169,7 +8276,7 @@ function _axColor(){ return _currentTheme()==='dark' ? '#C7C7CC' : '#888'; }
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'}, {id:'insight',label:'📊 발주 인사이트'},
   {id:'rg',label:'그로스 출고'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'tcb',label:'💸 택배사 보상목록'}, {id:'phoneorder',label:'📞 전화구매건 관리'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'knowledge',label:'📚 지식베이스'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'}, {id:'rgrevenue',label:'🚀 로켓그로스 매출'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'tcb',label:'💸 택배사 보상목록'}, {id:'phoneorder',label:'📞 전화구매건 관리'}, {id:'retmgmt',label:'🔄 반품관리'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'knowledge',label:'📚 지식베이스'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'}, {id:'rgrevenue',label:'🚀 로켓그로스 매출'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'moeum',label:'🧮 모음전 계산기'},
@@ -8188,10 +8295,10 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','insight','price','quote','family','consign','accreq','tcb','phoneorder','cost3day','review','knowledge'],
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','insight','price','quote','family','consign','accreq','tcb','phoneorder','retmgmt','cost3day','review','knowledge'],
     groups:[
       { label:'재고·발주', menus:['inv','sales','order','family','insight'] },
-      { label:'CX업무',    menus:['phoneorder','price','quote','review','knowledge','consign'] },
+      { label:'CX업무',    menus:['phoneorder','retmgmt','price','quote','review','knowledge','consign'] },
       { label:'기타',      menus:['accreq','cost3day','tcb'] },
     ] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout'] },
@@ -8319,7 +8426,7 @@ function _syncNavGroups(){
 //  · 데이터 요약이 아직 없는 메뉴는 '바로가기' 위젯으로 표시(HOME_PROVIDERS에 함수를 추가하면 요약 데이터가 붙음)
 // ══════════════════════════════════════════════
 function _isAdminUser(){ const u=window.__CURRENT_USER; return !!u && u.username==='admin'; }
-const HOME_ICONS={inv:'📦',sales:'📈',order:'🧾',insight:'📊',rg:'🚀',hist:'🕘',revenue:'💰',price:'🧮',quote:'📄',family:'👪',consign:'🚚',accreq:'🧩',tcb:'💸',phoneorder:'📞',cost3day:'📦',review:'⭐',knowledge:'📚',rgmgmt:'🚀',rgrevenue:'🚀',collab:'🤝',calendar:'📋',rpt_yuhyun:'📝',rpt_bora:'📝',rpt_yeonjeong:'📝',moeum:'🧮',soldout:'🚫',logihome:'🏠',logistock:'📦',logibox:'📮',logicarrot:'🥕',coupangad:'👥'};
+const HOME_ICONS={inv:'📦',sales:'📈',order:'🧾',insight:'📊',rg:'🚀',hist:'🕘',revenue:'💰',price:'🧮',quote:'📄',family:'👪',consign:'🚚',accreq:'🧩',tcb:'💸',phoneorder:'📞',retmgmt:'🔄',cost3day:'📦',review:'⭐',knowledge:'📚',rgmgmt:'🚀',rgrevenue:'🚀',collab:'🤝',calendar:'📋',rpt_yuhyun:'📝',rpt_bora:'📝',rpt_yeonjeong:'📝',moeum:'🧮',soldout:'🚫',logihome:'🏠',logistock:'📦',logibox:'📮',logicarrot:'🥕',coupangad:'👥'};
 let _homeCfg=null, _homeEdit=false, _homeTimer=null, _homeRefreshT=null, _homeDrag=null, _homeLanded=false;
 let _homeCalY=new Date().getFullYear(), _homeCalM=new Date().getMonth();
 let _homeSalesCache=null;
@@ -8327,6 +8434,7 @@ let _homeSalesCache=null;
 const HOME_SUBS={
   revenue:[['summary','📊 요약'],['monthly','📅 월별'],['backdata','🗂 백데이터'],['upload','📤 데이터 업로드'],['unified','📋 통합'],['daily','📄 일일보고'],['adcenter','📢 광고센터'],['region','📍 지역·연령별 현황'],['ssa','🧭 판매·방문·고객분석']],
   phoneorder:[['order','📞 전화구매건'],['invoice','🧾 세금계산서 발행'],['company','🏢 업체등록']],
+  retmgmt:[['pickup','📦 수거접수']],
   price:[['single','🧮 단가 계산기'],['combo','🧩 조합 계산기']],
   consign:[['products','📦 제품 세팅'],['orders','🧾 주문·거래 리스트']],
   knowledge:[['ask','🔍 질문으로 찾기'],['browse','📂 카테고리로 보기']],
@@ -8336,7 +8444,7 @@ const HOME_SUBS={
   logicarrot:[['list','🥕 주문 리스트'],['sales','📊 당근 매출']],
 };
 // 하위 탭 버튼의 DOM id 접두어 (버튼 id = 접두어 + 하위id) — 탭 버튼에 ☆를 붙이는 데 사용
-const HOME_SUB_BTN={revenue:'rsni-',phoneorder:'pivStab-',price:'pcSub-',consign:'csStab-',knowledge:'kbTab-',rgmgmt:'rgmStab-',review:'rvwStab-',family:'foStab-',logicarrot:'lcrSub-'};
+const HOME_SUB_BTN={revenue:'rsni-',phoneorder:'pivStab-',retmgmt:'rtStab-',price:'pcSub-',consign:'csStab-',knowledge:'kbTab-',rgmgmt:'rgmStab-',review:'rvwStab-',family:'foStab-',logicarrot:'lcrSub-'};
 function _hmParse(id){ const i=String(id).indexOf(':'); return i<0?{base:id,sub:null}:{base:id.slice(0,i),sub:id.slice(i+1)}; }
 function _hmSubDef(base,sub){ return (HOME_SUBS[base]||[]).find(x=>x[0]===sub)||null; }
 function _hmSubSplit(s){ const i=s.indexOf(' '); return {ico:s.slice(0,i), name:s.slice(i+1)}; }
@@ -8922,12 +9030,13 @@ function homeOpenWidget(id,act){
   // 하위메뉴: 해당 메뉴를 연 뒤 그 탭을 선택 (탭 버튼을 누른 것과 같은 동작)
   if(base==='revenue') _revPage=sub;      // 매출관리는 데이터 로드 뒤 _revPage 탭을 그리므로 먼저 지정
   if(base==='phoneorder') _pivTab=sub;
+  if(base==='retmgmt') _rtTab=sub;
   goMenu(base);
   if(base==='revenue' && currentPage==='revenue'){   // 데이터 로드가 끝나기 전에도 선택한 탭이 바로 보이도록 먼저 표시만 맞춤
     document.querySelectorAll('.rev-subnav .rsni').forEach(e=>e.classList.toggle('active', e.id==='rsni-'+sub));
     document.querySelectorAll('#page-revenue .rpage').forEach(e=>e.classList.toggle('active', e.id==='rpage-'+sub));
   }
-  const fn={price:'pcSwitchSub',consign:'csSwitchTab',knowledge:'kbSwitchMode',rgmgmt:'rgmSwitchTab',review:'rvwSwitchTab',family:'foSwitchTab',logicarrot:'lcrSwitchSub'}[base];
+  const fn={price:'pcSwitchSub',consign:'csSwitchTab',knowledge:'kbSwitchMode',rgmgmt:'rgmSwitchTab',review:'rvwSwitchTab',family:'foSwitchTab',logicarrot:'lcrSwitchSub',retmgmt:'rtSwitchTab'}[base];
   if(fn && currentPage===base && typeof window[fn]==='function') window[fn](sub);
 }
 function homeToggleEdit(){ _homeEdit=!_homeEdit; renderHome(); }
@@ -13990,7 +14099,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['home','inv','sales','order','insight','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','rgmgmt','cost3day','review','knowledge','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logicarrot','coupangad'].forEach(x=>{
+  ['home','inv','sales','order','insight','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','retmgmt','rgmgmt','cost3day','review','knowledge','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logicarrot','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -14039,6 +14148,7 @@ function goPage(p){
   if(p==='accreq') arqInit();
   if(p==='tcb') tcbInit();
   if(p==='phoneorder') pivInit();
+  if(p==='retmgmt') rtInit();
   if(p==='rgmgmt') rgmInit();
   if(p==='cost3day') c3Init();
   if(p==='review') reviewInit();
@@ -36426,6 +36536,266 @@ function _ntfRelayout(){
     const el = document.getElementById('ntf-'+id); if(!el) return;
     el.style.bottom = bottom+'px';
     bottom += el.offsetHeight + 12;
+  });
+}
+
+// ══════════════════════════════════════════════
+// 🔄 반품관리 (CX팀) — 하위메뉴: 수거접수 / 쿠팡 반품·교환(준비 중)
+//  수거접수: 건별 개별 저장 — work_calendar(person='__app__', kind='rt_<id>', data=레코드). 전화구매건(pb_*)과 같은 방식이라
+//            여러 PC가 동시에 작업해도 서로의 건을 덮어쓰지 않는다. (접두어 rt_ 는 다른 기능과 겹치지 않음)
+//  레코드: {id,cat(구분),staff(접수자),date(접수일),buyDate(구매일),ship(배송비·문자 그대로),recipient(수취인명),phone,addr,
+//           product,qty(요청수량),symptom(증상),memo(처리내용),done(완료여부 true/false),doneAt,source:'manual',createdAt,updatedAt}
+//  조회(egress 절약): 미완료 건은 월과 무관하게 전부 + 선택한 월(접수일 기준)의 건만.
+//  DB 읽기/쓰기는 _rtFetch*/_rtUpsert/_rtRemove 함수 안에서만 한다(검증 시 이 함수들만 가로채면 실DB 쓰기 방지).
+// ══════════════════════════════════════════════
+const RT_COLS = [
+  {k:'cat',h:'구분',cls:'rt-w-s'},{k:'staff',h:'접수자',cls:'rt-w-s'},{k:'date',h:'접수일',cls:'rt-w-m'},{k:'buyDate',h:'구매일',cls:'rt-w-m'},
+  {k:'ship',h:'배송비',cls:'rt-w-s'},{k:'recipient',h:'수취인명',cls:'rt-w-s'},{k:'phone',h:'연락처',cls:'rt-w-m'},{k:'addr',h:'주소',cls:'rt-w-xl'},
+  {k:'product',h:'상품명',cls:'rt-w-xl'},{k:'qty',h:'요청수량',cls:'rt-w-s'},{k:'symptom',h:'증상',cls:'rt-w-l'},{k:'memo',h:'처리내용',cls:'rt-w-l'},
+  {k:'done',h:'완료여부',cls:'rt-w-s'}
+];
+const RT_CAT_STYLE = {   // 구분 배지 색 — 배경·글자색을 함께 고정(다크모드에서도 읽히도록)
+  '반품':'background:#DBEAFE;color:#1D4ED8;', '교환':'background:#EDE9FE;color:#6D28D9;',
+  '환불':'background:#FFEDD5;color:#C2410C;', 'AS':'background:#CCFBF1;color:#0F766E;'
+};
+const RT_PAGE_SIZE = 50;
+let _rtTab = 'pickup';
+let _rtInited = false;
+let _rtLoaded = false;
+let _rtOpen = [];         // 서버에서 받은 미완료 건(전체 기간)
+let _rtMonthRows = [];    // 선택한 월의 건
+let _rtAll = [];          // 위 둘을 합친 목록
+let _rtFilter = 'all';    // all | open | done
+let _rtPage = 0;
+let _rtEditId = null;
+let _rtSaving = false;
+
+function _rtCanEdit(){ return _permOf('retmgmt')==='edit'; }
+function _rtNorm(s){ return String(s==null?'':s).replace(/\s+/g,'').toLowerCase(); }
+function _rtNextYm(ym){ const [y,m]=ym.split('-').map(Number); return m===12 ? (y+1)+'-01' : y+'-'+String(m+1).padStart(2,'0'); }
+function _rtFmtPhone(v){
+  const s = String(v||'').trim();
+  if(!s || /[^\d\-\s]/.test(s)) return s;          // 숫자·하이픈·공백 외 글자가 섞여 있으면 손대지 않음
+  const d = s.replace(/\D/g,'');
+  if(d.length===11) return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7);
+  if(d.length===10) return d.startsWith('02') ? d.slice(0,2)+'-'+d.slice(2,6)+'-'+d.slice(6) : d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
+  if(d.length===9 && d.startsWith('02')) return d.slice(0,2)+'-'+d.slice(2,5)+'-'+d.slice(5);
+  return s;
+}
+function _rtFmtShip(v){
+  const s = String(v==null?'':v).trim();
+  if(/^\d[\d,]*$/.test(s)) return Number(s.replace(/,/g,'')).toLocaleString('ko-KR')+'원';
+  return s;
+}
+
+function rtInit(){
+  if(!_rtInited){
+    _rtInited = true;
+    document.getElementById('rtHead').innerHTML = '<tr>'+RT_COLS.map(c=>`<th class="${c.cls}">${c.h}</th>`).join('')+'<th style="width:70px;">관리</th></tr>';
+    document.getElementById('rtMonth').value = _pivToday().slice(0,7);
+  }
+  rtSwitchTab(_rtTab);
+  const add = document.getElementById('rtAddBtn'); if(add) add.style.display = _rtCanEdit() ? '' : 'none';
+  rtReload();   // 메뉴에 들어올 때마다 최신 상태로
+}
+function rtSwitchTab(t){
+  _rtTab = t;
+  ['pickup','coupang'].forEach(x=>{
+    document.getElementById('rtStab-'+x)?.classList.toggle('active', x===t);
+    document.getElementById('rtTab-'+x)?.classList.toggle('active', x===t);
+  });
+}
+
+// ── DB 접근 (이 함수들만 sb를 직접 사용) ──
+async function _rtFetch(filterFn){
+  const all = [];
+  for(let from=0; ; from+=1000){
+    let q = sb.from('work_calendar').select('kind,data').eq('person','__app__').like('kind','rt\\_%');
+    const {data,error} = await filterFn(q).order('kind').range(from, from+999);
+    if(error){ console.warn('rtFetch 오류', error.message); return null; }
+    (data||[]).forEach(r=>{ if(r.data && r.data.id) all.push(r.data); });
+    if(!data || data.length<1000) break;
+  }
+  return all;
+}
+function _rtFetchOpen(){ return _rtFetch(q=>q.eq('data->>done','false')); }
+function _rtFetchMonth(ym){ return _rtFetch(q=>q.gte('data->>date', ym+'-01').lt('data->>date', _rtNextYm(ym)+'-01')); }
+function _rtFetchByIds(ids){ return ids.length ? _rtFetch(q=>q.in('kind', ids.map(i=>'rt_'+i))) : Promise.resolve([]); }
+async function _rtUpsert(recs){
+  const now = new Date().toISOString();
+  const rows = recs.map(r=>({ person:'__app__', kind:'rt_'+r.id, data:r, updated_at:now }));
+  const {error} = await sb.from('work_calendar').upsert(rows, { onConflict:'person,kind' });
+  if(error){ console.warn('rtUpsert 오류', error.message); return false; }
+  return true;
+}
+async function _rtRemove(id){
+  await sb.from('work_calendar').delete().eq('person','__app__').eq('kind','rt_'+id);
+  // delete().select() 결과는 RLS 때문에 신뢰할 수 없어 실제로 사라졌는지 다시 조회해서 확인
+  const {data} = await sb.from('work_calendar').select('kind').eq('person','__app__').eq('kind','rt_'+id);
+  return !(data && data.length);
+}
+
+async function rtReload(){
+  const ym = document.getElementById('rtMonth').value || _pivToday().slice(0,7);
+  const [o, m] = await Promise.all([_rtFetchOpen(), _rtFetchMonth(ym)]);
+  if(o===null || m===null){ toast('수거접수 건을 불러오지 못했습니다. 잠시 후 새로고침해주세요.'); if(!_rtLoaded) return; }
+  else { _rtOpen = o; _rtMonthRows = m; }
+  _rtLoaded = true;
+  rtRender();
+}
+function rtMonthChanged(){ _rtPage = 0; rtReload(); }
+function rtShiftMonth(d){
+  const el = document.getElementById('rtMonth'); const cur = el.value || _pivToday().slice(0,7);
+  const [y,m] = cur.split('-').map(Number); const t = new Date(y, m-1+d, 1);
+  el.value = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');
+  rtMonthChanged();
+}
+function rtSearchChanged(){ _rtPage = 0; rtRender(); }
+function rtSetFilter(f){ _rtFilter = f; _rtPage = 0; rtRender(); }
+function rtGoto(p){ _rtPage = Math.max(0,p); rtRender(); document.querySelector('#rtTab-pickup .piv-table-scroll')?.scrollTo({top:0}); }
+function _rtFind(id){ return _rtAll.find(x=>x.id===id); }
+function _rtSort(a,b){ return String(b.date||'').localeCompare(String(a.date||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')); }
+function _rtMatch(r, q){
+  if(!q) return true;
+  return [r.cat,r.staff,r.recipient,r.phone,r.addr,r.product,r.symptom,r.memo].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
+}
+
+function rtRender(){
+  const q = (document.getElementById('rtSearch')?.value||'').trim().toLowerCase();
+  const byId = new Map(); _rtOpen.concat(_rtMonthRows).forEach(r=>byId.set(r.id,r));
+  _rtAll = [...byId.values()];
+  const ym = document.getElementById('rtMonth').value || '';
+  const openN = _rtAll.filter(r=>!r.done).length;                        // 전체 기간 미완료
+  const monthRows = _rtMonthRows;
+  const monthDone = monthRows.filter(r=>r.done).length;
+  // 목록: 미완료는 월과 무관하게 포함, 완료 건은 선택한 월 것만
+  let list = _rtAll.filter(r=> !r.done || String(r.date||'').startsWith(ym));
+  if(_rtFilter==='open') list = list.filter(r=>!r.done);
+  else if(_rtFilter==='done') list = list.filter(r=>r.done);
+  list = list.filter(r=>_rtMatch(r,q)).sort(_rtSort);
+
+  const seg = document.getElementById('rtFilterSeg');
+  if(seg){
+    const items = [['all','전체'],['open',`미완료 ${openN}`],['done','완료']];
+    seg.innerHTML = items.map(([k,l])=>`<button class="${_rtFilter===k?'on':''}${k==='open'&&_rtFilter===k?' piv-seg-warn':''}" onclick="rtSetFilter('${k}')">${l}</button>`).join('');
+  }
+  document.getElementById('rtCount').textContent = list.length;
+  const mm = ym ? Number(ym.slice(5,7))+'월' : '';
+  document.getElementById('rtSumBar').innerHTML =
+    `<span class="rt-pill rt-pill-wait">미완료 ${openN}건</span>`
+    + `<span class="rt-pill rt-pill-n">${mm} 접수 ${monthRows.length}건</span>`
+    + `<span class="rt-pill rt-pill-ok">${mm} 완료 ${monthDone}건</span>`
+    + `<span class="rt-hint">미완료 건은 월과 관계없이 항상 표시됩니다 · 완료여부 배지를 누르면 완료/미완료가 바뀝니다 · 행을 누르면 수정</span>`;
+
+  const canEdit = _rtCanEdit();
+  const maxP = Math.max(1, Math.ceil(list.length/RT_PAGE_SIZE));
+  if(_rtPage > maxP-1) _rtPage = maxP-1;
+  const body = document.getElementById('rtBody');
+  if(!_rtLoaded) body.innerHTML = `<tr><td colspan="${RT_COLS.length+1}" class="cs-empty">불러오는 중…</td></tr>`;
+  else if(!list.length) body.innerHTML = `<tr><td colspan="${RT_COLS.length+1}" class="cs-empty">${q||_rtFilter!=='all'?'조건에 맞는 접수 건이 없습니다.':'이 달에 접수된 건이 없습니다. “＋ 수거접수 등록”으로 추가하세요.'}</td></tr>`;
+  else body.innerHTML = list.slice(_rtPage*RT_PAGE_SIZE,(_rtPage+1)*RT_PAGE_SIZE).map(r=>_rtRowHtml(r,canEdit)).join('');
+  document.getElementById('rtPager').innerHTML = _rgmPagerHtml(_rtPage, RT_PAGE_SIZE, list.length, 'rtGoto');
+}
+
+function _rtRowHtml(r, canEdit){
+  const wr = (v,cls)=>`<td class="rt-l rt-wrapc ${cls}">${_esc(v||'')}</td>`;
+  const cat = r.cat ? `<span class="rt-pill" style="${RT_CAT_STYLE[r.cat]||'background:#E2E8F0;color:#334155;'}">${_esc(r.cat)}</span>` : '';
+  const done = r.done
+    ? `<button class="rt-donebtn rt-ok" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 미완료로 되돌립니다"`:'disabled'}>✔ 완료</button>`
+    : `<button class="rt-donebtn rt-wait" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 완료 처리합니다"`:'disabled'}>⏳ 미완료</button>`;
+  return `<tr class="${canEdit?'rt-click':''}${r.done?' rt-done':''}" ${canEdit?`onclick="rtOpenModal('${r.id}')"`:''}>
+    <td class="rt-nw">${cat}</td>
+    <td class="rt-nw">${_esc(r.staff||'')}</td>
+    <td class="rt-nw">${_esc(r.date||'')}</td>
+    <td class="rt-nw">${_esc(r.buyDate||'')}</td>
+    <td class="rt-nw">${_esc(_rtFmtShip(r.ship))}</td>
+    <td class="rt-nw"><b>${_esc(r.recipient||'')}</b></td>
+    <td class="rt-nw">${_esc(r.phone||'')}</td>
+    ${wr(r.addr,'rt-w-xl')}
+    ${wr(r.product,'rt-w-xl')}
+    <td class="rt-nw">${_esc(r.qty==null?'':r.qty)}</td>
+    ${wr(r.symptom,'rt-w-l')}
+    ${wr(r.memo,'rt-w-l')}
+    <td class="rt-nw">${done}</td>
+    <td>${canEdit?`<button class="rt-del" onclick="event.stopPropagation();rtDelete('${r.id}')">삭제</button>`:''}</td>
+  </tr>`;
+}
+
+// ───────────────── 등록 / 수정 / 완료 토글 / 삭제 ─────────────────
+const RT_FIELD_IDS = { cat:'Cat', staff:'Staff', date:'Date', buyDate:'BuyDate', ship:'Ship', recipient:'Recipient', phone:'Phone', addr:'Addr', product:'Product', qty:'Qty', symptom:'Symptom', memo:'Memo' };
+function rtPhoneBlur(){ const el = document.getElementById('rtFPhone'); if(el) el.value = _rtFmtPhone(el.value); }
+function rtOpenModal(id){
+  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  _rtEditId = id || null;
+  const r = id ? (_rtFind(id) || {}) : {};
+  const u = window.__CURRENT_USER || {};
+  document.getElementById('rtModalTitle').textContent = id ? '📦 수거접수 수정' : '📦 수거접수 등록';
+  Object.entries(RT_FIELD_IDS).forEach(([k,suffix])=>{
+    let v = r[k];
+    if(!id && k==='date') v = _pivToday();
+    if(!id && k==='staff') v = u.name || u.username || '';
+    document.getElementById('rtF'+suffix).value = v==null ? '' : v;
+  });
+  document.getElementById('rtFDone').value = r.done ? '1' : '0';
+  openModal('rtModal');
+  setTimeout(()=>document.getElementById(id?'rtFRecipient':'rtFCat')?.focus(), 100);
+}
+async function rtSave(){
+  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  if(_rtSaving) return;
+  const g = k=>document.getElementById('rtF'+RT_FIELD_IDS[k]).value.trim();
+  const rec = {};
+  Object.keys(RT_FIELD_IDS).forEach(k=>{ rec[k] = g(k); });
+  if(!rec.date){ toast('접수일을 입력하세요.'); return; }
+  if(!rec.recipient){ toast('수취인명을 입력하세요.'); return; }
+  rec.phone = _rtFmtPhone(rec.phone);
+  const done = document.getElementById('rtFDone').value==='1';
+  const btn = document.getElementById('rtSaveBtn');
+  _rtSaving = true; btn.disabled = true; btn.textContent = '저장 중…';
+  const fail = (msg)=>{ _rtSaving = false; btn.disabled = false; btn.textContent = '저장'; toast(msg); };
+  const now = new Date().toISOString();
+  let full;
+  if(_rtEditId){
+    // 다른 PC에서 그 사이 바뀐 값을 덮어쓰지 않도록 서버 최신본에 이 화면에서 편집한 항목만 얹는다
+    const latest = await _rtFetchByIds([_rtEditId]);
+    if(latest===null){ fail('저장하기 전 최신 내용을 확인하지 못했습니다. 다시 시도해주세요.'); return; }
+    const base = latest[0] || _rtFind(_rtEditId) || {};
+    const wasDone = !!base.done;
+    full = { ...base, ...rec, id:_rtEditId, done, doneAt: done ? (wasDone ? (base.doneAt||now) : now) : '', updatedAt:now };
+  } else {
+    full = { ...rec, id:_pivNewId('rt'), done, doneAt: done ? now : '', source:'manual', createdAt:now, updatedAt:now };
+  }
+  const ok = await _rtUpsert([full]);
+  if(!ok){ fail('저장에 실패했습니다. 다시 시도해주세요.'); return; }
+  _rtSaving = false; btn.disabled = false; btn.textContent = '저장';
+  closeModal('rtModal');
+  // 방금 저장한 접수일의 달로 이동해서 바로 확인
+  const el = document.getElementById('rtMonth'); if(el && rec.date.slice(0,7)!==el.value && /^\d{4}-\d{2}/.test(rec.date)) el.value = rec.date.slice(0,7);
+  await rtReload();
+  toast(_rtEditId ? '수정되었습니다.' : '등록되었습니다.');
+}
+async function rtToggleDone(id){
+  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  const cur = _rtFind(id); if(!cur) return;
+  const latest = await _rtFetchByIds([id]);
+  if(latest===null){ toast('최신 내용을 확인하지 못했습니다. 다시 시도해주세요.'); return; }
+  const base = latest[0] || cur;
+  const now = new Date().toISOString();
+  const done = !base.done;
+  const u = window.__CURRENT_USER || {};
+  const ok = await _rtUpsert([{ ...base, done, doneAt: done ? now : '', doneBy: done ? (u.name||u.username||'') : '', updatedAt:now }]);
+  if(!ok){ toast('변경에 실패했습니다. 다시 시도해주세요.'); return; }
+  await rtReload();
+  toast(done ? '완료 처리되었습니다.' : '미완료로 되돌렸습니다.');
+}
+function rtDelete(id){
+  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  const r = _rtFind(id); if(!r) return;
+  _openDelPw(`수거접수 삭제 — ${r.recipient||''} / ${r.product||''}`, async ()=>{
+    const ok = await _rtRemove(id);
+    if(!ok){ toast('삭제되지 않았습니다. 잠시 후 다시 시도해주세요.'); return; }
+    await rtReload();
+    toast('삭제되었습니다.');
   });
 }
 
