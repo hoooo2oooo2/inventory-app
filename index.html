@@ -986,6 +986,24 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 #page-revenue .rev-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
 #page-revenue .rev-kpi-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;padding:16px 18px;}
 #rpage-summary .rev-kpi{grid-template-columns:repeat(5,1fr);}
+/* 요약 탭 TOP10·월별 요약 — 좌우 배치 + 읽기 쉬운 표 */
+#rpage-summary .rev-sum-tables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+#rpage-summary .rev-sum-tbl table{width:100%;table-layout:fixed;border-collapse:collapse;}
+#rpage-summary .rev-sum-tbl th{padding:9px 10px;font-size:11.5px;font-weight:600;color:var(--tx2);background:var(--bg2);white-space:nowrap;}
+#rpage-summary .rev-sum-tbl td{padding:9px 10px;font-size:12.5px;font-variant-numeric:tabular-nums;border-bottom:0.5px solid var(--bd);}
+#rpage-summary .rev-sum-tbl tbody tr:nth-child(even){background:rgba(120,130,150,.07);}
+#rpage-summary .rev-sum-tbl tbody tr:hover{background:rgba(49,130,246,.10);}
+#rpage-summary .rev-sum-tbl tbody tr:last-child td{border-bottom:none;}
+#rpage-summary .rev-sum-tbl td.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+#rpage-summary .rev-sum-tbl tr.cur-month{background:rgba(49,130,246,.12) !important;}
+#rpage-summary .rev-sum-tbl tr.cur-month td{font-weight:700;}
+#rpage-summary .rev-mr-hi{color:#059669;font-weight:600;}
+#rpage-summary .rev-mr-lo{color:#DC2626;font-weight:600;}
+#rpage-summary .rev-gr{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:600;}
+#rpage-summary .rev-gr.up{background:rgba(220,38,38,.12);color:#DC2626;}
+#rpage-summary .rev-gr.dn{background:rgba(5,150,105,.12);color:#059669;}
+#rpage-summary .rev-mon-now{display:inline-block;margin-left:5px;padding:0 5px;border-radius:6px;font-size:10px;font-weight:600;background:var(--pr);color:#fff;}
+@media(max-width:1200px){#rpage-summary .rev-sum-tables{grid-template-columns:1fr;}}
 .rev-kpi-badge{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;background:rgba(249,115,22,.15);color:#F97316;margin-left:2px;}
 #page-revenue .rev-kpi-lbl{font-size:11px;color:var(--tx2);margin-bottom:6px;display:flex;align-items:center;gap:5px;}
 #page-revenue .rev-kpi-val{font-size:26px;font-weight:800;letter-spacing:-0.5px;color:var(--tx);}
@@ -6345,39 +6363,37 @@ html.mob-native .lcr-det-val{font-size:15px;}
           <div class="rev-empty" id="revDnutEmpty" style="padding:16px;">업로드된 데이터가 없습니다</div>
         </div>
       </div>
-      <!-- TOP10 + 판매처 막대 -->
-      <div class="rev-chart-grid">
-        <div class="rev-tbl-card">
+      <!-- TOP10(좌) + 월별 요약(우) -->
+      <div class="rev-sum-tables">
+        <div class="rev-tbl-card rev-sum-tbl">
           <div class="rev-tbl-head">
             <span class="rev-tbl-title">🏆 이번달 TOP10 상품</span>
             <span style="font-size:11px;color:var(--tx2);">매출 기준</span>
           </div>
           <div class="rev-empty" id="revTop10Empty">업로드된 데이터가 없습니다</div>
           <div class="tw"><table class="dt" id="revTop10Tbl" style="display:none;">
+            <colgroup><col style="width:38px;"><col><col style="width:72px;"><col style="width:78px;"><col style="width:78px;"><col style="width:66px;"></colgroup>
             <thead><tr>
-              <th style="width:32px;">#</th><th>상품명</th>
+              <th>#</th><th>상품명</th>
               <th style="text-align:right;">주문수량</th><th style="text-align:right;">매출</th>
               <th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
             </tr></thead>
             <tbody id="revTop10Tbody"></tbody>
           </table></div>
         </div>
-        <div class="rev-card">
-          <div class="rev-card-title"><span>📦 판매처별 매출</span></div>
-          <div id="revSumChBars"><div class="rev-empty" style="padding:20px;">업로드된 데이터가 없습니다</div></div>
+        <!-- 월별 요약 테이블 -->
+        <div class="rev-tbl-card rev-sum-tbl">
+          <div class="rev-tbl-head"><span class="rev-tbl-title">📋 월별 요약</span></div>
+          <div class="rev-empty" id="revMonthlySumEmpty">업로드된 데이터가 없습니다</div>
+          <div class="tw"><table class="dt" id="revMonthlyTbl" style="display:none;">
+            <colgroup><col style="width:84px;"><col><col style="width:78px;"><col style="width:66px;"><col style="width:84px;"><col style="width:84px;"></colgroup>
+            <thead><tr>
+              <th>월</th><th style="text-align:right;">매출</th><th style="text-align:right;">마진</th>
+              <th style="text-align:right;">마진율</th><th style="text-align:right;">주문건수</th><th style="text-align:right;">전월대비</th>
+            </tr></thead>
+            <tbody id="revMonthlyTbody"></tbody>
+          </table></div>
         </div>
-      </div>
-      <!-- 월별 요약 테이블 -->
-      <div class="rev-tbl-card">
-        <div class="rev-tbl-head"><span class="rev-tbl-title">📋 월별 요약</span></div>
-        <div class="rev-empty" id="revMonthlySumEmpty">업로드된 데이터가 없습니다</div>
-        <div class="tw"><table class="dt" id="revMonthlyTbl" style="display:none;">
-          <thead><tr>
-            <th>월</th><th style="text-align:right;">매출</th><th style="text-align:right;">마진</th>
-            <th style="text-align:right;">마진율</th><th style="text-align:right;">주문건수</th><th style="text-align:right;">전월대비</th>
-          </tr></thead>
-          <tbody id="revMonthlyTbody"></tbody>
-        </table></div>
       </div>
     </div>
 
@@ -21967,6 +21983,8 @@ function rgSumDailyField(field, year, month, day){
 }
 function rgSumRevenue(year, month, day){ return rgSumDailyField('revenue', year, month, day); }
 
+// 요약 탭 표 마진율 색상 — 25% 이상 초록, 15% 미만 빨강
+function _revMrCls(r){ return r==null?'':r>=25?'rev-mr-hi':r<15?'rev-mr-lo':''; }
 // ── 요약 탭 렌더링 ──
 function renderRevSummary(){
   if(!_revData.length){ return; }
@@ -22225,11 +22243,11 @@ function renderRevSummary(){
       t10Body.innerHTML=top10.map(([name,v],i)=>`
         <tr>
           <td><span class="rank-badge ${i<3?['rank-1','rank-2','rank-3'][i]:''}">${i+1}</span></td>
-          <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;">${name}</td>
+          <td class="nm" title="${String(name).replace(/"/g,'&quot;')}">${name}</td>
           <td style="text-align:right;">${v.qty.toLocaleString()}</td>
           <td style="text-align:right;font-weight:600;">${fmt(v.sale)}</td>
           <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':v.margin<0?'rev-margin-neg':''}">${fmt(v.margin)}</td>
-          <td style="text-align:right;color:var(--tx2);">${v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-'}</td>
+          <td style="text-align:right;" class="${_revMrCls(v.settle>0?v.margin/v.settle*100:null)}">${v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-'}</td>
         </tr>`).join('');
     } else {
       if(t10Empty) t10Empty.style.display='block';
@@ -22244,18 +22262,22 @@ function renderRevSummary(){
   if(mBody && ymKeys.length){
     if(mEmpty) mEmpty.style.display='none';
     if(mTbl) mTbl.style.display='';
+    const maxSale=Math.max(1,...ymKeys.map(k=>byYM[k].sale));
+    const curKey=`${cy}-${ymStr(cm)}`;
     mBody.innerHTML=ymKeys.slice().reverse().map((k,i,arr)=>{
       const v=byYM[k];
       const prev=arr[i+1]?byYM[arr[i+1]]:null;
-      const rate=v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-';
+      const rateNum=v.settle>0?v.margin/v.settle*100:null;
+      const rate=rateNum!=null?rateNum.toFixed(1)+'%':'-';
       const gr=prev&&prev.sale?((v.sale-prev.sale)/prev.sale*100).toFixed(1):null;
-      return `<tr>
-        <td style="font-weight:600;">${k}</td>
-        <td style="text-align:right;">${fmt(v.sale)}</td>
+      const barW=Math.round(v.sale/maxSale*100);   // 매출 칸 배경 막대(최대 매출 월=100%)
+      return `<tr${k===curKey?' class="cur-month"':''}>
+        <td style="font-weight:600;">${k}${k===curKey?'<span class="rev-mon-now">이번달</span>':''}</td>
+        <td style="text-align:right;background:linear-gradient(90deg,rgba(49,130,246,.22) ${barW}%,transparent ${barW}%) no-repeat center/100% 52%;">${fmt(v.sale)}</td>
         <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':''}">${fmt(v.margin)}</td>
-        <td style="text-align:right;">${rate}</td>
+        <td style="text-align:right;" class="${_revMrCls(rateNum)}">${rate}</td>
         <td style="text-align:right;">${v.cnt.toLocaleString()}건</td>
-        <td style="text-align:right;font-size:11px;">${gr!==null?(gr>=0?`<span style="color:#DC2626;">▲${gr}%</span>`:`<span style="color:#059669;">▼${Math.abs(gr)}%</span>`):'-'}</td>
+        <td style="text-align:right;">${gr!==null?(gr>=0?`<span class="rev-gr up">▲ ${gr}%</span>`:`<span class="rev-gr dn">▼ ${Math.abs(gr)}%</span>`):'-'}</td>
       </tr>`;
     }).join('');
   }
