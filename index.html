@@ -4541,7 +4541,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>수취인명 *</label><input type="text" id="rtFRecipient" autocomplete="off"></div>
       <div class="field"><label>연락처</label><input type="text" id="rtFPhone" autocomplete="off" onblur="rtPhoneBlur()" placeholder="010-0000-0000"></div>
       <div class="field piv-span2"><label>주소</label><input type="text" id="rtFAddr" autocomplete="off"></div>
-      <div class="field piv-span2"><label>상품명</label><input type="text" id="rtFProduct" autocomplete="off"></div>
+      <div class="field piv-span2"><label>상품명 (운영관리 백데이터에서 선택)</label>
+        <div style="display:flex;gap:6px;align-items:stretch;"><input type="text" id="rtFProduct" readonly placeholder="🔍 상품 선택 버튼을 눌러 백데이터에서 가져오세요" style="cursor:pointer;" onclick="rtPickProduct()"><button type="button" class="cs-mini-btn" style="white-space:nowrap;font-size:13px;padding:0 12px;" onclick="rtPickProduct()">🔍 상품 선택</button><button type="button" class="cs-mini-btn" style="white-space:nowrap;font-size:13px;padding:0 10px;" onclick="rtClearProduct()">지우기</button></div>
+        <input type="hidden" id="rtFProductCode"></div>
       <div class="field"><label>요청수량</label><input type="text" id="rtFQty" autocomplete="off"></div>
       <div class="field piv-span3"><label>증상</label><textarea id="rtFSymptom"></textarea></div>
       <div class="field piv-span3"><label>처리내용</label><textarea id="rtFMemo"></textarea></div>
@@ -36787,7 +36789,7 @@ function _rtFind(id){ return _rtAll.find(x=>x.id===id); }
 function _rtSort(a,b){ return String(b.date||'').localeCompare(String(a.date||'')) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')); }
 function _rtMatch(r, q){
   if(!q) return true;
-  return [r.cat,r.staff,r.recipient,r.phone,r.addr,r.product,r.symptom,r.memo].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
+  return [r.cat,r.staff,r.recipient,r.phone,r.addr,r.product,r.productCode,r.symptom,r.memo].map(x=>String(x||'').toLowerCase()).join(' ').includes(q);
 }
 
 function rtRender(){
@@ -36879,7 +36881,7 @@ function rtOpenView(id){
       v('구분',r.cat) + v('접수자',r.staff) + v('접수일',r.date)
     + v('구매일',r.buyDate) + v('배송비',_rtFmtShip(r.ship)) + v('수취인명',r.recipient)
     + v('연락처',r.phone) + v('주소',r.addr,'rt-v2')
-    + v('상품명',r.product,'rt-v2') + v('요청수량',r.qty)
+    + v('상품명',(r.product||'') + (r.productCode ? '\n['+r.productCode+']' : ''),'rt-v2') + v('요청수량',r.qty)
     + v('증상',r.symptom,'rt-v3') + v('처리내용',r.memo,'rt-v3')
     + v('반송장번호', r.trackNo ? _rtCarName(r.carrier)+' '+r.trackNo : '', 'rt-v2')
     + (() => { const i = rtTrackInfo(r); if(!i) return v('배송상태',''); const t = i.t;
@@ -36892,6 +36894,18 @@ function rtViewToEdit(){
   const id = _rtViewId; if(!id) return;
   closeModal('rtViewModal');
   rtOpenModal(id);
+}
+// 상품명은 직접 입력하지 않고 운영관리 백데이터(공용 상품 검색 팝업)에서 선택 — 코드도 함께 저장
+function rtPickProduct(){
+  if(!_rtCanEdit()) return;
+  bdPickerOpen({ title:'🔍 수거 상품 선택 (코드·상품명)', initial:'', allowFree:false, onPick:r=>{
+    document.getElementById('rtFProduct').value = r.name || r.code || '';
+    document.getElementById('rtFProductCode').value = r.code || '';
+  }});
+}
+function rtClearProduct(){
+  document.getElementById('rtFProduct').value = '';
+  document.getElementById('rtFProductCode').value = '';
 }
 function rtPhoneBlur(){ const el = document.getElementById('rtFPhone'); if(el) el.value = _rtFmtPhone(el.value); }
 function rtOpenModal(id){
@@ -36908,6 +36922,7 @@ function rtOpenModal(id){
     if(k==='ship'){ const d = String(v==null?'':v).trim(); v = /^[\d,]+$/.test(d) ? Number(d.replace(/,/g,'')).toLocaleString('ko-KR') : d; }
     document.getElementById('rtF'+suffix).value = v==null ? '' : v;
   });
+  document.getElementById('rtFProductCode').value = r.productCode || '';
   _pbSetSelect('rtFCat', r.cat || '', RT_CATS, '선택');
   document.getElementById('rtFCarrier').innerHTML = RT_CARRIERS.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join('');
   document.getElementById('rtFCarrier').value = r.carrier || '04';
@@ -36926,6 +36941,7 @@ async function rtSave(){
   if(!rec.date){ toast('접수일을 입력하세요.'); return; }
   if(!rec.recipient){ toast('수취인명을 입력하세요.'); return; }
   rec.phone = _rtFmtPhone(rec.phone);
+  rec.productCode = rec.product ? document.getElementById('rtFProductCode').value.trim() : '';
   rec.ship = String(rec.ship||'').replace(/,/g,'').trim();
   const trackNo = document.getElementById('rtFTrackNo').value.replace(/\D/g,'');
   const carrier = document.getElementById('rtFCarrier').value || '04';
