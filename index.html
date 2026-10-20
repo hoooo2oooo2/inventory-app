@@ -985,6 +985,8 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 #page-revenue .rmain{padding:16px;display:flex;flex-direction:column;gap:14px;padding-bottom:80px;}
 #page-revenue .rev-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
 #page-revenue .rev-kpi-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;padding:16px 18px;}
+#rpage-summary .rev-kpi{grid-template-columns:repeat(5,1fr);}
+.rev-kpi-badge{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;background:rgba(249,115,22,.15);color:#F97316;margin-left:2px;}
 #page-revenue .rev-kpi-lbl{font-size:11px;color:var(--tx2);margin-bottom:6px;display:flex;align-items:center;gap:5px;}
 #page-revenue .rev-kpi-val{font-size:26px;font-weight:800;letter-spacing:-0.5px;color:var(--tx);}
 #page-revenue .rev-kpi-sub{font-size:11px;margin-top:5px;font-weight:500;display:flex;align-items:center;gap:4px;}
@@ -6304,7 +6306,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
           <div class="rev-kpi-sub" style="color:var(--tx2);">데이터 없음</div>
         </div>
         <div class="rev-kpi-card">
-          <div class="rev-kpi-lbl">📈 이번달 마진</div>
+          <div class="rev-kpi-lbl">📈 이번달 마진 <span class="rev-kpi-badge">광고비 차감</span></div>
           <div class="rev-kpi-val" id="revKpi1">—</div>
           <div class="rev-kpi-sub" style="color:var(--tx2);">데이터 없음</div>
         </div>
@@ -6317,6 +6319,11 @@ html.mob-native .lcr-det-val{font-size:15px;}
           <div class="rev-kpi-lbl">🛒 이번달 주문건수</div>
           <div class="rev-kpi-val" id="revKpi3">—</div>
           <div class="rev-kpi-sub" style="color:var(--tx2);">데이터 없음</div>
+        </div>
+        <div class="rev-kpi-card">
+          <div class="rev-kpi-lbl">📢 이번달 광고비</div>
+          <div class="rev-kpi-val" id="revKpi4">—</div>
+          <div class="rev-kpi-sub" style="color:var(--tx2);flex-wrap:wrap;">데이터 없음</div>
         </div>
       </div>
       <!-- 차트 그리드: 추이차트 + 도넛 -->
@@ -21992,8 +21999,9 @@ function renderRevSummary(){
   });
   const cur=sum(thisMonth), prv=sum(lastMonth);
   // 광고비 차감 반영 (마진 = 마진 - 광고비)
-  cur.margin -= sumAdSpend({year:cy, month:cm});
-  prv.margin -= sumAdSpend({year:prevY, month:prevM});
+  const adCur = sumAdSpend({year:cy, month:cm}), adPrv = sumAdSpend({year:prevY, month:prevM});
+  cur.margin -= adCur;
+  prv.margin -= adPrv;
   // 로켓그로스 정산금액·마진(마진 리스트로 계산 — 매칭 안 된 상품은 마진 계산에서 제외)
   const ymStr=m=>String(m).padStart(2,'0');
   const rgCurFin = rgSumSettlementMargin(`${cy}-${ymStr(cm)}-01`, `${cy}-${ymStr(cm)}-31`);
@@ -22020,6 +22028,7 @@ function renderRevSummary(){
     {id:'revKpi1',val:fmt(marginDisp),sub:diff(marginDisp,marginPrvDisp)||`전월 ${fmt(marginPrvDisp)}`},
     {id:'revKpi2',val:marginRate.toFixed(1)+'%',sub:`전월 ${prevRate.toFixed(1)}%`},
     {id:'revKpi3',val:cur.cnt.toLocaleString()+'건',sub:diff(cur.cnt,prv.cnt)||`전월 ${prv.cnt.toLocaleString()}건`},
+    {id:'revKpi4',val:fmt(adCur),sub:(diff(adCur,adPrv)||`전월 ${fmt(adPrv)}`)+(saleDisp>0?`<span style="color:var(--tx2);">· 매출 대비 ${(adCur/saleDisp*100).toFixed(1)}%</span>`:'')},
   ];
   kpis.forEach(k=>{
     const el=document.getElementById(k.id); if(!el) return;
@@ -22045,18 +22054,43 @@ function renderRevSummary(){
     const [yy,mm]=key.split('-');
     byYM[key].margin -= sumAdSpend({year:Number(yy), month:Number(mm)});
   });
+  // 광고비 데이터가 한 건이라도 들어있는 첫 달 (이 달부터 마진에 광고비가 차감됨) — 추이 차트 구분선용
+  let firstAdYm=null;
+  Object.keys(_adSpend).forEach(k=>{
+    if(!(Number(_adSpend[k])>0)) return;
+    const ym=parseAdKey(k).date.slice(0,7);
+    if(!firstAdYm||ym<firstAdYm) firstAdYm=ym;
+  });
   // 로켓그로스만 있고 다른 채널은 없는 달도 월 목록에 포함시키고, 모든 달에 로켓그로스 정산금액·마진 합산
   rgMonthsAll.forEach(ym=>{ if(!byYM[ym]) byYM[ym]={sale:0,settle:0,margin:0,cnt:0}; });
   Object.keys(byYM).forEach(key=>{
     const [yy,mm]=key.split('-');
     const fin=rgSumSettlementMargin(`${yy}-${mm}-01`, `${yy}-${mm}-31`);
+    byYM[key].ad=sumAdSpend({year:Number(yy), month:Number(mm)});
     byYM[key].sale+=fin.revenue;
     byYM[key].settle+=fin.settlement;
     byYM[key].margin+=fin.margin;
   });
   const ymKeys = Object.keys(byYM).sort();
   const rangeEl = document.getElementById('revChartRange');
-  if(rangeEl && ymKeys.length) rangeEl.textContent=`${ymKeys[0]} ~ ${ymKeys[ymKeys.length-1]}`;
+  const adStartIdx = firstAdYm ? ymKeys.indexOf(firstAdYm) : -1;
+  if(rangeEl && ymKeys.length) rangeEl.textContent=`${ymKeys[0]} ~ ${ymKeys[ymKeys.length-1]}`+(firstAdYm?` · 광고비 기입 시작 ${firstAdYm.replace('-','년 ').replace(/ 0/,' ')}월~`:'');
+  // 광고비 기입 시작 월 구분선 (이전 달은 광고비 미반영 마진)
+  const adStartPlugin={id:'adStartMarker',afterDatasetsDraw(ch){
+    if(adStartIdx<0) return;
+    const xs=ch.scales.x, ca=ch.chartArea, c2=ch.ctx;
+    const step=ymKeys.length>1?(xs.getPixelForValue(1)-xs.getPixelForValue(0)):(ca.right-ca.left);
+    const x=xs.getPixelForValue(adStartIdx)-step/2;
+    c2.save();
+    c2.setLineDash([5,4]); c2.strokeStyle='#F97316'; c2.lineWidth=1.5;
+    c2.beginPath(); c2.moveTo(x,ca.top); c2.lineTo(x,ca.bottom); c2.stroke();
+    c2.setLineDash([]); c2.fillStyle='#F97316'; c2.font='600 11px sans-serif'; c2.textBaseline='top';
+    const [yy,mm]=firstAdYm.split('-');
+    c2.textAlign='left'; c2.fillText(`▶ ${yy}년 ${Number(mm)}월부터 광고비 기입`,x+6,ca.top+4);
+    if(adStartIdx>0){ c2.textAlign='right'; c2.fillStyle=_axColor(); c2.fillText('광고비 미기입 구간(마진에 광고비 미반영) ◀',x-6,ca.top+4); }
+    c2.restore();
+  }};
+  const trendMax=Math.max(0,...ymKeys.map(k=>Math.max(byYM[k].sale,byYM[k].margin,byYM[k].ad||0)))/10000;
 
   // 추이 차트
   const trendEmpty=document.getElementById('revTrendEmpty');
@@ -22080,8 +22114,14 @@ function renderRevSummary(){
              pointBackgroundColor:'#059669',pointRadius:5,pointHoverRadius:7,fill:true,yAxisID:'y',
              datalabels:{anchor:'top',align:'top',offset:4,color:'#059669',font:{size:10,weight:'700'},
                formatter:v=>fmtMan(v)}},
+            {type:'line',label:'광고비',data:ymKeys.map(k=>Math.round((byYM[k].ad||0)/10000)),
+             borderColor:'#F97316',backgroundColor:'rgba(249,115,22,0.08)',borderDash:[4,3],tension:0.3,
+             pointBackgroundColor:'#F97316',pointRadius:4,pointHoverRadius:6,fill:false,yAxisID:'y',
+             datalabels:{anchor:'bottom',align:'bottom',offset:4,color:'#F97316',font:{size:10,weight:'700'},
+               formatter:v=>v>0?fmtMan(v):''}},
           ]
         },
+        plugins:[adStartPlugin],
         options:{responsive:true,maintainAspectRatio:false,
           layout:{padding:{top:28}},
           plugins:{
@@ -22091,7 +22131,7 @@ function renderRevSummary(){
           },
           scales:{
             x:{grid:{display:false},ticks:{color:_axColor(),font:{size:11}}},
-            y:{grid:{color:'rgba(100,100,120,.1)'},ticks:{color:_axColor(),font:{size:11},callback:v=>fmtMan(v)}}
+            y:{min:-Math.round(trendMax*0.08),suggestedMax:Math.round(trendMax*1.2),grid:{color:'rgba(100,100,120,.1)'},ticks:{color:_axColor(),font:{size:11},callback:v=>v<0?'':fmtMan(v)}}
           }
         }
       });
