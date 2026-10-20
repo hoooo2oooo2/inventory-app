@@ -1366,10 +1366,23 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .rt-table .rt-w-m{min-width:100px;}
 .rt-table .rt-w-l{min-width:150px;max-width:300px;}
 .rt-table .rt-w-xl{min-width:170px;max-width:340px;}
-.rt-table tbody tr.rt-done td{color:var(--tx2);}
+.rt-table tbody tr.rt-done td{background:#DCFCE7;color:#14532D;border-bottom-color:#BBF7D0;}
+.rt-table tbody tr.rt-done:hover td{background:#BBF7D0;}
+.rt-ell{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 auto 0 0;}
+.rt-ell.rt-ell-s{max-width:170px;}
+.rt-hfilter{display:block;margin:5px auto 0;width:92px;font-size:12.5px;font-weight:600;padding:3px 4px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:inherit;cursor:pointer;}
+.rt-hfilter.on{border-color:#3182F6;color:#3182F6;font-weight:800;}
+.rt-view{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;}
+.rt-view .rt-v{min-width:0;}
+.rt-view .rt-v.rt-v2{grid-column:span 2;}
+.rt-view .rt-v.rt-v3{grid-column:1 / -1;}
+.rt-view .rt-vl{font-size:12.5px;font-weight:700;color:var(--tx2);margin-bottom:4px;}
+.rt-view .rt-vv{font-size:15px;line-height:1.65;color:var(--tx);white-space:pre-wrap;overflow-wrap:anywhere;word-break:keep-all;background:var(--bg2);border-radius:9px;padding:9px 12px;min-height:22px;}
+#rtViewModal .modal{max-width:760px;padding:24px 26px;}
+#rtViewModal .modal h3{font-size:18px;margin-bottom:18px;display:flex;align-items:center;gap:10px;}
 .rt-donebtn{border:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;padding:5px 13px;border-radius:14px;white-space:nowrap;}
 .rt-donebtn.rt-wait{background:#FEF3C7;color:#B45309;}
-.rt-donebtn.rt-ok{background:#DCFCE7;color:#15803D;}
+.rt-donebtn.rt-ok{background:#16A34A;color:#fff;}
 .rt-donebtn:hover{filter:brightness(.95);}
 .rt-donebtn[disabled]{cursor:default;}
 .rt-del{border:1px solid var(--bd);background:var(--bg);border-radius:7px;padding:4px 10px;font-size:12.5px;color:var(--tx2);cursor:pointer;font-family:inherit;}
@@ -4509,11 +4522,11 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div class="modal">
     <h3 id="rtModalTitle">📦 수거접수 등록</h3>
     <div class="piv-grid">
-      <div class="field"><label>구분</label><input type="text" id="rtFCat" list="rtCatList" autocomplete="off" placeholder="선택 또는 직접 입력"><datalist id="rtCatList"><option value="반품"></option><option value="교환"></option><option value="환불"></option><option value="AS"></option></datalist></div>
+      <div class="field"><label>구분</label><select id="rtFCat"></select></div>
       <div class="field"><label>접수자</label><input type="text" id="rtFStaff" autocomplete="off"></div>
       <div class="field"><label>접수일 *</label><input type="date" id="rtFDate"></div>
       <div class="field"><label>구매일</label><input type="date" id="rtFBuyDate"></div>
-      <div class="field"><label>배송비</label><input type="text" id="rtFShip" list="rtShipList" autocomplete="off" placeholder="금액 또는 선불/착불"><datalist id="rtShipList"><option value="선불"></option><option value="착불"></option><option value="무료"></option></datalist></div>
+      <div class="field"><label>배송비 (원)</label><input type="text" id="rtFShip" inputmode="numeric" autocomplete="off" placeholder="숫자만 입력 (자동 쉼표)" oninput="rtShipInput(this)" style="text-align:right;"></div>
       <div class="field"><label>수취인명 *</label><input type="text" id="rtFRecipient" autocomplete="off"></div>
       <div class="field"><label>연락처</label><input type="text" id="rtFPhone" autocomplete="off" onblur="rtPhoneBlur()" placeholder="010-0000-0000"></div>
       <div class="field piv-span2"><label>주소</label><input type="text" id="rtFAddr" autocomplete="off"></div>
@@ -4525,6 +4538,16 @@ html.mob-native .lcr-det-val{font-size:15px;}
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('rtModal')">취소</button>
       <button class="btn btn-pr" id="rtSaveBtn" onclick="rtSave()">저장</button></div>
+  </div>
+</div>
+
+<!-- 반품관리 > 수거접수: 전체 내용 보기 팝업 -->
+<div class="modal-overlay" id="rtViewModal">
+  <div class="modal">
+    <h3>📦 수거접수 상세 <span id="rtViewDone"></span></h3>
+    <div class="rt-view" id="rtViewBody"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('rtViewModal')">닫기</button>
+      <button class="btn btn-pr" id="rtViewEditBtn" onclick="rtViewToEdit()">수정하기</button></div>
   </div>
 </div>
 
@@ -36553,13 +36576,15 @@ function _ntfRelayout(){
 // ══════════════════════════════════════════════
 const RT_COLS = [
   {k:'cat',h:'구분',cls:'rt-w-s'},{k:'staff',h:'접수자',cls:'rt-w-s'},{k:'date',h:'접수일',cls:'rt-w-m'},{k:'buyDate',h:'구매일',cls:'rt-w-m'},
-  {k:'ship',h:'배송비',cls:'rt-w-s'},{k:'recipient',h:'수취인명',cls:'rt-w-s'},{k:'phone',h:'연락처',cls:'rt-w-m'},{k:'addr',h:'주소',cls:'rt-w-xl'},
+  {k:'ship',h:'배송비',cls:'rt-w-s'},{k:'recipient',h:'수취인명',cls:'rt-w-s'},{k:'phone',h:'연락처',cls:'rt-w-m'},{k:'addr',h:'주소',cls:'rt-w-l'},
   {k:'product',h:'상품명',cls:'rt-w-xl'},{k:'qty',h:'요청수량',cls:'rt-w-s'},{k:'symptom',h:'증상',cls:'rt-w-l'},{k:'memo',h:'처리내용',cls:'rt-w-l'},
   {k:'done',h:'완료여부',cls:'rt-w-s'}
 ];
+const RT_CATS = ['반품','교환','맞교환','수리','오배송','파손'];
 const RT_CAT_STYLE = {   // 구분 배지 색 — 배경·글자색을 함께 고정(다크모드에서도 읽히도록)
   '반품':'background:#DBEAFE;color:#1D4ED8;', '교환':'background:#EDE9FE;color:#6D28D9;',
-  '환불':'background:#FFEDD5;color:#C2410C;', 'AS':'background:#CCFBF1;color:#0F766E;'
+  '맞교환':'background:#FCE7F3;color:#BE185D;', '수리':'background:#CCFBF1;color:#0F766E;',
+  '오배송':'background:#FFEDD5;color:#C2410C;', '파손':'background:#FEE2E2;color:#B91C1C;'
 };
 const RT_PAGE_SIZE = 50;
 let _rtTab = 'pickup';
@@ -36569,6 +36594,8 @@ let _rtOpen = [];         // 서버에서 받은 미완료 건(전체 기간)
 let _rtMonthRows = [];    // 선택한 월의 건
 let _rtAll = [];          // 위 둘을 합친 목록
 let _rtFilter = 'all';    // all | open | done
+let _rtCatFilter = '';    // 헤더 구분 필터('' = 전체)
+let _rtViewId = null;
 let _rtPage = 0;
 let _rtEditId = null;
 let _rtSaving = false;
@@ -36590,11 +36617,18 @@ function _rtFmtShip(v){
   if(/^\d[\d,]*$/.test(s)) return Number(s.replace(/,/g,'')).toLocaleString('ko-KR')+'원';
   return s;
 }
+// 배송비 입력칸: 숫자만 남기고 천 단위 쉼표 자동
+function rtShipInput(el){
+  const d = String(el.value||'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+  el.value = d ? Number(d).toLocaleString('ko-KR') : '';
+}
 
 function rtInit(){
   if(!_rtInited){
     _rtInited = true;
-    document.getElementById('rtHead').innerHTML = '<tr>'+RT_COLS.map(c=>`<th class="${c.cls}">${c.h}</th>`).join('')+'<th style="width:70px;">관리</th></tr>';
+    document.getElementById('rtHead').innerHTML = '<tr>'+RT_COLS.map(c=>c.k==='cat'
+      ? `<th class="${c.cls}">${c.h}<select class="rt-hfilter" id="rtCatFilter" onchange="rtCatFilterChanged()" title="원하는 구분만 보기"></select></th>`
+      : `<th class="${c.cls}">${c.h}</th>`).join('')+'<th style="width:70px;">관리</th></tr>';
     document.getElementById('rtMonth').value = _pivToday().slice(0,7);
   }
   rtSwitchTab(_rtTab);
@@ -36654,6 +36688,7 @@ function rtShiftMonth(d){
   rtMonthChanged();
 }
 function rtSearchChanged(){ _rtPage = 0; rtRender(); }
+function rtCatFilterChanged(){ _rtCatFilter = document.getElementById('rtCatFilter').value; _rtPage = 0; rtRender(); }
 function rtSetFilter(f){ _rtFilter = f; _rtPage = 0; rtRender(); }
 function rtGoto(p){ _rtPage = Math.max(0,p); rtRender(); document.querySelector('#rtTab-pickup .piv-table-scroll')?.scrollTo({top:0}); }
 function _rtFind(id){ return _rtAll.find(x=>x.id===id); }
@@ -36675,6 +36710,15 @@ function rtRender(){
   let list = _rtAll.filter(r=> !r.done || String(r.date||'').startsWith(ym));
   if(_rtFilter==='open') list = list.filter(r=>!r.done);
   else if(_rtFilter==='done') list = list.filter(r=>r.done);
+  // 헤더 구분 필터 (목록에 없는 옛 구분 값도 선택지에 포함)
+  const catSel = document.getElementById('rtCatFilter');
+  if(catSel){
+    const opts = [...RT_CATS]; _rtAll.forEach(r=>{ if(r.cat && !opts.includes(r.cat)) opts.push(r.cat); });
+    if(_rtCatFilter && !opts.includes(_rtCatFilter)) _rtCatFilter = '';
+    catSel.innerHTML = '<option value="">전체</option>' + opts.map(o=>`<option value="${_esc(o)}">${_esc(o)}</option>`).join('');
+    catSel.value = _rtCatFilter; catSel.classList.toggle('on', !!_rtCatFilter);
+  }
+  if(_rtCatFilter) list = list.filter(r=>r.cat===_rtCatFilter);
   list = list.filter(r=>_rtMatch(r,q)).sort(_rtSort);
 
   const seg = document.getElementById('rtFilterSeg');
@@ -36688,7 +36732,7 @@ function rtRender(){
     `<span class="rt-pill rt-pill-wait">미완료 ${openN}건</span>`
     + `<span class="rt-pill rt-pill-n">${mm} 접수 ${monthRows.length}건</span>`
     + `<span class="rt-pill rt-pill-ok">${mm} 완료 ${monthDone}건</span>`
-    + `<span class="rt-hint">미완료 건은 월과 관계없이 항상 표시됩니다 · 완료여부 배지를 누르면 완료/미완료가 바뀝니다 · 행을 누르면 수정</span>`;
+    + `<span class="rt-hint">미완료 건은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용 확인 · 완료여부 배지를 누르면 완료/미완료 전환(완료는 초록색)</span>`;
 
   const canEdit = _rtCanEdit();
   const maxP = Math.max(1, Math.ceil(list.length/RT_PAGE_SIZE));
@@ -36702,11 +36746,12 @@ function rtRender(){
 
 function _rtRowHtml(r, canEdit){
   const wr = (v,cls)=>`<td class="rt-l rt-wrapc ${cls}">${_esc(v||'')}</td>`;
+  const ell = (v,small)=>`<td class="rt-l"><div class="rt-ell${small?' rt-ell-s':''}">${_esc(v||'')}</div></td>`;   // 길면 … 으로 줄임(전체는 행을 눌러 팝업에서)
   const cat = r.cat ? `<span class="rt-pill" style="${RT_CAT_STYLE[r.cat]||'background:#E2E8F0;color:#334155;'}">${_esc(r.cat)}</span>` : '';
   const done = r.done
     ? `<button class="rt-donebtn rt-ok" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 미완료로 되돌립니다"`:'disabled'}>✔ 완료</button>`
     : `<button class="rt-donebtn rt-wait" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 완료 처리합니다"`:'disabled'}>⏳ 미완료</button>`;
-  return `<tr class="${canEdit?'rt-click':''}${r.done?' rt-done':''}" ${canEdit?`onclick="rtOpenModal('${r.id}')"`:''}>
+  return `<tr class="rt-click${r.done?' rt-done':''}" onclick="rtOpenView('${r.id}')">
     <td class="rt-nw">${cat}</td>
     <td class="rt-nw">${_esc(r.staff||'')}</td>
     <td class="rt-nw">${_esc(r.date||'')}</td>
@@ -36714,11 +36759,11 @@ function _rtRowHtml(r, canEdit){
     <td class="rt-nw">${_esc(_rtFmtShip(r.ship))}</td>
     <td class="rt-nw"><b>${_esc(r.recipient||'')}</b></td>
     <td class="rt-nw">${_esc(r.phone||'')}</td>
-    ${wr(r.addr,'rt-w-xl')}
+    ${ell(r.addr)}
     ${wr(r.product,'rt-w-xl')}
     <td class="rt-nw">${_esc(r.qty==null?'':r.qty)}</td>
-    ${wr(r.symptom,'rt-w-l')}
-    ${wr(r.memo,'rt-w-l')}
+    ${ell(r.symptom,true)}
+    ${ell(r.memo,true)}
     <td class="rt-nw">${done}</td>
     <td>${canEdit?`<button class="rt-del" onclick="event.stopPropagation();rtDelete('${r.id}')">삭제</button>`:''}</td>
   </tr>`;
@@ -36726,6 +36771,26 @@ function _rtRowHtml(r, canEdit){
 
 // ───────────────── 등록 / 수정 / 완료 토글 / 삭제 ─────────────────
 const RT_FIELD_IDS = { cat:'Cat', staff:'Staff', date:'Date', buyDate:'BuyDate', ship:'Ship', recipient:'Recipient', phone:'Phone', addr:'Addr', product:'Product', qty:'Qty', symptom:'Symptom', memo:'Memo' };
+// 행 클릭 → 전체 내용 팝업(수정하기 / 닫기)
+function rtOpenView(id){
+  const r = _rtFind(id); if(!r) return;
+  _rtViewId = id;
+  const v = (label,val,cls)=>`<div class="rt-v ${cls||''}"><div class="rt-vl">${label}</div><div class="rt-vv">${_esc(val==null?'':String(val))||'&nbsp;'}</div></div>`;
+  document.getElementById('rtViewBody').innerHTML =
+      v('구분',r.cat) + v('접수자',r.staff) + v('접수일',r.date)
+    + v('구매일',r.buyDate) + v('배송비',_rtFmtShip(r.ship)) + v('수취인명',r.recipient)
+    + v('연락처',r.phone) + v('주소',r.addr,'rt-v2')
+    + v('상품명',r.product,'rt-v2') + v('요청수량',r.qty)
+    + v('증상',r.symptom,'rt-v3') + v('처리내용',r.memo,'rt-v3');
+  document.getElementById('rtViewDone').innerHTML = r.done ? '<span class="rt-pill rt-pill-ok">✔ 완료</span>' : '<span class="rt-pill rt-pill-wait">⏳ 미완료</span>';
+  document.getElementById('rtViewEditBtn').style.display = _rtCanEdit() ? '' : 'none';
+  openModal('rtViewModal');
+}
+function rtViewToEdit(){
+  const id = _rtViewId; if(!id) return;
+  closeModal('rtViewModal');
+  rtOpenModal(id);
+}
 function rtPhoneBlur(){ const el = document.getElementById('rtFPhone'); if(el) el.value = _rtFmtPhone(el.value); }
 function rtOpenModal(id){
   if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
@@ -36737,11 +36802,14 @@ function rtOpenModal(id){
     let v = r[k];
     if(!id && k==='date') v = _pivToday();
     if(!id && k==='staff') v = u.name || u.username || '';
+    if(k==='cat') return;
+    if(k==='ship'){ const d = String(v==null?'':v).trim(); v = /^[\d,]+$/.test(d) ? Number(d.replace(/,/g,'')).toLocaleString('ko-KR') : d; }
     document.getElementById('rtF'+suffix).value = v==null ? '' : v;
   });
+  _pbSetSelect('rtFCat', r.cat || '', RT_CATS, '선택');
   document.getElementById('rtFDone').value = r.done ? '1' : '0';
   openModal('rtModal');
-  setTimeout(()=>document.getElementById(id?'rtFRecipient':'rtFCat')?.focus(), 100);
+  setTimeout(()=>document.getElementById('rtFRecipient')?.focus(), 100);
 }
 async function rtSave(){
   if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
@@ -36752,6 +36820,7 @@ async function rtSave(){
   if(!rec.date){ toast('접수일을 입력하세요.'); return; }
   if(!rec.recipient){ toast('수취인명을 입력하세요.'); return; }
   rec.phone = _rtFmtPhone(rec.phone);
+  rec.ship = String(rec.ship||'').replace(/,/g,'').trim();
   const done = document.getElementById('rtFDone').value==='1';
   const btn = document.getElementById('rtSaveBtn');
   _rtSaving = true; btn.disabled = true; btn.textContent = '저장 중…';
