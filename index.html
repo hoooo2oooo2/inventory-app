@@ -157,6 +157,13 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-sig .bd{min-width:40px;text-align:center;border-radius:12px;padding:2px 10px;font-size:13px;font-weight:700;white-space:nowrap;}
 .hm-bd-red{background:rgba(220,38,38,.12);color:#DC2626;} .hm-bd-orange{background:rgba(234,88,12,.12);color:#EA580C;} .hm-bd-amber{background:rgba(217,119,6,.13);color:#D97706;} .hm-bd-blue{background:rgba(49,130,246,.13);color:#3182F6;}
 .hm-sig.zero{opacity:.55;padding:5px 8px;} .hm-sig.zero .bd{background:transparent;color:var(--tx2);font-weight:500;}
+.hm-ic.hm-pr{background:var(--pr);border-color:var(--pr);color:#fff;font-weight:600;}
+.hm-ic.hm-pr:hover{filter:brightness(1.07);color:#fff;}
+.hm-add-row{display:flex;gap:6px;margin-bottom:8px;flex-shrink:0;}
+.hm-in{flex:1;min-width:0;height:32px;border:1.5px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);padding:0 10px;font-size:13px;outline:none;font-family:inherit;box-sizing:border-box;}
+.hm-in:focus{border-color:var(--pr);} .hm-in.hm-in-s{flex:0 0 96px;}
+.hm-x{border:none;background:transparent;color:var(--tx2);cursor:pointer;font-size:12px;opacity:0;padding:2px 5px;border-radius:6px;}
+.hm-trow:hover .hm-x{opacity:1;} .hm-x:hover{background:var(--bg2);color:#DC2626;}
 .hm-bar{flex:none;height:6px;background:var(--bd);border-radius:3px;overflow:hidden;margin:0 0 6px;} .hm-bar i{display:block;height:100%;background:#00A86B;transition:width .3s;}
 .hm-ok{padding:26px 6px;text-align:center;color:var(--tx2);font-size:12.5px;line-height:1.8;}
 .hm-chk{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--bd);cursor:pointer;font-size:13px;}
@@ -8398,14 +8405,14 @@ function homeMove(id,dir){ return _homeMutate(c=>{ const i=c.widgets.findIndex(w
 function homeMoveTo(fromId,toId){ return _homeMutate(c=>{ const i=c.widgets.findIndex(w=>w.id===fromId); if(i<0) return; const [w]=c.widgets.splice(i,1); const j=c.widgets.findIndex(x=>x.id===toId); c.widgets.splice(j<0?c.widgets.length:j,0,w); }); }
 function toggleHomeFav(id,ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
-  if(!_isAdminUser()) return;
+  if(!window.__CURRENT_USER) return;   // 로그인한 모든 계정이 즐겨찾기 사용 가능(계정별로 따로 저장)
   const has=(_homeCfg||_homeNorm(_homeLocalGet())).widgets.some(w=>w.id===id);
   has ? homeRemove(id) : homeAdd(id);
   toast(has ? '즐겨찾기에서 뺐습니다.' : '⭐ 즐겨찾기에 추가했습니다. 홈 화면에서 위젯으로 볼 수 있어요.');
 }
 // 메뉴 항목 옆 ☆/★ (관리자 전용)
 function _syncFavStars(){
-  const admin=_isAdminUser();
+  const admin=!!window.__CURRENT_USER;   // (변수명 유지) 모든 로그인 계정에 ☆ 표시
   const fav=new Set(((_homeCfg||_homeNorm(_homeLocalGet())).widgets).map(w=>w.id));
   MENUS.forEach(m=>{
     const el=document.getElementById('nav-'+m.id); if(!el) return;
@@ -8554,6 +8561,11 @@ const HOME_LOADERS={
   consign:()=>Promise.all([homeKv('consign_orders'),homeKv('consign_vendors')]),
   accreq:()=>homeKv('accessory_requests'),
   tcb:()=>homeKv('courier_comp_list'),
+  logi_handovers:()=>homeKv('logi_handovers'),
+  logi_checklist:()=>homeKv('logi_checklist'),
+  logi_notices:()=>homeKv('logi_notices'),
+  collab_tasks:()=>homeKv('collab_tasks'),
+  __todo:()=>tdRefresh(),   // 관리자 외 계정의 '오늘 할 일'(본인 전용)
   review:async()=>{
     const idx=await homeKv('review_idx');
     const months=(idx&&Array.isArray(idx.months))?idx.months.slice().sort().slice(-2):[];
@@ -8573,9 +8585,10 @@ const HOME_LOADERS={
   },
 };
 function homeLoadAll(force){
-  if(!_isAdminUser() || document.hidden) return;
+  if(!window.__CURRENT_USER || document.hidden) return;
   // 읽을 대상 = 홈에 올린 위젯 + '지금 확인할 것'에서 선택한 항목이 쓰는 데이터 (그 밖의 메뉴는 읽지 않음)
   const keys=new Set();
+  if(!_isAdminUser()) keys.add('__todo');
   ((_homeCfg&&_homeCfg.widgets)||[]).forEach(w=>{ if(_hmPerm(w.id)&&HOME_LOADERS[w.id]) keys.add(w.id); });
   try{ homeActiveSignals().forEach(s=>{ if(s.loader&&HOME_LOADERS[s.loader]) keys.add(s.loader); }); }catch(e){}
   keys.forEach(key=>{
@@ -8704,11 +8717,26 @@ const HOME_SIGNALS=[
   {id:'acc_wait', ico:'🧩', label:'부속요청 처리 대기', sub:'부속요청 게시판', target:'accreq', loader:'accreq', tone:'amber', unit:'건', n:()=>_hmSig('accreq',0)},
   {id:'cs_nosettle', ico:'🚚', label:'위탁배송 정산 미입력', sub:'위탁 배송건', target:'consign', loader:'consign', tone:'amber', unit:'건', n:()=>_hmSig('consign',0)},
   {id:'tcb_open', ico:'💸', label:'택배 보상 진행 중', sub:'택배사 보상목록(송금 전)', target:'tcb', loader:'tcb', tone:'blue', unit:'건', n:()=>_hmSig('tcb',0)},
+  // ── 물류팀 (물류 홈 권한이 있는 계정) ──
+  {id:'logi_handover', ico:'📨', label:'확인 안 된 전달사항', sub:'물류팀 › 홈', target:'logihome', loader:'logi_handovers', tone:'red', unit:'건',
+    n:()=>{ const a=_hmKv('logi_handovers'); return Array.isArray(a)?a.filter(h=>h.done!==true).length:null; }},
+  {id:'logi_chk', ico:'📋', label:'소장재고 체크리스트 진행 중', sub:'물류팀 › 홈', target:'logihome', loader:'logi_checklist', tone:'orange', unit:'개',
+    n:()=>{ const a=_hmKv('logi_checklist'); return Array.isArray(a)?a.filter(c=>!c.checked).length:null; }},
+  {id:'logi_notice', ico:'📢', label:'최근 7일 공지', sub:'물류팀 › 홈', target:'logihome', loader:'logi_notices', tone:'blue', unit:'건',
+    n:()=>{ const a=_hmKv('logi_notices'); if(!Array.isArray(a)) return null; const cut=_hmYmd(new Date(Date.now()-7*86400000)).replace(/-/g,'.'); return a.filter(x=>String(x.date||'')>=cut).length; }},
+  // ── 디자인팀 (협업업무 권한이 있는 계정) ──
+  {id:'collab_doing', ico:'🤝', label:'진행 중인 협업업무', sub:'디자인팀 › 협업업무', target:'collab', loader:'collab_tasks', tone:'amber', unit:'건',
+    n:()=>{ const a=_hmKv('collab_tasks'); return Array.isArray(a)?a.filter(t=>!t.weekly&&t.status==='doing').length:null; }},
+  {id:'collab_mine', ico:'🙋', label:'내 담당 진행 중 업무', sub:'디자인팀 › 협업업무(내 이름)', target:'collab', loader:'collab_tasks', tone:'orange', unit:'건',
+    when:()=>!!_hmMyPerson(),
+    n:()=>{ const a=_hmKv('collab_tasks'); const me=_hmMyPerson(); return Array.isArray(a)?a.filter(t=>!t.weekly&&t.status==='doing'&&t.assignee===me).length:null; }},
 ];
+// 디자인팀 담당자 이름(유현·보라·연정)은 계정 이름에서 성을 뺀 값과 같음 — 해당하지 않으면 '내 담당' 항목은 표시하지 않음
+function _hmMyPerson(){ const u=window.__CURRENT_USER; const nm=String((u&&(u.name||u.username))||''); const p=nm.length>=3?nm.slice(1):nm; return ['유현','보라','연정'].includes(p)?p:''; }
 function _hmSigAllowed(s){ try{ return _hmPerm(s.target); }catch(e){ return false; } }
 function homeActiveSignals(){
   const cfg=_homeCfg||_homeNorm(_homeLocalGet());
-  const allowed=HOME_SIGNALS.filter(_hmSigAllowed);
+  const allowed=HOME_SIGNALS.filter(_hmSigAllowed).filter(s=>!s.when||s.when());
   return cfg.signals ? allowed.filter(s=>cfg.signals.includes(s.id)) : allowed;
 }
 function renderHomeAlerts(){
@@ -8732,7 +8760,7 @@ function renderHomeAlerts(){
 }
 function homeToggleSignal(id){
   return _homeMutate(c=>{
-    const allowed=HOME_SIGNALS.filter(_hmSigAllowed).map(s=>s.id);
+    const allowed=HOME_SIGNALS.filter(_hmSigAllowed).filter(s=>!s.when||s.when()).map(s=>s.id);
     const cur=Array.isArray(c.signals)?c.signals.slice():allowed;
     const i=cur.indexOf(id); if(i<0) cur.push(id); else cur.splice(i,1);
     c.signals=cur;
@@ -8747,39 +8775,88 @@ function homeOpenSignals(rerender){
   ov.innerHTML=`<div style="background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:16px;max-width:460px;width:100%;max-height:80vh;overflow:auto;padding:18px 20px;">
     <div style="display:flex;align-items:center;margin-bottom:4px;"><b style="flex:1;font-size:15px;">🔔 지금 확인할 것 — 표시할 항목</b><button class="hm-btn" onclick="document.getElementById('hmSigOv').remove()">닫기</button></div>
     <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">내 업무에 필요한 항목만 골라 두세요. 이 선택은 <b>내 계정에만</b> 저장되고, 고른 항목의 데이터만 읽어 옵니다.</div>
-    ${HOME_SIGNALS.filter(_hmSigAllowed).map(s=>`<label class="hm-chk"><input type="checkbox" ${act.has(s.id)?'checked':''} onchange="homeToggleSignal('${s.id}')"><span style="font-size:16px;">${s.ico}</span><span style="flex:1;"><b>${_hmEsc(s.label)}</b><br><small style="color:var(--tx2);">${_hmEsc(s.sub)}</small></span></label>`).join('')}</div>`;
+    ${HOME_SIGNALS.filter(_hmSigAllowed).filter(s=>!s.when||s.when()).map(s=>`<label class="hm-chk"><input type="checkbox" ${act.has(s.id)?'checked':''} onchange="homeToggleSignal('${s.id}')"><span style="font-size:16px;">${s.ico}</span><span style="flex:1;"><b>${_hmEsc(s.label)}</b><br><small style="color:var(--tx2);">${_hmEsc(s.sub)}</small></span></label>`).join('')}</div>`;
   document.body.appendChild(ov);
 }
 
-// ══ 오늘 할 일 — 업무캘린더(📋)의 오늘 업무를 홈에서 바로 보고 체크 ══
-function renderHomeTodo(){
-  const el=document.getElementById('hmTodo'); if(!el) return;
-  const keepSt=(el.querySelector('.hm-pane-body')||{}).scrollTop||0;
-  const ds=_wcToday();
-  const ready=(typeof _wc!=='undefined') && _wc.mon && _wc.mon[ds.slice(0,7)]!==undefined && _wc.ver && _wc.ver[WC_FIXED_KIND]!==undefined;
-  const hd=(sub)=>`<div class="hm-pane-hd"><b>✅ 오늘 할 일</b><span class="hm-sub">${sub}</span><button class="hm-ic" onclick="homeOpenWc()" title="업무캘린더 열기 (추가·수정)">📋 열기</button></div>`;
-  if(!ready){ el.innerHTML=hd('')+`<div class="hm-pane-body"><div class="hm-ok">${(typeof _wc!=='undefined'&&_wc.err)?'업무캘린더 데이터를 불러오지 못했습니다.':'불러오는 중…'}</div></div>`; return; }
-  const ts=_wcTasks(ds), fx=_wcFixedFor(ds);
-  const items=[
-    ...ts.map(t=>({k:'t',id:t.id,title:t.title,time:t.dueTime,done:!!t.done,pri:t.priority})),
-    ...fx.map(f=>({k:'f',id:f.id,title:f.title,time:f.dueTime,done:!!(f.doneDates&&f.doneDates[ds]),pri:f.priority,pin:true}))
-  ];
-  const doneN=items.filter(i=>i.done).length, pct=items.length?Math.round(doneN/items.length*100):0;
-  items.sort((a,b)=>(a.done-b.done)||((a.time||'99:99').localeCompare(b.time||'99:99'))||(a.pin?1:0)-(b.pin?1:0));
-  const show=items.slice(0,40);
-  const rowHtml=i=>{
-    const ti=(!i.done&&i.time)?_wcTimer(i.time,ds):null;
-    return `<div class="hm-trow${i.done?' done':''}"><div class="wc-chk${i.done?' on':''}" onclick="homeTodoToggle('${i.k}','${i.id}')" title="완료 체크"></div><div class="tt" onclick="homeOpenWc()" title="${_hmEsc(i.title)}">${i.pin?'📌 ':''}${_hmEsc(i.title)}</div>${i.time&&!i.done?`<span class="tm${ti&&ti.cls==='over'?' over':ti&&ti.cls?' warn':''}">⏱ ${i.time}${ti&&ti.cls==='over'?' · '+ti.text:''}</span>`:''}</div>`;
-  };
-  el.innerHTML=hd(items.length?`${doneN}/${items.length} 완료 (${pct}%)`:'')
-    +(items.length?`<div class="hm-bar"><i style="width:${pct}%"></i></div>`:'')
-    +`<div class="hm-pane-body">${items.length?show.map(rowHtml).join(''):`<div class="hm-ok">오늘 등록된 할 일이 없습니다.<br>📋 열기에서 추가해 보세요.</div>`}</div>`;
-  const nb=el.querySelector('.hm-pane-body'); if(nb) nb.scrollTop=keepSt;   // 다시 그려도 스크롤 위치 유지
+// ══ 오늘 할 일 — admin: 업무캘린더(📋)의 오늘 업무 / 그 외 계정: 본인 전용 간단 할 일(todo_<아이디>) — 카드의 [＋ 추가]로 바로 등록 ══
+//  · 직원별로 따로 저장되고 다른 계정에는 보이지 않음(화면 기준). 완료한 항목은 14일 뒤 자동 정리, 못 끝낸 항목은 다음 날 '이월'로 계속 표시
+const _td={items:[],loaded:false,err:false};
+let _homeAddOpen=false;
+function _tdKind(){ return 'todo_'+(window.__CURRENT_USER?window.__CURRENT_USER.username:'anon'); }
+async function tdRefresh(){
+  const kind=_tdKind();
+  const v=await cloudKvVersion(kind);
+  if(v===undefined){ if(!_td.loaded) _td.err=true; return; }
+  if(_td.loaded && v===_wc.ver[kind]) return;      // 바뀐 게 없으면 다시 받지 않음
+  try{ const d=await _wcLoadKind(kind,()=>[]); _td.items=Array.isArray(d)?d:[]; _td.loaded=true; _td.err=false; }
+  catch(e){ if(!_td.loaded) _td.err=true; }
+}
+function tdMutate(fn){ return _wcMutate(_tdKind(), ()=>_td.items, v=>{ _td.items=Array.isArray(v)?v:[]; _td.loaded=true; }, fn, ()=>[]); }
+function _tdPrune(arr){
+  const cut=_hmYmd(new Date(Date.now()-14*86400000));
+  const keep=arr.filter(t=>!t.done || String(t.date||'')>=cut);
+  arr.splice(0,arr.length,...keep);
+}
+function homeToggleAdd(){ _homeAddOpen=!_homeAddOpen; renderHomeTodo(); if(_homeAddOpen) setTimeout(()=>document.getElementById('hmAddT')?.focus(),30); }
+async function homeAddTask(){
+  const t=document.getElementById('hmAddT'); if(!t) return; const title=(t.value||'').trim();
+  if(!title){ t.focus(); return; }
+  const time=document.getElementById('hmAddTm').value||null, ds=_wcToday();
+  let ok=false;
+  if(_isAdminUser()){
+    const ym=ds.slice(0,7); await wcEnsureMonths([ym]);
+    ok=await wcMutMonth(ym,m=>{ (m[ds]=m[ds]||[]).push({id:_wcId(),title,dueTime:time,priority:'medium',memo:'',done:false,doneAt:null,createdAt:new Date().toISOString()}); });
+  } else {
+    ok=await tdMutate(arr=>{ arr.push({id:_wcId(),title,date:ds,time,done:false,doneAt:null,createdAt:new Date().toISOString()}); _tdPrune(arr); });
+  }
+  if(ok){ t.value=''; const tm=document.getElementById('hmAddTm'); if(tm) tm.value=''; renderHomeTodo(); if(_isAdminUser()) wcCheckAlerts(); document.getElementById('hmAddT')?.focus(); }
 }
 async function homeTodoToggle(kind,id){
   const ds=_wcToday();
-  if(kind==='f') await wcToggleFixed(id,ds); else await wcToggle1(id,ds);
+  if(kind==='f') await wcToggleFixed(id,ds);
+  else if(kind==='u') await tdMutate(arr=>{ const t=arr.find(x=>x.id===id); if(!t) return; t.done=!t.done; t.doneAt=t.done?new Date().toISOString():null; if(t.done) t.date=t.date||ds; });
+  else await wcToggle1(id,ds);
   renderHomeTodo();
+}
+async function homeTodoDelete(id){
+  if(!confirm('이 할 일을 삭제할까요?')) return;
+  await tdMutate(arr=>{ const i=arr.findIndex(x=>x.id===id); if(i>=0) arr.splice(i,1); });
+  renderHomeTodo();
+}
+function renderHomeTodo(){
+  const el=document.getElementById('hmTodo'); if(!el) return;
+  const keepSt=(el.querySelector('.hm-pane-body')||{}).scrollTop||0;
+  const keepT=(document.getElementById('hmAddT')||{}).value||'', keepTm=(document.getElementById('hmAddTm')||{}).value||'';
+  const admin=_isAdminUser(), ds=_wcToday();
+  const ready=admin
+    ? ((typeof _wc!=='undefined') && _wc.mon && _wc.mon[ds.slice(0,7)]!==undefined && _wc.ver && _wc.ver[WC_FIXED_KIND]!==undefined)
+    : _td.loaded;
+  const hd=(sub)=>`<div class="hm-pane-hd"><b>✅ 오늘 할 일</b><span class="hm-sub">${sub}</span><button class="hm-ic hm-pr" onclick="homeToggleAdd()" title="할 일 추가">${_homeAddOpen?'✕ 닫기':'＋ 추가'}</button></div>`;
+  const addRow=_homeAddOpen?`<div class="hm-add-row"><input id="hmAddT" class="hm-in" placeholder="할 일 입력 후 Enter" onkeydown="if(event.key==='Enter')homeAddTask()"><input id="hmAddTm" class="hm-in hm-in-s" type="time" title="마감 시각(선택)"><button class="hm-ic hm-pr" onclick="homeAddTask()">추가</button></div>`:'';
+  if(!ready){ el.innerHTML=hd('')+addRow+`<div class="hm-pane-body"><div class="hm-ok">${(admin?(typeof _wc!=='undefined'&&_wc.err):_td.err)?'할 일을 불러오지 못했습니다. 잠시 후 다시 시도됩니다.':'불러오는 중…'}</div></div>`; return; }
+  let items;
+  if(admin){
+    items=[
+      ..._wcTasks(ds).map(t=>({k:'t',id:t.id,title:t.title,time:t.dueTime,done:!!t.done})),
+      ..._wcFixedFor(ds).map(f=>({k:'f',id:f.id,title:f.title,time:f.dueTime,done:!!(f.doneDates&&f.doneDates[ds]),pin:true}))
+    ];
+  } else {
+    items=_td.items.filter(t=>t.date===ds || (t.date<ds && !t.done)).map(t=>({k:'u',id:t.id,title:t.title,time:t.time,done:!!t.done,late:t.date<ds?t.date:null,del:true}));
+  }
+  const doneN=items.filter(i=>i.done).length, pct=items.length?Math.round(doneN/items.length*100):0;
+  items.sort((a,b)=>(a.done-b.done)||((b.late?1:0)-(a.late?1:0))||((a.time||'99:99').localeCompare(b.time||'99:99'))||(a.pin?1:0)-(b.pin?1:0));
+  const rowHtml=i=>{
+    const ti=(!i.done&&i.time&&!i.late)?_wcTimer(i.time,ds):null;
+    const when=i.late?`<span class="tm over" title="${i.late}에 등록한 할 일">이월 ${+i.late.slice(5,7)}/${+i.late.slice(8,10)}</span>`
+      :(i.time&&!i.done?`<span class="tm${ti&&ti.cls==='over'?' over':ti&&ti.cls?' warn':''}">⏱ ${i.time}${ti&&ti.cls==='over'?' · '+ti.text:''}</span>`:'');
+    return `<div class="hm-trow${i.done?' done':''}"><div class="wc-chk${i.done?' on':''}" onclick="homeTodoToggle('${i.k}','${i.id}')" title="완료 체크"></div><div class="tt" title="${_hmEsc(i.title)}">${i.pin?'📌 ':''}${_hmEsc(i.title)}</div>${when}${i.del?`<button class="hm-x" onclick="homeTodoDelete('${i.id}')" title="삭제">✕</button>`:''}</div>`;
+  };
+  el.innerHTML=hd(items.length?`${doneN}/${items.length} 완료 (${pct}%)`:'')+addRow
+    +(items.length?`<div class="hm-bar"><i style="width:${pct}%"></i></div>`:'')
+    +`<div class="hm-pane-body">${items.length?items.slice(0,60).map(rowHtml).join(''):`<div class="hm-ok">오늘 등록된 할 일이 없습니다.<br><b>＋ 추가</b>로 오늘 할 일을 적어 보세요.</div>`}</div>`;
+  const nb=el.querySelector('.hm-pane-body'); if(nb) nb.scrollTop=keepSt;
+  if(_homeAddOpen){ const a=document.getElementById('hmAddT'), tm=document.getElementById('hmAddTm'); if(a&&keepT) a.value=keepT; if(tm&&keepTm) tm.value=keepTm; }
 }
 function homeOpenWc(){ const p=document.getElementById('wcPop'); if(p&&!p.classList.contains('open')) wcToggle(); }
 
@@ -8836,7 +8913,7 @@ function homeOpen(){
   },60000);
 }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden && currentPage==='home') homeLoadAll(); });
-function goHome(){ if(_isAdminUser()) goPage('home'); }
+function goHome(){ if(window.__CURRENT_USER) goPage('home'); }
 function homeOpenWidget(id,act){
   if(_homeEdit) return;
   if(HOME_OPEN[id]) HOME_OPEN[id](act);
@@ -9483,7 +9560,7 @@ function updateNavVisibility(){
   const deptNav=document.getElementById('deptNav');
   const onHome = currentPage==='home';
   if(deptNav){
-    deptNav.innerHTML = (_isAdminUser()?`<div class="ni ${onHome?'active':''}" onclick="goHome()">🏠 홈</div>`:'')
+    deptNav.innerHTML = (window.__CURRENT_USER?`<div class="ni ${onHome?'active':''}" onclick="goHome()">🏠 홈</div>`:'')
       + visDepts.map(d=>`<div class="ni ${(d.id===_activeDept && !onHome)?'active':''}" onclick="selectDept('${d.id}')">${d.label}</div>`).join('');
     deptNav.style.borderBottom = onHome ? '0.5px solid var(--bd)' : 'none';   // 홈에서는 아래 메뉴 줄이 없으므로 구분선 표시
   }
@@ -9596,7 +9673,7 @@ function applyPermissions(){
   if(blank) blank.style.display='none';
   ['deptNav','mainMenuNav'].forEach(id=>{ const e=document.getElementById(id); if(e)e.style.display=''; });
   // 관리자(admin)는 로그인 직후 홈 화면부터 시작 (최초 1회)
-  if(_isAdminUser() && !_homeLanded){ _homeLanded=true; goPage('home'); return; }
+  if(!_homeLanded){ _homeLanded=true; goPage('home'); return; }   // 모든 계정: 로그인 직후 홈부터 시작(최초 1회)
   // 현재 페이지 접근 불가 → 첫 허용 메뉴로 이동, 가능하면 현재 페이지 열기
   if(_pagePerm()==='none') goMenu(first.id);
   else goPage(currentPage);
@@ -13902,7 +13979,7 @@ function _mobViewportSync(p){
 function _mobIsNative(){ return document.documentElement.classList.contains('mob-native'); }
 function goPage(p){
   _mobViewportSync(p);
-  if(p==='home' && !_isAdminUser()) return;   // 홈 화면은 관리자(admin) 전용
+  if(p==='home' && !window.__CURRENT_USER) return;   // 홈 화면: 로그인한 모든 계정(내용은 계정별로 다름)
   // 권한 없는 메뉴 접근 차단 (매출관리는 로켓그로스 매출 권한만 있어도 진입 허용 — 로켓그로스 부서 딥링크용)
   if(window.__CURRENT_USER && p!=='home' && _menuPerm(p)==='none' && !(p==='revenue' && _permOf('revenue.rocket')!=='none')){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   // 리뷰관리 화면을 벗어나면 실시간 폴링 중단(다른 화면에서 불필요한 egress 방지) — 'review'로
