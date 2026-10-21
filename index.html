@@ -237,6 +237,12 @@ select option{background:var(--bg);color:var(--tx);}
 /* 머리글 아래 굵은 선: border 는 sticky 머리글이 스크롤될 때 떨어져 나가므로 inset 그림자로 함께 이동 */
 thead th{box-shadow:inset 0 -2px 0 var(--tbl-head-line);}
 .hm-cal thead th{box-shadow:none;}
+/* 열 사이 세로줄 — 칸 크기가 밀리지 않도록 border 대신 inset 그림자로 그림(머리글이 스크롤 고정돼도 같이 이동).
+   제외: 견적서 문서(.qt-tbl)·전화구매 피벗(.pb-table/.piv-table)은 자체 줄이 있고, 홈 달력(.hm-cal)은 의도적으로 줄 없음 */
+table:not(.qt-tbl):not(.pb-table):not(.piv-table):not(.cs-order-table):not(.um-table):not(.hm-cal *) :is(tbody,tfoot)>tr>:is(td,th):not(:last-child){box-shadow:inset -1px 0 0 var(--tbl-line);}
+table:not(.qt-tbl):not(.pb-table):not(.piv-table):not(.cs-order-table):not(.um-table):not(.hm-cal *) thead>tr>th:not(:last-child){box-shadow:inset -1px 0 0 var(--tbl-line),inset 0 -2px 0 var(--tbl-head-line);}
+/* 이미 그림자(고정 열 표시)를 쓰는 표 두 개는 border 로 */
+.cs-order-table :is(td,th):not(:last-child),.um-table :is(td,th):not(:last-child){border-right:1px solid var(--tbl-line);}
 body{background:var(--bg2);color:var(--tx);min-height:100vh;line-height:1.3;}
 .app{display:flex;flex-direction:column;min-height:100vh;}
 .theme-toggle{display:none;align-items:center;gap:4px;background:var(--bg2);border:0.5px solid var(--bd);border-radius:20px;padding:3px;cursor:pointer;}
