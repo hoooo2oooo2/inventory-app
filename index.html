@@ -1317,8 +1317,8 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 #rpage-backdata .rev-tbl-card .tw{overflow-x:visible;}
 #rpage-backdata #bdTable{width:fit-content;white-space:nowrap;}
 #rpage-backdata .bd-layout{display:flex;gap:18px;align-items:flex-start;width:100%;}
-#rpage-backdata .bd-left{flex-shrink:0;}
-#rpage-backdata .bd-right{flex:1;min-width:360px;position:sticky;top:140px;max-height:calc(100vh - 160px);display:flex;flex-direction:column;}
+#rpage-backdata .bd-left{flex:1 1 0;min-width:0;}
+#rpage-backdata .bd-right{flex:0 0 clamp(640px,40vw,700px);min-width:640px;position:sticky;top:140px;max-height:calc(100vh - 160px);display:flex;flex-direction:column;}
 #rpage-backdata .bd-right .rev-tbl-card{width:100%;flex:1;display:flex;flex-direction:column;min-height:0;}
 #rpage-backdata .bd-right .tw{flex:1;overflow-y:auto;min-height:0;}
 #rpage-backdata .bd-right #shipTable{width:100%;white-space:normal;}
@@ -1339,6 +1339,9 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 #page-revenue .rev-empty{text-align:center;padding:40px;color:var(--tx2);font-size:13px;}
 #page-revenue .rev-uni-scroll{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 300px);}
 #page-revenue .rev-uni-scroll thead th{position:sticky;top:0;z-index:5;background:var(--bg2);}
+/* 통합 표: 칸 밖으로 글자·숫자가 삐져나오지 않게 하고(overflow), 좌우 여백을 줄여 숫자 자리를 확보. 열 폭은 _uniFitCols()가 창 폭에 맞춤 */
+#revUniTable td,#revUniTable th{overflow:hidden;padding-left:6px;padding-right:6px;}
+#revUniTable th{text-overflow:ellipsis;}
 /* 합계: 검색창 옆 인라인 표시 */
 #page-revenue #revUniSumInline .uni-sum-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;}
 #page-revenue #revUniSumInline .uni-sum-total{font-size:12px;font-weight:700;color:var(--etc-1e293b);background:var(--slate-100);border-radius:6px;padding:3px 10px;white-space:nowrap;}
@@ -2916,6 +2919,17 @@ html.mob-native .lcs-sort{flex-wrap:wrap;}
 html.mob-native .lcs-sort button{padding:8px 13px;font-size:13px;}
 html.mob-native .lcr-det-lbl{font-size:13px;}
 html.mob-native .lcr-det-val{font-size:15px;}
+/* ── 가로 스크롤 제거: 표 폭을 창(한 화면)에 맞춤 (2026-10-21) ── */
+/* 발주 인사이트: 좌우 여백을 줄이고 상품명 열은 길면 …(마우스를 올리면 전체) */
+#insightTblWrap td,#insightTblWrap th{padding-left:5px;padding-right:5px;}
+#insightTblWrap td:nth-child(3){max-width:280px;overflow:hidden;text-overflow:ellipsis;}
+/* 반품관리: 열 최소 폭·여백을 줄여 한 화면에 */
+.rt-table thead th,.rt-table tbody td{padding-left:6px;padding-right:6px;}
+.rt-table .rt-w-m{min-width:84px;}.rt-table .rt-w-l{min-width:104px;}.rt-table .rt-w-xl{min-width:120px;}.rt-table .rt-w-trk{min-width:150px;}
+/* 백데이터: 왼쪽 표 칸은 줄바꿈 허용, 오른쪽 배송 표는 칸 여백을 줄여 가로 스크롤 없이 */
+#rpage-backdata #bdTable td,#rpage-backdata #bdTable th{white-space:normal;overflow-wrap:anywhere;word-break:keep-all;}
+#rpage-backdata #bdTable td:last-child .btn{margin:1px 0;}
+#rpage-backdata #shipTable td,#rpage-backdata #shipTable th{padding-left:4px;padding-right:4px;overflow-wrap:anywhere;}
 </style>
 
 <div class="app" id="appRoot">
@@ -6675,7 +6689,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
           <div class="rev-tbl-head"><span class="rev-tbl-title">📋 월별 요약</span></div>
           <div class="rev-empty" id="revMonthlySumEmpty">업로드된 데이터가 없습니다</div>
           <div class="tw"><table class="dt" id="revMonthlyTbl" style="display:none;">
-            <colgroup><col style="width:84px;"><col><col style="width:78px;"><col style="width:66px;"><col style="width:84px;"><col style="width:84px;"></colgroup>
+            <colgroup><col style="width:112px;"><col><col style="width:78px;"><col style="width:66px;"><col style="width:84px;"><col style="width:84px;"></colgroup>
             <thead><tr>
               <th>월</th><th style="text-align:right;">매출</th><th style="text-align:right;">마진</th>
               <th style="text-align:right;">마진율</th><th style="text-align:right;">주문건수</th><th style="text-align:right;">전월대비</th>
@@ -6904,33 +6918,34 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="rev-tbl-card">
         <div class="tw rev-uni-scroll" id="revUniScroll">
           <table class="dt" id="revUniTable" style="width:100%;table-layout:fixed;">
+            <!-- 열 폭: 숫자 열은 쉼표 포함 최대 자릿수가 들어가는 고정 폭(절대 안 잘림), data-flex="최소,최대,가중치" 열은 창 폭에 맞춰 _uniFitCols()가 나눠 가짐 → 가로 스크롤 없이 한 화면에 -->
             <colgroup>
-              <col style="width:26px"><!-- 체크박스 -->
+              <col style="width:28px"><!-- 체크박스 -->
               <!-- 년도·날짜·판매처 -->
-              <col style="width:34px"><col style="width:44px"><col style="width:62px">
-              <!-- 주문번호 압축 -->
-              <col style="width:48px">
+              <col style="width:48px"><col style="width:52px"><col style="width:78px">
+              <!-- 주문번호 -->
+              <col data-flex="50,150,2.2" style="width:60px">
               <!-- 구매자·수취인 -->
-              <col style="width:42px"><col style="width:42px">
-              <!-- 연락처1·2 압축 -->
-              <col style="width:72px"><col style="width:60px">
+              <col style="width:54px"><col style="width:54px">
+              <!-- 연락처 -->
+              <col data-flex="76,120,1.2" style="width:90px">
               <!-- 우편·주소 -->
-              <col style="width:42px"><col style="width:74px">
-              <!-- 상품번호 표시 --><col style="width:74px">
+              <col style="width:54px"><col data-flex="56,280,1.6" style="width:90px">
+              <!-- 상품번호 --><col data-flex="48,130,1" style="width:70px">
               <!-- 구분·코드 -->
-              <col style="width:42px"><col style="width:54px">
-              <!-- 모델명 -->
-              <col style="width:180px">
-              <!-- 수량·출고·배송비·판매가·정산·매입·마진·마진율·단가 -->
-              <col style="width:38px"><col style="width:30px"><col style="width:32px">
-              <col style="width:46px"><col style="width:48px"><col style="width:42px">
-              <col style="width:44px"><col style="width:40px"><col style="width:40px">
-              <col style="width:24px"><!-- 수정 -->
+              <col style="width:74px"><col style="width:64px">
+              <!-- 모델명: 풀네임이 다 보이도록 현재 표시된 가장 긴 이름 폭만큼 확보(_uniModelNeed) -->
+              <col data-model="1" style="width:240px">
+              <!-- 수량·출고·배송비·판매가·정산·매입·마진·마진율·단가 (쉼표·최대 자릿수 기준 고정) -->
+              <col style="width:42px"><col style="width:40px"><col style="width:54px">
+              <col style="width:70px"><col style="width:72px"><col style="width:72px">
+              <col style="width:68px"><col style="width:66px"><col style="width:68px">
+              <col style="width:28px"><!-- 수정 -->
             </colgroup>
             <thead><tr>
               <th style="text-align:center;"><input type="checkbox" id="revUniSelAll" onchange="toggleUniSelAll(this.checked)" title="이 페이지 전체 선택"></th>
               <th>년도</th><th>날짜</th><th>판매처</th><th>주문번호</th>
-              <th>구매자</th><th>수취인</th><th>연락처1</th><th>연락처2</th>
+              <th>구매자</th><th>수취인</th><th>연락처</th>
               <th>우편</th><th>주소</th><th>상품번호</th>
               <th>구분</th><th>코드</th><th>모델명</th>
               <th style="text-align:right;">수량</th><th style="text-align:right;">출고</th>
@@ -26701,6 +26716,40 @@ async function _doDeleteBatchUni(){
   finally{ if(btn){ btn.disabled=false; } }
 }
 
+// 통합 표 열 폭 맞춤 — 숫자 열은 고정 폭(쉼표 포함 최대 자릿수), data-flex="최소,최대,가중치" 열이 남는 폭을 나눠 가져 창 폭에 딱 맞춘다(가로 스크롤 없이 한 화면).
+//  창이 너무 좁아 최소 폭 합계도 못 담을 때만 가로 스크롤이 남는다. 창 크기가 바뀌면 다시 계산.
+function _uniModelNeed(t){   // 현재 표시된 모델명 중 가장 긴 이름이 한 줄로 다 들어가는 폭(px)
+  try{
+    const ins=t.querySelectorAll('tbody tr td:nth-child(14) input'); if(!ins.length) return 0;
+    const cs=getComputedStyle(ins[0]); const cx=(_uniModelNeed._c||(_uniModelNeed._c=document.createElement('canvas'))).getContext('2d');
+    cx.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily; let mx=0;
+    ins.forEach(i=>{ const w=cx.measureText(i.value||'').width; if(w>mx) mx=w; });
+    return Math.ceil(mx)+parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight)+8;   // 입력칸 안쪽 여백·테두리 몫
+  }catch(e){ return 0; }
+}
+function _uniFitCols(){
+  const t=document.getElementById('revUniTable'); if(!t) return;
+  const wrap=t.parentElement; const avail=wrap?wrap.clientWidth:0; if(!avail) return;   // 숨겨진 탭이면 0 → 건너뜀(탭을 열 때 다시 호출됨)
+  const cols=[...t.querySelectorAll('colgroup col')]; let fixed=0; const flex=[]; let model=null;
+  cols.forEach(c=>{
+    if(c.hasAttribute('data-model')){ model=c; return; }
+    const f=c.getAttribute('data-flex');
+    if(f){ const p=f.split(',').map(Number); flex.push({c,min:p[0],max:p[1],wt:p[2]}); } else fixed+=parseFloat(c.style.width)||0;
+  });
+  const room=avail-fixed, othersMin=flex.reduce((a,f)=>a+f.min,0);
+  const need=model?Math.min(Math.max(_uniModelNeed(t),120),460):0;                    // 모델명: 풀네임 폭 우선(최대 460px)
+  const modelMin=need?Math.min(need,Math.max(120,room-othersMin)):0;                  // 창이 좁으면 최소 120px까지만 양보(그때는 …)
+  if(room<=othersMin+modelMin){ flex.forEach(f=>{ f.c.style.width=f.min+'px'; }); if(model) model.style.width=modelMin+'px'; return; }   // 최소폭 합계도 못 담는 좁은 창만 가로 스크롤
+  const alloc=flex.map(f=>f.min); let left=room-othersMin-modelMin, act=flex.map((f,i)=>i);
+  for(let it=0; it<8 && left>0.5 && act.length; it++){   // 남는 폭을 가중치대로 나누되 열마다 상한
+    const tw=act.reduce((a,i)=>a+flex[i].wt,0), next=[]; let used=0;
+    act.forEach(i=>{ const g=Math.min(left*flex[i].wt/tw, flex[i].max-alloc[i]); alloc[i]+=g; used+=g; if(alloc[i]<flex[i].max-0.5) next.push(i); });
+    left-=used; act=next;
+  }
+  flex.forEach((f,i)=>{ f.c.style.width=Math.floor(alloc[i])+'px'; });
+  if(model) model.style.width=Math.floor(modelMin+Math.max(0,left))+'px';             // 상한까지 다 찼으면 남는 폭은 모델명 칸 여유로
+}
+window.addEventListener('resize',()=>{ clearTimeout(window.__uniFitT); window.__uniFitT=setTimeout(_uniFitCols,120); });
 // 통합 표 입력칸(배송비·판매가·정산) 표시용 천 단위 쉼표 — 편집 중엔 숫자만(onfocus), 벗어나면 다시 쉼표(onblur). 저장 함수는 쉼표를 제거하고 읽으므로 데이터는 그대로
 function _uniFmtComma(el){ const raw=String(el.value).replace(/,/g,'').trim(); if(raw!==''&&/^-?\d+(\.\d+)?$/.test(raw)) el.value=Number(raw).toLocaleString(); }
 function renderUnifiedTable(){
@@ -26791,15 +26840,14 @@ function renderUnifiedTable(){
       <td style="${TC}">${r.year||''}</td>
       <td style="${TC}">${r.date||''}</td>
       <td style="${TC}">${r.ch||''}</td>
-      <td style="font-size:10px;${TC}">${r.orderNo||''}</td>
+      <td style="font-size:10px;${TC}" title="${escAttr(r.orderNo||'')}">${r.orderNo||''}</td>
       <td style="${TC};${r.buyer?'cursor:pointer;':''}" title="${r.buyer?escAttr(r.buyer)+' — 더블클릭: 구매내역':''}" ${r.buyer?`ondblclick="openCustomerPopup(${r.id},'buyer')"`:''}>${maskName(r.buyer)}</td>
       <td style="${TC};${r.receiver?'cursor:pointer;':''}" title="${r.receiver?escAttr(r.receiver)+' — 더블클릭: 구매내역':''}" ${r.receiver?`ondblclick="openCustomerPopup(${r.id},'receiver')"`:''}>${maskName(r.receiver)}</td>
       <td style="${TC}">${maskPhone(r.phone1)}</td>
-      <td style="${TC}">${maskPhone(r.phone2)}</td>
       <td style="${TC}">${r.zip||''}</td>
       <td style="font-size:10px;${TC}" title="${_revMaskOn?'':r.addr||''}">${maskAddr(r.addr)}</td>
       <td style="font-size:10px;${TC}" title="${r.itemNo||''}">${r.itemNo||''}</td>
-      <td style="${TC}">${r.itemType||''}</td>
+      <td style="${TC}" title="${escAttr(r.itemType||'')}">${r.itemType||''}</td>
       <td style="padding:0;">
         <input type="text" value="${escAttr(r.itemCode||'')}"
           onfocus="this.select()" onclick="event.stopPropagation()"
@@ -26839,7 +26887,7 @@ function renderUnifiedTable(){
           onkeydown="if(event.key==='Enter'){this.blur();}"
           onchange="updateRowShipping(${r.id}, this.value)"
           title="클릭하여 배송비 수정 (마진 자동 반영)"
-          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px;border-radius:4px;cursor:text;"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px 4px;border-radius:4px;cursor:text;"
           onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
           onblur="this.style.borderColor='transparent';this.style.background='transparent';_uniFmtComma(this);">
@@ -26850,7 +26898,7 @@ function renderUnifiedTable(){
           onkeydown="if(event.key==='Enter'){this.blur();}"
           onchange="updateRowSalePrice(${r.id}, this.value)"
           title="클릭하여 판매가 수정"
-          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px;border-radius:4px;cursor:text;"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px 4px;border-radius:4px;cursor:text;"
           onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
           onblur="this.style.borderColor='transparent';this.style.background='transparent';_uniFmtComma(this);">
@@ -26861,7 +26909,7 @@ function renderUnifiedTable(){
           onkeydown="if(event.key==='Enter'){this.blur();}"
           onchange="updateRowSettlement(${r.id}, this.value)"
           title="클릭하여 정산예정금액 수정 (마진 자동 반영)"
-          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;font-weight:600;color:inherit;padding:6px;border-radius:4px;cursor:text;"
+          style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;font-weight:600;color:inherit;padding:6px 4px;border-radius:4px;cursor:text;"
           onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
           onblur="this.style.borderColor='transparent';this.style.background='transparent';_uniFmtComma(this);">
@@ -26874,6 +26922,7 @@ function renderUnifiedTable(){
     </tr>`;
   }).join('');
 
+  _uniFitCols();   // 창 폭에 맞춰 열 폭 배분(가로 스크롤 없이)
   // 선택 UI 갱신
   updateUniSelUI();
   const selAll=document.getElementById('revUniSelAll');
@@ -36960,13 +37009,27 @@ function _pbSplitDup(rows, date, existing){
   return { newRows, dup };
 }
 
+// 전화구매 표 열 폭 맞춤 — 줄임(…) 열(수취인·주소·상품명·비고)만 최소 폭까지 줄여 창 폭에 맞춘다. 숫자·구분 열은 그대로. 최소 폭 합계도 못 담는 좁은 창에서만 가로 스크롤.
+const PB_MINW = { recipient:80, addr:92, product:112, note:70 };
+function _pbFitCols(){
+  const wrap=document.querySelector('#pbBodyU')&&document.querySelector('#pbBodyU').closest('.piv-table-scroll'); const avail=(wrap?wrap.clientWidth:0)-4; if(avail<=4) return;   // 표 테두리 몫 4px 여유
+  const widths=PB_VIEW.map(c=>c.w); let total=widths.reduce((a,b)=>a+b,0);
+  if(total>avail){
+    const shr=PB_VIEW.map((c,i)=>(c.ell&&PB_MINW[c.k])?Math.max(0,c.w-PB_MINW[c.k]):0), cap=shr.reduce((a,b)=>a+b,0);
+    const need=Math.min(total-avail, cap);
+    if(cap>0) PB_VIEW.forEach((c,i)=>{ widths[i]=c.w-Math.floor(need*shr[i]/cap); });
+    total=widths.reduce((a,b)=>a+b,0);
+  }
+  ['U','D'].forEach(k=>{ const tb=document.getElementById('pbBody'+k); const t=tb&&tb.closest('table'); if(!t) return; t.querySelectorAll('colgroup col').forEach((col,i)=>{ if(widths[i]!=null) col.style.width=widths[i]+'px'; }); t.style.minWidth=Math.min(total,Math.max(avail,0)>=total?total:total)+'px'; });
+}
+window.addEventListener('resize',()=>{ clearTimeout(window.__pbFitT); window.__pbFitT=setTimeout(_pbFitCols,120); });
 function pbInit(){
   if(!_pbInited){
     _pbInited = true;
     // 두 표(미입금건 관리 / 거래건)가 같은 열 폭을 쓰도록 colgroup을 똑같이 넣음 → 머리글 간격이 항상 일치
     const head = '<tr>'+PB_VIEW.map(c=>`<th>${c.h}</th>`).join('')+'</tr>';
-    const cg = '<colgroup>'+PB_VIEW.map(c=>`<col style="width:${c.w}px">`).join('')+'</colgroup>';
-    const minW = PB_VIEW.reduce((t,c)=>t+c.w,0)+'px';
+    const cg = '<colgroup>'+PB_VIEW.map((c,i)=>`<col data-i="${i}" style="width:${c.w}px">`).join('')+'</colgroup>';
+    const minW = PB_VIEW.reduce((t,c)=>t+c.w,0)+'px';   // 창이 충분히 넓지 않을 때만 _pbFitCols()가 줄임 열을 줄여 맞춤
     ['U','D'].forEach(k=>{
       const th=document.getElementById('pbHead'+k); th.innerHTML = head;
       th.parentElement.querySelector('colgroup')?.remove(); th.parentElement.insertAdjacentHTML('afterbegin', cg); th.parentElement.style.minWidth = minW;
@@ -36977,6 +37040,7 @@ function pbInit(){
   const canEdit = _pivCanEdit();
   ['pbUploadBtn','pbAddBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display = canEdit ? '' : 'none'; });
   if(!_pbLoaded) pbReload(); else pbRender();
+  setTimeout(_pbFitCols,0);
 }
 
 // ── DB 접근 (이 함수들만 sb를 직접 사용) ──
