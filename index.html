@@ -192,7 +192,8 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .ct-dy .n{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:50%;font-weight:600;}
 .ct-dy.today .n{background:var(--pr);color:#fff;} .ct-dy.sel{background:var(--prl);}
 .ct-dy .hl{font-size:10px;font-weight:600;color:var(--red);margin-left:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 28px);display:inline-block;vertical-align:middle;}
-.ct-dy .more{position:absolute;left:5px;bottom:2px;font-size:11.5px;color:var(--tx2);font-weight:700;}
+.ct-dy .more{position:absolute;right:4px;top:3px;font-size:11.5px;line-height:16px;padding:0 6px;border-radius:9px;background:var(--prl);color:var(--pr);font-weight:700;z-index:3;}
+.ct-dy:has(.more) .hl{max-width:calc(100% - 66px);}
 .ct-bar,.ct-tk,.ct-dr,.ct-chip{--cb:#E8EAEE;--cf:#4B5563;--cc:#9CA3AF;}
 .ct-cat-CX{--cb:#D5F3EE;--cf:#0F766E;--cc:#14B8A6;}.ct-cat-디자인{--cb:#FCE1EC;--cf:#9D174D;--cc:#EC4899;}.ct-cat-물류{--cb:#FFE8D2;--cf:#9A3412;--cc:#F59E0B;}.ct-cat-운영{--cb:#DCEAFE;--cf:#1E40AF;--cc:#3182F6;}.ct-cat-로켓{--cb:#EBE3FD;--cf:#5B21B6;--cc:#8B5CF6;}
 :root[data-theme="dark"] .ct-bar,:root[data-theme="dark"] .ct-tk,:root[data-theme="dark"] .ct-dr,:root[data-theme="dark"] .ct-chip{--cb:rgba(156,163,175,.22);--cf:#D1D5DB;}
@@ -9453,7 +9454,7 @@ function ctMonthHtml(o){
     h+=`<div class="ct-wk" style="min-height:${o.top+o.max*(o.bh+3)+4}px">`+days.map((d,i)=>{
       const ds=_hmYmd(d), hol=_ctHol(ds);
       const c=['ct-dy',d.getMonth()!==mm-1?'oth':'',i===0?'sun':'',i===6?'sat':'',hol?'hol':'',ds===today?'today':'',ds===_ct.sel?'sel':''].join(' ');
-      return `<div class="${c}" onclick="event.stopPropagation();${o.pop?`ctPick('${ds}')`:`ctOpenPop('${ds}')`}"><span class="n">${d.getDate()}</span>${hol?`<span class="hl" title="${_hmEsc(hol)}">${_hmEsc(hol)}</span>`:''}${hid[i]?`<span class="more">+${hid[i]}</span>`:''}</div>`; }).join('')
+      return `<div class="${c}" onclick="event.stopPropagation();${o.pop?`ctPick('${ds}')`:`ctOpenPop('${ds}')`}"><span class="n">${d.getDate()}</span>${hol?`<span class="hl" title="${_hmEsc(hol)}">${_hmEsc(hol)}</span>`:''}${hid[i]?`<span class="more" title="더 있는 업무 ${hid[i]}건 — 날짜를 누르면 전체 목록을 볼 수 있어요">+${hid[i]}</span>`:''}</div>`; }).join('')
       +place.filter(p=>p.l<o.max).map(p=>`<div class="ct-bar ct-cat-${p.t.cat}" style="top:${o.top+p.l*(o.bh+3)}px;left:calc(${p.sI}*100%/7 + 3px);width:calc(${p.eI-p.sI+1}*100%/7 - 6px)" onclick="event.stopPropagation();ctShowTask('${p.t.id}')" title="${_hmEsc(p.t.title)} · ${p.t.s.slice(5)}~${p.t.e.slice(5)}">${_ctVisIco(p.t)}${_hmEsc(p.t.title)}</div>`).join('')+`</div>`;
   }
   return h;
