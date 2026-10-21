@@ -9630,11 +9630,10 @@ async function _ctNotify(items){
     if(!recs.length) return;
     const v=await cloudKvVersion('task_requests'); if(v===undefined) return;      // 서버 연결 확인 실패 → 기존 알림 목록을 덮어쓰지 않도록 중단
     let arr=v===null?[]:await cloudKvLoad('task_requests'); if(!Array.isArray(arr)) return;
-    // 이 기능이 만든 알림(ctTask)만, 읽은 지 30일 지난 것은 정리 — 목록이 무한히 커져 모두가 매번 받는 양이 늘지 않게 (기존 요청·시스템 알림은 건드리지 않음)
-    const cut=Date.now()-30*864e5; arr=arr.filter(r=>!(r&&r.ctTask&&r.read&&new Date(r.createdAt).getTime()<cut));
+    arr=_taskPrune(arr);   // 생성 후 10일 지난 '읽은' 알림 정리 — 목록이 무한히 커져 모두가 매번 받는 양이 늘지 않게
     recs.forEach(r=>arr.push(r));
-    await cloudKvSave('task_requests', arr);
-    _taskRequests=arr;
+    await cloudKvSave(TASK_KEY, arr);
+    try{ _taskRequests=(await _taskLoadAll()).all; }catch(e){ _taskRequests=arr; }
     _taskBroadcast();
   }catch(e){ console.warn('협업 캘린더 알림 전송 실패', e); }
 }
@@ -11187,6 +11186,23 @@ function _taskFmtTime(iso){
   return `${p2(d.getMonth()+1)}/${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
 }
 
+// ── 알림 저장소 분리 · 자동 정리 (2026-10-21) ──
+//  · 'task_requests'     : 직원 요청(F9) · 협업 캘린더 알림 — 모든 계정이 읽음(작게 유지)
+//  · 'task_requests_sys' : 시스템 자동 알림(발주 우선순위·마진율 급락·판매가 변동) — 수신자가 admin 뿐인데 제품 상세가 들어 있어 큼
+//                          → admin 계정만 읽는다. 직원 계정은 이 큰 목록을 변경 때마다 내려받지 않아도 됨(egress 절약)
+//  · 정리: 생성 후 10일이 지난 '읽은' 알림은 저장할 때마다 삭제. 아직 안 읽은 알림은 오래돼도 보존.
+//  · 분리 전에 task_requests 안에 남아 있는 시스템 알림도 id 기준으로 합쳐 보여주므로(중복 제거) 이전 화면과 섞여도 안전.
+const TASK_KEY='task_requests', TASK_SYS_KEY='task_requests_sys', TASK_KEEP_DAYS=10;
+function _taskSeesSys(){ const me=_taskMe(); if(!me) return false; try{ return SYS_ALERT_RECIPIENTS.includes(me.username); }catch(e){ return me.username==='admin'; } }
+function _taskPrune(arr){ const cut=Date.now()-TASK_KEEP_DAYS*864e5; return (arr||[]).filter(r=>!(r&&r.read&&new Date(r.createdAt).getTime()<cut)); }
+async function _taskLoadAll(){   // 이 계정이 볼 수 있는 알림 전부(all) + 저장소별 원본 배열(main/sys)
+  const main=(await cloudKvLoad(TASK_KEY))||[];
+  const sys=_taskSeesSys()?((await cloudKvLoad(TASK_SYS_KEY))||[]):[];
+  const seen=new Set(), all=[];
+  [...sys,...main].forEach(r=>{ if(r&&!seen.has(r.id)){ seen.add(r.id); all.push(r); } });
+  return {main,sys,all};
+}
+
 async function taskOpenCreateModal(){
   const me=_taskMe(); if(!me){ toast('로그인 후 이용해주세요.'); return; }
   try{ await loadAppProfiles(); }catch{}
@@ -11218,10 +11234,10 @@ async function taskSubmitCreate(){
     read:false, resolvedAt:null
   };
   let arr=[];
-  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{}
-  arr.push(rec);
-  await cloudKvSave('task_requests', arr);
-  _taskRequests=arr;
+  try{ arr=(await cloudKvLoad(TASK_KEY))||[]; }catch{}
+  arr=_taskPrune(arr); arr.push(rec);
+  await cloudKvSave(TASK_KEY, arr);
+  try{ _taskRequests=(await _taskLoadAll()).all; }catch{ _taskRequests=arr; }
   _taskSeenIds.add(rec.id);   // 내가 방금 만든 건 나에게 팝업으로 다시 뜨지 않도록
   _taskBroadcast();
   closeModal('taskCreateModal');
@@ -11259,18 +11275,21 @@ function taskRenderInbox(){
 }
 async function taskOpenInbox(){
   const me=_taskMe(); if(!me){ toast('로그인 후 이용해주세요.'); return; }
-  try{ _taskRequests=(await cloudKvLoad('task_requests'))||[]; }catch{}
+  try{ _taskRequests=(await _taskLoadAll()).all; }catch{}
   taskRenderInbox();
   openModal('taskInboxModal');
   taskRenderBadge();
 }
 async function _taskUpdateRecord(id, patch){
-  let arr=[];
-  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{ return; }
-  const idx=arr.findIndex(t=>t.id===id); if(idx===-1) return;
-  arr[idx]={ ...arr[idx], ...patch };
-  await cloudKvSave('task_requests', arr);
-  _taskRequests=arr;
+  let L;
+  try{ L=await _taskLoadAll(); }catch{ return; }
+  const si=L.sys.findIndex(t=>t.id===id), mi=L.main.findIndex(t=>t.id===id);
+  let key, arr;
+  if(si!==-1){ key=TASK_SYS_KEY; arr=L.sys; arr[si]={ ...arr[si], ...patch }; }
+  else if(mi!==-1){ key=TASK_KEY; arr=L.main; arr[mi]={ ...arr[mi], ...patch }; }
+  else return;
+  await cloudKvSave(key, _taskPrune(arr));   // 저장 직전 최신본(방금 읽은 것) 위에 이 한 건만 반영 + 10일 지난 읽은 알림 정리
+  _taskRequests=_taskPrune(L.all.map(t=>t.id===id?{ ...t, ...patch }:t));
   taskRenderBadge();
   if(document.getElementById('taskInboxModal')?.classList.contains('open')) taskRenderInbox();
   _taskBroadcast();
@@ -11415,7 +11434,7 @@ function taskViewSysAlert(id){
 async function _taskCheckNew(){
   const me=_taskMe(); if(!me) return;
   let arr;
-  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{ return; }
+  try{ arr=(await _taskLoadAll()).all; }catch{ return; }
   _taskRequests=arr;
   if(document.getElementById('taskInboxModal')?.classList.contains('open')) taskRenderInbox();
   taskRenderBadge();
@@ -11425,8 +11444,10 @@ async function _taskCheckNew(){
 }
 async function _taskPollTick(){
   if(document.hidden) return;
-  const v=await cloudKvVersion('task_requests');
-  if(v!==undefined && v!==_taskVerCache){ _taskVerCache=v; await _taskCheckNew(); }
+  const keys=_taskSeesSys()?[TASK_KEY,TASK_SYS_KEY]:[TASK_KEY];
+  const vs=await cloudKvVersions(keys); if(vs===undefined) return;   // 두 저장소 버전을 한 번에 조회
+  const tok=keys.map(k=>String(vs[k]===undefined?null:vs[k])).join('|');
+  if(tok!==_taskVerCache){ _taskVerCache=tok; await _taskCheckNew(); }
 }
 function _taskBroadcast(){
   try{ if(_taskWatchCh){ _taskWatchCh.send({type:'broadcast',event:'task_ping',payload:{t:Date.now()}}); return; } }catch{}
@@ -11441,7 +11462,7 @@ async function taskStartWatch(){
   _taskWatchStarted=true;
   try{ _logiGetCtx(); }catch{}   // 물류팀 권한 없는 계정은 logiStartNoticeWatch에서 오디오 잠금 해제가 안 되므로 여기서도 시도(로그인 직후 호출돼야 브라우저 자동재생 정책 통과)
   let arr=[];
-  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{}
+  try{ arr=(await _taskLoadAll()).all; }catch{}
   _taskRequests=arr;
   _taskSeenIds=new Set(arr.map(t=>t.id));   // 로그인 시점 이전 항목은 팝업 없이 뱃지로만 표시
   taskRenderBadge();
@@ -11451,10 +11472,11 @@ async function taskStartWatch(){
   }
   if(_taskWatchCh) return;
   try{
-    _taskWatchCh = sb.channel('task-rt')
+    let ch = sb.channel('task-rt')
       .on('broadcast', { event:'task_ping' }, _taskCheckNew)
-      .on('postgres_changes', { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.task_requests' }, _taskCheckNew)
-      .subscribe();
+      .on('postgres_changes', { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.'+TASK_KEY }, _taskCheckNew);
+    if(_taskSeesSys()) ch = ch.on('postgres_changes', { event:'*', schema:'public', table:'work_calendar', filter:'kind=eq.'+TASK_SYS_KEY }, _taskCheckNew);   // 시스템 알림 저장소(admin만 구독)
+    _taskWatchCh = ch.subscribe();
   }catch(e){ console.warn('업무요청 realtime 구독 실패(폴링으로 대체)', e); }
 }
 // ── 시스템 자동 알림(발주 우선순위 · 채널별 마진율 급락) — 기존 업무요청(F9/받은요청함) 체계에 통합 ──
@@ -11465,8 +11487,8 @@ async function taskStartWatch(){
 async function _sysAlertSend(records){
   if(!records.length) return;
   let arr=[];
-  try{ arr=(await cloudKvLoad('task_requests'))||[]; }catch{}
-  await cloudKvSave('task_requests', arr.concat(records));
+  try{ arr=(await cloudKvLoad(TASK_SYS_KEY))||[]; }catch{}   // 시스템 알림은 전용 저장소(admin만 읽음)에 쌓는다
+  await cloudKvSave(TASK_SYS_KEY, _taskPrune(arr).concat(records));
   _taskBroadcast();
   // 방송(realtime broadcast)은 페이지 막 로드된 시점엔 구독 채널이 아직 안 붙어있어 놓칠 수 있으므로,
   // 알림을 만든 이 세션 자신은 방송 왕복을 기다리지 않고 즉시 확인해서 팝업 큐에 바로 반영한다.
