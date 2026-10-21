@@ -28205,7 +28205,7 @@ async function discProd(id){
   await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:d?'단종처리':'단종해제',before:d?'정상':'단종',after:d?'단종':'정상',user:'수동'});
   renderInv();updateFloat();
 }
-async function hideProd(id){const p=products.find(x=>x.id===id);if(!p)return;const h=!p.hidden;await sb.from('products').update({hidden:h}).eq('id',id);_bumpProducts();p.hidden=h;await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:h?'숨김':'표시복원',before:h?'표시':'숨김',after:h?'숨김':'표시',user:'수동'});renderInv();updateFloat();}
+async function hideProd(id){const p=products.find(x=>x.id===id);if(!p)return;const h=!p.hidden;if(h&&!confirm(`"${p.name}" 제품을 숨김 처리하시겠습니까?`))return;await sb.from('products').update({hidden:h}).eq('id',id);_bumpProducts();p.hidden=h;await addHistory({menu:'재고관리',type:'edit',code:p.code,name:p.name,desc:h?'숨김':'표시복원',before:h?'표시':'숨김',after:h?'숨김':'표시',user:'수동'});renderInv();updateFloat();}
 function toggleShowHidden(){_showHidden=!_showHidden;const b=document.getElementById('showHiddenBtn');if(b){b.textContent=_showHidden?'👁 전체보기':'🙈 숨긴제품만 보기';b.style.color=_showHidden?'var(--pr)':'var(--tx2)';}renderInv();}
 
 // ══════════════════════════════════════════════
