@@ -26689,6 +26689,8 @@ async function _doDeleteBatchUni(){
   finally{ if(btn){ btn.disabled=false; } }
 }
 
+// 통합 표 입력칸(배송비·판매가·정산) 표시용 천 단위 쉼표 — 편집 중엔 숫자만(onfocus), 벗어나면 다시 쉼표(onblur). 저장 함수는 쉼표를 제거하고 읽으므로 데이터는 그대로
+function _uniFmtComma(el){ const raw=String(el.value).replace(/,/g,'').trim(); if(raw!==''&&/^-?\d+(\.\d+)?$/.test(raw)) el.value=Number(raw).toLocaleString(); }
 function renderUnifiedTable(){
   // 연도 기본값/적재 보장 — 기본은 최신 연도, '전체' 선택 시에만 전 연도 로드
   if(_uniFilter.year===null||_uniFilter.year===undefined) _uniFilter.year=_revYears()[0]||new Date().getFullYear();
@@ -26820,37 +26822,37 @@ function renderUnifiedTable(){
       </td>
       <td style="text-align:right;">${r.shipQty!=null?r.shipQty:''}</td>
       <td style="text-align:right;padding:0;">
-        <input type="text" inputmode="numeric" value="${r.shipping!=null?r.shipping:''}"
-          onfocus="this.select()" onclick="event.stopPropagation()"
+        <input type="text" inputmode="numeric" value="${r.shipping!=null?Number(r.shipping).toLocaleString():''}"
+          onfocus="this.value=this.value.replace(/,/g,'');this.select()" onclick="event.stopPropagation()"
           onkeydown="if(event.key==='Enter'){this.blur();}"
           onchange="updateRowShipping(${r.id}, this.value)"
           title="클릭하여 배송비 수정 (마진 자동 반영)"
           style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px;border-radius:4px;cursor:text;"
           onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
-          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';_uniFmtComma(this);">
       </td>
       <td style="text-align:right;padding:0;">
-        <input type="text" inputmode="numeric" value="${r.salePrice!=null?r.salePrice:''}"
-          onfocus="this.select()" onclick="event.stopPropagation()"
+        <input type="text" inputmode="numeric" value="${r.salePrice!=null?Number(r.salePrice).toLocaleString():''}"
+          onfocus="this.value=this.value.replace(/,/g,'');this.select()" onclick="event.stopPropagation()"
           onkeydown="if(event.key==='Enter'){this.blur();}"
           onchange="updateRowSalePrice(${r.id}, this.value)"
           title="클릭하여 판매가 수정"
           style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;color:inherit;padding:6px;border-radius:4px;cursor:text;"
           onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
-          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';_uniFmtComma(this);">
       </td>
       <td style="text-align:right;padding:0;">
-        <input type="text" inputmode="numeric" value="${r.settlement!=null?r.settlement:''}"
-          onfocus="this.select()" onclick="event.stopPropagation()"
+        <input type="text" inputmode="numeric" value="${r.settlement!=null?Number(r.settlement).toLocaleString():''}"
+          onfocus="this.value=this.value.replace(/,/g,'');this.select()" onclick="event.stopPropagation()"
           onkeydown="if(event.key==='Enter'){this.blur();}"
           onchange="updateRowSettlement(${r.id}, this.value)"
           title="클릭하여 정산예정금액 수정 (마진 자동 반영)"
           style="width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;text-align:right;font:inherit;font-weight:600;color:inherit;padding:6px;border-radius:4px;cursor:text;"
           onmouseover="this.style.borderColor='var(--pr)';this.style.background='var(--bg)';"
           onmouseout="if(document.activeElement!==this){this.style.borderColor='transparent';this.style.background='transparent';}"
-          onblur="this.style.borderColor='transparent';this.style.background='transparent';">
+          onblur="this.style.borderColor='transparent';this.style.background='transparent';_uniFmtComma(this);">
       </td>
       <td style="text-align:right;">${r.costPrice!=null?r.costPrice.toLocaleString():''}</td>
       <td style="text-align:right;" class="${mgCls}">${mg!=null?mg.toLocaleString():''}</td>
