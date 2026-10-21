@@ -6782,8 +6782,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
       </div>
       <!-- KPI -->
       <div class="rev-kpi" id="revDlyKpi" style="grid-template-columns:repeat(5,1fr);">
-        <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 정산금액</div><div class="rev-kpi-val" id="revDlyK0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK0s"></div></div>
-        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revDlyK1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK1s"></div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 매출(판매가)</div><div class="rev-kpi-val" id="revDlyK0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK0s"></div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진 <span class="rev-kpi-badge" id="revDlyK1Badge">광고비 차감</span></div><div class="rev-kpi-val" id="revDlyK1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK1s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revDlyK2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK2s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl" id="revDlyK3Lbl">📦 택배건수</div><div class="rev-kpi-val" id="revDlyK3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK3s"></div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revDlyK4">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revDlyK4s">해당 기간·판매처</div></div>
@@ -6805,10 +6805,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
               <th style="white-space:nowrap;">구분 <select id="dlyTypeFilter" onchange="setDlyTypeFilter(this.value)" style="font-size:10px;padding:1px 4px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--tx);cursor:pointer;max-width:90px;"><option value="ALL">전체</option></select></th>
               <th style="text-align:right;">주문수량</th>
               <th style="text-align:right;">택배건수</th>
-              <th style="text-align:right;">판매가 합</th>
-              <th style="text-align:right;">정산금액</th>
+              <th style="text-align:right;">매출(판매가)</th>
               <th style="text-align:right;">마진</th>
-              <th style="text-align:right;cursor:pointer;" onclick="setDlySort('rate')" title="클릭하여 정렬">마진율<span class="uni-sort-ar" data-dly-k="rate"></span></th>
+              <th style="text-align:right;cursor:pointer;" onclick="setDlySort('rate')" title="마진 ÷ 정산금액 · 클릭하여 정렬">마진율<span class="uni-sort-ar" data-dly-k="rate"></span></th>
             </tr></thead>
             <tbody id="revDlyTbody"></tbody>
             <tfoot id="revDlyTfoot" style="font-weight:700;background:var(--prl);color:var(--pr);"></tfoot>
@@ -6836,9 +6835,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
           <thead><tr>
             <th>상품명</th>
             <th style="text-align:right;">매출</th>
-            <th style="text-align:right;">정산금액</th>
             <th style="text-align:right;">마진</th>
-            <th style="text-align:right;">마진율</th>
+            <th style="text-align:right;" title="마진 ÷ 정산금액">마진율</th>
             <th style="text-align:right;">판매량</th>
             <th style="text-align:right;">주문건수</th>
             <th style="text-align:right;">방문자</th>
@@ -23166,9 +23164,12 @@ function renderDailyReport(){
   const curTo=_dlyFilter.day!==null?curFrom:`${_dlyFilter.year}-${monStr}-31`;
   const prevFrom=prevDay!==null?`${prevY}-${prevMonStr}-${pad(prevDay)}`:`${prevY}-${prevMonStr}-01`;
   const prevTo=prevDay!==null?prevFrom:`${prevY}-${prevMonStr}-31`;
-  const rgFin = rgActive ? rgSumSettlementMargin(curFrom, curTo) : {settlement:0,margin:0};
-  const rgPrevFin = rgActive ? rgSumSettlementMargin(prevFrom, prevTo) : {settlement:0,margin:0};
+  const rgFin = rgActive ? rgSumSettlementMargin(curFrom, curTo) : {settlement:0,margin:0,revenue:0};
+  const rgPrevFin = rgActive ? rgSumSettlementMargin(prevFrom, prevTo) : {settlement:0,margin:0,revenue:0};
   const totalSettleDisp = totalSettle + rgFin.settlement, prevSettleDisp = prevSettle + rgPrevFin.settlement;
+  // 매출(판매가) = 판매처 판매가 합 + 로켓그로스 매출 — KPI 첫 카드용. 마진율은 기존대로 정산금액 기준
+  const totalSaleDisp = rows.reduce((s,r)=>s+(r.salePrice||0),0) + rgFin.revenue;
+  const prevSaleDisp = prevRows.reduce((s,r)=>s+(r.salePrice||0),0) + rgPrevFin.revenue;
 
   // 전월(또는 전주 동요일) 대비 텍스트 생성
   const diffHtml=(cur,prv,unit='')=>{
@@ -23178,9 +23179,11 @@ function renderDailyReport(){
     return `<span style="color:${up?'#DC2626':'#059669'};font-weight:600;">${up?'▲':'▼'} ${pct}%</span>&nbsp;<span style="color:var(--tx2);">${compareLabel} ${fmt(prv)}${unit}</span>`;
   };
 
-  document.getElementById('revDlyK0').textContent=fmt(totalSettleDisp);
-  document.getElementById('revDlyK0s').innerHTML=diffHtml(totalSettleDisp,prevSettleDisp);
+  document.getElementById('revDlyK0').textContent=fmt(totalSaleDisp);
+  document.getElementById('revDlyK0s').innerHTML=diffHtml(totalSaleDisp,prevSaleDisp);
   const k3lbl=document.getElementById('revDlyK3Lbl');
+  // 광고비 차감 표시: 로켓그로스 단독 선택 시엔 광고비가 마진에 반영되지 않으므로 배지 숨김
+  const k1Badge=document.getElementById('revDlyK1Badge'); if(k1Badge) k1Badge.style.display=rgChSelected?'none':'';
   if(rgChSelected){
     if(k3lbl) k3lbl.textContent='📦 주문건수';
     const rgRate=rgFin.settlement>0?(rgFin.margin/rgFin.settlement*100):0;
@@ -23230,7 +23233,7 @@ function renderDailyReport(){
   const tfoot=document.getElementById('revDlyTfoot');
   const sub=document.getElementById('revDlyTblSub');
   const chLabelDly=_dlyFilter.ch==='ALL'?'전체':(Array.isArray(_dlyFilter.ch)?_dlyFilter.ch.join('·'):_dlyFilter.ch);
-  if(sub) sub.textContent=`${periodLabel} ${chLabelDly}`+(adDly>0?` · 광고비 -${fmt(adDly)} (마진 반영)`:'');
+  if(sub) sub.textContent=`${periodLabel} ${chLabelDly}`+(adDly>0?` · 광고비 -${fmt(adDly)} (상단 KPI 마진에만 반영 · 표의 마진은 광고비 차감 전)`:'');
 
   // 제품별 집계 (택배건수 = 합포장 기준 고유 배송 건수)
   //   주문수량은 백데이터에 설정된 개입수(코드별 몇개입 세트)를 곱해서 실제 판매 개수로 집계한다.
@@ -23258,7 +23261,7 @@ function renderDailyReport(){
       });
     });
   }
-  const prodList=Object.entries(byProd).sort((a,b)=>b[1].settle-a[1].settle);
+  const prodList=Object.entries(byProd).sort((a,b)=>b[1].saleTotal-a[1].saleTotal);
 
   if(!prodList.length){
     if(empty) empty.style.display='block'; if(tbl) tbl.style.display='none'; return;
@@ -23296,8 +23299,7 @@ function renderDailyReport(){
       <td>${v.type}</td>
       <td style="text-align:right;">${v.qty.toLocaleString()}</td>
       <td style="text-align:right;">${v.cnt.toLocaleString()}</td>
-      <td style="text-align:right;">${fmt(v.saleTotal)}</td>
-      <td style="text-align:right;font-weight:600;">${fmt(v.settle)}</td>
+      <td style="text-align:right;font-weight:600;">${fmt(v.saleTotal)}</td>
       <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':v.margin<0?'rev-margin-neg':''}">${fmt(v.margin)}</td>
       <td style="text-align:right;" class="${rCls}">${rate.toFixed(1)}%</td>
     </tr>`;
@@ -23333,7 +23335,6 @@ function renderDailyReport(){
     <td style="text-align:right;">${totQty.toLocaleString()}</td>
     <td style="text-align:right;">${totCnt.toLocaleString()}</td>
     <td style="text-align:right;">${fmt(totSale)}</td>
-    <td style="text-align:right;">${fmt(totSettle)}</td>
     <td style="text-align:right;">${fmt(totMargin)}</td>
     <td style="text-align:right;">${totRate.toFixed(1)}%</td>
   </tr>`;
@@ -23345,13 +23346,13 @@ function renderDailyReport(){
 
   // 제품구분 도넛 (로켓그로스가 선택 범위에 포함되면 같은 기간 정산금액도 합산)
   const byType={};
-  rows.forEach(r=>{const t=r.itemType||'기타';if(!byType[t])byType[t]=0;byType[t]+=r.settlement||0;});
+  rows.forEach(r=>{const t=r.itemType||'기타';if(!byType[t])byType[t]=0;byType[t]+=r.salePrice||0;});
   if(rgIncluded){
     Object.keys(_rgProdCache).forEach(ym=>{
       (_rgProdCache[ym]||[]).forEach(r=>{
         if(!r.date||r.date<curFrom||r.date>curTo) return;
         const t=rgResolveType(r.optionId)||'기타';
-        byType[t]=(byType[t]||0)+rgCalcRowFinance(r).settlement;
+        byType[t]=(byType[t]||0)+(r.revenue||0);
       });
     });
   }
@@ -23454,7 +23455,6 @@ async function renderDlyRgCard(periodLabel){
     tBody.innerHTML=pageList.map(o=>`<tr>
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;" title="${o.displayName}${o.marginKnown?'':' (원가 미매칭 — 마진 계산 제외)'}">${o.displayName}${o.marginKnown?'':' ⚠️'}</td>
       <td style="text-align:right;font-weight:600;">${fmt(o.revenue)}</td>
-      <td style="text-align:right;">${fmt(o.settlement)}</td>
       <td style="text-align:right;" class="${o.margin>0?'rev-margin-pos':o.margin<0?'rev-margin-neg':''}">${fmt(o.margin)}</td>
       <td style="text-align:right;">${o.marginRate.toFixed(1)}%</td>
       <td style="text-align:right;">${o.qty.toLocaleString()}</td>
@@ -23473,7 +23473,6 @@ async function renderDlyRgCard(periodLabel){
       tFoot.innerHTML=`<tr>
         <td>합계</td>
         <td style="text-align:right;">${fmt(t.revenue)}</td>
-        <td style="text-align:right;">${fmt(t.settlement)}</td>
         <td style="text-align:right;">${fmt(t.margin)}</td>
         <td style="text-align:right;">${marginRateT.toFixed(1)}%</td>
         <td style="text-align:right;">${t.qty.toLocaleString()}</td>
