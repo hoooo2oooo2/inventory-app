@@ -138,8 +138,8 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-head .hm-date{font-size:13px;color:var(--tx2);margin-top:4px;}
 .hm-head .hm-time{font-size:26px;font-weight:700;letter-spacing:-.5px;color:var(--tx);font-variant-numeric:tabular-nums;white-space:nowrap;}
 .hm-head .hm-time small{font-size:13px;font-weight:600;margin-right:5px;color:var(--pr);}
-.hm-top{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr) 600px;gap:16px;margin-bottom:28px;align-items:stretch;}
-.hm-top>.hm-card{height:304px;overflow:hidden;}
+.hm-top{display:grid;grid-template-columns:300px 300px minmax(0,1fr);gap:16px;margin-bottom:28px;align-items:stretch;}
+.hm-top>.hm-card{height:490px;overflow:hidden;}
 .hm-pane{padding:16px 18px 12px;display:flex;flex-direction:column;}
 .hm-pane-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0;}
 .hm-pane-hd b{font-size:14px;color:var(--tx);} .hm-pane-hd .hm-sub{font-size:11.5px;color:var(--tx2);flex:1;}
@@ -167,8 +167,96 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;}
 .hm-bar{flex:none;height:6px;background:var(--bd);border-radius:3px;overflow:hidden;margin:0 0 6px;} .hm-bar i{display:block;height:100%;background:#00A86B;transition:width .3s;}
 .hm-ok{padding:26px 6px;text-align:center;color:var(--tx2);font-size:12.5px;line-height:1.8;}
 .hm-chk{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--bd);cursor:pointer;font-size:13px;}
-@media(max-width:1560px){ .hm-top{grid-template-columns:1fr 1fr;} .hm-top>.hm-cal{grid-column:1/-1;height:auto;} }
+@media(max-width:1500px){ .hm-top{grid-template-columns:1fr 1fr;} }
 @media(max-width:900px){ .hm-top{grid-template-columns:1fr;} .hm-top>.hm-card{height:auto;max-height:360px;} }
+/* ── 협업 캘린더 (ct-) ── */
+.hm-top.nt{grid-template-columns:340px minmax(0,1fr);}
+.hm-top.nt #hmTodo{display:none;}
+.hm-top>.ct-calcard{padding:0;display:flex;cursor:pointer;min-width:0;}
+.ct-calcard,.ct-ov{--red:#DC2626;--ok:#00A86B;--warn:#EA580C;--shl:0 18px 60px rgba(0,0,0,.28);}
+:root[data-theme="dark"] .ct-ov{--shl:0 18px 60px rgba(0,0,0,.6);}
+.ct-calL{flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;}
+.ct-calR{width:290px;flex-shrink:0;border-left:1px solid var(--bd);padding:12px 14px;display:flex;flex-direction:column;background:var(--bg2);border-radius:0 16px 16px 0;cursor:default;}
+.ct-calR h4{font-size:13px;margin-bottom:2px;color:var(--tx);} .ct-calR .sub,.ct-pside .sub{font-size:11.5px;color:var(--tx2);margin-bottom:8px;}
+.ct-pb{flex:1;overflow-y:auto;min-height:0;overscroll-behavior:contain;}
+.ct-nav{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-shrink:0;} .ct-nav b{font-size:15px;flex:1;color:var(--tx);}
+.ct-nav button{border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;padding:3px 9px;font-size:12px;cursor:pointer;}
+.ct-nav button:hover{border-color:var(--pr);color:var(--pr);}
+.ct-wd{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10.5px;font-weight:600;color:var(--tx2);padding:4px 0;border-bottom:1px solid var(--grid);flex-shrink:0;}
+.ct-wd span:first-child{color:var(--red);} .ct-wd span:last-child{color:var(--pr);}
+.ct-weeks{flex:1;display:flex;flex-direction:column;min-height:0;}
+.ct-wk{position:relative;flex:1;display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--grid);}
+.ct-dy{border-right:1px solid var(--bd);padding:3px 5px;font-size:11.5px;position:relative;cursor:pointer;min-width:0;color:var(--tx);} .ct-dy:last-child{border-right:none;}
+.ct-dy:hover{background:var(--prl);} .ct-dy.oth{color:var(--tx2);opacity:.55;background:rgba(127,127,127,.06);}
+.ct-dy.sun .n,.ct-dy.hol .n{color:var(--red);} .ct-dy.sat .n{color:var(--pr);} .ct-dy.hol.today .n,.ct-dy.sun.today .n,.ct-dy.sat.today .n{color:#fff;}
+.ct-dy .n{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:50%;font-weight:600;}
+.ct-dy.today .n{background:var(--pr);color:#fff;} .ct-dy.sel{background:var(--prl);}
+.ct-dy .hl{font-size:10px;font-weight:600;color:var(--red);margin-left:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 28px);display:inline-block;vertical-align:middle;}
+.ct-dy .more{position:absolute;left:5px;bottom:2px;font-size:10px;color:var(--tx2);font-weight:600;}
+.ct-bar,.ct-tk,.ct-dr,.ct-chip{--cb:#E8EAEE;--cf:#4B5563;--cc:#9CA3AF;}
+.ct-cat-CX{--cb:#D5F3EE;--cf:#0F766E;--cc:#14B8A6;}.ct-cat-디자인{--cb:#FCE1EC;--cf:#9D174D;--cc:#EC4899;}.ct-cat-물류{--cb:#FFE8D2;--cf:#9A3412;--cc:#F59E0B;}.ct-cat-운영{--cb:#DCEAFE;--cf:#1E40AF;--cc:#3182F6;}.ct-cat-로켓{--cb:#EBE3FD;--cf:#5B21B6;--cc:#8B5CF6;}
+:root[data-theme="dark"] .ct-bar,:root[data-theme="dark"] .ct-tk,:root[data-theme="dark"] .ct-dr,:root[data-theme="dark"] .ct-chip{--cb:rgba(156,163,175,.22);--cf:#D1D5DB;}
+:root[data-theme="dark"] .ct-cat-CX{--cb:rgba(20,184,166,.25);--cf:#5EEAD4;}:root[data-theme="dark"] .ct-cat-디자인{--cb:rgba(236,72,153,.25);--cf:#F9A8D4;}:root[data-theme="dark"] .ct-cat-물류{--cb:rgba(245,158,11,.25);--cf:#FCD34D;}:root[data-theme="dark"] .ct-cat-운영{--cb:rgba(49,130,246,.28);--cf:#93C5FD;}:root[data-theme="dark"] .ct-cat-로켓{--cb:rgba(139,92,246,.28);--cf:#C4B5FD;}
+.ct-bar{position:absolute;height:16px;border-radius:5px;padding:0 6px;font-size:10.5px;font-weight:600;line-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--cb);color:var(--cf);cursor:pointer;z-index:2;}
+.ct-bar:hover{filter:brightness(.96);box-shadow:0 0 0 1.5px var(--cf) inset;}
+.ct-tk{display:block;background:var(--bg);border:1px solid var(--bd);border-left:4px solid var(--cc);border-radius:10px;padding:8px 10px;margin-bottom:7px;cursor:pointer;}
+.ct-tk:hover{box-shadow:0 2px 10px rgba(0,0,0,.08);border-color:var(--cc);} .ct-tk .t{font-weight:700;font-size:12.5px;color:var(--tx);word-break:break-all;} .ct-tk .m{font-size:11px;color:var(--tx2);margin-top:2px;}
+.ct-tk .f{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:var(--tx2);}
+.ct-av{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;flex-shrink:0;}
+.ct-chip{display:inline-block;border-radius:10px;padding:0 8px;font-size:10.5px;font-weight:700;background:var(--bg2);color:var(--tx2);}
+.ct-chip.st-doing{background:rgba(245,158,11,.16);color:#B45309;}.ct-chip.st-plan{background:rgba(49,130,246,.14);color:var(--pr);}.ct-chip.st-done{background:rgba(0,168,107,.16);color:var(--ok);}.ct-chip.st-hold{background:rgba(127,127,127,.2);color:var(--tx2);}
+.ct-tag{display:inline-block;border-radius:9px;padding:0 7px;font-size:10px;font-weight:700;background:rgba(49,130,246,.14);color:var(--pr);margin-left:4px;} .ct-tag.red{background:rgba(220,38,38,.12);color:var(--red);font-size:11px;}
+.ct-qa{display:flex;gap:6px;margin-bottom:3px;flex-shrink:0;} .ct-qa input{flex:1;min-width:0;}
+.ct-qhint{font-size:10.5px;color:var(--tx2);margin-bottom:7px;flex-shrink:0;}
+.ct-btn{border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:9px;padding:6px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;}
+.ct-btn:hover{border-color:var(--pr);color:var(--pr);} .ct-btn.pri{background:var(--pr);border-color:var(--pr);color:#fff;font-weight:600;} .ct-btn.pri:hover{filter:brightness(1.08);color:#fff;} .ct-btn:disabled{opacity:.6;cursor:default;}
+.ct-btn.dgr{color:var(--red);} .ct-btn.dgr:hover{border-color:var(--red);color:var(--red);} .ct-btn.dgr.on{background:var(--red);border-color:var(--red);color:#fff;font-weight:600;} .ct-btn.dgr.on:hover{filter:brightness(1.08);color:#fff;}
+.ct-calcard input[type=text],.ct-ov select,.ct-ov input[type=text],.ct-ov input[type=date],.ct-ov textarea{font-family:inherit;font-size:12.5px;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:5px 9px;outline:none;box-sizing:border-box;}
+.ct-calcard input:focus,.ct-ov select:focus,.ct-ov input:focus,.ct-ov textarea:focus{border-color:var(--pr);} .ct-ov textarea{width:100%;min-height:78px;resize:vertical;line-height:1.55;}
+/* 큰 팝업 */
+.ct-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99900;display:none;align-items:center;justify-content:center;padding:2vh 2vw;}
+.ct-ov.on{display:flex;}
+.ct-pop{width:96vw;max-width:1840px;height:94vh;background:var(--bg);color:var(--tx);border-radius:18px;box-shadow:var(--shl);display:flex;flex-direction:column;overflow:hidden;position:relative;}
+.ct-phd{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap;}
+.ct-phd h2{font-size:18px;margin-right:8px;color:var(--tx);} .ct-phd .sp{flex:1;}
+.ct-lb{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--tx2);cursor:pointer;}
+.ct-pbody{flex:1;display:flex;min-height:0;}
+.ct-pcal{flex:1;min-width:0;padding:14px 20px;display:flex;flex-direction:column;}
+.ct-pcal .ct-weeks{overflow-y:auto;} .ct-pcal .ct-dy{padding:5px 7px;font-size:12.5px;} .ct-pcal .ct-dy .hl{font-size:11px;} .ct-pcal .ct-bar{height:19px;line-height:19px;font-size:11.5px;}
+.ct-pside{width:380px;border-left:1px solid var(--bd);padding:16px 18px;overflow-y:auto;background:var(--bg2);flex-shrink:0;}
+.ct-pside h3{font-size:16px;color:var(--tx);}
+/* 상세 */
+.ct-dr{position:absolute;top:0;right:0;bottom:0;width:500px;max-width:100%;background:var(--bg);border-left:1px solid var(--bd);box-shadow:-12px 0 36px rgba(0,0,0,.18);display:none;flex-direction:column;z-index:5;}
+.ct-dr.on{display:flex;}
+.ct-drh{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bd);flex-shrink:0;}
+.ct-id{border:1px solid var(--cc);color:var(--cf);border-radius:9px;padding:1px 9px;font-size:11.5px;font-weight:700;}
+.ct-drb{flex:1;overflow-y:auto;padding:14px 20px 20px;}
+.ct-drb h2{font-size:19px;letter-spacing:-.3px;margin-bottom:4px;color:var(--tx);word-break:break-all;} .ct-meta{font-size:12px;color:var(--tx2);margin-bottom:14px;}
+.ct-edl{cursor:pointer;font-size:13px;color:var(--tx2);margin-left:4px;} .ct-edl:hover{color:var(--pr);}
+.ct-lnk{cursor:pointer;color:var(--pr);font-size:11.5px;margin-left:6px;}
+.ct-fl{display:grid;grid-template-columns:76px 1fr;align-items:center;gap:6px 8px;margin:0 0 12px;font-size:12.5px;} .ct-fl dt{color:var(--tx2);} .ct-fl dd{min-width:0;margin:0;}
+.ct-pill{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--bd);border-radius:14px;padding:2px 9px 2px 3px;margin:0 4px 4px 0;font-size:12px;background:var(--bg);color:var(--tx);} .ct-pill .x{color:var(--tx2);cursor:pointer;font-size:11px;}
+.ct-sec{border-top:1px solid var(--bd);padding-top:12px;margin-top:6px;} .ct-sec h4{font-size:13.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px;color:var(--tx);}
+.ct-hint{font-size:11.5px;color:var(--tx2);margin:-3px 0 7px;line-height:1.5;}
+.ct-prog{height:6px;background:var(--bd);border-radius:3px;overflow:hidden;margin-bottom:8px;} .ct-prog i{display:block;height:100%;background:var(--ok);transition:width .25s;}
+.ct-ci{display:flex;align-items:center;gap:9px;padding:5px 2px;font-size:12.5px;color:var(--tx);} .ct-ci.done span.l{text-decoration:line-through;color:var(--tx2);} .ct-ci span.l{flex:1;min-width:0;word-break:break-all;}
+.ct-chk{width:18px;height:18px;border-radius:50%;border:2px solid var(--grid);flex-shrink:0;box-sizing:border-box;} .ct-chk.on{background:var(--ok);border-color:var(--ok);} .ct-chk.on::after{content:'✓';color:#fff;font-size:10px;display:block;text-align:center;line-height:14px;}
+.ct-ci .ct-ia,.ct-cm .ct-ia{display:none;gap:2px;align-items:center;} .ct-ci:hover .ct-ia,.ct-cm:hover .ct-ia{display:inline-flex;}
+.ct-ia button{border:none;background:var(--bg2);border-radius:6px;width:24px;height:24px;color:var(--tx2);font-size:12px;cursor:pointer;} .ct-ia button:hover{color:var(--pr);} .ct-ia .del:hover{color:var(--red);background:rgba(220,38,38,.12);}
+.ct-addrow{display:flex;gap:6px;margin-top:6px;} .ct-addrow input{flex:1;min-width:0;}
+.ct-tabs{display:flex;gap:16px;border-bottom:1px solid var(--bd);margin:14px 0 10px;} .ct-tabs button{border:none;background:none;color:var(--tx2);padding:7px 0;font-size:13px;font-weight:600;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;} .ct-tabs button.on{color:var(--pr);border-color:var(--pr);}
+.ct-cm{display:flex;gap:9px;padding:9px 2px;border-bottom:1px solid var(--bd);color:var(--tx);} .ct-cm .b{flex:1;min-width:0;} .ct-cm .w{font-weight:700;font-size:12.5px;} .ct-cm .w small{color:var(--tx2);font-weight:400;margin-left:6px;font-size:11px;}
+.ct-cm p{margin:3px 0 5px;white-space:pre-wrap;word-break:break-all;} .ct-react{border:1px solid var(--bd);background:var(--bg);border-radius:12px;padding:0 9px;font-size:12px;color:var(--tx2);cursor:pointer;} .ct-react.on{background:var(--prl);border-color:var(--pr);color:var(--pr);}
+.ct-lock{background:var(--bg2);border:1px dashed var(--grid);border-radius:10px;padding:12px;text-align:center;color:var(--tx2);font-size:12px;margin-bottom:8px;}
+.ct-lg{font-size:12px;color:var(--tx2);padding:7px 2px;border-bottom:1px solid var(--bd);}
+/* 등록 */
+.ct-reg{width:640px;max-width:96vw;max-height:92vh;overflow-y:auto;background:var(--bg);color:var(--tx);border-radius:16px;box-shadow:var(--shl);padding:20px 24px;}
+.ct-reg h2{font-size:17px;margin-bottom:14px;color:var(--tx);} .ct-reg .ct-fl{grid-template-columns:84px 1fr;}
+.ct-ft{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.ct-vis{display:flex;flex-direction:column;gap:6px;} .ct-vis label{display:flex;align-items:baseline;gap:8px;border:1px solid var(--bd);border-radius:10px;padding:7px 10px;cursor:pointer;flex-wrap:wrap;} .ct-vis label.on{border-color:var(--pr);background:var(--prl);} .ct-vis small{color:var(--tx2);font-size:11.5px;}
+@media(max-width:1500px){ .hm-top>.ct-calcard{grid-column:1/-1;} .hm-top.nt{grid-template-columns:1fr;} }
+@media(max-width:900px){ .hm-top>.ct-calcard{flex-direction:column;height:auto;} .ct-calR{width:auto;border-left:none;border-top:1px solid var(--bd);border-radius:0 0 16px 16px;} .ct-pbody{flex-direction:column;overflow-y:auto;} .ct-pside{width:auto;border-left:none;border-top:1px solid var(--bd);} .ct-pcal{min-height:560px;} .ct-dr{width:100%;} }
+@media(max-width:900px){ .hm-top>.ct-calcard{max-height:none;} }
 .hm-w-par{font-size:10.5px;color:var(--tx2);margin:-5px 0 6px 23px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sub-star{display:inline-block;margin-left:5px;font-size:12px;line-height:1;color:var(--tx2);opacity:0;transition:opacity .15s,color .15s;cursor:pointer;}
 *:hover>.sub-star{opacity:.7;}
@@ -3059,7 +3147,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div class="hm-top">
     <div class="hm-card hm-pane" id="hmTodo"></div>
     <div class="hm-card hm-pane" id="hmAlerts"></div>
-    <div class="hm-card hm-cal" id="hmCal"></div>
+    <div class="hm-card ct-calcard" id="hmCal"></div>
   </div>
   <div class="hm-sec-hd">
     <h3>⭐ 내 즐겨찾기</h3>
@@ -8760,7 +8848,7 @@ const HOME_LOADERS={
   logi_checklist:()=>homeKv('logi_checklist'),
   logi_notices:()=>homeKv('logi_notices'),
   collab_tasks:()=>homeKv('collab_tasks'),
-  __todo:()=>tdRefresh(),   // 관리자 외 계정의 '오늘 할 일'(본인 전용)
+  ct:()=>(_ct.loaded?ctRefresh():ctInit()),   // 협업 캘린더(전 직원) — 월별 문서, 버전이 바뀐 때만 다시 받음
   review:async()=>{
     const idx=await homeKv('review_idx');
     const months=(idx&&Array.isArray(idx.months))?idx.months.slice().sort().slice(-2):[];
@@ -8783,7 +8871,7 @@ function homeLoadAll(force){
   if(!window.__CURRENT_USER || document.hidden) return;
   // 읽을 대상 = 홈에 올린 위젯 + '지금 확인할 것'에서 선택한 항목이 쓰는 데이터 (그 밖의 메뉴는 읽지 않음)
   const keys=new Set();
-  if(!_isAdminUser()) keys.add('__todo');
+  keys.add('ct');
   ((_homeCfg&&_homeCfg.widgets)||[]).forEach(w=>{ if(_hmPerm(w.id)&&HOME_LOADERS[w.id]) keys.add(w.id); });
   try{ homeActiveSignals().forEach(s=>{ if(s.loader&&HOME_LOADERS[s.loader]) keys.add(s.loader); }); }catch(e){}
   keys.forEach(key=>{
@@ -8925,10 +9013,13 @@ const HOME_SIGNALS=[
   {id:'collab_mine', ico:'🙋', label:'내 담당 진행 중 업무', sub:'디자인팀 › 협업업무(내 이름)', target:'collab', loader:'collab_tasks', tone:'orange', unit:'건',
     when:()=>!!_hmMyPerson(),
     n:()=>{ const a=_hmKv('collab_tasks'); const me=_hmMyPerson(); return Array.isArray(a)?a.filter(t=>!t.weekly&&t.status==='doing'&&t.assignee===me).length:null; }},
+  // ── 협업 캘린더 (전 직원) ──
+  {id:'ct_mine', ico:'🗓', label:'나에게 할당·참조된 업무', sub:'협업 캘린더 (완료 전)', target:'__ct', loader:'ct', tone:'orange', unit:'건',
+    n:()=>(typeof _ct!=='undefined'&&_ct.loaded)?ctMineCount():null},
 ];
 // 디자인팀 담당자 이름(유현·보라·연정)은 계정 이름에서 성을 뺀 값과 같음 — 해당하지 않으면 '내 담당' 항목은 표시하지 않음
 function _hmMyPerson(){ const u=window.__CURRENT_USER; const nm=String((u&&(u.name||u.username))||''); const p=nm.length>=3?nm.slice(1):nm; return ['유현','보라','연정'].includes(p)?p:''; }
-function _hmSigAllowed(s){ try{ return _hmPerm(s.target); }catch(e){ return false; } }
+function _hmSigAllowed(s){ try{ return s.target==='__ct' ? true : _hmPerm(s.target); }catch(e){ return false; } }
 function homeActiveSignals(){
   const cfg=_homeCfg||_homeNorm(_homeLocalGet());
   const allowed=HOME_SIGNALS.filter(_hmSigAllowed).filter(s=>!s.when||s.when());
@@ -9021,6 +9112,7 @@ async function homeTodoDelete(id){
 }
 function renderHomeTodo(){
   const el=document.getElementById('hmTodo'); if(!el) return;
+  if(!_isAdminUser()) return;   // 관리자 외 계정의 할 일은 협업 캘린더(빠른 추가)로 대체
   const keepSt=(el.querySelector('.hm-pane-body')||{}).scrollTop||0;
   const keepT=(document.getElementById('hmAddT')||{}).value||'', keepTm=(document.getElementById('hmAddTm')||{}).value||'';
   const admin=_isAdminUser(), ds=_wcToday();
@@ -9087,7 +9179,8 @@ function renderHome(){
   const hour=new Date().getHours(), greet=hour<11?'좋은 아침이에요 ☀️':hour<18?'좋은 오후예요 👋':'오늘도 수고 많으셨어요 🌙';
   const hello=document.getElementById('hmHello'); if(hello) hello.textContent=`${u?(u.name||u.username):''}님, ${greet}`;
   _homeTick(); if(!_homeTimer) _homeTimer=setInterval(_homeTick,1000);
-  renderHomeCal(); renderHomeTodo(); renderHomeAlerts();
+  { const top=document.querySelector('.hm-top'); if(top) top.classList.toggle('nt',!_isAdminUser()); }   // 관리자 외 계정은 '오늘 할 일' 카드 없이 2카드
+  ctRenderHomeCal(); renderHomeTodo(); renderHomeAlerts();
   const ws=_homeCfg.widgets.filter(w=>_hmPerm(w.id));
   grid.classList.toggle('hm-editing',_homeEdit);
   const eb=document.getElementById('hmEditBtn'); if(eb){ eb.classList.toggle('on',_homeEdit); eb.textContent=_homeEdit?'✓ 편집 완료':'✎ 편집'; }
@@ -9114,6 +9207,7 @@ document.addEventListener('visibilitychange',()=>{ if(!document.hidden && curren
 function goHome(){ if(window.__CURRENT_USER) goPage('home'); }
 function homeOpenWidget(id,act){
   if(_homeEdit) return;
+  if(id==='__ct'){ ctOpenPop({mine:true}); return; }
   if(HOME_OPEN[id]) HOME_OPEN[id](act);
   const {base,sub}=_hmParse(id);
   if(!sub){ goMenu(base); return; }
@@ -9209,6 +9303,403 @@ function homeOpenAdd(){
 })();
 
 // ══════════════════════════════════════════════
+// 🗓 협업 캘린더 (전 직원) — 홈의 캘린더 카드 + 큰 팝업(기간 막대 캘린더 · 업무 등록/상세 · 체크리스트 · 하위 업무 · 댓글 · 기록)
+//  · 저장: cloudKv 'ct_t_YYYY-MM'(업무 시작 월 기준) = { seq, tasks:[…] } — 변경 시 항상 최신본을 다시 받아 그 위에 내 변경만 적용(_wcMutate)
+//  · 공개 범위(등록자가 선택): private(나만 보기) / members(참여자: 등록자·담당자·참조 + 관리자) / all(전체 공개)
+//  · 관리자(CT_MANAGERS = admin·조신성)는 'members'·'all' 업무를 모두 볼 수 있고 직원별로 골라 볼 수 있음. 직원의 '나만 보기'는 볼 수 없음
+//  · 화면에서 거르는 방식(데이터 저장소는 모든 계정이 공유) — 민감정보 용도 아님
+//  · 권한: 수정=등록자·담당자·관리자 / 체크리스트=담당자(+등록자·관리자) / 하위 업무=그 담당자 또는 위 권한 / 댓글=담당자·참조·등록자 / 업무 삭제=등록자·관리자
+// ══════════════════════════════════════════════
+const CT_MANAGERS=['admin','조신성'];
+const CT_CAT_LIST=['CX','디자인','물류','운영','로켓'];
+const CT_STATUS=[['plan','예정'],['doing','진행 중'],['done','완료'],['hold','보류']];
+const CT_PRI=['긴급','높음','보통','낮음'];
+const CT_VIS=[['private','🔒 나만 보기','등록한 나만 볼 수 있어요'],['members','👥 참여자','담당자·참조 인원과 관리자가 볼 수 있어요'],['all','🌐 전체 공개','모든 직원이 볼 수 있어요']];
+const CT_PALETTE=['#6D5BD0','#0EA5A4','#F59E0B','#EC4899','#3182F6','#10B981','#EF4444','#8B5CF6','#14B8A6','#F97316'];
+const _ct={ mon:{}, people:[], pLoaded:false, vy:0, vm:0, sel:null, open:null, tab:'c', edit:null, pend:null, mine:false, cat:'', person:'', reg:null, err:false, loaded:false, popOpen:false, timer:null };
+const _ctEmptyDoc=()=>({seq:0,tasks:[]});
+const _ctKey=ym=>'ct_t_'+ym;
+function _ctMe(){ const u=window.__CURRENT_USER; return u?u.username:''; }
+function _ctIsMgr(){ return CT_MANAGERS.includes(_ctMe()); }
+function _ctName(u){ const p=_ct.people.find(x=>x.u===u); return p?p.n:u; }
+function _ctColor(u){ let h=0; for(const c of String(u)) h=(h*31+c.charCodeAt(0))>>>0; return CT_PALETTE[h%CT_PALETTE.length]; }
+function _ctAv(u){ const n=_ctName(u); return `<span class="ct-av" style="background:${_ctColor(u)}" title="${_hmEsc(n)}">${_hmEsc(n.length>=3?n.slice(1,2):n.slice(0,1))}</span>`; }
+function _ctNid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _ctStK(k){ const f=CT_STATUS.find(x=>x[0]===k); return f?f[1]:k; }
+function _ctToday(){ return _wcToday(); }
+function _ctYm(ds){ return ds.slice(0,7); }
+function _ctDay(s){ return _wcLocal(s); }
+function _ctHol(ds){ return (typeof WC_HOLIDAYS!=='undefined'&&WC_HOLIDAYS[ds])||''; }
+function _ctRel(iso){ const m=Math.round((Date.now()-new Date(iso).getTime())/60000); if(m<1) return '방금'; if(m<60) return m+'분 전'; if(m<1440) return Math.floor(m/60)+'시간 전'; if(m<43200) return Math.floor(m/1440)+'일 전'; return String(iso).slice(0,10); }
+
+// ── 공개 범위 · 권한 ──
+function ctCanSee(t){
+  const me=_ctMe(); if(!me) return false;
+  if(t.by===me||t.as===me||(t.refs||[]).includes(me)) return true;
+  if(t.vis==='all') return true;
+  if(t.vis==='private') return false;       // 나만 보기: 관리자도 못 봄
+  return _ctIsMgr();                        // 참여자 공개: 관리자는 볼 수 있음
+}
+function ctCanEdit(t){ const me=_ctMe(); return me===t.by||me===t.as||_ctIsMgr(); }
+function ctCanComment(t){ const me=_ctMe(); return me===t.as||me===t.by||(t.refs||[]).includes(me); }
+function ctCanDelTask(t){ const me=_ctMe(); return me===t.by||_ctIsMgr(); }
+
+// ── 데이터 로드(월별 · 버전 확인 후 바뀐 때만) ──
+function _ctMonths(){ const ym=`${_ct.vy}-${_hmPad(_ct.vm+1)}`; return [_wcAddMonth(ym,-2),_wcAddMonth(ym,-1),ym,_wcAddMonth(ym,1)]; }
+async function ctEnsure(yms){
+  for(const ym of yms){
+    if(_ct.mon[ym]!==undefined) continue;
+    try{ const d=await _wcLoadKind(_ctKey(ym),_ctEmptyDoc); _ct.mon[ym]=(d&&Array.isArray(d.tasks))?d:_ctEmptyDoc(); }
+    catch(e){ _ct.err=true; }
+  }
+  _ct.loaded=true;
+}
+async function ctRefresh(){
+  const yms=Object.keys(_ct.mon); if(!yms.length) return;
+  const vs=await cloudKvVersions(yms.map(_ctKey)); if(vs===undefined) return;
+  let changed=false;
+  for(const ym of yms){
+    const k=_ctKey(ym), nv=vs[k]===undefined?null:vs[k];
+    if(nv===(_wc.ver[k]===undefined?null:_wc.ver[k]) && _wc.ver[k]!==undefined) continue;
+    try{ const d=await _wcLoadKind(k,_ctEmptyDoc); _ct.mon[ym]=(d&&Array.isArray(d.tasks))?d:_ctEmptyDoc(); changed=true; }catch(e){}
+  }
+  if(changed) ctRenderAll();
+}
+async function ctLoadPeople(){
+  if(_ct.pLoaded) return;
+  let rows=null;
+  try{ const {data,error}=await sb.from('app_profiles').select('username,name'); if(!error&&data&&data.length>=2) rows=data.map(r=>({u:r.username,n:r.name||r.username})); }catch(e){}
+  if(rows){
+    _ct.people=rows; _ct.pLoaded=true;
+    if(_ctIsMgr()){   // 직원 목록이 직원 계정에서 안 읽힐 때를 대비해 관리자가 한 번 저장해 둠(바뀐 경우에만)
+      try{ const cur=await cloudKvLoad('ct_roster'); if(JSON.stringify(cur||[])!==JSON.stringify(rows)) await cloudKvSave('ct_roster',rows,{force:true}); }catch(e){}
+    }
+  } else {
+    try{ const r=await cloudKvLoad('ct_roster'); if(Array.isArray(r)&&r.length){ _ct.people=r; } }catch(e){}
+    _ct.pLoaded=true;
+  }
+  if(!_ct.people.find(p=>p.u===_ctMe())){ const u=window.__CURRENT_USER; if(u) _ct.people.push({u:u.username,n:u.name||u.username}); }
+}
+async function ctInit(){
+  if(!_ct.vy){ const n=new Date(); _ct.vy=n.getFullYear(); _ct.vm=n.getMonth(); _ct.sel=_ctToday(); }
+  await Promise.all([ctEnsure(_ctMonths()), ctLoadPeople()]);
+  ctRenderAll();
+}
+function ctMut(ym,fn){ return _wcMutate(_ctKey(ym),()=>_ct.mon[ym]||_ctEmptyDoc(),v=>{ _ct.mon[ym]=(v&&Array.isArray(v.tasks))?v:_ctEmptyDoc(); },fn,_ctEmptyDoc); }
+function ctFind(id){ for(const ym of Object.keys(_ct.mon)){ const t=(_ct.mon[ym].tasks||[]).find(x=>x.id===id); if(t) return {ym,t}; } return null; }
+function ctVisibleTasks(opts){
+  opts=opts||{}; const me=_ctMe(), out=[];
+  Object.keys(_ct.mon).forEach(ym=>(_ct.mon[ym].tasks||[]).forEach(t=>{ if(ctCanSee(t)) out.push(t); }));
+  return out.filter(t=>{
+    if(!opts.all){
+      if(_ct.mine && !(t.as===me||(t.refs||[]).includes(me))) return false;
+      if(_ct.cat && t.cat!==_ct.cat) return false;
+      if(_ct.person && !(t.as===_ct.person||(t.refs||[]).includes(_ct.person)||t.by===_ct.person)) return false;
+    }
+    return true;
+  });
+}
+function ctMineCount(){ const me=_ctMe(); return ctVisibleTasks({all:true}).filter(t=>t.st!=='done'&&(t.as===me||(t.refs||[]).includes(me))).length; }
+function _ctProg(t){ const c=(t.ck||[]).length?` · ☑ ${t.ck.filter(x=>x.d).length}/${t.ck.length}`:'', u=(t.sub||[]).length?` · ↳ ${t.sub.filter(x=>x.d).length}/${t.sub.length}`:''; return c+u; }
+function _ctVisIco(t){ return t.vis==='private'?'🔒 ':t.vis==='all'?'🌐 ':''; }
+
+// ── 월 달력(기간 막대) ──
+function ctMonthHtml(o){
+  const yy=_ct.vy, mm=_ct.vm+1, first=new Date(yy,mm-1,1), start=new Date(first); start.setDate(1-first.getDay());
+  const list=ctVisibleTasks({all:!!o.all}), rowsN=Math.ceil((first.getDay()+new Date(yy,mm,0).getDate())/7), today=_ctToday();
+  let h='';
+  for(let w=0;w<rowsN;w++){
+    const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(start.getDate()+w*7+i); return d; });
+    const ws=_hmYmd(days[0]), we=_hmYmd(days[6]);
+    const ts=list.filter(t=>t.e>=ws&&t.s<=we).sort((a,b)=>a.s.localeCompare(b.s)||b.e.localeCompare(a.e));
+    const lanes=[], place=[];
+    ts.forEach(t=>{ const sI=Math.max(0,Math.round((_ctDay(t.s)-_ctDay(ws))/864e5)), eI=Math.min(6,Math.round((_ctDay(t.e)-_ctDay(ws))/864e5)); let l=0; while(lanes[l]!==undefined&&lanes[l]>=sI) l++; lanes[l]=eI; place.push({t,sI,eI,l}); });
+    const hid=Array(7).fill(0); place.forEach(p=>{ if(p.l>=o.max) for(let i=p.sI;i<=p.eI;i++) hid[i]++; });
+    h+=`<div class="ct-wk" style="min-height:${o.top+o.max*(o.bh+3)+4}px">`+days.map((d,i)=>{
+      const ds=_hmYmd(d), hol=_ctHol(ds);
+      const c=['ct-dy',d.getMonth()!==mm-1?'oth':'',i===0?'sun':'',i===6?'sat':'',hol?'hol':'',ds===today?'today':'',ds===_ct.sel?'sel':''].join(' ');
+      return `<div class="${c}" onclick="event.stopPropagation();${o.pop?`ctPick('${ds}')`:`ctOpenPop('${ds}')`}"><span class="n">${d.getDate()}</span>${hol?`<span class="hl" title="${_hmEsc(hol)}">${_hmEsc(hol)}</span>`:''}${hid[i]?`<span class="more">+${hid[i]}</span>`:''}</div>`; }).join('')
+      +place.filter(p=>p.l<o.max).map(p=>`<div class="ct-bar ct-cat-${p.t.cat}" style="top:${o.top+p.l*(o.bh+3)}px;left:calc(${p.sI}*100%/7 + 3px);width:calc(${p.eI-p.sI+1}*100%/7 - 6px)" onclick="event.stopPropagation();ctShowTask('${p.t.id}')" title="${_hmEsc(p.t.title)} · ${p.t.s.slice(5)}~${p.t.e.slice(5)}">${_ctVisIco(p.t)}${_hmEsc(p.t.title)}</div>`).join('')+`</div>`;
+  }
+  return h;
+}
+function _ctTaskCard(t,showMine){
+  const me=_ctMe(), mine=t.as===me||(t.refs||[]).includes(me);
+  return `<div class="ct-tk ct-cat-${t.cat}" onclick="event.stopPropagation();ctShowTask('${t.id}')"><div class="t">${_ctVisIco(t)}${_hmEsc(t.title)}${showMine&&mine?'<span class="ct-tag">내 업무</span>':''}</div><div class="m">${_hmEsc(t.cat)} · ${t.s.slice(5).replace('-','/')} ~ ${t.e.slice(5).replace('-','/')}${_ctProg(t)}</div><div class="f">${_ctAv(t.as)} ${_hmEsc(_ctName(t.as))}${(t.refs||[]).length?` · 참조 ${t.refs.length}`:''}<span class="ct-chip st-${t.st}" style="margin-left:auto">${_ctStK(t.st)}</span></div></div>`;
+}
+function _ctDayTasks(ds){ return ctVisibleTasks({}).filter(t=>t.s<=ds&&t.e>=ds).sort((a,b)=>((a.st==='done')-(b.st==='done'))); }
+
+// ── 홈 캘린더 카드 ──
+function ctRenderHomeCal(){
+  const el=document.getElementById('hmCal'); if(!el) return;
+  if(!_ct.vy){ const n=new Date(); _ct.vy=n.getFullYear(); _ct.vm=n.getMonth(); _ct.sel=_ctToday(); }
+  const me=_ctMe(), sel=_ct.sel, today=_ctToday();
+  const keepQ=(document.getElementById('ctQaIn')||{}).value||'', hadFocus=document.activeElement&&document.activeElement.id==='ctQaIn';
+  const ts=_ctDayTasks(sel).sort((a,b)=>(((b.as===me||(b.refs||[]).includes(me))?1:0)-((a.as===me||(a.refs||[]).includes(me))?1:0)));
+  const mineN=ts.filter(t=>t.as===me||(t.refs||[]).includes(me)).length, hol=_ctHol(sel);
+  const ready=_ct.loaded;
+  el.className='hm-card ct-calcard'; el.onclick=()=>ctOpenPop();
+  el.innerHTML=`<div class="ct-calL"><div class="ct-nav"><b>📅 ${_ct.vy}년 ${_ct.vm+1}월</b><button onclick="event.stopPropagation();ctMove(-1)">‹</button><button onclick="event.stopPropagation();ctToday()">오늘</button><button onclick="event.stopPropagation();ctMove(1)">›</button></div>
+    <div class="ct-wd"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div><div class="ct-weeks">${ctMonthHtml({max:2,top:26,bh:16,pop:true,all:true})}</div></div>
+   <div class="ct-calR"><h4>${sel===today?'오늘':sel.slice(5).replace('-','/')} 업무 ${ready?ts.length:'…'}건</h4><div class="sub">${sel.replace(/-/g,'.')} (${'일월화수목금토'[_ctDay(sel).getDay()]})${hol?' · '+_hmEsc(hol):''} · 내 업무 ${mineN}건</div>
+    <div class="ct-qa" onclick="event.stopPropagation()"><input type="text" id="ctQaIn" placeholder="＋ 내 할 일 빠른 추가 (Enter)" onkeydown="if(event.key==='Enter')ctQuickAdd()"><button class="ct-btn" onclick="ctQuickAdd()">추가</button></div>
+    <div class="ct-qhint" onclick="event.stopPropagation()">빠른 추가는 🔒 나만 보기로 저장돼요 (공유는 업무 상세에서)</div>
+    <div class="ct-pb">${ready?(ts.map(t=>_ctTaskCard(t,true)).join('')||'<div class="sub">이 날짜의 업무가 없습니다.</div>'):'<div class="sub">불러오는 중…</div>'}</div>
+    <button class="ct-btn pri" style="margin-top:6px" onclick="event.stopPropagation();ctOpenReg()">＋ 업무 등록 (기간·참조·체크리스트…)</button></div>`;
+  const q=document.getElementById('ctQaIn'); if(q&&keepQ){ q.value=keepQ; if(hadFocus) q.focus(); }
+}
+async function ctQuickAdd(){
+  const q=document.getElementById('ctQaIn'); const v=(q.value||'').trim(); if(!v){ q.focus(); return; }
+  const ds=_ct.sel||_ctToday();
+  const ok=await ctCreate({title:v,cat:'',s:ds,e:ds,as:_ctMe(),refs:[],vis:'private',desc:'',ck:[],sub:[]});
+  if(ok){ q.value=''; toast('🔒 나만 보기 업무로 추가했습니다.'); }
+}
+function ctMove(d){ const n=new Date(_ct.vy,_ct.vm+d,1); _ct.vy=n.getFullYear(); _ct.vm=n.getMonth(); ctEnsure(_ctMonths()).then(ctRenderAll); ctRenderAll(); }
+function ctToday(){ const n=new Date(); _ct.vy=n.getFullYear(); _ct.vm=n.getMonth(); _ct.sel=_ctToday(); ctEnsure(_ctMonths()).then(ctRenderAll); ctRenderAll(); }
+function ctPick(ds){ _ct.sel=ds; const [y,m]=ds.split('-').map(Number); if(y!==_ct.vy||m-1!==_ct.vm){ _ct.vy=y; _ct.vm=m-1; ctEnsure(_ctMonths()).then(ctRenderAll); } ctRenderAll(); }
+
+// ── 큰 팝업 ──
+function _ctEnsureDom(){
+  if(document.getElementById('ctOvPop')) return;
+  const w=document.createElement('div');
+  w.innerHTML=`<div class="ct-ov" id="ctOvPop" onclick="if(event.target===this)ctClosePop()"><div class="ct-pop">
+    <div class="ct-phd"><h2>📅 협업 캘린더</h2>
+      <div class="ct-nav" style="margin:0"><button onclick="ctMove(-1)">‹</button><b id="ctPTitle" style="flex:none;min-width:112px;text-align:center"></b><button onclick="ctMove(1)">›</button><button onclick="ctToday()">오늘</button></div>
+      <span class="sp"></span>
+      <label class="ct-lb"><input type="checkbox" id="ctMine" onchange="_ct.mine=this.checked;ctRenderAll()"> 내 업무만</label>
+      <select id="ctCatF" onchange="_ct.cat=this.value;ctRenderAll()"><option value="">전체 분류</option>${CT_CAT_LIST.map(c=>`<option>${c}</option>`).join('')}</select>
+      <span id="ctPerWrap"></span>
+      <button class="ct-btn pri" onclick="ctOpenReg()">＋ 업무 등록</button><button class="ct-btn" onclick="ctClosePop()">✕</button></div>
+    <div class="ct-pbody"><div class="ct-pcal"><div class="ct-wd"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div><div class="ct-weeks" id="ctPWeeks"></div></div><div class="ct-pside" id="ctPSide"></div></div>
+    <div class="ct-dr" id="ctDr"></div></div></div>
+   <div class="ct-ov" id="ctOvReg" style="z-index:99950" onclick="if(event.target===this)ctCloseReg()"><div class="ct-reg" id="ctRegBox"></div></div>
+   <div class="ct-ov" id="ctOvCf" style="z-index:99980" onclick="if(event.target===this)ctCfClose()"><div class="ct-reg" style="width:420px;padding:22px 24px">
+     <h2 style="margin-bottom:10px">🗑 삭제하시겠습니까?</h2><div id="ctCfMsg" style="font-size:13.5px;line-height:1.6"></div>
+     <div class="ct-ft"><button class="ct-btn" id="ctCfNo" onclick="ctCfClose()">취소</button><button class="ct-btn dgr on" onclick="ctCfYes()">삭제</button></div></div></div>`;
+  while(w.firstChild) document.body.appendChild(w.firstChild);
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape') return;
+    const on=id=>document.getElementById(id)?.classList.contains('on');
+    if(on('ctOvCf')){ ctCfClose(); e.stopPropagation(); return; }
+    if(on('ctOvReg')){ ctCloseReg(); e.stopPropagation(); return; }
+    if(on('ctOvPop')){ if(_ct.edit){ _ct.edit=null; ctRenderDetail(); } else if(_ct.open){ _ct.open=null; ctRenderDetail(); } else ctClosePop(); e.stopPropagation(); }
+  },true);
+}
+async function ctOpenPop(ds,opts){
+  _ctEnsureDom();
+  if(typeof ds==='object'&&ds){ opts=ds; ds=null; }
+  if(!_ct.vy){ const n=new Date(); _ct.vy=n.getFullYear(); _ct.vm=n.getMonth(); }
+  if(ds){ _ct.sel=ds; _ct.vy=+ds.slice(0,4); _ct.vm=+ds.slice(5,7)-1; } else if(!_ct.sel) _ct.sel=_ctToday();
+  if(opts&&opts.mine){ _ct.mine=true; const c=document.getElementById('ctMine'); if(c) c.checked=true; }
+  document.getElementById('ctOvPop').classList.add('on'); _ct.popOpen=true;
+  ctRenderAll();
+  if(!_ct.timer) _ct.timer=setInterval(()=>{ if(_ct.popOpen&&!document.hidden) ctRefresh(); },60000);
+  await ctInit();
+}
+function ctClosePop(){ document.getElementById('ctOvPop')?.classList.remove('on'); _ct.popOpen=false; _ct.open=null; _ct.edit=null; ctRenderAll(); }
+function ctShowTask(id){
+  _ctEnsureDom(); const f=ctFind(id); if(!f) return; const t=f.t;
+  _ct.open=id; _ct.tab='c'; _ct.edit=null;
+  if(!_ct.popOpen){ _ct.sel=(t.s<=_ctToday()&&t.e>=_ctToday())?_ctToday():t.s; _ct.vy=+_ct.sel.slice(0,4); _ct.vm=+_ct.sel.slice(5,7)-1; document.getElementById('ctOvPop').classList.add('on'); _ct.popOpen=true; ctEnsure(_ctMonths()).then(ctRenderAll); }
+  ctRenderAll();
+}
+function ctRenderAll(){
+  ctRenderHomeCal();
+  if(!document.getElementById('ctOvPop')) return;
+  const [yy,mm]=[_ct.vy,_ct.vm+1]; document.getElementById('ctPTitle').textContent=`${yy}년 ${mm}월`;
+  const pw=document.getElementById('ctPerWrap');
+  if(_ctIsMgr()){ const cur=_ct.person; pw.innerHTML=`<select id="ctPerF" onchange="_ct.person=this.value;ctRenderAll()" title="직원별 보기 (관리자 전용)"><option value="">전체 직원</option>${_ct.people.filter(p=>p.u!==_ctMe()).map(p=>`<option value="${_hmEsc(p.u)}" ${cur===p.u?'selected':''}>${_hmEsc(p.n)}</option>`).join('')}</select>`; } else pw.innerHTML='';
+  if(!_ct.popOpen) return;
+  document.getElementById('ctPWeeks').innerHTML=ctMonthHtml({max:4,top:30,bh:19,pop:true});
+  const sel=_ct.sel, ts=_ctDayTasks(sel), hol=_ctHol(sel);
+  document.getElementById('ctPSide').innerHTML=`<h3>${sel.replace(/-/g,'.')} (${'일월화수목금토'[_ctDay(sel).getDay()]})${hol?` <span class="ct-tag red">${_hmEsc(hol)}</span>`:''}</h3><div class="sub">해당 일의 업무 ${ts.length}건${_ct.person?` · ${_hmEsc(_ctName(_ct.person))} 기준`:''}</div>`
+    +(ts.map(t=>_ctTaskCard(t,false)).join('')||'<div class="ct-lock">이 날짜의 업무가 없습니다.</div>')
+    +(_ct.err?'<div class="ct-lock" style="color:var(--red)">일부 월 데이터를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>':'');
+  ctRenderDetail();
+}
+function ctRenderDetail(){
+  const dr=document.getElementById('ctDr'); if(!dr) return;
+  const f=_ct.open?ctFind(_ct.open):null;
+  if(!f||!ctCanSee(f.t)){ dr.classList.remove('on'); return; }
+  const t=f.t, me=_ctMe(), can=ctCanEdit(t), done=(t.ck||[]).filter(c=>c.d).length, pct=(t.ck||[]).length?Math.round(done/t.ck.length*100):0;
+  const subPct=(t.sub||[]).length?Math.round(t.sub.filter(x=>x.d).length/t.sub.length*100):null;
+  const others=_ct.people.filter(p=>p.u!==t.as&&!(t.refs||[]).includes(p.u));
+  const keep=(id)=>(document.getElementById(id)||{}).value||'';
+  const kCk=keep('ctCkIn'), kSub=keep('ctSubIn'), kCm=keep('ctCmIn');
+  dr.className='ct-dr on ct-cat-'+t.cat;
+  const dis=can?'':' disabled';
+  dr.innerHTML=`<div class="ct-drh"><span class="ct-id">${_hmEsc(t.id)}</span><span style="flex:1"></span><button class="ct-btn" onclick="ctCloseDetail()">✕</button></div>
+  <div class="ct-drb"><h2>${_ctVisIco(t)}${_hmEsc(t.title)} ${can?`<a class="ct-edl" onclick="ctEditTitle('${t.id}')" title="제목 수정">✎</a>`:''}</h2>
+   <div class="ct-meta"><span class="ct-chip" style="background:var(--cb);color:var(--cf)">${_hmEsc(t.cat||'미분류')}</span> · <b>진행률 ${subPct!==null?subPct+'% (하위 업무 기준)':(t.st==='done'?'100%':t.st==='doing'?'진행 중':'시작 전')}</b> · 등록 ${_hmEsc(_ctName(t.by))} ${_ctRel(t.at)}</div>
+   <dl class="ct-fl">
+    <dt>담당자</dt><dd>${can?`<select onchange="ctSetField('${t.id}','as',this.value,'담당자를 변경')">${_ct.people.map(p=>`<option value="${_hmEsc(p.u)}" ${p.u===t.as?'selected':''}>${_hmEsc(p.n)}</option>`).join('')}</select>`:`<span class="ct-pill">${_ctAv(t.as)} ${_hmEsc(_ctName(t.as))}</span>`}${t.as!==me&&can&&t.vis!=='private'?` <a class="ct-lnk" onclick="ctSetField('${t.id}','as','${_hmEsc(me)}','담당자를 변경')">나에게 할당</a>`:''}</dd>
+    <dt>참조</dt><dd>${t.vis==='private'?'<span style="color:var(--tx2)">나만 보기 업무는 참조를 지정할 수 없어요</span>':`${(t.refs||[]).map(u=>`<span class="ct-pill">${_ctAv(u)} ${_hmEsc(_ctName(u))}${can?` <span class="x" onclick="ctRef('${t.id}','${_hmEsc(u)}',0)">✕</span>`:''}</span>`).join('')}${can?`<select onchange="ctRef('${t.id}',this.value,1);this.value=''" style="padding:2px 6px"><option value="">＋ 참조 추가</option>${others.map(p=>`<option value="${_hmEsc(p.u)}">${_hmEsc(p.n)}</option>`).join('')}</select>`:''}`}</dd>
+    <dt>공개 범위</dt><dd>${(me===t.by||_ctIsMgr())&&t.by===me?`<select onchange="ctSetVis('${t.id}',this.value)">${CT_VIS.map(v=>`<option value="${v[0]}" ${t.vis===v[0]?'selected':''}>${v[1]}</option>`).join('')}</select>`:`<span class="ct-chip">${(CT_VIS.find(v=>v[0]===t.vis)||CT_VIS[1])[1]}</span>`} <span style="color:var(--tx2);font-size:11.5px">${(CT_VIS.find(v=>v[0]===t.vis)||CT_VIS[1])[2]}</span></dd>
+    <dt>기간</dt><dd><input type="date" value="${t.s}" ${dis} onchange="ctSetDates('${t.id}',this.value,null)"> — <input type="date" value="${t.e}" ${dis} onchange="ctSetDates('${t.id}',null,this.value)"></dd>
+    <dt>상태</dt><dd><select ${dis} onchange="ctSetField('${t.id}','st',this.value,'상태를 변경')">${CT_STATUS.map(s=>`<option value="${s[0]}" ${t.st===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select></dd>
+    <dt>우선순위</dt><dd><select ${dis} onchange="ctSetField('${t.id}','pri',this.value,'우선순위를 변경')">${CT_PRI.map(s=>`<option ${t.pri===s?'selected':''}>${s}</option>`).join('')}</select></dd>
+    <dt>분류</dt><dd><select ${dis} onchange="ctSetField('${t.id}','cat',this.value,'분류를 변경')"><option value="">미분류</option>${CT_CAT_LIST.map(s=>`<option ${t.cat===s?'selected':''}>${s}</option>`).join('')}</select></dd>
+   </dl>
+   <div class="ct-sec"><h4>설명</h4><textarea ${dis} onchange="ctSetField('${t.id}','desc',this.value,'설명을 수정')" placeholder="업무 내용을 적어주세요">${_hmEsc(t.desc||'')}</textarea></div>
+   <div class="ct-sec"><h4>☑ 체크리스트 (${done}/${(t.ck||[]).length}) <span style="color:var(--pr);font-size:12px">${pct}%</span></h4><div class="ct-hint">업무 안의 간단한 확인 항목입니다. 담당자 없이 체크만 하고, 진행률은 이 업무 상세에만 표시됩니다.</div><div class="ct-prog"><i style="width:${pct}%"></i></div>
+     ${(t.ck||[]).map(c=>_ctItemRow('ck',t,c)).join('')}
+     ${can?`<div class="ct-addrow"><input type="text" id="ctCkIn" placeholder="＋ 새 체크리스트 항목 (Enter)" onkeydown="if(event.key==='Enter')ctItemAdd('${t.id}','ck')"><button class="ct-btn" onclick="ctItemAdd('${t.id}','ck')">추가</button></div>`:''}</div>
+   <div class="ct-sec"><h4>↳ 하위 업무 (${(t.sub||[]).length}) <span style="color:var(--pr);font-size:12px">${subPct!==null?subPct+'%':''}</span></h4><div class="ct-hint">더 작은 업무입니다. 하위 업무마다 담당자를 정할 수 있고, 상위 업무의 진행률·캘린더 카드(↳ 1/2)에 반영됩니다.</div>
+     ${(t.sub||[]).map(c=>_ctItemRow('sub',t,c)).join('')}
+     ${can?`<div class="ct-addrow"><input type="text" id="ctSubIn" placeholder="＋ 새 하위 업무 (Enter)" onkeydown="if(event.key==='Enter')ctItemAdd('${t.id}','sub')"><button class="ct-btn" onclick="ctItemAdd('${t.id}','sub')">추가</button></div>`:''}</div>
+   <div class="ct-tabs"><button class="${_ct.tab==='c'?'on':''}" onclick="_ct.tab='c';ctRenderDetail()">댓글 (${(t.cm||[]).length})</button><button class="${_ct.tab==='l'?'on':''}" onclick="_ct.tab='l';ctRenderDetail()">기록</button></div>
+   ${_ct.tab==='c'?((ctCanComment(t)
+     ?`<div style="display:flex;gap:9px;margin-bottom:8px">${_ctAv(me)}<div style="flex:1"><textarea id="ctCmIn" placeholder="댓글을 입력하세요. (담당자·참조 인원만 작성할 수 있어요)"></textarea><div style="text-align:right;margin-top:5px"><button class="ct-btn pri" onclick="ctCmAdd('${t.id}')">저장</button></div></div></div>`
+     :`<div class="ct-lock">🔒 댓글은 <b>담당자(${_hmEsc(_ctName(t.as))})</b>와 <b>참조 인원</b>만 작성할 수 있습니다. 읽기만 가능합니다.</div>`)
+     +(t.cm||[]).map(c=>{ const ed=_ct.edit&&_ct.edit.k==='cm'&&_ct.edit.id===t.id&&_ct.edit.i===c.id;
+        return `<div class="ct-cm">${_ctAv(c.w)}<div class="b"><div class="w">${_hmEsc(_ctName(c.w))}<small>${_ctRel(c.tm)}${c.ed?' (수정됨)':''}</small></div>`
+        +(ed?`<textarea id="ctCmEd" style="margin:4px 0">${_hmEsc(c.t)}</textarea><div style="text-align:right"><button class="ct-btn" onclick="ctItemCancel()">취소</button> <button class="ct-btn pri" onclick="ctCmSave('${t.id}','${c.id}')">저장</button></div>`
+          :`<p>${_hmEsc(c.t)}</p><button class="ct-react ${(c.lk||[]).includes(me)?'on':''}" onclick="ctLike('${t.id}','${c.id}')">👍 ${(c.lk||[]).length||''}</button>`
+            +(c.w===me?`<span class="ct-ia" style="margin-left:6px"><button title="수정" onclick="ctItemEdit('cm','${t.id}','${c.id}')">✎</button><button class="del" title="삭제" onclick="ctAskDel('cm','${t.id}','${c.id}')">🗑</button></span>`:''))
+        +`</div></div>`; }).join(''))
+     :((t.lg||[]).map(l=>`<div class="ct-lg">${_hmEsc(_ctName(l.w))}님이 ${_hmEsc(l.t)} · ${_ctRel(l.tm)}</div>`).join('')||'<div class="ct-lock">기록이 없습니다.</div>')}
+   ${ctCanDelTask(t)?`<div style="margin-top:22px;padding-top:12px;border-top:1px solid var(--bd);text-align:right"><button class="ct-btn dgr" onclick="ctAskDel('task','${t.id}')">🗑 업무 삭제</button></div>`:''}
+  </div>`;
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e&&v) e.value=v; }; set('ctCkIn',kCk); set('ctSubIn',kSub); set('ctCmIn',kCm);
+}
+function ctCloseDetail(){ _ct.open=null; _ct.edit=null; ctRenderDetail(); }
+function _ctItemRow(k,t,c){
+  const me=_ctMe(), editing=_ct.edit&&_ct.edit.k===k&&_ct.edit.id===t.id&&_ct.edit.i===c.id;
+  const can=ctCanEdit(t), canTog=k==='ck'?can:(can||c.w===me);
+  const chk=`<span class="ct-chk ${c.d?'on':''}" style="cursor:pointer" onclick="ctItemTog('${t.id}','${k}','${c.id}')"></span>`;
+  if(editing) return `<div class="ct-ci">${chk}<input type="text" id="ctItemEd" value="${_hmEsc(c.t)}" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')ctItemSave('${t.id}','${k}','${c.id}');if(event.key==='Escape')ctItemCancel()">`
+    +(k==='sub'?`<select id="ctItemWho">${_ct.people.map(p=>`<option value="${_hmEsc(p.u)}" ${p.u===c.w?'selected':''}>${_hmEsc(p.n)}</option>`).join('')}</select>`:'')
+    +`<button class="ct-btn" onclick="ctItemSave('${t.id}','${k}','${c.id}')">저장</button><button class="ct-btn" onclick="ctItemCancel()">취소</button></div>`;
+  return `<div class="ct-ci ${c.d?'done':''}">${canTog?chk:`<span class="ct-chk ${c.d?'on':''}"></span>`}<span class="l">${_hmEsc(c.t)}</span>${k==='sub'?_ctAv(c.w):''}`
+    +(can?`<span class="ct-ia"><button title="수정" onclick="ctItemEdit('${k}','${t.id}','${c.id}')">✎</button><button class="del" title="삭제" onclick="ctAskDel('${k}','${t.id}','${c.id}')">🗑</button></span>`:'')+`</div>`;
+}
+
+// ── 변경(저장) 함수들: 항상 최신본 위에 내 변경만 적용 ──
+function _ctLog(t,msg){ (t.lg=t.lg||[]).unshift({w:_ctMe(),t:msg,tm:new Date().toISOString()}); if(t.lg.length>80) t.lg.length=80; }
+async function ctUpdate(id,fn){
+  const f=ctFind(id); if(!f) return false;
+  let ok=false;
+  try{ ok=await ctMut(f.ym,doc=>{ const t=(doc.tasks||[]).find(x=>x.id===id); if(!t) throw new Error('이미 삭제된 업무입니다.'); fn(t); }); }
+  catch(e){ toast(e&&e.message?e.message:'저장하지 못했습니다.'); }
+  ctRenderAll(); return ok;
+}
+async function ctCreate(d){
+  const ym=_ctYm(d.s), me=_ctMe(); await ctEnsure([ym]);
+  let newId=null;
+  const ok=await ctMut(ym,doc=>{
+    doc.seq=(doc.seq||0)+1; newId=`${ym.slice(2,4)}${ym.slice(5,7)}-${String(doc.seq).padStart(3,'0')}`;
+    const priv=d.vis==='private';
+    doc.tasks.push({id:newId,ym,title:d.title,cat:d.cat||'',s:d.s,e:d.e||d.s,as:priv?me:d.as,refs:priv?[]:(d.refs||[]),vis:d.vis||'members',st:'plan',pri:d.pri||'보통',desc:d.desc||'',
+      ck:(d.ck||[]).map(t=>({id:_ctNid(),t,d:0})),sub:(d.sub||[]).map(t=>({id:_ctNid(),t,d:0,w:priv?me:d.as})),cm:[],lg:[{w:me,t:'업무를 등록',tm:new Date().toISOString()}],by:me,at:new Date().toISOString()});
+  });
+  if(ok){ if(d.s!==_ct.sel&&ym!==`${_ct.vy}-${_hmPad(_ct.vm+1)}`){ /* 보기 달 밖이면 그 달로 이동 */ } ctRenderAll(); }
+  return ok;
+}
+async function ctSetField(id,k,v,msg){
+  if(k==='as'){ const f=ctFind(id); if(f&&f.t.vis==='private'){ toast('나만 보기 업무는 담당자를 바꿀 수 없어요. 공개 범위를 먼저 바꿔 주세요.'); ctRenderDetail(); return; } }
+  await ctUpdate(id,t=>{ const old=t[k]; t[k]=v; if(k==='st') _ctLog(t,'상태를 '+_ctStK(v)+'(으)로 변경'); else if(k==='as') _ctLog(t,'담당자를 '+_ctName(v)+'(으)로 변경'); else if(k==='desc') _ctLog(t,'설명을 수정'); else _ctLog(t,msg+' ('+(old||'-')+' → '+v+')'); });
+}
+async function ctSetDates(id,s,e){
+  const f=ctFind(id); if(!f) return; const t=f.t; let ns=s||t.s, ne=e||t.e; if(ne<ns){ if(s) ne=ns; else ns=ne; }
+  const nym=_ctYm(ns);
+  if(nym===f.ym){ await ctUpdate(id,x=>{ x.s=ns; x.e=ne; _ctLog(x,'기간을 '+ns+' ~ '+ne+'로 변경'); }); return; }
+  // 시작 월이 바뀌면 저장 위치(월)도 옮김: 새 달에 먼저 넣고 → 옛 달에서 제거
+  await ctEnsure([nym]);
+  let snap=null; await ctMut(f.ym,doc=>{ const x=(doc.tasks||[]).find(y=>y.id===id); if(x) snap=JSON.parse(JSON.stringify(x)); });
+  if(!snap) return;
+  snap.s=ns; snap.e=ne; snap.ym=nym; _ctLog(snap,'기간을 '+ns+' ~ '+ne+'로 변경');
+  const ok1=await ctMut(nym,doc=>{ if(!(doc.tasks||[]).some(y=>y.id===id)) doc.tasks.push(snap); });
+  if(ok1) await ctMut(f.ym,doc=>{ doc.tasks=(doc.tasks||[]).filter(y=>y.id!==id); });
+  ctRenderAll();
+}
+async function ctSetVis(id,v){
+  await ctUpdate(id,t=>{ t.vis=v; if(v==='private'){ t.as=_ctMe(); t.refs=[]; (t.sub||[]).forEach(s=>{ s.w=_ctMe(); }); } _ctLog(t,'공개 범위를 '+(CT_VIS.find(x=>x[0]===v)||[])[1]+'(으)로 변경'); });
+}
+async function ctRef(id,u,add){ if(!u) return; await ctUpdate(id,t=>{ t.refs=t.refs||[]; if(add){ if(!t.refs.includes(u)) t.refs.push(u); _ctLog(t,'참조에 '+_ctName(u)+'을(를) 추가'); } else { t.refs=t.refs.filter(x=>x!==u); _ctLog(t,'참조에서 '+_ctName(u)+'을(를) 제거'); } }); }
+async function ctEditTitle(id){ const f=ctFind(id); if(!f) return; const v=prompt('업무 제목',f.t.title); if(v===null) return; const nv=v.trim(); if(!nv) return; await ctUpdate(id,t=>{ _ctLog(t,'제목을 수정 ('+t.title+' → '+nv+')'); t.title=nv; }); }
+async function ctItemTog(id,k,iid){
+  const f=ctFind(id); if(!f) return; const t=f.t, c=(k==='ck'?t.ck:t.sub).find(x=>x.id===iid); if(!c) return;
+  const ok=k==='ck'?ctCanEdit(t):(ctCanEdit(t)||c.w===_ctMe());
+  if(!ok){ toast(k==='ck'?'체크리스트는 담당자(또는 관리자)만 체크할 수 있어요':'하위 업무는 그 업무의 담당자 또는 상위 업무 담당자가 체크할 수 있어요'); return; }
+  await ctUpdate(id,t2=>{ const x=(k==='ck'?t2.ck:t2.sub).find(y=>y.id===iid); if(!x) return; x.d=x.d?0:1; _ctLog(t2,(k==='ck'?'체크리스트':'하위 업무')+' 「'+x.t+'」을(를) '+(x.d?'완료':'미완료로 변경')); });
+}
+async function ctItemAdd(id,k){
+  const inp=document.getElementById(k==='ck'?'ctCkIn':'ctSubIn'); const v=(inp.value||'').trim(); if(!v) return;
+  await ctUpdate(id,t=>{ const a=(t[k]=t[k]||[]); a.push(k==='ck'?{id:_ctNid(),t:v,d:0}:{id:_ctNid(),t:v,d:0,w:t.as}); _ctLog(t,(k==='ck'?'체크리스트':'하위 업무')+' 「'+v+'」을(를) 추가'); });
+  const n=document.getElementById(k==='ck'?'ctCkIn':'ctSubIn'); if(n){ n.value=''; n.focus(); }
+}
+function ctItemEdit(k,id,iid){ _ct.edit={k,id,i:iid}; ctRenderDetail(); setTimeout(()=>{ const e=document.getElementById('ctItemEd')||document.getElementById('ctCmEd'); if(e){ e.focus(); e.select&&e.select(); } },30); }
+function ctItemCancel(){ _ct.edit=null; ctRenderDetail(); }
+async function ctItemSave(id,k,iid){
+  const v=(document.getElementById('ctItemEd').value||'').trim(); if(!v){ document.getElementById('ctItemEd').focus(); return; }
+  const who=k==='sub'?document.getElementById('ctItemWho').value:null; _ct.edit=null;
+  await ctUpdate(id,t=>{ const x=(k==='ck'?t.ck:t.sub).find(y=>y.id===iid); if(!x) return; const old=x.t; x.t=v; if(who) x.w=who; _ctLog(t,(k==='ck'?'체크리스트':'하위 업무')+' 항목을 수정 (「'+old+'」 → 「'+v+'」)'); });
+}
+async function ctCmAdd(id){
+  const inp=document.getElementById('ctCmIn'); const v=(inp.value||'').trim(); if(!v) return;
+  await ctUpdate(id,t=>{ if(!ctCanComment(t)) throw new Error('댓글은 담당자·참조 인원만 작성할 수 있습니다.'); (t.cm=t.cm||[]).push({id:_ctNid(),w:_ctMe(),t:v,tm:new Date().toISOString(),lk:[]}); });
+}
+async function ctCmSave(id,cid){
+  const v=(document.getElementById('ctCmEd').value||'').trim(); if(!v) return; _ct.edit=null;
+  await ctUpdate(id,t=>{ const c=(t.cm||[]).find(x=>x.id===cid); if(c&&c.w===_ctMe()){ c.t=v; c.ed=1; } });
+}
+async function ctLike(id,cid){
+  await ctUpdate(id,t=>{ const c=(t.cm||[]).find(x=>x.id===cid); if(!c) return; c.lk=c.lk||[]; const me=_ctMe(), i=c.lk.indexOf(me); if(i<0) c.lk.push(me); else c.lk.splice(i,1); });
+}
+// ── 삭제(확인창 필수) ──
+function ctAskDel(k,id,iid){
+  const f=ctFind(id); if(!f) return; const t=f.t; _ct.pend={k,id,iid}; let msg='';
+  if(k==='ck') msg='체크리스트 항목 <b>“'+_hmEsc((t.ck.find(x=>x.id===iid)||{}).t||'')+'”</b>을(를) 삭제하시겠습니까?';
+  if(k==='sub') msg='하위 업무 <b>“'+_hmEsc((t.sub.find(x=>x.id===iid)||{}).t||'')+'”</b>을(를) 삭제하시겠습니까?';
+  if(k==='cm') msg='내 댓글을 삭제하시겠습니까?<br><span style="color:var(--tx2)">“'+_hmEsc(String((t.cm.find(x=>x.id===iid)||{}).t||'').slice(0,40))+'…”</span>';
+  if(k==='task') msg='업무 <b>“'+_hmEsc(t.title)+'”</b>을(를) 삭제하시겠습니까?<br><span style="color:var(--tx2)">체크리스트 '+(t.ck||[]).length+'개 · 하위 업무 '+(t.sub||[]).length+'개 · 댓글 '+(t.cm||[]).length+'개도 함께 삭제됩니다.</span>';
+  document.getElementById('ctCfMsg').innerHTML=msg+'<div style="margin-top:8px;font-size:12px;color:var(--red)">삭제하면 되돌릴 수 없습니다.</div>';
+  document.getElementById('ctOvCf').classList.add('on'); setTimeout(()=>document.getElementById('ctCfNo').focus(),20);
+}
+function ctCfClose(){ document.getElementById('ctOvCf')?.classList.remove('on'); _ct.pend=null; }
+async function ctCfYes(){
+  const q=_ct.pend; ctCfClose(); if(!q) return; const f=ctFind(q.id); if(!f) return;
+  if(q.k==='task'){
+    if(!ctCanDelTask(f.t)){ toast('업무는 등록한 사람 또는 관리자만 삭제할 수 있어요'); return; }
+    const ok=await ctMut(f.ym,doc=>{ doc.tasks=(doc.tasks||[]).filter(x=>x.id!==q.id); });
+    if(ok){ _ct.open=null; toast('업무를 삭제했습니다.'); ctRenderAll(); } return;
+  }
+  if(q.k==='cm'){ await ctUpdate(q.id,t=>{ t.cm=(t.cm||[]).filter(x=>!(x.id===q.iid&&x.w===_ctMe())); }); return; }
+  await ctUpdate(q.id,t=>{ const a=q.k==='ck'?t.ck:t.sub, x=a.find(y=>y.id===q.iid); if(!x) return; const nm=x.t; const i=a.indexOf(x); a.splice(i,1); _ctLog(t,(q.k==='ck'?'체크리스트':'하위 업무')+' 항목 「'+nm+'」을(를) 삭제'); });
+}
+
+// ── 업무 등록 ──
+function ctOpenReg(){
+  _ctEnsureDom(); _ct.reg={refs:[],ck:[],sub:[],vis:'members'}; document.getElementById('ctOvReg').classList.add('on'); ctRenderReg();
+  ctLoadPeople().then(()=>{ if(document.getElementById('ctOvReg').classList.contains('on')) ctRenderReg(); });
+}
+function ctCloseReg(){ document.getElementById('ctOvReg')?.classList.remove('on'); }
+function ctRenderReg(){
+  const R=_ct.reg, me=_ctMe(), g=id=>(document.getElementById(id)||{}).value, keep={T:g('ctrT'),C:g('ctrC'),P:g('ctrP'),S:g('ctrS'),E:g('ctrE'),A:g('ctrA'),D:g('ctrD')};
+  const sel=_ct.sel||_ctToday(), priv=R.vis==='private';
+  document.getElementById('ctRegBox').innerHTML=`<h2>＋ 새 업무 등록</h2>
+  <dl class="ct-fl"><dt>제목</dt><dd><input type="text" id="ctrT" style="width:100%" placeholder="업무 제목" value="${_hmEsc(keep.T||'')}"></dd>
+   <dt>공개 범위</dt><dd><div class="ct-vis">${CT_VIS.map(v=>`<label class="${R.vis===v[0]?'on':''}"><input type="radio" name="ctrV" ${R.vis===v[0]?'checked':''} onchange="_ct.reg.vis='${v[0]}';ctRenderReg()"> <b>${v[1]}</b><small>${v[2]}</small></label>`).join('')}</div></dd>
+   <dt>분류</dt><dd><select id="ctrC"><option value="">미분류</option>${CT_CAT_LIST.map(s=>`<option ${keep.C===s?'selected':''}>${s}</option>`).join('')}</select> <select id="ctrP">${CT_PRI.map(s=>`<option ${(keep.P||'보통')===s?'selected':''}>${s}</option>`).join('')}</select></dd>
+   <dt>기간</dt><dd><input type="date" id="ctrS" value="${keep.S||sel}"> — <input type="date" id="ctrE" value="${keep.E||sel}"></dd>
+   <dt>담당자</dt><dd>${priv?`<span class="ct-pill">${_ctAv(me)} ${_hmEsc(_ctName(me))} (나)</span> <span style="color:var(--tx2);font-size:11.5px">나만 보기는 담당자가 본인입니다</span>`:`<select id="ctrA">${_ct.people.map(p=>`<option value="${_hmEsc(p.u)}" ${(keep.A||me)===p.u?'selected':''}>${_hmEsc(p.n)}${p.u===me?' (나)':''}</option>`).join('')}</select>`}</dd>
+   ${priv?'':`<dt>참조</dt><dd>${R.refs.map(u=>`<span class="ct-pill">${_ctAv(u)} ${_hmEsc(_ctName(u))} <span class="x" onclick="_ct.reg.refs=_ct.reg.refs.filter(x=>x!=='${_hmEsc(u)}');ctRenderReg()">✕</span></span>`).join('')}<select onchange="if(this.value)_ct.reg.refs.push(this.value);ctRenderReg()"><option value="">＋ 직원 선택</option>${_ct.people.filter(p=>!R.refs.includes(p.u)).map(p=>`<option value="${_hmEsc(p.u)}">${_hmEsc(p.n)}</option>`).join('')}</select></dd>`}
+   <dt>설명</dt><dd><textarea id="ctrD" placeholder="업무 내용">${_hmEsc(keep.D||'')}</textarea></dd>
+   <dt>체크리스트</dt><dd>${R.ck.map((c,i)=>`<div class="ct-ci"><span class="ct-chk"></span><span class="l">${_hmEsc(c)}</span><span class="ct-ia" style="display:inline-flex"><button class="del" onclick="_ct.reg.ck.splice(${i},1);ctRenderReg()">✕</button></span></div>`).join('')}<div class="ct-addrow"><input type="text" id="ctrCk" placeholder="항목 입력 후 Enter" onkeydown="if(event.key==='Enter'&&this.value.trim()){_ct.reg.ck.push(this.value.trim());ctRenderReg();document.getElementById('ctrCk').focus()}"></div></dd>
+   <dt>하위 업무</dt><dd>${R.sub.map((c,i)=>`<div class="ct-ci"><span class="ct-chk"></span><span class="l">${_hmEsc(c)}</span><span class="ct-ia" style="display:inline-flex"><button class="del" onclick="_ct.reg.sub.splice(${i},1);ctRenderReg()">✕</button></span></div>`).join('')}<div class="ct-addrow"><input type="text" id="ctrSb" placeholder="하위 업무 입력 후 Enter" onkeydown="if(event.key==='Enter'&&this.value.trim()){_ct.reg.sub.push(this.value.trim());ctRenderReg();document.getElementById('ctrSb').focus()}"></div></dd></dl>
+  <div class="ct-ft"><button class="ct-btn" onclick="ctCloseReg()">취소</button><button class="ct-btn pri" id="ctrSave" onclick="ctSaveReg()">등록</button></div>`;
+}
+async function ctSaveReg(){
+  const R=_ct.reg, me=_ctMe(), g=id=>(document.getElementById(id)||{}).value||'';
+  const title=g('ctrT').trim(); if(!title){ document.getElementById('ctrT').focus(); return; }
+  const s=g('ctrS')||_ctToday(); let e=g('ctrE')||s; if(e<s) e=s;
+  const btn=document.getElementById('ctrSave'); btn.disabled=true; btn.textContent='등록 중…';
+  const ok=await ctCreate({title,cat:g('ctrC'),pri:g('ctrP')||'보통',s,e,as:R.vis==='private'?me:(g('ctrA')||me),refs:R.vis==='private'?[]:R.refs.slice(),vis:R.vis,desc:g('ctrD'),ck:R.ck.slice(),sub:R.sub.slice()});
+  btn.disabled=false; btn.textContent='등록';
+  if(ok){ ctCloseReg(); _ct.sel=s; _ct.vy=+s.slice(0,4); _ct.vm=+s.slice(5,7)-1; await ctEnsure(_ctMonths()); toast('업무를 등록했습니다.'); ctRenderAll(); }
+}
+
+// ══════════════════════════════════════════════
 // 📋 업무캘린더 미니 창 (관리자 admin 전용) — 컴퓨터에 설치해 쓰던 '업무 캘린더' 프로그램(할 일·고정업무·메모장·업무보고서·점심금액)을
 //   재고앱 위에 떠 있는 창으로 옮긴 것. 다른 메뉴를 쓰면서 동시에 열어둘 수 있음.
 //  · 저장: cloudKv(work_calendar, person='__app__') — 할 일은 월별로 쪼개 'wc_admin_t_YYYY-MM', 나머지는 'wc_admin_fixed|notes|reports|lunch'
@@ -9218,8 +9709,8 @@ function homeOpenAdd(){
 // ══════════════════════════════════════════════
 const WC_FIXED_KIND='wc_admin_fixed', WC_NOTES_KIND='wc_admin_notes', WC_REPORTS_KIND='wc_admin_reports', WC_LUNCH_KIND='wc_admin_lunch';
 const WC_LUNCH_STAFF=['실장님','상훈','이모','가영','지민','연정','보라','유현','규리','종범'];
-const WC_HOLIDAYS={'2025-01-01':'신정','2025-01-28':'설날 연휴','2025-01-29':'설날','2025-01-30':'설날 연휴','2025-03-01':'삼일절','2025-03-03':'대체공휴일','2025-05-05':'어린이날·부처님오신날','2025-05-06':'대체공휴일','2025-06-06':'현충일','2025-08-15':'광복절','2025-10-03':'개천절','2025-10-05':'추석 연휴','2025-10-06':'추석','2025-10-07':'추석 연휴','2025-10-08':'대체공휴일','2025-10-09':'한글날','2025-12-25':'크리스마스',
-'2026-01-01':'신정','2026-02-16':'설날 연휴','2026-02-17':'설날','2026-02-18':'설날 연휴','2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일','2026-06-06':'현충일','2026-08-15':'광복절','2026-08-17':'대체공휴일','2026-09-24':'추석 연휴','2026-09-25':'추석','2026-09-26':'추석 연휴','2026-09-28':'대체공휴일','2026-10-03':'개천절','2026-10-05':'대체공휴일','2026-10-09':'한글날','2026-12-25':'크리스마스',
+const WC_HOLIDAYS={'2025-01-01':'신정','2025-01-27':'임시공휴일','2025-01-28':'설날 연휴','2025-01-29':'설날','2025-01-30':'설날 연휴','2025-03-01':'삼일절','2025-03-03':'대체공휴일','2025-05-05':'어린이날·부처님오신날','2025-05-06':'대체공휴일','2025-06-03':'대통령선거일','2025-06-06':'현충일','2025-08-15':'광복절','2025-10-03':'개천절','2025-10-05':'추석 연휴','2025-10-06':'추석','2025-10-07':'추석 연휴','2025-10-08':'대체공휴일','2025-10-09':'한글날','2025-12-25':'크리스마스',
+'2026-01-01':'신정','2026-02-16':'설날 연휴','2026-02-17':'설날','2026-02-18':'설날 연휴','2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일','2026-06-03':'지방선거일','2026-06-06':'현충일','2026-08-15':'광복절','2026-08-17':'대체공휴일','2026-09-24':'추석 연휴','2026-09-25':'추석','2026-09-26':'추석 연휴','2026-09-28':'대체공휴일','2026-10-03':'개천절','2026-10-05':'대체공휴일','2026-10-09':'한글날','2026-12-25':'크리스마스',
 '2027-01-01':'신정','2027-02-05':'설날 연휴','2027-02-06':'설날','2027-02-07':'설날 연휴','2027-02-08':'대체공휴일','2027-03-01':'삼일절','2027-05-05':'어린이날','2027-05-13':'부처님오신날','2027-06-06':'현충일','2027-08-15':'광복절','2027-08-16':'대체공휴일','2027-09-14':'추석 연휴','2027-09-15':'추석','2027-09-16':'추석 연휴','2027-10-03':'개천절','2027-10-04':'대체공휴일','2027-10-09':'한글날','2027-10-11':'대체공휴일','2027-12-25':'크리스마스'};
 const _wc={ view:'main', sel:null, vy:0, vm:0, mon:{}, ver:{}, fixed:[], notes:{}, reports:{}, lunch:{price:8000,lunch:{}},
   form:null, fixedForm:null, showCal:true, booted:false, timer:null, lcY:0, lcM:0, lcSel:null, imp:null, searchQ:'', err:false, allLoaded:false };
