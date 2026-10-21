@@ -2919,6 +2919,10 @@ html.mob-native .lcs-sort{flex-wrap:wrap;}
 html.mob-native .lcs-sort button{padding:8px 13px;font-size:13px;}
 html.mob-native .lcr-det-lbl{font-size:13px;}
 html.mob-native .lcr-det-val{font-size:15px;}
+/* ── 매출관리(통합·일일보고 등) 표 머리글 색 — 배경이 카드와 거의 같아 어디가 머리글인지 구분이 안 되던 문제 ── */
+:root{--tbl-head-bg:#D9E4F5;--tbl-head-tx:#1B2A47;}
+:root[data-theme="dark"]{--tbl-head-bg:#2D3548;--tbl-head-tx:#E8EEFA;}
+#page-revenue table.dt thead th{background:var(--tbl-head-bg);color:var(--tbl-head-tx);font-weight:700;}
 /* ── 가로 스크롤 제거: 표 폭을 창(한 화면)에 맞춤 (2026-10-21) ── */
 /* 발주 인사이트: 좌우 여백을 줄이고 상품명 열은 길면 …(마우스를 올리면 전체) */
 #insightTblWrap td,#insightTblWrap th{padding-left:5px;padding-right:5px;}
@@ -6924,22 +6928,22 @@ html.mob-native .lcr-det-val{font-size:15px;}
               <!-- 년도·날짜·판매처 -->
               <col style="width:48px"><col style="width:52px"><col style="width:78px">
               <!-- 주문번호 -->
-              <col data-flex="50,150,2.2" style="width:60px">
+              <col data-flex="50,124,2" style="width:60px">
               <!-- 구매자·수취인 -->
               <col style="width:54px"><col style="width:54px">
               <!-- 연락처 -->
-              <col data-flex="76,120,1.2" style="width:90px">
+              <col data-flex="76,100,1" style="width:90px">
               <!-- 우편·주소 -->
-              <col style="width:54px"><col data-flex="56,280,1.6" style="width:90px">
-              <!-- 상품번호 --><col data-flex="48,130,1" style="width:70px">
+              <col style="width:54px"><col data-flex="56,170,1.7" style="width:90px">
+              <!-- 상품번호 --><col data-flex="48,90,.6" style="width:70px">
               <!-- 구분·코드 -->
               <col style="width:74px"><col style="width:64px">
               <!-- 모델명: 풀네임이 다 보이도록 현재 표시된 가장 긴 이름 폭만큼 확보(_uniModelNeed) -->
               <col data-model="1" style="width:240px">
               <!-- 수량·출고·배송비·판매가·정산·매입·마진·마진율·단가 (쉼표·최대 자릿수 기준 고정) -->
-              <col style="width:42px"><col style="width:40px"><col style="width:54px">
-              <col style="width:70px"><col style="width:72px"><col style="width:72px">
-              <col style="width:68px"><col style="width:66px"><col style="width:68px">
+              <col style="width:42px"><col style="width:40px"><col style="width:56px">
+              <col style="width:82px"><col style="width:84px"><col style="width:82px">
+              <col style="width:72px"><col style="width:66px"><col style="width:72px">
               <col style="width:28px"><!-- 수정 -->
             </colgroup>
             <thead><tr>
@@ -26724,7 +26728,7 @@ function _uniModelNeed(t){   // 현재 표시된 모델명 중 가장 긴 이름
     const cs=getComputedStyle(ins[0]); const cx=(_uniModelNeed._c||(_uniModelNeed._c=document.createElement('canvas'))).getContext('2d');
     cx.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily; let mx=0;
     ins.forEach(i=>{ const w=cx.measureText(i.value||'').width; if(w>mx) mx=w; });
-    return Math.ceil(mx)+parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight)+8;   // 입력칸 안쪽 여백·테두리 몫
+    return Math.ceil(mx)+parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight)+22;   // 입력칸 안쪽 여백·테두리 몫
   }catch(e){ return 0; }
 }
 function _uniFitCols(){
