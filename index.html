@@ -6527,8 +6527,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
         </div>
       </div>
       <div class="rev-kpi" id="revMonKpiRow" style="grid-template-columns:repeat(6,1fr);">
-        <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 정산금액</div><div class="rev-kpi-val" id="revMonKpi0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi0Sub">데이터 없음</div></div>
-        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진</div><div class="rev-kpi-val" id="revMonKpi1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi1Sub">데이터 없음</div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">💰 매출(판매가)</div><div class="rev-kpi-val" id="revMonKpi0">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi0Sub">데이터 없음</div></div>
+        <div class="rev-kpi-card"><div class="rev-kpi-lbl">📈 마진 <span class="rev-kpi-badge">광고비 차감</span></div><div class="rev-kpi-val" id="revMonKpi1">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi1Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">💹 마진율</div><div class="rev-kpi-val" id="revMonKpi2" style="color:#D97706;">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi2Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">🛒 주문건수</div><div class="rev-kpi-val" id="revMonKpi3">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi3Sub">데이터 없음</div></div>
         <div class="rev-kpi-card"><div class="rev-kpi-lbl">📢 광고비</div><div class="rev-kpi-val" id="revMonKpi5">—</div><div class="rev-kpi-sub" style="color:var(--tx2);" id="revMonKpi5Sub">판매처 선택 반영</div></div>
@@ -6536,12 +6536,12 @@ html.mob-native .lcr-det-val{font-size:15px;}
       </div>
       <div class="rev-chart-grid">
         <div class="rev-card">
-          <div class="rev-card-title"><span>📊 일별 정산금액 추이</span></div>
+          <div class="rev-card-title"><span>📊 일별 매출 추이</span></div>
           <div class="rev-chart-wrap"><canvas id="revDailyChart"></canvas></div>
           <div class="rev-empty" id="revDailyEmpty" style="padding:20px;">업로드된 데이터가 없습니다</div>
         </div>
         <div class="rev-card">
-          <div class="rev-card-title"><span>📦 판매처별 정산금액</span></div>
+          <div class="rev-card-title"><span>📦 판매처별 매출</span></div>
           <div id="revMonChBars"><div class="rev-empty" style="padding:20px;">업로드된 데이터가 없습니다</div></div>
         </div>
       </div>
@@ -6554,8 +6554,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <div class="tw"><table class="dt" id="revMonTopTbl" style="display:none;">
           <thead><tr>
             <th style="width:32px;">#</th><th>상품명</th>
-            <th style="text-align:right;">주문수량</th><th style="text-align:right;">정산금액</th>
-            <th style="text-align:right;">마진</th><th style="text-align:right;">마진율</th>
+            <th style="text-align:right;">주문수량</th><th style="text-align:right;">매출</th>
+            <th style="text-align:right;">마진</th><th style="text-align:right;" title="마진 ÷ 정산금액">마진율</th>
           </tr></thead>
           <tbody id="revMonTopTbody"></tbody>
         </table></div>
@@ -22846,8 +22846,9 @@ function renderRevMonthly(){
   const adMon=sumAdSpend({year:sy, month:sm, ch:_revSelCh});
   const margin=marginGross-adMon;
   // 로켓그로스 정산금액·마진('전체' 판매처 선택 시에만 합산 — 특정 채널 필터 중엔 섞지 않음)
-  const rgFin = _revSelCh==='ALL' ? rgSumSettlementMargin(`${rgYm}-01`, `${rgYm}-31`) : {settlement:0,margin:0};
+  const rgFin = _revSelCh==='ALL' ? rgSumSettlementMargin(`${rgYm}-01`, `${rgYm}-31`) : {settlement:0,margin:0,revenue:0};
   const settleDisp = settle + rgFin.settlement;
+  const saleDisp = rows.reduce((s,r)=>s+(r.salePrice||0),0) + rgFin.revenue;   // 매출(판매가) = 판매처 판매가 합 + 로켓그로스 매출
   const marginDisp = margin + rgFin.margin;
   const rate=settleDisp>0?(marginDisp/settleDisp*100):0;
   // 손실금액 = 마진이 마이너스인 건들의 손실 합계(절댓값)
@@ -22861,7 +22862,7 @@ function renderRevMonthly(){
     el.textContent=val;
     const s=el.parentElement.querySelector('.rev-kpi-sub'); if(s) s.textContent=sub;
   };
-  setKpi('revMonKpi0',fmt(settleDisp),`${_revSelMonth} 정산`+(rgFin.settlement>0?' (로켓그로스 포함)':''));
+  setKpi('revMonKpi0',fmt(saleDisp),`${_revSelMonth} 매출`+(rgFin.revenue>0?' (로켓그로스 포함)':''));
   setKpi('revMonKpi1',fmt(marginDisp),adMon>0?`광고비 -${fmt(adMon)} 반영`:`${_revSelMonth} 마진`);
   setKpi('revMonKpi2',rate.toFixed(1)+'%','마진율');
   setKpi('revMonKpi3',rows.length.toLocaleString()+'건','주문건수');
@@ -22870,11 +22871,11 @@ function renderRevMonthly(){
 
   // 일별 추이 차트
   const byDay={};
-  rows.forEach(r=>{ if(r.date){byDay[r.date]=(byDay[r.date]||0)+(r.settlement||0);} });
+  rows.forEach(r=>{ if(r.date){byDay[r.date]=(byDay[r.date]||0)+(r.salePrice||0);} });
   if(_revSelCh==='ALL'){
     (_rgProdCache[rgYm]||[]).forEach(r=>{
       const mkey=r.date.slice(5);   // 'MM-DD'
-      byDay[mkey]=(byDay[mkey]||0)+rgCalcRowFinance(r).settlement;
+      byDay[mkey]=(byDay[mkey]||0)+(r.revenue||0);
     });
   }
   const dayKeys=Object.keys(byDay).sort();
@@ -22901,8 +22902,8 @@ function renderRevMonthly(){
   // 채널 막대
   const CH_COLORS=['#059669','#F59E0B','#3182F6','#DC2626','#8B5CF6','#EC4899','#0EA5E9','#14B8A6','#F97316','#64748B'];
   const byCh={};
-  rows.forEach(r=>{const k=r.ch||'기타';if(!byCh[k])byCh[k]=0;byCh[k]+=r.settlement||0;});
-  if(rgFin.settlement>0) byCh['로켓그로스']=rgFin.settlement;
+  rows.forEach(r=>{const k=r.ch||'기타';if(!byCh[k])byCh[k]=0;byCh[k]+=r.salePrice||0;});
+  if(rgFin.revenue>0) byCh['로켓그로스']=rgFin.revenue;
   const chE=Object.entries(byCh).sort((a,b)=>b[1]-a[1]);
   const mChBars=document.getElementById('revMonChBars');
   if(mChBars) mChBars.innerHTML=chE.length
@@ -22913,18 +22914,19 @@ function renderRevMonthly(){
 
   // TOP15 (로켓그로스는 '전체' 판매처일 때만, 매칭된 상품명 기준으로 병합)
   const byP={};
-  rows.forEach(r=>{const k=r.modelName||r.itemCode||'미상';if(!byP[k])byP[k]={qty:0,settle:0,margin:0};byP[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName);byP[k].settle+=r.settlement||0;byP[k].margin+=r.margin||0;});
+  rows.forEach(r=>{const k=r.modelName||r.itemCode||'미상';if(!byP[k])byP[k]={qty:0,sale:0,settle:0,margin:0};byP[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName);byP[k].sale+=r.salePrice||0;byP[k].settle+=r.settlement||0;byP[k].margin+=r.margin||0;});
   if(_revSelCh==='ALL'){
     (_rgProdCache[rgYm]||[]).forEach(r=>{
       const k=rgResolveName(r.optionId)||r.productName;
-      if(!byP[k]) byP[k]={qty:0,settle:0,margin:0};
+      if(!byP[k]) byP[k]={qty:0,sale:0,settle:0,margin:0};
       const fin=rgCalcRowFinance(r);
       byP[k].qty += (r.qty||0)*rgQtyMultiplier(r.optionId);
+      byP[k].sale += r.revenue||0;
       byP[k].settle += fin.settlement;
       if(fin.margin!=null) byP[k].margin += fin.margin;
     });
   }
-  const top15=Object.entries(byP).sort((a,b)=>b[1].settle-a[1].settle).slice(0,15);
+  const top15=Object.entries(byP).sort((a,b)=>b[1].sale-a[1].sale).slice(0,15);
   const tBody=document.getElementById('revMonTopTbody');
   const tTbl=document.getElementById('revMonTopTbl');
   const tEmpty=document.getElementById('revMonTopEmpty');
@@ -22937,7 +22939,7 @@ function renderRevMonthly(){
         <td><span class="rank-badge ${i<3?['rank-1','rank-2','rank-3'][i]:''}">${i+1}</span></td>
         <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;">${name}</td>
         <td style="text-align:right;">${v.qty.toLocaleString()}</td>
-        <td style="text-align:right;font-weight:600;">${fmt(v.settle)}</td>
+        <td style="text-align:right;font-weight:600;">${fmt(v.sale)}</td>
         <td style="text-align:right;" class="${v.margin>0?'rev-margin-pos':''}">${fmt(v.margin)}</td>
         <td style="text-align:right;color:var(--tx2);">${v.settle>0?(v.margin/v.settle*100).toFixed(1)+'%':'-'}</td>
       </tr>`).join('');
@@ -25734,7 +25736,7 @@ function renderAdChart(){
 // 엑셀 날짜 직렬값 (1899-12-30 기준)
 function _excelSerial(y,m,d){ return Math.round((Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000); }
 
-// 일일보고 시트 차트(일자별 정산금액·광고비, 묶은 세로막대 = 단일 축 클러스터) XML 생성
+// 일일보고 시트 차트(일자별 매출(판매가)·광고비, 묶은 세로막대 = 단일 축 클러스터) XML 생성
 function _buildDailyChartXml(sheetName, serials, saleVals, adVals, firstR, lastR){
   const n=serials.length;
   const sn=`'${sheetName}'`;
@@ -25755,17 +25757,17 @@ function _buildDailyChartXml(sheetName, serials, saleVals, adVals, firstR, lastR
     +catRef
     +`<c:val><c:numLit>${zeroLit}</c:numLit></c:val></c:ser>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="1400"/><a:t>일자별 판매가 · 광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>`
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="1400"/><a:t>일자별 매출 · 광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>`
     +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
-    +ser(0,0,'B','판매가','B',saleVals,'<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>')
+    +ser(0,0,'B','매출(판매가)','B',saleVals,'<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>')
     +phSer(1,1)
     +`<c:gapWidth val="60"/><c:overlap val="-20"/><c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>`
     +`<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>`
     +phSer(2,2)
-    +ser(3,3,'G','광고비','G',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
+    +ser(3,3,'F','광고비','F',adVals,'<a:solidFill><a:srgbClr val="DC2626"/></a:solidFill>')
     +`<c:gapWidth val="60"/><c:overlap val="-20"/><c:axId val="333333333"/><c:axId val="444444444"/></c:barChart>`
     +`<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="mm-dd" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="222222222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
-    +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:title><c:tx><c:rich><a:bodyPr rot="0" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>판매가</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
+    +`<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:title><c:tx><c:rich><a:bodyPr rot="0" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>매출</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111111111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`
     +`<c:valAx><c:axId val="444444444"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/><c:title><c:tx><c:rich><a:bodyPr rot="0" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="ko-KR" sz="900"/><a:t>광고비</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="333333333"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>`
     +`<c:catAx><c:axId val="333333333"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="1"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="444444444"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>`
     +`</c:plotArea><c:legend><c:legendPos val="b"/><c:legendEntry><c:idx val="1"/><c:delete val="1"/></c:legendEntry><c:legendEntry><c:idx val="2"/><c:delete val="1"/></c:legendEntry><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
@@ -25875,14 +25877,14 @@ async function downloadDailyExcel(){
     s.push([`일일보고 핵심지표 - ${name} [${chLabel}]`]);
     for(let i=0;i<15;i++) s.push([]);
     s.push(['■ 핵심 지표']);
-    s.push(['날짜','판매가','정산예정금액','마진','마진율','택배건수','광고비','최종마진']);
-    agg.forEach(d=>s.push([d.serial,d.sale,d.settle,d.margin,d.rate,d.pkgs,d.ad,d.finalMargin]));
+    s.push(['날짜','매출(판매가)','마진','마진율','택배건수','광고비','최종마진']);   // 마진율 = 마진 ÷ 정산금액(정산금액 열은 매출 기준 전환으로 제거)
+    agg.forEach(d=>s.push([d.serial,d.sale,d.margin,d.rate,d.pkgs,d.ad,d.finalMargin]));
     const ws=U.aoa_to_sheet(_xmlSafeAoa(s));
-    ws['!cols']=[{wch:13},{wch:14},{wch:14},{wch:13},{wch:9},{wch:10},{wch:12},{wch:13}];
-    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:7}}];
+    ws['!cols']=[{wch:13},{wch:14},{wch:13},{wch:9},{wch:10},{wch:12},{wch:13}];
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
     sc(ws,0,0,SECT); sc(ws,16,0,SECT);
-    for(let c=0;c<8;c++) sc(ws,17,c,HEAD);
-    agg.forEach((d,i)=>{ const r=18+i; fmt(ws,r,0,DATEFMT); fmt(ws,r,1,WON); fmt(ws,r,2,WON); fmt(ws,r,3,MARGIN_FMT); fmt(ws,r,4,PCT); fmt(ws,r,5,'#,##0'); fmt(ws,r,6,WON); fmt(ws,r,7,MARGIN_FMT); });
+    for(let c=0;c<7;c++) sc(ws,17,c,HEAD);
+    agg.forEach((d,i)=>{ const r=18+i; fmt(ws,r,0,DATEFMT); fmt(ws,r,1,WON); fmt(ws,r,2,MARGIN_FMT); fmt(ws,r,3,PCT); fmt(ws,r,4,'#,##0'); fmt(ws,r,5,WON); fmt(ws,r,6,MARGIN_FMT); });
     U.book_append_sheet(wb,ws,name);
     monthCharts.push({name, serials:agg.map(d=>d.serial), sales:agg.map(d=>d.sale), ads:agg.map(d=>d.ad), firstR:19, lastR:18+agg.length, sheetIdx:monthCharts.length+1});
   });
@@ -25893,12 +25895,12 @@ async function downloadDailyExcel(){
 
   // ── 제품구분비중 시트 (다운로드 기준일 기준) ──
   const byType={};
-  dayRowsForBreakdown.forEach(r=>{const t=r.itemType||'기타';byType[t]=(byType[t]||0)+(r.settlement||0);});
+  dayRowsForBreakdown.forEach(r=>{const t=r.itemType||'기타';byType[t]=(byType[t]||0)+(r.salePrice||0);});
   const typeList=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
   const typeTot=typeList.reduce((s,[,v])=>s+v,0);
   const stp=[];
   stp.push([`■ 제품구분별 비중 - ${selY}-${selMonStr}-${pad(endDay)} [${chLabel}]`]);
-  stp.push(['구분','정산금액','비중']);
+  stp.push(['구분','매출','비중']);
   typeList.forEach(([t,v])=>stp.push([t,v,typeTot>0?v/typeTot:0]));
   const wsT=U.aoa_to_sheet(_xmlSafeAoa(stp));
   wsT['!cols']=[{wch:16},{wch:14},{wch:10}];
@@ -25937,10 +25939,10 @@ async function downloadDailyExcel(){
       });
     });
   }
-  // 구분(B열) 텍스트 내림차순 우선 정렬, 같은 구분 안에서는 매출액(정산금액) 내림차순
+  // 구분(B열) 텍스트 내림차순 우선 정렬, 같은 구분 안에서는 매출액(판매가) 내림차순
   const prodList=Object.entries(byProd).sort((a,b)=>{
     const catCmp=String(b[1].type||'').localeCompare(String(a[1].type||''),'ko');
-    return catCmp!==0 ? catCmp : b[1].settle-a[1].settle;
+    return catCmp!==0 ? catCmp : b[1].saleTotal-a[1].saleTotal;
   });
 
   // ── 일별 판매수량(다운로드 기준일 포함 최근 31일) + '신규' 판정용 데이터 ──
@@ -26038,7 +26040,7 @@ async function downloadDailyExcel(){
   s2.push(['■ 제품별 판매 현황']);
   // 헤더는 1행(제목) 다음 딱 한 줄 — A~I 컬럼명 + J열부터 날짜(요일). 필터를 이 행 하나에만 걸 것이므로
   // 날짜도 별도 행으로 빼지 않고 이 헤더 행에 바로 넣는다.
-  s2.push(['모델명','구분','주문수량','택배건수','판매가합','마진','마진율','비고','전주대비', ...dateHeaders]);
+  s2.push(['모델명','구분','주문수량','택배건수','매출(판매가)','마진','마진율','비고','전주대비', ...dateHeaders]);
   prodList.forEach(([name,v])=>{
     const daily=dateCols.map(d=>qtyOn(name,d));
     const rgQ=rgQtyByName[name]||0;
