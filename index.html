@@ -239,8 +239,8 @@ thead th{box-shadow:inset 0 -2px 0 var(--tbl-head-line);}
 .hm-cal thead th{box-shadow:none;}
 /* 열 사이 세로줄 — 칸 크기가 밀리지 않도록 border 대신 inset 그림자로 그림(머리글이 스크롤 고정돼도 같이 이동).
    제외: 견적서 문서(.qt-tbl)·전화구매 피벗(.pb-table/.piv-table)은 자체 줄이 있고, 홈 달력(.hm-cal)은 의도적으로 줄 없음 */
-table:not(.qt-tbl):not(.pb-table):not(.piv-table):not(.cs-order-table):not(.um-table):not(.hm-cal *) :is(tbody,tfoot)>tr>:is(td,th):not(:last-child){box-shadow:inset -1px 0 0 var(--tbl-line);}
-table:not(.qt-tbl):not(.pb-table):not(.piv-table):not(.cs-order-table):not(.um-table):not(.hm-cal *) thead>tr>th:not(:last-child){box-shadow:inset -1px 0 0 var(--tbl-line),inset 0 -2px 0 var(--tbl-head-line);}
+table:not(.qt-tbl):not(.pb-table):not(.cs-order-table):not(.um-table):not(.hm-cal *) :is(tbody,tfoot)>tr>:is(td,th):not(:last-child){box-shadow:inset -1px 0 0 var(--tbl-line);}
+table:not(.qt-tbl):not(.pb-table):not(.cs-order-table):not(.um-table):not(.hm-cal *) thead>tr>th:not(:last-child){box-shadow:inset -1px 0 0 var(--tbl-line),inset 0 -2px 0 var(--tbl-head-line);}
 /* 이미 그림자(고정 열 표시)를 쓰는 표 두 개는 border 로 */
 .cs-order-table :is(td,th):not(:last-child),.um-table :is(td,th):not(:last-child){border-right:1px solid var(--tbl-line);}
 body{background:var(--bg2);color:var(--tx);min-height:100vh;line-height:1.3;}
@@ -2923,6 +2923,26 @@ html.mob-native .lcr-det-val{font-size:15px;}
 :root{--tbl-head-bg:#D9E4F5;--tbl-head-tx:#1B2A47;}
 :root[data-theme="dark"]{--tbl-head-bg:#2D3548;--tbl-head-tx:#E8EEFA;}
 #page-revenue table.dt thead th{background:var(--tbl-head-bg);color:var(--tbl-head-tx);font-weight:700;}
+/* ── 전화구매건 관리: 세금계산서 발행·업체등록 표(헤더 색·…처리) + 팝업 통일 ── */
+.piv-table:not(.pb-table) thead th{background:var(--tbl-head-bg);color:var(--tbl-head-tx);font-weight:700;}
+.piv-ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* 팝업: 홈 캘린더 팝업(.ct-reg)과 같은 모양 — 둥근 흰 카드·큰 제목·1px 입력칸·둥근 버튼 */
+:is(#pivModal,#pivCoModal,#pivConfirmModal,#pbModal,#pbUploadModal,#pbMissModal,#pbLinkModal){background:rgba(0,0,0,.45);}
+:is(#pivModal,#pivCoModal,#pivConfirmModal,#pbModal,#pbUploadModal,#pbMissModal,#pbLinkModal)>.modal{background:var(--bg);color:var(--tx);border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.28);padding:20px 24px;}
+:root[data-theme="dark"] :is(#pivModal,#pivCoModal,#pivConfirmModal,#pbModal,#pbUploadModal,#pbMissModal,#pbLinkModal)>.modal{box-shadow:0 18px 60px rgba(0,0,0,.6);}
+:is(#pivModal,#pivCoModal,#pivConfirmModal,#pbModal,#pbUploadModal,#pbMissModal,#pbLinkModal)>.modal h3{font-size:17px;font-weight:700;margin-bottom:14px;color:var(--tx);}
+:is(#pivModal,#pivCoModal,#pbModal,#pbLinkModal) .field label{font-size:12.5px;color:var(--tx2);margin-bottom:4px;}
+:is(#pivModal,#pivCoModal,#pbModal,#pbLinkModal) .field input:not([type=checkbox]):not([type=radio]),:is(#pivModal,#pivCoModal,#pbModal,#pbLinkModal) .field select,:is(#pivModal,#pivCoModal,#pbModal,#pbLinkModal) .field textarea{border:1px solid var(--bd);border-radius:9px;padding:8px 10px;font-size:13px;}
+:is(#pivModal,#pivCoModal,#pbModal,#pbLinkModal) .field input:focus,:is(#pivModal,#pivCoModal,#pbModal,#pbLinkModal) .field select:focus,:is(#pivModal,#pivCoModal,#pbModal,#pbLinkModal) .field textarea:focus{border-color:var(--pr);}
+:is(#pivModal,#pivCoModal,#pivConfirmModal,#pbModal,#pbUploadModal,#pbMissModal,#pbLinkModal) .ma{margin-top:16px;gap:8px;}
+:is(#pivModal,#pivCoModal,#pivConfirmModal,#pbModal,#pbUploadModal,#pbMissModal,#pbLinkModal) .ma .btn{border-radius:9px;padding:6px 14px;font-size:12.5px;}
+:is(#pivModal,#pivCoModal,#pivConfirmModal,#pbModal,#pbUploadModal,#pbMissModal,#pbLinkModal) .ma .btn-pr{font-weight:600;}
+:is(#pivModal,#pivCoModal) .ma .btn:disabled{opacity:.45;cursor:default;}
+/* 내용이 길어 스크롤돼도 [수정하기][취소][저장] 버튼은 항상 팝업 아래에 보이게 */
+:is(#pivModal,#pivCoModal) .ma{position:sticky;bottom:-20px;z-index:3;background:var(--bg);padding:12px 0 2px;margin-top:12px;border-top:1px solid var(--bd);}
+/* 보기 모드: 값은 또렷하게 보이되 입력은 막음 */
+:is(#pivModal,#pivCoModal) .piv-view .field input:disabled,:is(#pivModal,#pivCoModal) .piv-view .field select:disabled,:is(#pivModal,#pivCoModal) .piv-view .field textarea:disabled{background:var(--bg2);color:var(--tx);opacity:1;-webkit-text-fill-color:var(--tx);cursor:default;}
+#pivModal .piv-view .piv-items button,#pivModal .piv-view .cs-mini-btn{display:none;}
 /* ── 가로 스크롤 제거: 표 폭을 창(한 화면)에 맞춤 (2026-10-21) ── */
 /* 발주 인사이트: 좌우 여백을 줄이고 상품명 열은 길면 …(마우스를 올리면 전체) */
 #insightTblWrap td,#insightTblWrap th{padding-left:5px;padding-right:5px;}
@@ -4994,11 +5014,12 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>상호 *</label><input type="text" id="pivFCompany" autocomplete="off"></div>
       <div class="field"><label>대표자명</label><input type="text" id="pivFCeo" autocomplete="off"></div>
 
+      <div class="field piv-span3"><label>사업장</label><input type="text" id="pivFAddr" autocomplete="off"></div>
+
       <div class="field"><label>거래구분</label><select id="pivFTrade"></select></div>
       <div class="field"><label>업태</label><input type="text" id="pivFBizType" autocomplete="off"></div>
       <div class="field"><label>종목</label><input type="text" id="pivFBizItem" autocomplete="off"></div>
 
-      <div class="field piv-span3"><label>사업장</label><input type="text" id="pivFAddr" autocomplete="off"></div>
       <div class="field piv-span2"><label>이메일 (@ 기준 아이디 / 도메인)</label>
         <div style="display:flex;gap:6px;align-items:center;">
           <input type="text" id="pivFEmailId" autocomplete="off" placeholder="아이디" oninput="pivEmailIdInput()">
@@ -5034,7 +5055,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field" id="pivDueWrap"><label>입금예정일 *</label><input type="date" id="pivFDueDate"></div>
       <div class="field piv-span2"><label>비고</label><textarea id="pivFNote"></textarea></div>
     </div>
-    <div class="ma"><button class="btn" onclick="closeModal('pivModal')">취소</button>
+    <div class="ma"><button class="btn" id="pivEditBtn" onclick="pivEnterEdit()">수정하기</button>
+      <button class="btn" id="pivCancelBtn" onclick="pivCancelClick()">취소</button>
       <button class="btn btn-pr" id="pivSaveBtn" onclick="pivSave()">저장</button></div>
   </div>
 </div>
@@ -5065,7 +5087,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field piv-span2"><label>이메일</label><input type="text" id="pivCoEmail" autocomplete="off"></div>
     </div>
     <div class="piv-hint" id="pivCoKindHint" style="margin-top:6px;"></div>
-    <div class="ma"><button class="btn" onclick="closeModal('pivCoModal')">취소</button>
+    <div class="ma"><button class="btn" id="pivCoEditBtn" onclick="pivCoEnterEdit()">수정하기</button>
+      <button class="btn" id="pivCoCancelBtn" onclick="pivCoCancelClick()">취소</button>
       <button class="btn btn-pr" id="pivCoSaveBtn" onclick="pivCoSave()">저장</button></div>
   </div>
 </div>
@@ -36418,6 +36441,7 @@ function pivRender(){
     tb.innerHTML = `<tr><td colspan="21" class="cs-empty">${_pivRows.length ? '조건에 맞는 건이 없습니다.' : '등록된 계산서가 없습니다. 우측 상단 “＋ 계산서 등록”으로 추가하세요.'}</td></tr>`;
   } else {
     const clip = (v)=>`<td class="piv-l piv-wrapc piv-wide">${_esc(v||'')}</td>`;
+    const ell = (v,w)=>`<td class="piv-l"><div class="piv-ell" style="max-width:${w}px" title="${_esc(v||'')}">${_esc(v||'')}</div></td>`;   // 한 줄 …처리
     tb.innerHTML = page.map(r=>{
       const m = Number(r.margin)||0;
       const od = _pivOverdueDays(r);
@@ -36433,9 +36457,9 @@ function pivRender(){
         <td>${r.tradeType?`<span class="piv-badge piv-tt-${_esc(r.tradeType)}">${_esc(r.tradeType)}</span>`:''}</td>
         <td class="piv-l piv-wrapc" style="font-weight:600;">${_esc(r.company||'')}</td>
         <td class="piv-wrapc">${_esc(r.ceo||'')}</td>
-        ${clip(r.addr)}
+        ${ell(r.addr,150)}
         <td>${_esc(r.bizType||'')}</td>
-        <td>${_esc(r.bizItem||'')}</td>
+        ${ell(r.bizItem,90)}
         <td class="piv-l piv-wrapc">${_esc(_pivSplitEmail(r.email)[0])}</td>
         <td class="piv-l piv-wrapc">${_esc(_pivSplitEmail(r.email)[1])}</td>
         ${clip(r.item)}
@@ -36446,7 +36470,7 @@ function pivRender(){
         <td>${_esc(r.issueDate||'')}</td>
         <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':(r.issued==='발급취소'?'piv-late':(r.issued==='발행요청'?'piv-req':'piv-wait'))}">${_esc(r.issued||'미발급')}</span></td>
         <td>${paidCell}</td>
-        ${clip(r.note)}
+        ${ell(r.note,110)}
         <td>${canEdit ? `<button class="piv-act piv-del" onclick="event.stopPropagation();pivDelete('${r.id}')">삭제</button>` : ''}</td>
       </tr>`;
     }).join('');
@@ -36643,13 +36667,38 @@ function pivOpenModal(id){
   pivRenderItems();
   document.getElementById('pivCostTotal').textContent = _pivNum(_pivCost())+'원';
   document.getElementById('pivFCostView').value = _pivItems.length ? _pivNum(_pivCost())+'원' : '';
+  _pivSetMode(id ? 'view' : 'edit');   // 실수로 바뀌지 않도록 기존 건은 보기 전용으로 먼저 연다(수정하기를 눌러야 입력 가능)
   openModal('pivModal');
   if(!_pivCoLoaded) pivCoLoad();   // 자동 반영에 쓸 업체등록 목록 확보
-  setTimeout(()=>document.getElementById(id?'pivFCompany':'pivFRegNo')?.focus(), 100);
+  if(!id) setTimeout(()=>document.getElementById('pivFRegNo')?.focus(), 100);
+}
+// 보기/수정 모드 — 보기: 모든 입력칸 잠금, [수정하기][취소(닫기)][저장(비활성)] / 수정: [취소(수정 취소)][저장]
+let _pivMode = 'edit';
+function _pivSetMode(mode){
+  _pivMode = mode;
+  const modal = document.querySelector('#pivModal .modal'); if(!modal) return;
+  modal.classList.toggle('piv-view', mode==='view');
+  const ctrls = modal.querySelectorAll('.piv-grid input, .piv-grid select, .piv-grid textarea');
+  if(mode==='view'){ ctrls.forEach(c=>{ c.disabled = true; }); }
+  else {
+    ctrls.forEach(c=>{ if(c.id!=='pivFCostView') c.disabled = false; });
+    pivApplyLock(); pivIssuedChanged();   // 영수처리·발급여부에 따른 잠금 상태 복원
+  }
+  const eb = document.getElementById('pivEditBtn'), sv = document.getElementById('pivSaveBtn');
+  if(eb) eb.style.display = mode==='view' ? '' : 'none';
+  if(sv) sv.disabled = (mode==='view');
+  const t = document.getElementById('pivModalTitle');
+  if(t) t.textContent = mode==='view' ? '🧾 계산서 상세' : (_pivEditId ? '🧾 계산서 수정' : '🧾 계산서 등록');
+}
+function pivEnterEdit(){ _pivSetMode('edit'); setTimeout(()=>document.getElementById('pivFCompany')?.focus(), 50); }
+function pivCancelClick(){
+  if(_pivMode==='edit' && _pivEditId){ pivOpenModal(_pivEditId); return; }   // 수정 취소 → 저장된 값으로 되돌려 보기 모드
+  closeModal('pivModal');
 }
 function pivConfirmOk(){ closeModal('pivConfirmModal'); pivSave(true); }
 async function pivSave(confirmed){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  if(_pivMode==='view'){ toast('수정하려면 먼저 [수정하기]를 눌러주세요.'); return; }
   const g = _pivGet;
   const rec = {
     reqDate:g('ReqDate'), staff:g('Staff'), regNo:g('RegNo'), tradeType:g('Trade'), company:g('Company'), ceo:g('Ceo'),
@@ -36732,15 +36781,15 @@ function pivCoRender(){
   } else if(!page.length){
     tb.innerHTML = `<tr><td colspan="9" class="cs-empty">${_pivCoRows.length ? '조건에 맞는 업체가 없습니다.' : '등록된 업체가 없습니다. 우측 상단 “＋ 업체 등록”으로 추가하세요.'}</td></tr>`;
   } else {
-    const clip = (v)=>`<td class="piv-l piv-wrapc piv-wide">${_esc(v||'')}</td>`;
+    const ell = (v,w)=>`<td class="piv-l"><div class="piv-ell" style="max-width:${w}px" title="${_esc(v||'')}">${_esc(v||'')}</div></td>`;   // 한 줄 …처리
     tb.innerHTML = page.map(r=>`<tr class="${canEdit?'piv-click':''}" ${canEdit?`onclick="pivCoOpenModal('${r.id}')"`:''}>
       <td><span class="piv-badge piv-type">${_esc(r.kind||'')}</span></td>
       <td>${_esc(r.regNo||'')}</td>
       <td class="piv-l piv-wrapc" style="font-weight:600;">${_esc(r.company||'')}</td>
       <td class="piv-wrapc">${_esc(r.ceo||'')}</td>
-      ${clip(r.addr)}
+      ${ell(r.addr,200)}
       <td>${_esc(r.bizType||'')}</td>
-      <td>${_esc(r.bizItem||'')}</td>
+      ${ell(r.bizItem,110)}
       <td class="piv-l piv-wrapc">${_esc(r.email||'')}</td>
       <td>${canEdit ? `<button class="piv-act piv-del" onclick="event.stopPropagation();pivCoDelete('${r.id}')">삭제</button>` : ''}</td>
     </tr>`).join('');
@@ -36781,11 +36830,40 @@ function pivCoOpenModal(id){
   _pivCoSet('RegNo', r.regNo); _pivCoSet('Company', r.company); _pivCoSet('Ceo', r.ceo); _pivCoSet('Addr', r.addr);
   _pivCoSet('BizType', r.bizType); _pivCoSet('BizItem', r.bizItem); _pivCoSet('Email', r.email);
   pivCoKindChanged();
+  _pivCoSetMode(id ? 'view' : 'edit');
   openModal('pivCoModal');
-  setTimeout(()=>document.getElementById('pivCoRegNo')?.focus(), 100);
+  if(!id) setTimeout(()=>document.getElementById('pivCoRegNo')?.focus(), 100);
 }
+let _pivCoMode = 'edit';
+function _pivCoSetMode(mode){
+  _pivCoMode = mode;
+  const modal = document.querySelector('#pivCoModal .modal'); if(!modal) return;
+  modal.classList.toggle('piv-view', mode==='view');
+  const ctrls = modal.querySelectorAll('.piv-grid2 input, .piv-grid2 select, .piv-grid2 textarea');
+  if(mode==='view'){ ctrls.forEach(c=>{ c.disabled = true; }); }
+  else { ctrls.forEach(c=>{ c.disabled = false; }); pivCoKindChanged(); }   // 종류별 빈칸 고정 복원
+  const eb = document.getElementById('pivCoEditBtn'), sv = document.getElementById('pivCoSaveBtn');
+  if(eb) eb.style.display = mode==='view' ? '' : 'none';
+  if(sv) sv.disabled = (mode==='view');
+  const t = document.getElementById('pivCoModalTitle');
+  if(t) t.textContent = mode==='view' ? '🏢 업체 상세' : (_pivCoEditId ? '🏢 업체 수정' : '🏢 업체 등록');
+}
+function pivCoEnterEdit(){ _pivCoSetMode('edit'); setTimeout(()=>document.getElementById('pivCoCompany')?.focus(), 50); }
+function pivCoCancelClick(){
+  if(_pivCoMode==='edit' && _pivCoEditId){ pivCoOpenModal(_pivCoEditId); return; }
+  closeModal('pivCoModal');
+}
+// ESC: 보기 모드면 닫기, 수정 중이면 수정 취소(보기로) — 입력 중 실수로 사라지지 않게
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape') return;
+  const open = id => document.getElementById(id)?.classList.contains('open');
+  if(open('pivConfirmModal')) return;
+  if(open('pivModal')){ pivCancelClick(); e.stopPropagation(); return; }
+  if(open('pivCoModal')){ pivCoCancelClick(); e.stopPropagation(); return; }
+}, true);
 async function pivCoSave(){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+  if(_pivCoMode==='view'){ toast('수정하려면 먼저 [수정하기]를 눌러주세요.'); return; }
   const g = _pivCoGet;
   const rec = { kind:g('Kind'), regNo:g('RegNo'), company:g('Company'), ceo:g('Ceo'), addr:g('Addr'), bizType:g('BizType'), bizItem:g('BizItem'), email:g('Email') };
   if(!rec.regNo){ toast('등록번호를 입력하세요.'); return; }
