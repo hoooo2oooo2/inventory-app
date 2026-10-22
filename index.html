@@ -1678,6 +1678,22 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .rt-tst{display:inline-block;padding:4px 12px;border-radius:13px;font-size:13px;font-weight:700;white-space:nowrap;}
 .rt-sub{display:block;font-size:11.5px;margin-top:3px;opacity:.78;color:inherit;white-space:nowrap;}
 .rt-refresh{border:none;background:none;cursor:pointer;font-size:13px;padding:0 0 0 4px;color:inherit;}
+#rtEntry td{background:var(--prl);padding:9px 6px;border-bottom:2px solid var(--pr);vertical-align:middle;}
+#rtEntry td.rt-es{color:var(--tx2);font-size:12.5px;}
+.rt-in{width:100%;min-width:64px;box-sizing:border-box;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font-family:inherit;font-size:14px;padding:8px 8px;outline:none;}
+.rt-in:focus{border-color:var(--pr);box-shadow:0 0 0 2px var(--prl);}
+.rt-in.rt-bad{border-color:var(--red-500);}
+#rtEntry td.rt-w-m .rt-in{min-width:84px;} #rtEntry td.rt-w-l .rt-in{min-width:120px;} #rtEntry td.rt-w-xl .rt-in{min-width:160px;}
+.rt-entry-save{border:none;background:var(--pr);color:#fff;border-radius:7px;padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.rt-entry-save:disabled{opacity:.5;cursor:default;}
+.rt-drop{position:fixed;z-index:100002;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);max-height:300px;overflow-y:auto;display:none;}
+.rt-drop-i{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--bd);font-size:13.5px;line-height:1.4;}
+.rt-drop-i:last-child{border-bottom:none;}
+.rt-drop-i.on,.rt-drop-i:hover{background:var(--prl);}
+.rt-drop-i small{display:block;color:var(--tx2);font-size:12px;}
+.rt-drop-e{padding:10px 12px;color:var(--tx2);font-size:13px;}
+@keyframes rtflash{from{background:var(--prl);}to{background:transparent;}}
+.rt-table tbody tr.rt-flash td{animation:rtflash 2.2s ease-out;}
 .rt-hfilter{display:block;margin:5px auto 0;width:92px;font-size:12.5px;font-weight:600;padding:3px 4px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:inherit;cursor:pointer;}
 .rt-hfilter.on{border-color:var(--brand);color:var(--brand);font-weight:800;}
 .rt-view{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;}
@@ -4871,13 +4887,14 @@ html.mob-native .lcr-det-val{font-size:15px;}
         </div>
         <input class="cs-search" id="rtSearch" placeholder="수취인·연락처·주소·상품명·증상 검색" autocomplete="off" oninput="rtSearchChanged()"/>
         <button class="cs-mini-btn" onclick="rtReload()">🔄 새로고침</button>
-        <button class="cs-add-btn" id="rtAddBtn" style="background:var(--emerald-600);" onclick="rtOpenModal()">＋ 수거접수 등록</button>
+        <button class="cs-add-btn" id="rtAddBtn" style="background:var(--emerald-600);" onclick="rtEntryFocus()" title="표 맨 위 입력 줄로 이동">＋ 접수 입력</button>
       </div>
     </div>
     <div class="rt-sumbar" id="rtSumBar"></div>
     <div class="piv-table-scroll">
       <table class="rt-table">
         <thead id="rtHead"></thead>
+        <tbody id="rtEntry" class="rt-entry"></tbody>
         <tbody id="rtBody"></tbody>
       </table>
     </div>
@@ -37902,6 +37919,7 @@ function rtShipInput(el){
 function rtInit(){
   if(!_rtInited){
     _rtInited = true;
+    rtBuildEntry();
     document.getElementById('rtHead').innerHTML = '<tr>'+RT_COLS.map(c=>c.k==='cat'
       ? `<th class="${c.cls}">${c.h}<select class="rt-hfilter" id="rtCatFilter" onchange="rtCatFilterChanged()" title="원하는 구분만 보기"></select></th>`
       : `<th class="${c.cls}">${c.h}</th>`).join('')+'<th style="width:70px;">관리</th></tr>';
@@ -37909,6 +37927,8 @@ function rtInit(){
   }
   rtSwitchTab(_rtTab);
   const add = document.getElementById('rtAddBtn'); if(add) add.style.display = _rtCanEdit() ? '' : 'none';
+  const ent = document.getElementById('rtEntry'); if(ent) ent.style.display = _rtCanEdit() ? '' : 'none';
+  try{ pcEnsureBackdata(); }catch(e){}   // 상품명 검색용 백데이터 미리 로드
   rtReload();   // 메뉴에 들어올 때마다 최신 상태로
 }
 function rtSwitchTab(t){
@@ -38111,7 +38131,7 @@ function rtRender(){
     + `<span class="rt-pill rt-pill-n">${mm} 접수 ${monthRows.length}건</span>`
     + `<span class="rt-pill rt-pill-ok">${mm} 완료 ${monthDone}건</span>`
     + (failN ? `<span class="rt-pill" style="background:var(--red-100);color:var(--red-700);">수거안됨 ${failN}건 · 재수거 필요</span>` : '')
-    + `<span class="rt-hint">미완료 건은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용 확인 · 완료여부 배지를 누르면 완료/미완료 전환(완료는 초록색)</span>`;
+    + `<span class="rt-hint">맨 위 입력 줄: Tab=다음 칸 · Enter=저장하고 다음 줄 · 미완료 건은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용</span>`;
 
   const canEdit = _rtCanEdit();
   const maxP = Math.max(1, Math.ceil(list.length/RT_PAGE_SIZE));
@@ -38133,7 +38153,8 @@ function _rtRowHtml(r, canEdit){
   const trkCell = canEdit
     ? `<div class="rt-trk" data-no="${_esc(r.trackNo||'')}" data-car="${_esc(r.carrier||RT_DEF_CAR)}"><select class="rt-car" onchange="rtTrkDirty(this)">${RT_CARRIERS.map(c=>`<option value="${c[0]}" ${c[0]===(r.carrier||RT_DEF_CAR)?'selected':''}>${c[2]}</option>`).join('')}</select><input class="rt-trk-in" inputmode="numeric" placeholder="반송장번호" value="${_esc(r.trackNo||'')}" oninput="rtTrkDirty(this)" onkeydown="if(event.key==='Enter')rtTrkSave('${r.id}',this)"><button class="rt-trk-save" onclick="rtTrkSave('${r.id}',this)">저장</button></div>`
     : (r.trackNo ? `${_esc(_rtCarName(r.carrier,true))} ${_esc(r.trackNo)}` : '');
-  return `<tr class="rt-click${r.done?' rt-done':''}" onclick="rtOpenView('${r.id}')">
+  const flash = (r.id===_rtFlashId) ? ' rt-flash' : '';
+  return `<tr class="rt-click${r.done?' rt-done':''}${flash}" onclick="rtOpenView('${r.id}')">
     <td class="rt-nw">${cat}</td>
     <td class="rt-nw">${_esc(r.staff||'')}</td>
     <td class="rt-nw">${_esc(r.date||'')}</td>
@@ -38189,6 +38210,151 @@ function rtPickProduct(){
 function rtClearProduct(){
   document.getElementById('rtFProduct').value = '';
   document.getElementById('rtFProductCode').value = '';
+}
+// ───────────────── 엑셀처럼 바로 입력하는 줄 (표 맨 위) ─────────────────
+//  Tab=다음 칸 / Enter=저장하고 같은 자리에 새 빈 줄 / 구분=선택 / 접수자=입력하는 사람 자동 / 상품명=백데이터 검색해서 선택
+//  날짜는 숫자만 쳐도 됨(1022 → 올해 10-22, 20261022, 26.10.22 …). 한글 입력 중 Enter(조합 확정)는 저장으로 보지 않음.
+let _rtEntryBusy = false, _rtFlashId = null, _rtDropIdx = -1, _rtDropList = [], _rtProd = { name:'', code:'' };
+function _rtUserName(){ const u = window.__CURRENT_USER || {}; return u.name || u.username || ''; }
+function rtBuildEntry(){
+  const tb = document.getElementById('rtEntry'); if(!tb) return;
+  const kd = ` onkeydown="rtEntryKey(event,this)"`;
+  const inp = (k, ph, extra)=>`<input class="rt-in" id="rtE_${k}" data-k="${k}" type="text" autocomplete="off" placeholder="${ph||''}"${kd}${extra||''}>`;
+  tb.innerHTML = `<tr>
+    <td class="rt-w-s"><select class="rt-in" id="rtE_cat" data-k="cat"${kd}><option value="">구분</option>${RT_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></td>
+    <td class="rt-es" title="입력하는 사람이 자동으로 접수자가 됩니다"><b id="rtE_staff"></b></td>
+    <td class="rt-w-m">${inp('date','예 1022',' onblur="rtEntryDateBlur(this)"')}</td>
+    <td class="rt-w-m">${inp('buyDate','예 1019',' onblur="rtEntryDateBlur(this)"')}</td>
+    <td class="rt-w-s">${inp('ship','배송비',' inputmode="numeric" oninput="rtShipInput(this)" style="text-align:right;"')}</td>
+    <td class="rt-w-s">${inp('recipient','수취인명 *')}</td>
+    <td class="rt-w-m">${inp('phone','연락처',' onblur="this.value=_rtFmtPhone(this.value)"')}</td>
+    <td class="rt-w-l">${inp('addr','주소')}</td>
+    <td class="rt-w-xl">${inp('product','🔍 상품 검색(코드·이름)',' oninput="rtEntryProdInput(this)" onfocus="rtEntryProdInput(this)" onblur="rtEntryProdBlur(this)"')}</td>
+    <td class="rt-w-s">${inp('qty','수량',' inputmode="numeric"')}</td>
+    <td class="rt-w-l">${inp('symptom','증상')}</td>
+    <td class="rt-w-l">${inp('memo','처리내용')}</td>
+    <td class="rt-w-trk"><div class="rt-trk"><select class="rt-car" id="rtE_carrier" data-k="carrier"${kd}>${RT_CARRIERS.map(c=>`<option value="${c[0]}" ${c[0]===RT_DEF_CAR?'selected':''}>${c[2]}</option>`).join('')}</select>${inp('trackNo','반송장번호',' inputmode="numeric" style="width:122px;min-width:0;"')}</div></td>
+    <td class="rt-es">—</td><td class="rt-es">—</td>
+    <td><button class="rt-entry-save" id="rtE_save" onclick="rtEntrySave()" title="Enter">↵ 저장</button></td>
+  </tr>`;
+  document.getElementById('rtE_staff').textContent = _rtUserName();
+  document.getElementById('rtE_date').value = _pivToday();
+  const d = document.createElement('div'); d.className = 'rt-drop'; d.id = 'rtEntryDrop'; document.body.appendChild(d);
+}
+function rtEntryFocus(){
+  const sc = document.querySelector('#rtTab-pickup .piv-table-scroll'); if(sc) sc.scrollTo({top:0});
+  document.getElementById('rtE_cat')?.focus();
+}
+function _rtParseDate(v){
+  const s = String(v||'').trim(); if(!s) return '';
+  const now = new Date(), Y = now.getFullYear();
+  let y, m, d, a;
+  if((a = s.match(/^(\d{4}|\d{2})\D+(\d{1,2})\D+(\d{1,2})$/))){ y = +a[1]; m = +a[2]; d = +a[3]; if(a[1].length===2) y += 2000; }
+  else if((a = s.match(/^(\d{1,2})\D+(\d{1,2})$/))){ y = Y; m = +a[1]; d = +a[2]; }
+  else if(/^\d+$/.test(s)){
+    if(s.length===8){ y = +s.slice(0,4); m = +s.slice(4,6); d = +s.slice(6,8); }
+    else if(s.length===6){ y = 2000 + +s.slice(0,2); m = +s.slice(2,4); d = +s.slice(4,6); }
+    else if(s.length===4){ y = Y; m = +s.slice(0,2); d = +s.slice(2,4); }
+    else return null;
+  } else return null;
+  const t = new Date(y, m-1, d);
+  if(isNaN(t) || t.getFullYear()!==y || t.getMonth()!==m-1 || t.getDate()!==d) return null;
+  return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function rtEntryDateBlur(el){
+  const r = _rtParseDate(el.value);
+  if(r===null){ el.classList.add('rt-bad'); toast('날짜를 알아볼 수 없습니다. 예) 1022 · 2026-10-22'); el.value = ''; return; }
+  el.classList.remove('rt-bad'); el.value = r;
+}
+// 상품명: 백데이터 검색 드롭다운
+function _rtDrop(){ return document.getElementById('rtEntryDrop'); }
+function _rtDropOpen(){ const d = _rtDrop(); return !!d && d.style.display==='block'; }
+function rtEntryProdInput(el){
+  if(el.value.trim()!==_rtProd.name){ _rtProd = { name:'', code:'' }; }   // 글자를 고치면 선택이 풀림
+  const q = el.value.trim().toLowerCase(), d = _rtDrop(); if(!d) return;
+  if(!q){ d.style.display = 'none'; _rtDropList = []; return; }
+  const loaded = (typeof _bdData!=='undefined') && _bdData.length;
+  if(!loaded){ d.innerHTML = '<div class="rt-drop-e">상품 목록 불러오는 중…</div>'; _rtPlaceDrop(el); try{ pcEnsureBackdata().then(()=>{ if(document.activeElement===el) rtEntryProdInput(el); }); }catch(e){} return; }
+  const toks = q.split(/\s+/).filter(Boolean);
+  _rtDropList = _bdData.filter(r=>{ const hay = [r.code, r.name, ...(r.aliasCodes||[])].join(' ').toLowerCase(); return toks.every(t=>hay.includes(t)); }).slice(0,8);
+  _rtDropIdx = _rtDropList.length ? 0 : -1;
+  d.innerHTML = _rtDropList.length
+    ? _rtDropList.map((r,i)=>`<div class="rt-drop-i${i===0?' on':''}" onmousedown="event.preventDefault();rtEntryPick(${i})">${_esc(r.name||'')}<small>${_esc(r.code||'')}${r.price!=null?' · '+Number(r.price).toLocaleString('ko-KR')+'원':''}</small></div>`).join('')
+    : '<div class="rt-drop-e">일치하는 상품이 없습니다 (백데이터에 있는 상품만 선택할 수 있습니다)</div>';
+  _rtPlaceDrop(el);
+}
+function _rtPlaceDrop(el){
+  const d = _rtDrop(), r = el.getBoundingClientRect();
+  d.style.left = r.left+'px'; d.style.top = (r.bottom+3)+'px'; d.style.width = Math.max(r.width, 360)+'px'; d.style.display = 'block';
+}
+function _rtDropMove(n){
+  if(!_rtDropList.length) return;
+  _rtDropIdx = (_rtDropIdx + n + _rtDropList.length) % _rtDropList.length;
+  [..._rtDrop().children].forEach((c,i)=>c.classList.toggle('on', i===_rtDropIdx));
+  _rtDrop().children[_rtDropIdx]?.scrollIntoView({block:'nearest'});
+}
+function rtEntryPick(i){
+  const r = _rtDropList[i]; if(!r) return;
+  _rtProd = { name: r.name||r.code||'', code: r.code||'' };
+  const el = document.getElementById('rtE_product'); el.value = _rtProd.name; el.classList.remove('rt-bad');
+  _rtDrop().style.display = 'none'; _rtDropList = [];
+  document.getElementById('rtE_qty')?.focus();   // 선택하면 다음 칸(수량)으로
+}
+function rtEntryProdBlur(el){
+  setTimeout(()=>{
+    const d = _rtDrop(); if(d) d.style.display = 'none';
+    if(el.value.trim() && el.value.trim()!==_rtProd.name){ el.value = ''; _rtProd = { name:'', code:'' }; toast('상품명은 검색 목록에서 골라 선택해주세요.'); }
+  }, 150);
+}
+function rtEntryKey(e, el){
+  if(e.isComposing || e.keyCode===229) return;   // 한글 조합 중
+  const k = el.dataset.k;
+  if(k==='product' && _rtDropOpen()){
+    if(e.key==='ArrowDown'){ e.preventDefault(); _rtDropMove(1); return; }
+    if(e.key==='ArrowUp'){ e.preventDefault(); _rtDropMove(-1); return; }
+    if(e.key==='Escape'){ e.preventDefault(); _rtDrop().style.display = 'none'; return; }
+    if((e.key==='Enter' || e.key==='Tab') && _rtDropList.length){ e.preventDefault(); rtEntryPick(_rtDropIdx<0?0:_rtDropIdx); return; }
+  }
+  if(e.key==='Enter'){ e.preventDefault(); rtEntrySave(); }
+}
+async function rtEntrySave(){
+  if(!_rtCanEdit() || _rtEntryBusy) return;
+  const g = k=>(document.getElementById('rtE_'+k)?.value||'').trim();
+  const bad = (k, msg)=>{ const el = document.getElementById('rtE_'+k); el?.classList.add('rt-bad'); toast(msg); el?.focus(); };
+  document.querySelectorAll('#rtEntry .rt-bad').forEach(x=>x.classList.remove('rt-bad'));
+  // 비어 있는 줄(기본값만 있음)에서 Enter 는 아무 일도 하지 않음
+  const filled = ['cat','buyDate','ship','recipient','phone','addr','product','qty','symptom','memo','trackNo'].some(k=>g(k));
+  if(!filled) return;
+  const date = _rtParseDate(g('date'));
+  if(!date){ bad('date','접수일을 입력하세요. 예) 1022'); return; }
+  const buyDate = g('buyDate') ? _rtParseDate(g('buyDate')) : '';
+  if(buyDate===null){ bad('buyDate','구매일을 알아볼 수 없습니다.'); return; }
+  if(!g('recipient')){ bad('recipient','수취인명을 입력하세요.'); return; }
+  const trackNo = g('trackNo').replace(/\D/g,'');
+  if(trackNo && (trackNo.length<9 || trackNo.length>15)){ bad('trackNo','반송장번호는 숫자 9~15자리로 입력하세요.'); return; }
+  const prodTxt = g('product');
+  if(prodTxt && prodTxt!==_rtProd.name){ bad('product','상품명은 검색 목록에서 골라 선택해주세요.'); return; }
+  const carrier = g('carrier') || RT_DEF_CAR, now = new Date().toISOString();
+  const full = { id:_pivNewId('rt'), cat:g('cat'), staff:_rtUserName(), date, buyDate, ship:g('ship').replace(/,/g,''), recipient:g('recipient'),
+    phone:_rtFmtPhone(g('phone')), addr:g('addr'), product:prodTxt, productCode: prodTxt ? _rtProd.code : '', qty:g('qty'), symptom:g('symptom'), memo:g('memo'),
+    done:false, doneAt:'', source:'entry', createdAt:now, updatedAt:now, rev:_pivNewId('v'),
+    trackNo, carrier, trackNoAt: trackNo ? now : '', cancel:false };
+  const btn = document.getElementById('rtE_save');
+  _rtEntryBusy = true; btn.disabled = true; btn.textContent = '저장 중…';
+  const ok = await _rtUpsert([full]);
+  _rtEntryBusy = false; btn.disabled = false; btn.textContent = '↵ 저장';
+  if(!ok){ toast('저장에 실패했습니다. 입력한 내용은 그대로 남아 있으니 다시 Enter 를 눌러주세요.'); return; }
+  // 새 빈 줄: 접수일만 방금 값을 이어받음(같은 날 여러 건 입력용)
+  ['buyDate','ship','recipient','phone','addr','product','qty','symptom','memo','trackNo'].forEach(k=>{ const el = document.getElementById('rtE_'+k); if(el) el.value = ''; });
+  document.getElementById('rtE_cat').value = ''; document.getElementById('rtE_carrier').value = RT_DEF_CAR;
+  _rtProd = { name:'', code:'' }; document.getElementById('rtE_date').value = date;
+  const mEl = document.getElementById('rtMonth'); if(mEl && date.slice(0,7)!==mEl.value) mEl.value = date.slice(0,7);
+  _rtFlashId = full.id;
+  document.getElementById('rtE_cat').focus();
+  await rtReload();
+  toast('✅ 접수되었습니다 — ' + full.recipient);
+  setTimeout(()=>{ _rtFlashId = null; }, 2600);
+  if(trackNo) rtTrackNow(full.id);
 }
 function rtPhoneBlur(){ const el = document.getElementById('rtFPhone'); if(el) el.value = _rtFmtPhone(el.value); }
 function rtOpenModal(id){
