@@ -4980,7 +4980,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 <div class="modal-overlay" id="cpPickModal" style="z-index:330;">
   <div class="modal" style="max-width:720px;">
     <h3>🛒 접수할 제품을 선택해주세요</h3>
-    <div class="piv-hint" style="margin:-6px 0 10px;font-size:12.5px;">한 주문에 여러 제품이 있어 어떤 제품의 반품·교환인지 확인이 필요합니다. 선택한 제품이 상품명으로 등록됩니다.</div>
+    <div class="piv-hint" style="margin:-6px 0 10px;font-size:12.5px;">한 주문에 여러 제품이 있습니다. 해당하는 제품을 모두 체크해주세요(여러 개 가능). 체크한 제품마다 한 줄씩 등록됩니다.</div>
     <div id="cpPickBody"></div>
     <div class="ma"><button class="btn" onclick="cpPickCancel()">취소</button>
       <button class="btn btn-pr" id="cpPickOk" onclick="cpPickOk()" disabled>제품을 모두 선택하세요</button></div>
@@ -39024,7 +39024,7 @@ async function _cpDoInsert(){
   const plan = p.plan || _cpCollectPlan();
   const btn = document.getElementById('cpUpOk'); btn.disabled = true; btn.textContent = '등록 중…';
   const now = new Date().toISOString();
-  const recs = plan.ins.map(r=>{ const x = { ...r, createdAt:now, updatedAt:now, rev:_pivNewId('v') }; delete x.optId; delete x.choices; delete x.suggest; return x; });
+  const recs = plan.ins.flatMap(r=>[r, ...(r.extras||[])]).map(r=>{ const x = { ...r, createdAt:now, updatedAt:now, rev:_pivNewId('v') }; delete x.optId; delete x.choices; delete x.suggest; delete x.extras; return x; });
   if(recs.length){
     const ok = await _cpInsertNew(recs);
     if(!ok){ btn.disabled = false; _cpUpdateOkLabel(); toast('등록에 실패했습니다. 다시 시도해주세요.'); return; }
@@ -39049,41 +39049,51 @@ function cpOpenPick(list){
   document.getElementById('cpPickBody').innerHTML = list.map((r,i)=>`
     <div class="cp-pick">
       <div class="cp-pick-h"><span class="rt-pill" style="${RT_CAT_STYLE[r.type]||''}">${_esc(r.type)}</span> <b>${_esc(r.name||'')}</b>
-        <span class="cp-pick-s">접수번호 ${_esc(r.no)} · 주문번호 ${_esc(r.orderNo)} · 수량 ${_esc(r.qty||'')}</span></div>
+        <span class="cp-pick-s">접수번호 ${_esc(r.no)} · 주문번호 ${_esc(r.orderNo)} · 엑셀 수량 ${_esc(r.qty||'')}</span>
+        <button type="button" class="cs-mini-btn" style="margin-left:auto;" onclick="cpPickAll(${i})">전체 선택</button></div>
       <div class="cp-pick-x">엑셀 상품: ${_esc(r.xProduct||'')}</div>
-      ${r.choices.map((c,j)=>`<label class="cp-pick-o"><input type="radio" name="cpPk${i}" value="${j}" ${r.suggest===j?'checked':''} onchange="cpPickChanged()">
+      ${r.choices.map((c,j)=>`<label class="cp-pick-o"><input type="checkbox" data-i="${i}" data-j="${j}" ${r.suggest===j?'checked':''} onchange="cpPickToggle(this)">
         <span><b>${_esc(c.name||'(상품명 없음)')}</b><small>${_esc(c.code||'')}${c.optNo?' · 상품번호 '+_esc(c.optNo):''} · 주문수량 ${_esc(c.qty==null?'':c.qty)}${c.price!=null?' · 판매가 '+Number(c.price).toLocaleString('ko-KR')+'원':''}</small></span></label>`).join('')}
-      <label class="cp-pick-o"><input type="radio" name="cpPk${i}" value="x" onchange="cpPickChanged()"><span><b>목록에 없음 — 엑셀 상품명 그대로 등록</b></span></label>
-      <label class="cp-pick-o"><input type="radio" name="cpPk${i}" value="all" onchange="cpPickChanged()"><span style="flex:1;min-width:0;"><b>전체 상품에서 검색해서 선택</b>
-        <input class="rt-in" id="cpPkAll${i}" data-k="product" data-next="" data-no-save="1" data-onpick="cpPickChanged" type="text" autocomplete="off" placeholder="🔍 코드·상품명 검색 (백데이터 전체)" style="margin-top:6px;" onclick="event.stopPropagation()" onkeydown="rtEntryKey(event,this)" oninput="cpPickAllInput(${i},this)" onfocus="cpPickAllInput(${i},this)" onblur="rtEntryProdBlur(this);setTimeout(cpPickChanged,250)"></span></label>
+      <label class="cp-pick-o"><input type="checkbox" data-i="${i}" data-x="1" onchange="cpPickToggle(this)"><span><b>목록에 없음 — 엑셀 상품명 그대로 등록</b></span></label>
     </div>`).join('');
   cpPickChanged();
   openModal('cpPickModal');
 }
-// 전체 상품 검색 칸에 글자를 넣으면 그 항목(전체 상품)이 선택된 것으로 보고, 목록에서 실제 상품을 골라야 선택 완료
-function cpPickAllInput(i, el){
-  const rd = document.querySelector(`input[name="cpPk${i}"][value="all"]`); if(rd && el.value.trim()) rd.checked = true;
-  rtEntryProdInput(el); cpPickChanged();
+// 체크박스(여러 개 가능). '목록에 없음'은 다른 항목과 함께 선택할 수 없음
+function cpPickToggle(el){
+  const i = el.dataset.i;
+  if(el.checked){
+    document.querySelectorAll(`#cpPickBody input[data-i="${i}"]`).forEach(x=>{ if(x!==el && (el.dataset.x ? true : !!x.dataset.x)) x.checked = false; });
+  }
+  cpPickChanged();
 }
-function _cpPickOk(i){
-  const c = document.querySelector(`input[name="cpPk${i}"]:checked`); if(!c) return false;
-  if(c.value!=='all') return true;
-  const pe = document.getElementById('cpPkAll'+i); return !!(pe && pe._prod && pe._prod.name);
+function cpPickAll(i){
+  document.querySelectorAll(`#cpPickBody input[data-i="${i}"]`).forEach(x=>{ x.checked = !x.dataset.x; });
+  cpPickChanged();
 }
+function _cpPicksOf(i){ return [...document.querySelectorAll(`#cpPickBody input[data-i="${i}"]:checked`)]; }
 function cpPickChanged(){
-  const n = _cpAskList.filter((r,i)=>_cpPickOk(i)).length, done = n===_cpAskList.length;
+  const n = _cpAskList.filter((r,i)=>_cpPicksOf(i).length>0).length, done = n===_cpAskList.length;
+  const total = _cpAskList.reduce((t,r,i)=>t+(_cpPicksOf(i).length||0),0);
   const b = document.getElementById('cpPickOk');
   b.disabled = !done;
-  b.textContent = done ? `선택 완료 · 등록 진행` : `제품을 모두 선택하세요 (${n}/${_cpAskList.length})`;
+  b.textContent = done ? `선택 완료 · 등록 진행 (${total}줄)` : `제품을 선택하세요 (${n}/${_cpAskList.length})`;
 }
 async function cpPickOk(){
   if(!_cpAskList.length) return;
-  const picks = _cpAskList.map((r,i)=>{ const el = document.querySelector(`input[name="cpPk${i}"]:checked`); return el ? el.value : null; });
-  if(picks.some(v=>v==null) || _cpAskList.some((r,i)=>!_cpPickOk(i))){ toast('제품을 모두 선택해주세요. (전체 상품 검색은 목록에서 상품을 골라야 합니다)'); return; }
+  if(_cpAskList.some((r,i)=>!_cpPicksOf(i).length)){ toast('제품을 하나 이상 체크해주세요.'); return; }
   _cpAskList.forEach((r,i)=>{
-    if(picks[i]==='x'){ r.product = r.xProduct||r.product; r.productCode = ''; }
-    else if(picks[i]==='all'){ const pe = document.getElementById('cpPkAll'+i); r.product = pe._prod.name; r.productCode = pe._prod.code; }
-    else { const c = r.choices[Number(picks[i])]; r.product = c.name; r.productCode = c.code; }
+    const ck = _cpPicksOf(i);
+    r.extras = [];
+    if(ck[0].dataset.x){ r.product = r.xProduct||r.product; r.productCode = ''; }
+    else {
+      const cs = ck.map(x=>r.choices[Number(x.dataset.j)]);
+      r.product = cs[0].name; r.productCode = cs[0].code;
+      if(cs.length>1){   // 여러 제품 → 제품마다 한 줄씩(같은 접수번호), 수량은 통합의 제품별 주문수량
+        if(cs[0].qty!=null) r.qty = String(cs[0].qty);
+        cs.slice(1).forEach((c,k)=>r.extras.push({ ...r, id:r.id+'-'+(k+2), product:c.name, productCode:c.code, qty:c.qty!=null?String(c.qty):r.qty, extras:undefined, choices:undefined, suggest:undefined }));
+      }
+    }
     r.multi = false; delete r.choices; delete r.suggest;
   });
   _cpAskList = [];
