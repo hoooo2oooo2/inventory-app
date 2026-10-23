@@ -1678,12 +1678,12 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .rt-tst{display:inline-block;padding:4px 12px;border-radius:13px;font-size:13px;font-weight:700;white-space:nowrap;}
 .rt-sub{display:block;font-size:11.5px;margin-top:3px;opacity:.78;color:inherit;white-space:nowrap;}
 .rt-refresh{border:none;background:none;cursor:pointer;font-size:13px;padding:0 0 0 4px;color:inherit;}
-#rtEntry td{background:var(--prl);padding:9px 6px;border-bottom:2px solid var(--pr);vertical-align:middle;}
-#rtEntry td.rt-es{color:var(--tx2);font-size:12.5px;}
+#rtEntry td,#cpEntry td{background:var(--prl);padding:9px 6px;border-bottom:2px solid var(--pr);vertical-align:middle;}
+#rtEntry td.rt-es,#cpEntry td.rt-es{color:var(--tx2);font-size:12.5px;}
 .rt-in{width:100%;min-width:64px;box-sizing:border-box;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font-family:inherit;font-size:14px;padding:8px 8px;outline:none;}
 .rt-in:focus{border-color:var(--pr);box-shadow:0 0 0 2px var(--prl);}
 .rt-in.rt-bad{border-color:var(--red-500);}
-#rtEntry td.rt-w-m .rt-in{min-width:84px;} #rtEntry td.rt-w-l .rt-in{min-width:120px;} #rtEntry td.rt-w-xl .rt-in{min-width:160px;}
+#rtEntry td.rt-w-m .rt-in,#cpEntry td.rt-w-m .rt-in{min-width:84px;} #rtEntry td.rt-w-l .rt-in,#cpEntry td.rt-w-l .rt-in{min-width:120px;} #rtEntry td.rt-w-xl .rt-in,#cpEntry td.rt-w-xl .rt-in{min-width:160px;}
 .rt-entry-save{border:none;background:var(--pr);color:#fff;border-radius:7px;padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .rt-entry-save:disabled{opacity:.5;cursor:default;}
 .rt-drop{position:fixed;z-index:100002;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);max-height:300px;overflow-y:auto;display:none;}
@@ -4921,6 +4921,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="piv-table-scroll">
       <table class="rt-table">
         <thead id="cpHead"></thead>
+        <tbody id="cpEntry" class="rt-entry"></tbody>
         <tbody id="cpBody"></tbody>
       </table>
     </div>
@@ -38214,7 +38215,7 @@ function rtClearProduct(){
 // ───────────────── 엑셀처럼 바로 입력하는 줄 (표 맨 위) ─────────────────
 //  Tab=다음 칸 / Enter=저장하고 같은 자리에 새 빈 줄 / 구분=선택 / 접수자=입력하는 사람 자동 / 상품명=백데이터 검색해서 선택
 //  날짜는 숫자만 쳐도 됨(1022 → 올해 10-22, 20261022, 26.10.22 …). 한글 입력 중 Enter(조합 확정)는 저장으로 보지 않음.
-let _rtEntryBusy = false, _rtFlashId = null, _rtDropIdx = -1, _rtDropList = [], _rtProd = { name:'', code:'' };
+let _rtEntryBusy = false, _rtFlashId = null, _rtDropIdx = -1, _rtDropList = [], _rtDropEl = null;   // 선택된 상품은 각 입력칸(el._prod)에 보관
 function _rtUserName(){ const u = window.__CURRENT_USER || {}; return u.name || u.username || ''; }
 function rtBuildEntry(){
   const tb = document.getElementById('rtEntry'); if(!tb) return;
@@ -38229,7 +38230,7 @@ function rtBuildEntry(){
     <td class="rt-w-s">${inp('recipient','수취인명 *')}</td>
     <td class="rt-w-m">${inp('phone','연락처',' onblur="this.value=_rtFmtPhone(this.value)"')}</td>
     <td class="rt-w-l">${inp('addr','주소')}</td>
-    <td class="rt-w-xl">${inp('product','🔍 상품 검색(코드·이름)',' oninput="rtEntryProdInput(this)" onfocus="rtEntryProdInput(this)" onblur="rtEntryProdBlur(this)"')}</td>
+    <td class="rt-w-xl">${inp('product','🔍 상품 검색(코드·이름)',' data-next="rtE_qty" oninput="rtEntryProdInput(this)" onfocus="rtEntryProdInput(this)" onblur="rtEntryProdBlur(this)"')}</td>
     <td class="rt-w-s">${inp('qty','수량',' inputmode="numeric"')}</td>
     <td class="rt-w-l">${inp('symptom','증상')}</td>
     <td class="rt-w-l">${inp('memo','처리내용')}</td>
@@ -38270,7 +38271,8 @@ function rtEntryDateBlur(el){
 function _rtDrop(){ return document.getElementById('rtEntryDrop'); }
 function _rtDropOpen(){ const d = _rtDrop(); return !!d && d.style.display==='block'; }
 function rtEntryProdInput(el){
-  if(el.value.trim()!==_rtProd.name){ _rtProd = { name:'', code:'' }; }   // 글자를 고치면 선택이 풀림
+  _rtDropEl = el; if(!el._prod) el._prod = { name:'', code:'' };
+  if(el.value.trim()!==el._prod.name){ el._prod = { name:'', code:'' }; }   // 글자를 고치면 선택이 풀림
   const q = el.value.trim().toLowerCase(), d = _rtDrop(); if(!d) return;
   if(!q){ d.style.display = 'none'; _rtDropList = []; return; }
   const loaded = (typeof _bdData!=='undefined') && _bdData.length;
@@ -38295,15 +38297,17 @@ function _rtDropMove(n){
 }
 function rtEntryPick(i){
   const r = _rtDropList[i]; if(!r) return;
-  _rtProd = { name: r.name||r.code||'', code: r.code||'' };
-  const el = document.getElementById('rtE_product'); el.value = _rtProd.name; el.classList.remove('rt-bad');
+  const el = _rtDropEl; if(!el) return;
+  el._prod = { name: r.name||r.code||'', code: r.code||'' };
+  el.value = el._prod.name; el.classList.remove('rt-bad');
   _rtDrop().style.display = 'none'; _rtDropList = [];
-  document.getElementById('rtE_qty')?.focus();   // 선택하면 다음 칸(수량)으로
+  document.getElementById(el.dataset.next||'')?.focus();   // 선택하면 다음 칸(수량)으로
 }
 function rtEntryProdBlur(el){
   setTimeout(()=>{
     const d = _rtDrop(); if(d) d.style.display = 'none';
-    if(el.value.trim() && el.value.trim()!==_rtProd.name){ el.value = ''; _rtProd = { name:'', code:'' }; toast('상품명은 검색 목록에서 골라 선택해주세요.'); }
+    const pr = el._prod || { name:'', code:'' };
+    if(el.value.trim() && el.value.trim()!==pr.name){ el.value = ''; el._prod = { name:'', code:'' }; toast('상품명은 검색 목록에서 골라 선택해주세요.'); }
   }, 150);
 }
 function rtEntryKey(e, el){
@@ -38315,7 +38319,7 @@ function rtEntryKey(e, el){
     if(e.key==='Escape'){ e.preventDefault(); _rtDrop().style.display = 'none'; return; }
     if((e.key==='Enter' || e.key==='Tab') && _rtDropList.length){ e.preventDefault(); rtEntryPick(_rtDropIdx<0?0:_rtDropIdx); return; }
   }
-  if(e.key==='Enter'){ e.preventDefault(); rtEntrySave(); }
+  if(e.key==='Enter'){ e.preventDefault(); (el.closest('#cpEntry') ? cpEntrySave : rtEntrySave)(); }
 }
 async function rtEntrySave(){
   if(!_rtCanEdit() || _rtEntryBusy) return;
@@ -38332,11 +38336,11 @@ async function rtEntrySave(){
   if(!g('recipient')){ bad('recipient','수취인명을 입력하세요.'); return; }
   const trackNo = g('trackNo').replace(/\D/g,'');
   if(trackNo && (trackNo.length<9 || trackNo.length>15)){ bad('trackNo','반송장번호는 숫자 9~15자리로 입력하세요.'); return; }
-  const prodTxt = g('product');
-  if(prodTxt && prodTxt!==_rtProd.name){ bad('product','상품명은 검색 목록에서 골라 선택해주세요.'); return; }
+  const prodTxt = g('product'), prodSel = document.getElementById('rtE_product')._prod || { name:'', code:'' };
+  if(prodTxt && prodTxt!==prodSel.name){ bad('product','상품명은 검색 목록에서 골라 선택해주세요.'); return; }
   const carrier = g('carrier') || RT_DEF_CAR, now = new Date().toISOString();
   const full = { id:_pivNewId('rt'), cat:g('cat'), staff:_rtUserName(), date, buyDate, ship:g('ship').replace(/,/g,''), recipient:g('recipient'),
-    phone:_rtFmtPhone(g('phone')), addr:g('addr'), product:prodTxt, productCode: prodTxt ? _rtProd.code : '', qty:g('qty'), symptom:g('symptom'), memo:g('memo'),
+    phone:_rtFmtPhone(g('phone')), addr:g('addr'), product:prodTxt, productCode: prodTxt ? prodSel.code : '', qty:g('qty'), symptom:g('symptom'), memo:g('memo'),
     done:false, doneAt:'', source:'entry', createdAt:now, updatedAt:now, rev:_pivNewId('v'),
     trackNo, carrier, trackNoAt: trackNo ? now : '', cancel:false };
   const btn = document.getElementById('rtE_save');
@@ -38347,7 +38351,7 @@ async function rtEntrySave(){
   // 새 빈 줄: 접수일만 방금 값을 이어받음(같은 날 여러 건 입력용)
   ['buyDate','ship','recipient','phone','addr','product','qty','symptom','memo','trackNo'].forEach(k=>{ const el = document.getElementById('rtE_'+k); if(el) el.value = ''; });
   document.getElementById('rtE_cat').value = ''; document.getElementById('rtE_carrier').value = RT_DEF_CAR;
-  _rtProd = { name:'', code:'' }; document.getElementById('rtE_date').value = date;
+  document.getElementById('rtE_product')._prod = { name:'', code:'' }; document.getElementById('rtE_date').value = date;
   const mEl = document.getElementById('rtMonth'); if(mEl && date.slice(0,7)!==mEl.value) mEl.value = date.slice(0,7);
   _rtFlashId = full.id;
   document.getElementById('rtE_cat').focus();
@@ -38511,6 +38515,7 @@ let _cpInited = false, _cpLoaded = false;
 let _cpOpen = [], _cpMonthRows = [], _cpAll = [];
 let _cpFilter = 'all', _cpTypeFilter = '', _cpPage = 0;
 let _cpEditId = null, _cpEditOrig = null, _cpViewId = null, _cpSaving = false;
+let _cpFlashId = null, _cpEntryBusy = false;
 let _cpPending = null;      // 업로드 대기 {recs, files}
 let _cpStAsk = null;        // 처리여부 변경 확인 대기 {id, to}
 
@@ -38569,6 +38574,7 @@ async function _cpLookupOrders(orderNos){
 function cpInit(){
   if(!_cpInited){
     _cpInited = true;
+    cpBuildEntry();
     document.getElementById('cpHead').innerHTML = '<tr>'+CP_COLS.map(c=>c.k==='type'
       ? `<th class="${c.cls}">${c.h}<select class="rt-hfilter" id="cpTypeFilter" onchange="cpTypeFilterChanged()" title="반품/교환만 보기"></select></th>`
       : `<th class="${c.cls}">${c.h}</th>`).join('')+'<th style="width:70px;">관리</th>';
@@ -38576,6 +38582,8 @@ function cpInit(){
     cpBindDrop();
   }
   const up = document.getElementById('cpUploadBtn'); if(up) up.style.display = _rtCanEdit() ? '' : 'none';
+  const ent = document.getElementById('cpEntry'); if(ent) ent.style.display = _rtCanEdit() ? '' : 'none';
+  try{ pcEnsureBackdata(); }catch(e){}   // 상품명 검색용 백데이터 미리 로드
   cpReload();
 }
 async function cpReload(){
@@ -38632,7 +38640,7 @@ function cpRender(){
   document.getElementById('cpSumBar').innerHTML =
     `<span class="rt-pill rt-pill-wait">미처리 ${openN}건</span>`
     + `<span class="rt-pill rt-pill-n">${mm} 반품 ${nRet}건</span><span class="rt-pill rt-pill-n">${mm} 교환 ${nEx}건</span>`
-    + `<span class="rt-hint">미처리(접수완료·입고) 건은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용 확인 · 처리여부는 목록에서 바로 변경(확인 팝업)</span>`;
+    + `<span class="rt-hint">맨 위 입력 줄: Tab=다음 칸 · Enter=저장하고 다음 줄 (엑셀 업로드도 가능) · 미처리 건은 월과 관계없이 항상 표시 · 처리여부는 목록에서 바로 변경</span>`;
 
   const canEdit = _rtCanEdit();
   const maxP = Math.max(1, Math.ceil(list.length/CP_PAGE_SIZE));
@@ -38651,7 +38659,7 @@ function _cpRowHtml(r, canEdit){
     ? `<select class="cp-stsel" style="${CP_ST_STYLE[r.status]||''}" onclick="event.stopPropagation()" onchange="cpStatusAsk('${r.id}',this)">${_cpOpts(r.type).map(s=>`<option value="${s}" ${s===r.status?'selected':''}>${s}</option>`).join('')}</select>`
     : `<span class="rt-tst" style="${CP_ST_STYLE[r.status]||''}">${_esc(r.status||'')}</span>`;
   const warn = r.matched===false ? '<span title="매출관리 통합에서 주문번호를 찾지 못해 엑셀 값을 사용했습니다" style="cursor:help;">⚠ </span>' : '';
-  return `<tr class="rt-click${r.status==='처리완료'?' rt-done':''}${r.status==='교환철회'?' cp-wd':''}" onclick="cpOpenView('${r.id}')">
+  return `<tr class="rt-click${r.status==='처리완료'?' rt-done':''}${r.status==='교환철회'?' cp-wd':''}${r.id===_cpFlashId?' rt-flash':''}" onclick="cpOpenView('${r.id}')">
     <td class="rt-nw">${_esc(r.date||'')}</td>
     <td class="rt-nw">${type}</td>
     <td class="rt-nw"><b>${_esc(r.name||'')}</b></td>
@@ -38769,6 +38777,61 @@ function cpOpenUpload(){
   const b = document.getElementById('cpUpOk'); b.disabled = true; b.textContent = '등록';
   openModal('cpUploadModal');
 }
+// ───────────────── 수기 입력 줄 (엑셀 업로드 외에 직접 타이핑으로 등록) ─────────────────
+//  수거접수 입력 줄과 같은 방식: Tab=다음 칸 / Enter=저장하고 새 빈 줄 / 날짜는 숫자만 / 상품명은 백데이터 검색 선택
+//  수기 건은 쿠팡 접수번호가 없으므로 id 를 새로 만들어 저장(엑셀 업로드 건과 접수번호 중복 판정에는 영향 없음)
+function cpBuildEntry(){
+  const tb = document.getElementById('cpEntry'); if(!tb) return;
+  const kd = ` onkeydown="rtEntryKey(event,this)"`;
+  const inp = (k, ph, extra)=>`<input class="rt-in" id="cpE_${k}" data-k="${k}" type="text" autocomplete="off" placeholder="${ph||''}"${kd}${extra||''}>`;
+  const sel = (k, opts, ph, def)=>`<select class="rt-in" id="cpE_${k}" data-k="${k}"${kd}>${ph?`<option value="">${ph}</option>`:''}${opts.map(o=>`<option value="${o}" ${o===def?'selected':''}>${o}</option>`).join('')}</select>`;
+  tb.innerHTML = `<tr>
+    <td class="rt-w-m">${inp('date','예 1022',' onblur="rtEntryDateBlur(this)"')}</td>
+    <td class="rt-w-s">${sel('type',['반품','교환'],'구분')}</td>
+    <td class="rt-w-s">${inp('name','고객명 *')}</td>
+    <td class="rt-w-m">${inp('phone','연락처',' onblur="this.value=_rtFmtPhone(this.value)"')}</td>
+    <td class="rt-w-l">${inp('addr','주소')}</td>
+    <td class="rt-w-xl">${inp('product','🔍 상품 검색(코드·이름)',' data-next="cpE_qty" oninput="rtEntryProdInput(this)" onfocus="rtEntryProdInput(this)" onblur="rtEntryProdBlur(this)"')}</td>
+    <td class="rt-w-s">${inp('qty','수량',' inputmode="numeric"')}</td>
+    <td class="rt-w-s">${sel('shipBy',['판매자','고객'],'배송비 주체')}</td>
+    <td class="rt-w-m">${sel('status',CP_STATUS,'','접수완료')}</td>
+    <td class="rt-w-l">${inp('note','비고')}</td>
+    <td><button class="rt-entry-save" id="cpE_save" onclick="cpEntrySave()" title="Enter">↵ 저장</button></td>
+  </tr>`;
+  document.getElementById('cpE_date').value = _pivToday();
+  if(!document.getElementById('rtEntryDrop')){ const d = document.createElement('div'); d.className = 'rt-drop'; d.id = 'rtEntryDrop'; document.body.appendChild(d); }
+}
+async function cpEntrySave(){
+  if(!_rtCanEdit() || _cpEntryBusy) return;
+  const g = k=>(document.getElementById('cpE_'+k)?.value||'').trim();
+  const bad = (k, msg)=>{ const el = document.getElementById('cpE_'+k); el?.classList.add('rt-bad'); toast(msg); el?.focus(); };
+  document.querySelectorAll('#cpEntry .rt-bad').forEach(x=>x.classList.remove('rt-bad'));
+  if(!['type','name','phone','addr','product','qty','shipBy','note'].some(k=>g(k))) return;   // 빈 줄에서 Enter 는 무시
+  const date = _rtParseDate(g('date'));
+  if(!date){ bad('date','접수날짜를 입력하세요. 예) 1022'); return; }
+  if(!g('type')){ bad('type','구분(반품/교환)을 선택하세요.'); return; }
+  if(!g('name')){ bad('name','고객명을 입력하세요.'); return; }
+  const pel = document.getElementById('cpE_product'), prodTxt = g('product'), prodSel = pel._prod || { name:'', code:'' };
+  if(prodTxt && prodTxt!==prodSel.name){ bad('product','상품명은 검색 목록에서 골라 선택해주세요.'); return; }
+  const now = new Date().toISOString(), u = window.__CURRENT_USER || {};
+  const full = { id:_pivNewId('cpm'), no:'', type:g('type'), date, name:g('name'), phone:_rtFmtPhone(g('phone')), addr:g('addr'), product:prodTxt,
+    productCode: prodTxt ? prodSel.code : '', qty:g('qty'), shipBy:g('shipBy'), status:g('status')||'접수완료', note:g('note'), orderNo:'', reason:'', channel:'수기 입력',
+    matched:true, source:'entry', createdBy:u.name||u.username||'', createdAt:now, updatedAt:now, rev:_pivNewId('v') };
+  const btn = document.getElementById('cpE_save');
+  _cpEntryBusy = true; btn.disabled = true; btn.textContent = '저장 중…';
+  const ok = await _cpInsertNew([full]);
+  _cpEntryBusy = false; btn.disabled = false; btn.textContent = '↵ 저장';
+  if(!ok){ toast('저장에 실패했습니다. 입력한 내용은 그대로 남아 있으니 다시 Enter 를 눌러주세요.'); return; }
+  ['type','name','phone','addr','product','qty','shipBy','note'].forEach(k=>{ const el = document.getElementById('cpE_'+k); if(el) el.value = ''; });
+  document.getElementById('cpE_status').value = '접수완료'; pel._prod = { name:'', code:'' }; document.getElementById('cpE_date').value = date;
+  const mEl = document.getElementById('cpMonth'); if(mEl && date.slice(0,7)!==mEl.value) mEl.value = date.slice(0,7);
+  _cpFlashId = full.id;
+  document.getElementById('cpE_type').focus();
+  await cpReload();
+  toast('✅ 접수되었습니다 — ' + full.name);
+  setTimeout(()=>{ _cpFlashId = null; }, 2600);
+}
+
 // 엑셀 한 파일 → {type, fileName, rows:[레코드 초안], withdrawn:n, skippedNoNo:n} | {error}
 function _cpParseFile(buf, fileName){
   let wb; try{ wb = XLSX.read(buf, {type:'array'}); }catch(e){ return { fileName, error:'엑셀 파일을 읽지 못했습니다.' }; }
