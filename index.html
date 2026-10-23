@@ -38550,6 +38550,20 @@ async function _cpExistingIds(ids){
   }
   return found;
 }
+// 수기 건에 접수번호를 연결(합치기)해 둔 건까지 포함해, 이미 있는 (구분|접수번호) 집합 — 실패 시 null
+async function _cpExistingByNo(nos){
+  const found = new Set(); const list = [...new Set(nos.filter(Boolean))];
+  for(let i=0;i<list.length;i+=100){
+    const {data,error} = await sb.from('work_calendar').select('data').eq('person','__app__').like('kind','cp\\_%').in('data->>no', list.slice(i,i+100));
+    if(error){ console.warn('cpExistingByNo 오류', error.message); return null; }
+    (data||[]).forEach(r=>{ if(r.data) found.add(String(r.data.type)+'|'+String(r.data.no)); });
+  }
+  return found;
+}
+// 아직 접수번호가 없는 수기 입력 건 중 날짜 범위 안의 것 — 엑셀 업로드 때 같은 건인지 비교용(읽기 전용). 실패 시 null
+function _cpManualCandidates(lo, hi){
+  return _rtFetch(q=>q.eq('data->>source','entry').eq('data->>no','').gte('data->>date', lo).lte('data->>date', hi), 'cp');
+}
 // 신규 건 저장: 같은 접수번호가 이미 있으면 건드리지 않는다(ON CONFLICT DO NOTHING) — 동시에 두 명이 올려도 중복·덮어쓰기 없음
 async function _cpInsertNew(recs){
   const now = new Date().toISOString();
@@ -38920,14 +38934,18 @@ async function cpPickFiles(fileList){
   parsed.forEach(p=>{ if(p.error) return; p.dupInFile = 0; p.rows = p.rows.filter(r=>{ if(seen.has(r.id)){ p.dupInFile++; return false; } seen.add(r.id); return true; }); p.rows.forEach(r=>cand.push(r)); });
   const existing = await _cpExistingIds(cand.map(r=>r.id));
   if(existing===null){ box.innerHTML = '<div class="piv-hint" style="color:#DC2626;">기존 등록 건을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.</div>'; return; }
-  const fresh = cand.filter(r=>!existing.has(r.id));
-  parsed.forEach(p=>{ if(!p.error){ p.dup = p.rows.filter(r=>existing.has(r.id)).length; p.fresh = p.rows.filter(r=>!existing.has(r.id)); } });
+  const byNo = await _cpExistingByNo(cand.map(r=>r.no));   // 수기 건에 합쳐서 접수번호가 연결된 건도 '이미 등록됨'으로
+  if(byNo===null){ box.innerHTML = '<div class="piv-hint" style="color:#DC2626;">기존 등록 건을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.</div>'; return; }
+  const isDup = r=>existing.has(r.id) || byNo.has(r.type+'|'+r.no);
+  const fresh = cand.filter(r=>!isDup(r));
+  parsed.forEach(p=>{ if(!p.error){ p.dup = p.rows.filter(isDup).length; p.fresh = p.rows.filter(r=>!isDup(r)); } });
   let rev = [];
   if(fresh.length){
     rev = await _cpLookupOrders([...new Set(fresh.map(r=>r.orderNo).filter(Boolean))]);
     if(rev===null){ rev = []; toast('매출관리 통합 조회에 실패해 엑셀의 주소·상품명을 사용합니다.'); }
   }
   _cpApplyOrders(fresh, rev);
+  const suspects = await _cpFindManualSuspects(fresh);   // 수기로 먼저 등록된 같은 건 의심
   const unmatched = fresh.filter(r=>!r.matched);
   const asks = fresh.filter(r=>r.choices && r.choices.length>1);
   box.innerHTML = parsed.map(p=> p.error
@@ -38938,29 +38956,83 @@ async function cpPickFiles(fileList){
         </div>`).join('')
     + (fresh.length ? `<div style="font-size:13px;color:var(--tx);margin-top:4px;">매출관리 통합 매칭: <b>${fresh.length-unmatched.length}</b>건 성공${unmatched.length?` · <span style="color:#B45309;">${unmatched.length}건 미매칭 → 엑셀의 주소·상품명으로 등록(⚠ 표시)</span>`:''}</div>` : '')
     + (unmatched.length ? `<div class="piv-hint" style="margin-top:4px;">미매칭 주문번호: ${_esc(unmatched.slice(0,8).map(r=>r.orderNo||'(없음)').join(', '))}${unmatched.length>8?' …':''}</div>` : '');
+  if(suspects.length){
+    box.innerHTML += `<div style="margin-top:10px;padding:10px 12px;border:1px solid #F59E0B;border-radius:10px;background:var(--bg2);">
+      <div style="font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:6px;">⚠ 수기로 먼저 등록된 건과 같은 것으로 보이는 ${suspects.length}건 <span style="font-weight:400;color:var(--tx2);font-size:12px;">(구분·고객명이 같고 접수날짜가 3일 이내)</span></div>
+      ${suspects.map((x,i)=>`<div style="padding:8px 0;border-top:1px solid var(--bd);font-size:13px;line-height:1.55;color:var(--tx);">
+        <div><span class="rt-pill" style="${RT_CAT_STYLE[x.row.type]||''}">${_esc(x.row.type)}</span> <b>${_esc(x.row.name)}</b></div>
+        <div style="color:var(--tx2);">엑셀: ${_esc(x.row.date)} · ${_esc(x.row.product||'')} · ${_esc(x.row.qty||'')}개 (접수번호 ${_esc(x.row.no)})</div>
+        <div style="color:var(--tx2);">수기: ${_esc(x.manual.date||'')} · ${_esc(x.manual.product||'(상품 없음)')} · ${_esc(x.manual.qty||'')}개</div>
+        <label style="margin-right:14px;cursor:pointer;"><input type="radio" name="cpSus${i}" value="merge" checked onchange="cpSusChanged()"> 같은 건 → 수기 건에 접수번호만 연결(새로 만들지 않음)</label>
+        <label style="cursor:pointer;"><input type="radio" name="cpSus${i}" value="new" onchange="cpSusChanged()"> 다른 건 → 새로 등록</label>
+      </div>`).join('')}</div>`;
+  }
   if(asks.length) box.innerHTML += `<div style="font-size:13px;color:var(--tx);margin-top:6px;">🛒 한 주문에 여러 제품이 있는 <b>${asks.length}건</b>은 등록할 때 접수할 제품을 고르는 창이 열립니다.</div>`;
-  if(fresh.length){ _cpPending = { recs:fresh }; okBtn.disabled = false; okBtn.textContent = `${fresh.length}건 등록`; }
+  if(fresh.length){ _cpPending = { recs:fresh, suspects }; okBtn.disabled = false; _cpUpdateOkLabel(); }
   else { okBtn.textContent = '등록'; if(!parsed.some(p=>p.error)) box.innerHTML += '<div class="piv-hint" style="margin-top:6px;">새로 등록할 건이 없습니다.</div>'; }
 }
+// 수기 중복 의심 건 찾기: 구분·고객명이 같고 접수날짜 차이 3일 이내 — 수기 건 1개는 엑셀 1건에만 연결(날짜가 가까운 쪽 우선)
+async function _cpFindManualSuspects(fresh){
+  if(!fresh.length) return [];
+  const dates = fresh.map(r=>r.date).filter(Boolean).sort(); if(!dates.length) return [];
+  const shift = (d,n)=>{ const t = new Date(d+'T00:00:00'); t.setDate(t.getDate()+n); return t.getFullYear()+'-'+_cpPad(t.getMonth()+1)+'-'+_cpPad(t.getDate()); };
+  const cands = await _cpManualCandidates(shift(dates[0],-3), shift(dates[dates.length-1],3));
+  if(!cands || !cands.length) return [];
+  const DAY = 86400000, used = new Set(), out = [];
+  fresh.forEach(r=>{
+    const best = cands.filter(m=>!used.has(m.id) && m.type===r.type && _cpNorm(m.name)===_cpNorm(r.name) && Math.abs(Date.parse(m.date)-Date.parse(r.date))<=3*DAY)
+      .sort((x,y)=>Math.abs(Date.parse(x.date)-Date.parse(r.date))-Math.abs(Date.parse(y.date)-Date.parse(r.date)))[0];
+    if(best){ used.add(best.id); out.push({ row:r, manual:best }); }
+  });
+  return out;
+}
+// 라디오 선택을 읽어 {merge:[수기 건에 합칠 것], ins:[새로 등록할 것]} 로 정리
+function _cpCollectPlan(){
+  const p = _cpPending, merge = [], skip = new Set();
+  ((p && p.suspects) || []).forEach((x,i)=>{
+    const v = document.querySelector(`input[name="cpSus${i}"]:checked`);
+    if(!v || v.value==='merge'){ merge.push(x); skip.add(x.row.id); }
+  });
+  return { merge, ins:(p?p.recs:[]).filter(r=>!skip.has(r.id)) };
+}
+function _cpUpdateOkLabel(){
+  const b = document.getElementById('cpUpOk'); if(!b || !_cpPending) return;
+  const pl = _cpCollectPlan();
+  b.textContent = (pl.ins.length ? `${pl.ins.length}건 등록` : '등록') + (pl.merge.length ? `${pl.ins.length?' + ':''}${pl.merge.length}건 수기 건에 연결` : '');
+  b.disabled = !(pl.ins.length || pl.merge.length);
+}
+function cpSusChanged(){ _cpUpdateOkLabel(); }
 async function cpConfirmUpload(){
   if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   const p = _cpPending; if(!p || !p.recs.length) return;
   if(document.getElementById('cpUpOk').disabled) return;
-  const asks = p.recs.filter(r=>r.choices && r.choices.length>1);
+  p.plan = _cpCollectPlan();
+  const asks = p.plan.ins.filter(r=>r.choices && r.choices.length>1);
   if(asks.length){ cpOpenPick(asks); return; }   // 여러 제품이 섞인 주문 → 먼저 제품 선택
   await _cpDoInsert();
 }
 async function _cpDoInsert(){
-  const p = _cpPending; if(!p || !p.recs.length) return;
+  const p = _cpPending; if(!p) return;
+  const plan = p.plan || _cpCollectPlan();
   const btn = document.getElementById('cpUpOk'); btn.disabled = true; btn.textContent = '등록 중…';
   const now = new Date().toISOString();
-  const recs = p.recs.map(r=>{ const x = { ...r, createdAt:now, updatedAt:now, rev:_pivNewId('v') }; delete x.optId; delete x.choices; delete x.suggest; return x; });
-  const ok = await _cpInsertNew(recs);
-  if(!ok){ btn.disabled = false; btn.textContent = `${recs.length}건 등록`; toast('등록에 실패했습니다. 다시 시도해주세요.'); return; }
+  const recs = plan.ins.map(r=>{ const x = { ...r, createdAt:now, updatedAt:now, rev:_pivNewId('v') }; delete x.optId; delete x.choices; delete x.suggest; return x; });
+  if(recs.length){
+    const ok = await _cpInsertNew(recs);
+    if(!ok){ btn.disabled = false; _cpUpdateOkLabel(); toast('등록에 실패했습니다. 다시 시도해주세요.'); return; }
+  }
+  // 수기 건에 합치기: 수기 건의 입력값은 그대로 두고 접수번호·주문번호·사유만 연결(빈 칸만 엑셀 값으로 채움) — 서버 최신본 위에 병합
+  let merged = 0, mergeFail = 0;
+  for(const x of plan.merge){
+    const r = x.row;
+    const res = await _rtMutate(x.manual.id, (b)=>({ ...b, no:r.no, orderNo:r.orderNo, reason:r.reason||b.reason||'', channel:r.channel||b.channel||'', linkedExcel:true, matched:r.matched,
+      addr:b.addr||r.addr, product:b.product||r.product, productCode:b.product ? (b.productCode||'') : (r.productCode||''), qty:b.qty||r.qty, shipBy:b.shipBy||r.shipBy, phone:b.phone||r.phone, xAddr:r.xAddr, xProduct:r.xProduct }), 'cp');
+    if(res.ok) merged++; else mergeFail++;
+  }
   _cpPending = null;
   closeModal('cpUploadModal');
   await cpReload();
-  toast(`${recs.length}건 등록되었습니다.`);
+  toast(`${recs.length}건 등록${merged?` · ${merged}건 수기 건에 연결`:''}${mergeFail?` · ⚠ ${mergeFail}건 연결 실패(수기 건이 삭제됐거나 동시 수정 중)`:''}`);
 }
 // 여러 제품이 있는 주문: 접수할 제품을 고르는 팝업
 let _cpAskList = [];
@@ -38982,7 +39054,7 @@ function cpPickChanged(){
   const done = _cpAskList.every((r,i)=>document.querySelector(`input[name="cpPk${i}"]:checked`));
   const b = document.getElementById('cpPickOk');
   b.disabled = !done;
-  b.textContent = done ? `선택 완료 · ${(_cpPending&&_cpPending.recs.length)||0}건 등록` : `제품을 모두 선택하세요 (${_cpAskList.filter((r,i)=>document.querySelector(`input[name="cpPk${i}"]:checked`)).length}/${_cpAskList.length})`;
+  b.textContent = done ? `선택 완료 · 등록 진행` : `제품을 모두 선택하세요 (${_cpAskList.filter((r,i)=>document.querySelector(`input[name="cpPk${i}"]:checked`)).length}/${_cpAskList.length})`;
 }
 async function cpPickOk(){
   if(!_cpAskList.length) return;
