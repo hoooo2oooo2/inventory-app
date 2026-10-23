@@ -4969,6 +4969,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <small>두 파일을 함께 올려도 됩니다 · 구분(반품/교환)은 파일 내용으로 자동 판별 · 이미 등록된 접수번호와 교환 철회 건은 제외됩니다 · .xlsx / .xls</small>
     </div>
     <input type="file" id="cpFileInput" accept=".xlsx,.xls" multiple style="display:none;" onchange="cpPickFiles(this.files); this.value='';">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;color:var(--tx);cursor:pointer;"><input type="checkbox" id="cpSkipDone" checked onchange="cpRescan()"> 이미 완료된 건(반품완료·교환완료)은 가져오지 않기 <span style="color:var(--tx2);font-size:12px;">— 쿠팡 엑셀에는 최근 처리 끝난 건도 같이 들어 있습니다</span></label>
     <div id="cpUpResult" style="margin-top:12px;"></div>
     <div class="ma"><button class="btn" onclick="closeModal('cpUploadModal')">닫기</button>
       <button class="btn btn-pr" id="cpUpOk" onclick="cpConfirmUpload()" disabled>등록</button></div>
@@ -38301,7 +38302,8 @@ function rtEntryPick(i){
   el._prod = { name: r.name||r.code||'', code: r.code||'' };
   el.value = el._prod.name; el.classList.remove('rt-bad');
   _rtDrop().style.display = 'none'; _rtDropList = [];
-  document.getElementById(el.dataset.next||'')?.focus();   // 선택하면 다음 칸(수량)으로
+  if(el.dataset.next) document.getElementById(el.dataset.next)?.focus();   // 선택하면 다음 칸(수량)으로
+  if(el.dataset.onpick && typeof window[el.dataset.onpick]==='function') window[el.dataset.onpick](el);
 }
 function rtEntryProdBlur(el){
   setTimeout(()=>{
@@ -38313,6 +38315,7 @@ function rtEntryProdBlur(el){
 function rtEntryKey(e, el){
   if(e.isComposing || e.keyCode===229) return;   // 한글 조합 중
   const k = el.dataset.k;
+  if(el.dataset.noSave && !(k==='product' && _rtDropOpen())) return;   // 팝업 안 검색칸: 목록이 닫혀 있으면 Enter 로 저장하지 않음
   if(k==='product' && _rtDropOpen()){
     if(e.key==='ArrowDown'){ e.preventDefault(); _rtDropMove(1); return; }
     if(e.key==='ArrowUp'){ e.preventDefault(); _rtDropMove(-1); return; }
@@ -38516,6 +38519,7 @@ let _cpOpen = [], _cpMonthRows = [], _cpAll = [];
 let _cpFilter = 'all', _cpTypeFilter = '', _cpPage = 0;
 let _cpEditId = null, _cpEditOrig = null, _cpViewId = null, _cpSaving = false;
 let _cpFlashId = null, _cpEntryBusy = false;
+let _cpLastFiles = [];
 let _cpPending = null;      // 업로드 대기 {recs, files}
 let _cpStAsk = null;        // 처리여부 변경 확인 대기 {id, to}
 
@@ -38784,9 +38788,10 @@ function cpBindDrop(){
   ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); dz.style.background=''; }));
   dz.addEventListener('drop', e=>{ const f=e.dataTransfer && e.dataTransfer.files; if(f && f.length) cpPickFiles(f); });
 }
+function cpRescan(){ if(_cpLastFiles.length) cpPickFiles(_cpLastFiles); }
 function cpOpenUpload(){
   if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
-  _cpPending = null;
+  _cpPending = null; _cpLastFiles = [];
   document.getElementById('cpUpResult').innerHTML = '';
   const b = document.getElementById('cpUpOk'); b.disabled = true; b.textContent = '등록';
   openModal('cpUploadModal');
@@ -38925,10 +38930,13 @@ async function cpPickFiles(fileList){
   const files = [...fileList].filter(f=>/\.xlsx?$/i.test(f.name));
   const box = document.getElementById('cpUpResult'), okBtn = document.getElementById('cpUpOk');
   if(!files.length){ box.innerHTML = '<div class="piv-hint" style="color:#DC2626;">엑셀(.xlsx / .xls) 파일을 선택하세요.</div>'; return; }
-  okBtn.disabled = true; _cpPending = null;
+  okBtn.disabled = true; _cpPending = null; _cpLastFiles = files;
   box.innerHTML = '<div class="piv-hint">⏳ 파일 분석 중…</div>';
   const parsed = [];
   for(const f of files){ parsed.push(_cpParseFile(await f.arrayBuffer(), f.name)); }
+  if(document.getElementById('cpSkipDone')?.checked){   // 이미 처리 끝난 건(반품완료·교환완료)은 새 일거리가 아니므로 기본 제외
+    parsed.forEach(p=>{ if(p.error) return; const n0 = p.rows.length; p.rows = p.rows.filter(r=>r.status!=='처리완료'); p.doneSkipped = n0 - p.rows.length; });
+  }
   // 같은 접수번호가 이번 업로드 안에서 겹치면 한 번만
   const seen = new Set(), cand = [];
   parsed.forEach(p=>{ if(p.error) return; p.dupInFile = 0; p.rows = p.rows.filter(r=>{ if(seen.has(r.id)){ p.dupInFile++; return false; } seen.add(r.id); return true; }); p.rows.forEach(r=>cand.push(r)); });
@@ -38952,7 +38960,7 @@ async function cpPickFiles(fileList){
       ? `<div style="padding:9px 12px;border:1px solid #FCA5A5;border-radius:9px;margin-bottom:8px;font-size:13px;color:#DC2626;">❌ ${_esc(p.fileName)} — ${_esc(p.error)}</div>`
       : `<div style="padding:10px 12px;border:1px solid var(--bd);border-radius:9px;margin-bottom:8px;font-size:13px;line-height:1.7;color:var(--tx);">
           <b>${_esc(p.fileName)}</b> <span class="rt-pill" style="${RT_CAT_STYLE[p.type]}">${p.type}</span><br>
-          신규 <b>${p.fresh.length}</b>건${p.dup?` · 이미 등록됨 ${p.dup}건 제외`:''}${p.withdrawn?` · 교환 철회/불가 ${p.withdrawn}건 제외`:''}${p.dupInFile?` · 파일 내 중복 ${p.dupInFile}건 제외`:''}${p.skippedNoNo?` · 접수번호 없음 ${p.skippedNoNo}건 제외`:''}
+          신규 <b>${p.fresh.length}</b>건${p.dup?` · 이미 등록됨 ${p.dup}건 제외`:''}${p.withdrawn?` · 교환 철회/불가 ${p.withdrawn}건 제외`:''}${p.doneSkipped?` · 이미 완료된 ${p.doneSkipped}건 제외`:''}${p.dupInFile?` · 파일 내 중복 ${p.dupInFile}건 제외`:''}${p.skippedNoNo?` · 접수번호 없음 ${p.skippedNoNo}건 제외`:''}
         </div>`).join('')
     + (fresh.length ? `<div style="font-size:13px;color:var(--tx);margin-top:4px;">매출관리 통합 매칭: <b>${fresh.length-unmatched.length}</b>건 성공${unmatched.length?` · <span style="color:#B45309;">${unmatched.length}건 미매칭 → 엑셀의 주소·상품명으로 등록(⚠ 표시)</span>`:''}</div>` : '')
     + (unmatched.length ? `<div class="piv-hint" style="margin-top:4px;">미매칭 주문번호: ${_esc(unmatched.slice(0,8).map(r=>r.orderNo||'(없음)').join(', '))}${unmatched.length>8?' …':''}</div>` : '');
@@ -39046,22 +39054,35 @@ function cpOpenPick(list){
       ${r.choices.map((c,j)=>`<label class="cp-pick-o"><input type="radio" name="cpPk${i}" value="${j}" ${r.suggest===j?'checked':''} onchange="cpPickChanged()">
         <span><b>${_esc(c.name||'(상품명 없음)')}</b><small>${_esc(c.code||'')}${c.optNo?' · 상품번호 '+_esc(c.optNo):''} · 주문수량 ${_esc(c.qty==null?'':c.qty)}${c.price!=null?' · 판매가 '+Number(c.price).toLocaleString('ko-KR')+'원':''}</small></span></label>`).join('')}
       <label class="cp-pick-o"><input type="radio" name="cpPk${i}" value="x" onchange="cpPickChanged()"><span><b>목록에 없음 — 엑셀 상품명 그대로 등록</b></span></label>
+      <label class="cp-pick-o"><input type="radio" name="cpPk${i}" value="all" onchange="cpPickChanged()"><span style="flex:1;min-width:0;"><b>전체 상품에서 검색해서 선택</b>
+        <input class="rt-in" id="cpPkAll${i}" data-k="product" data-next="" data-no-save="1" data-onpick="cpPickChanged" type="text" autocomplete="off" placeholder="🔍 코드·상품명 검색 (백데이터 전체)" style="margin-top:6px;" onclick="event.stopPropagation()" onkeydown="rtEntryKey(event,this)" oninput="cpPickAllInput(${i},this)" onfocus="cpPickAllInput(${i},this)" onblur="rtEntryProdBlur(this);setTimeout(cpPickChanged,250)"></span></label>
     </div>`).join('');
   cpPickChanged();
   openModal('cpPickModal');
 }
+// 전체 상품 검색 칸에 글자를 넣으면 그 항목(전체 상품)이 선택된 것으로 보고, 목록에서 실제 상품을 골라야 선택 완료
+function cpPickAllInput(i, el){
+  const rd = document.querySelector(`input[name="cpPk${i}"][value="all"]`); if(rd && el.value.trim()) rd.checked = true;
+  rtEntryProdInput(el); cpPickChanged();
+}
+function _cpPickOk(i){
+  const c = document.querySelector(`input[name="cpPk${i}"]:checked`); if(!c) return false;
+  if(c.value!=='all') return true;
+  const pe = document.getElementById('cpPkAll'+i); return !!(pe && pe._prod && pe._prod.name);
+}
 function cpPickChanged(){
-  const done = _cpAskList.every((r,i)=>document.querySelector(`input[name="cpPk${i}"]:checked`));
+  const n = _cpAskList.filter((r,i)=>_cpPickOk(i)).length, done = n===_cpAskList.length;
   const b = document.getElementById('cpPickOk');
   b.disabled = !done;
-  b.textContent = done ? `선택 완료 · 등록 진행` : `제품을 모두 선택하세요 (${_cpAskList.filter((r,i)=>document.querySelector(`input[name="cpPk${i}"]:checked`)).length}/${_cpAskList.length})`;
+  b.textContent = done ? `선택 완료 · 등록 진행` : `제품을 모두 선택하세요 (${n}/${_cpAskList.length})`;
 }
 async function cpPickOk(){
   if(!_cpAskList.length) return;
   const picks = _cpAskList.map((r,i)=>{ const el = document.querySelector(`input[name="cpPk${i}"]:checked`); return el ? el.value : null; });
-  if(picks.some(v=>v==null)){ toast('제품을 모두 선택해주세요.'); return; }
+  if(picks.some(v=>v==null) || _cpAskList.some((r,i)=>!_cpPickOk(i))){ toast('제품을 모두 선택해주세요. (전체 상품 검색은 목록에서 상품을 골라야 합니다)'); return; }
   _cpAskList.forEach((r,i)=>{
     if(picks[i]==='x'){ r.product = r.xProduct||r.product; r.productCode = ''; }
+    else if(picks[i]==='all'){ const pe = document.getElementById('cpPkAll'+i); r.product = pe._prod.name; r.productCode = pe._prod.code; }
     else { const c = r.choices[Number(picks[i])]; r.product = c.name; r.productCode = c.code; }
     r.multi = false; delete r.choices; delete r.suggest;
   });
