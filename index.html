@@ -1777,6 +1777,9 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-inv thead th{overflow:hidden;text-overflow:ellipsis;padding-left:3px;padding-right:3px;}
 .piv-inv tbody td{height:52px;padding-left:4px;padding-right:4px;overflow:hidden;}
 .piv-inv tbody td.piv-ellc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.piv-badge.pb-catsel{border:none;outline:none;cursor:pointer;font-family:inherit;font-weight:700;font-size:12px;border-radius:12px;padding:3px 4px;width:100%;max-width:56px;text-align:center;text-align-last:center;-webkit-appearance:none;appearance:none;}
+.piv-badge.pb-catsel.pb-cat-none{background:var(--bg2);color:var(--tx2);border:1px dashed var(--bd);font-weight:600;}
+.piv-badge.pb-catsel option{background:var(--bg);color:var(--tx);}
 .piv-badge.pb-cat-a{background:var(--green-100);color:var(--green-700);}
 .piv-badge.pb-cat-b{background:var(--blue-100);color:var(--blue-700);}
 .piv-badge.pb-cat-c{background:var(--violet-100);color:var(--violet-700);}
@@ -37608,6 +37611,38 @@ function pbRender(){
   document.getElementById('pbPager').innerHTML = _rgmPagerHtml(_pbPage, PB_PAGE_SIZE, deals.length, 'pbGoto');
 }
 
+// 거래구분을 [팝업 열기 전에] 목록에서 바로 고르는 선택칸 — 고르면 거래구분만 저장
+function _pbCatSelectHtml(r){
+  const opts = [...PB_CATEGORIES]; if(r.category && !opts.includes(r.category)) opts.push(r.category);
+  const cls = r.category ? (PB_CAT_CLS[r.category]||'piv-type') : 'pb-cat-none';
+  return `<select class="piv-badge pb-catsel ${cls}" onclick="event.stopPropagation()" onchange="pbCatSet('${r.id}',this.value)" title="거래구분 — 같은 날짜·연락처·주소의 빈 건은 같이 채워집니다"><option value="">선택</option>${opts.map(o=>`<option value="${_esc(o)}" ${o===r.category?'selected':''}>${_esc(o)}</option>`).join('')}</select>`;
+}
+// 같은 날짜 + 같은 연락처1 + 같은 주소인데 거래구분이 비어 있는 다른 건 (연락처·주소가 비어 있으면 같은 고객으로 보지 않음)
+function _pbSameContactBlank(base){
+  const k = r=>_pbNorm(r.phone1)+'|'+_pbNorm(r.addr);
+  if(!_pbNorm(base.phone1) || !_pbNorm(base.addr) || !base.date) return [];
+  const key = k(base);
+  return _pbAll.filter(r=>r.id!==base.id && !r.category && r.date===base.date && k(r)===key);
+}
+let _pbCatBusy = false;
+async function pbCatSet(id, cat){
+  if(_pbCatBusy) return;
+  if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); pbRender(); return; }
+  const base = _pbFind(id); if(!base) return;
+  if((base.category||'')===cat) return;
+  _pbCatBusy = true;
+  try{
+    const extra = cat ? _pbSameContactBlank(base) : [];
+    const latest = await _pbFetchByIds([id].concat(extra.map(r=>r.id)));   // 저장 직전 최신본 위에 거래구분만 얹는다
+    if(latest===null){ toast('저장 실패: 최신 내용을 불러오지 못했습니다. 잠시 후 다시 시도하세요.'); pbRender(); return; }
+    const now = new Date().toISOString();
+    const recs = latest.map(r=> r.id===id ? { ...r, category:cat, updatedAt:now } : (r.category ? null : { ...r, category:cat, updatedAt:now })).filter(Boolean);
+    if(!recs.length || !(await _pbUpsert(recs))){ toast('저장에 실패했습니다. 다시 시도해주세요.'); pbRender(); return; }
+    await pbReload();
+    const n = recs.length-1;
+    toast(cat ? (n>0 ? `거래구분 '${cat}' 저장 — 같은 연락처·주소의 ${n}건에도 자동 기입했어요.` : `거래구분 '${cat}' 저장되었습니다.`) : '거래구분이 비워졌습니다.');
+  } finally { _pbCatBusy = false; }
+}
 function _pbRowHtml(r, canEdit, isTop){
   const wr = (v,wide)=>`<td class="piv-l piv-wrapc${wide?' piv-wide':''}">${_esc(v||'')}</td>`;
   const od = _pbOverdueDays(r);
@@ -37623,7 +37658,7 @@ function _pbRowHtml(r, canEdit, isTop){
   const invCell = inv ? `<span class="piv-badge ${PB_INVOICE_CLS[inv]||'piv-type'}">${_esc(inv)}</span>${r.invoiceId?`<span class="piv-sub">${cancelled?'🔗 연동 계산서 발급취소됨':'🔗 계산서 연동'}</span>`:''}` : '';
   const ell = v=>`<td class="pb-ell" title="${_esc(v||'')}">${_esc(v||'')}</td>`;
   return `<tr class="${canEdit?'piv-click':''} ${od!=null?'piv-over':''}" ${canEdit?`onclick="pbOpenModal('${r.id}')"`:''}>
-    <td>${r.category?`<span class="piv-badge ${PB_CAT_CLS[r.category]||'piv-type'}">${_esc(r.category)}</span>`:''}</td>
+    <td>${canEdit?_pbCatSelectHtml(r):(r.category?`<span class="piv-badge ${PB_CAT_CLS[r.category]||'piv-type'}">${_esc(r.category)}</span>`:'')}</td>
     <td>${r.staff?`<span class="piv-badge piv-st piv-st-${_pivStaffColor(r.staff, _pbAll)}">${_esc(r.staff)}</span>`:''}</td>
     <td>${_esc(r.date||'')}</td>
     ${ell(r.recipient)}
@@ -37855,8 +37890,20 @@ async function pbSave(){
   try{ await _pbSyncInvoice(full, _pbLinkOrig); }catch(e){ console.warn('계산서 연동 동기화 실패', e); toast('저장은 됐지만 세금계산서 발행 건과의 연동 반영에 실패했습니다.'); }
   btn.disabled = false; btn.textContent = '저장';
   closeModal('pbModal');
+  let catN = 0;
+  if(full.category && (full.category!==(old.category||''))){
+    try{
+      const extra = _pbSameContactBlank(full);
+      if(extra.length){
+        const latest = await _pbFetchByIds(extra.map(r=>r.id));
+        const t = new Date().toISOString();
+        const recs = (latest||[]).filter(r=>!r.category).map(r=>({ ...r, category:full.category, updatedAt:t }));
+        if(recs.length && await _pbUpsert(recs)) catN = recs.length;
+      }
+    }catch(e){ console.warn('거래구분 자동 기입 실패', e); }
+  }
   await pbReload();
-  toast(_pbEditId ? '수정되었습니다.' : '등록되었습니다.');
+  toast((_pbEditId ? '수정되었습니다.' : '등록되었습니다.') + (catN ? ` 같은 연락처·주소 ${catN}건에도 거래구분 '${full.category}'을(를) 자동 기입했어요.` : ''));
 }
 function pbDelete(id){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
