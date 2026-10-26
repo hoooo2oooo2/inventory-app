@@ -26676,6 +26676,7 @@ async function downloadDailyExcel(){
   ws3['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},{wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},{wch:8},{wch:10},{wch:12},{wch:10},{wch:12},{wch:8},{wch:10}];
   sc(ws3,0,0,SECT); for(let c=0;c<22;c++) sc(ws3,2,c,HEAD);
   for(let i=3;i<s3.length;i++){ [15,16,17,18,21].forEach(c=>fmt(ws3,i,c,WON)); fmt(ws3,i,19,MARGIN_FMT); fmt(ws3,i,20,PCT); }
+  ws3['!autofilter']={ref:U.encode_range({s:{r:2,c:0},e:{r:Math.max(2,s3.length-1),c:21}})};
   U.book_append_sheet(wb,ws3,'상세데이터');
 
   // ── 광고비 시트 (선택월 1일~기준일) ──
