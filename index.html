@@ -3012,6 +3012,12 @@ html.mob-native .lcr-det-val{font-size:15px;}
 /* 보기 모드: 값은 또렷하게 보이되 입력은 막음 */
 :is(#pivModal,#pivCoModal) .piv-view .field input:disabled,:is(#pivModal,#pivCoModal) .piv-view .field select:disabled,:is(#pivModal,#pivCoModal) .piv-view .field textarea:disabled{background:var(--bg2);color:var(--tx);opacity:1;-webkit-text-fill-color:var(--tx);cursor:default;}
 #pivModal .piv-view .piv-items button,#pivModal .piv-view .cs-mini-btn{display:none;}
+/* 금액 입력칸: 천 단위 쉼표는 입력하면 자동, 오른쪽 '원' 표시 */
+.piv-won{position:relative;min-width:0;}
+.piv-won input{padding-right:28px !important;text-align:right;}
+.piv-won span{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12.5px;color:var(--tx2);pointer-events:none;}
+#pivModal .field.piv-amt .piv-won span{color:#B45309;font-weight:800;font-size:14px;}
+:root[data-theme="dark"] #pivModal .field.piv-amt .piv-won span{color:#FBBF24;}
 /* 발행금액 강조 — 배경·글자색을 함께 고정(다크모드에서도 대비 유지), 보기 모드(disabled) 규칙보다 우선 */
 #pivModal .field.piv-amt label{color:#B45309;font-weight:800;}
 #pivModal .field.piv-amt input,#pivModal .piv-view .field.piv-amt input:disabled{background:#FEF3C7;color:#7C2D12;-webkit-text-fill-color:#7C2D12;opacity:1;border:2px solid #F59E0B;font-size:17px;font-weight:800;}
@@ -5152,7 +5158,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>운임구분</label><input type="text" id="pbFFreight" list="pbFreightList" autocomplete="off"><datalist id="pbFreightList"><option value="선불"></option><option value="착불"></option></datalist></div>
       <div class="field piv-span2"><label>배송메모</label><input type="text" id="pbFShipMemo" autocomplete="off"></div>
       <div class="field"><label>패밀리상품코드</label><input type="text" id="pbFCode" autocomplete="off"></div>
-      <div class="field"><label>총금액</label><input type="number" id="pbFAmount" min="0"></div>
+      <div class="field"><label>총금액</label><div class="piv-won"><input type="text" inputmode="numeric" id="pbFAmount" autocomplete="off" oninput="moneyInput(this)"><span>원</span></div></div>
       <div class="field"><label>입금여부</label><select id="pbFPaid" onchange="pbPaidChanged()"></select></div>
       <div class="field" id="pbDueWrap" style="display:none;"><label>입금예정일 *</label><input type="date" id="pbFDue"></div>
       <div class="field"><label>계산서 발급여부</label><select id="pbFInvoice" onchange="pbInvoiceChanged()"></select></div>
@@ -5209,9 +5215,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
         </div>
       </div>
 
-      <div class="field piv-amt"><label>금액 (발행금액)</label><input type="number" id="pivFAmount" min="0" oninput="pivCalcMargin()"></div>
+      <div class="field piv-amt"><label>금액 (발행금액)</label><div class="piv-won"><input type="text" inputmode="numeric" data-money id="pivFAmount" autocomplete="off" oninput="moneyInput(this);pivCalcMargin()"><span>원</span></div></div>
       <div class="field"><label>단가 합계 (품목 기준)</label><input type="text" id="pivFCostView" readonly disabled></div>
-      <div class="field"><label>마진 (금액 − 단가 합계)</label><input type="number" id="pivFMargin"></div>
+      <div class="field"><label>마진 (금액 − 단가 합계)</label><div class="piv-won"><input type="text" inputmode="text" data-money id="pivFMargin" autocomplete="off" oninput="moneyInput(this)"><span>원</span></div></div>
 
       <div class="field"><label>발행일자</label><input type="date" id="pivFIssueDate"></div>
       <div class="field"><label>발급여부</label>
@@ -17504,6 +17510,7 @@ async function insightSetFamMap(productId, famId){
   const latest = await cloudKvLoad(INSIGHT_FAM_MAP_KIND);
   _insightFamMap = (latest && typeof latest==='object') ? latest : {};
   if(famId) _insightFamMap[productId]=famId; else delete _insightFamMap[productId];
+  _simRows=null;   // 발주 시뮬레이터 계산 캐시도 새 연결을 반영하도록 비움
   await cloudKvSave(INSIGHT_FAM_MAP_KIND, _insightFamMap);
 }
 let _insightFamPickProductId=null;
@@ -30525,6 +30532,7 @@ async function simEnsureRows(){
   const ms=insightRgYms();
   await Promise.all([
     loadDailyCache(), pcEnsureBackdata(), insightFactoryLoad(),
+    _insightEnsureFamData(),   // 패밀리오더 연결·미입고분 — 발주 인사이트와 같은 '진행중 발주'로 계산하려면 필수
     (_rgOptionMapLoaded?Promise.resolve():loadRgOptionMap()),
     (_rgPackMultiplierLoaded?Promise.resolve():loadRgPackMultiplier()),
     rgEnsureProdMonths(ms[ms.length-1], ms[0])
@@ -36793,8 +36801,8 @@ function pivRender(){
 }
 
 // ───────────────── 계산서 등록/수정 팝업 ─────────────────
-function _pivSet(k,v){ const el=document.getElementById('pivF'+k); if(el) el.value = v==null ? '' : v; }
-function _pivGet(k){ return document.getElementById('pivF'+k).value.trim(); }
+function _pivSet(k,v){ const el=document.getElementById('pivF'+k); if(el) el.value = (v==null||v==='') ? '' : (el.hasAttribute('data-money') ? moneyFmt(v) : v); }
+function _pivGet(k){ const el=document.getElementById('pivF'+k); return el.hasAttribute('data-money') ? el.value.replace(/[^\d-]/g,'') : el.value.trim(); }
 // 이메일은 저장은 한 문자열(a@b.com), 화면은 @ 기준 아이디/도메인 두 칸
 function _pivSplitEmail(e){ const s=String(e||'').trim(); const i=s.indexOf('@'); return i<0 ? [s,''] : [s.slice(0,i), s.slice(i+1)]; }
 function _pivSetEmail(e){ const [a,b]=_pivSplitEmail(e); _pivSet('EmailId',a); _pivSet('EmailDomain',b); }
@@ -36919,16 +36927,16 @@ function pivRenderItems(){
   box.innerHTML = `<div class="piv-item-row piv-item-head"><span>제품</span><span style="text-align:right;">단가</span><span style="text-align:right;">수량</span><span style="text-align:right;">소계</span><span></span></div>`
     + _pivItems.map((it,i)=>`<div class="piv-item-row">
       <div class="piv-item-name" title="${_esc(it.name)}">${_esc(it.name)}<small>${_esc(it.code)}</small></div>
-      <input type="number" min="0" value="${it.unitPrice}" oninput="pivItemChg(${i},'unitPrice',this.value)">
+      <div class="piv-won"><input type="text" inputmode="numeric" value="${moneyFmt(it.unitPrice)}" oninput="moneyInput(this);pivItemChg(${i},'unitPrice',this.value)"><span>원</span></div>
       <input type="number" min="1" value="${it.qty}" oninput="pivItemChg(${i},'qty',this.value)">
-      <div class="piv-item-sub" id="pivItemSub${i}">${_pivNum(it.unitPrice*it.qty)}</div>
+      <div class="piv-item-sub" id="pivItemSub${i}">${_pivNum(it.unitPrice*it.qty)}원</div>
       <button type="button" class="piv-act piv-del" onclick="pivItemDel(${i})">✕</button>
     </div>`).join('');
 }
 function pivItemChg(i, k, v){
   const it = _pivItems[i]; if(!it) return;
-  it[k] = Math.max(0, Number(v)||0);
-  const sub = document.getElementById('pivItemSub'+i); if(sub) sub.textContent = _pivNum(it.unitPrice*it.qty);
+  it[k] = Math.max(0, Number(String(v).replace(/,/g,''))||0);
+  const sub = document.getElementById('pivItemSub'+i); if(sub) sub.textContent = _pivNum(it.unitPrice*it.qty)+'원';
   pivUpdateCost();
 }
 function pivItemDel(i){ _pivItems.splice(i,1); pivRenderItems(); pivUpdateCost(); }
@@ -36942,7 +36950,7 @@ function pivUpdateCost(){
 // 품목이 있을 때만 마진 = 금액 − 단가 합계 자동 반영 (품목 없으면 직접 입력값 유지)
 function pivCalcMargin(){
   if(!_pivItems.length) return;
-  const a = document.getElementById('pivFAmount').value;
+  const a = _pivGet('Amount');
   _pivSet('Margin', a==='' ? '' : Math.round(Number(a) - _pivCost()));
 }
 // 수리비·배송비는 표시용 체크일 뿐 마진 계산에 관여하지 않음 (마진 = 금액 − 제품 단가 합계)
@@ -37811,6 +37819,7 @@ function pbOpenModal(id){
     if(!id && k==='staff') v = u.name || u.username || '';
     document.getElementById('pbF'+suffix).value = v==null ? '' : v;
   });
+  { const a=document.getElementById('pbFAmount'); a.value = moneyFmt(a.value); }   // 총금액은 쉼표 표시
   _pbSetSelect('pbFCategory', r.category || '', PB_CATEGORIES);
   _pbSetSelect('pbFPaid', _pbNormPaid(r.paid), ['미입금','입금완료']);
   _pbSetSelect('pbFInvoice', _pbNormInvoice(r.invoice), PB_INVOICE_OPTS);
@@ -38042,6 +38051,14 @@ function _rtFmtShip(v){
   if(/^\d[\d,]*$/.test(s)) return Number(s.replace(/,/g,'')).toLocaleString('ko-KR')+'원';
   return s;
 }
+// 금액 입력칸 공용 — 숫자만 남기고 천 단위 쉼표 자동(맨 앞 '-'는 허용: 마진 등 음수)
+function moneyFmt(v){
+  if(typeof v==='number') v = Math.round(v);
+  const t=String(v==null?'':v).trim(); const neg=t.startsWith('-');
+  const d=t.replace(/[^\d]/g,'').replace(/^0+(?=\d)/,'');
+  return d ? (neg?'-':'')+Number(d).toLocaleString('ko-KR') : (neg?'-':'');
+}
+function moneyInput(el){ el.value = moneyFmt(el.value); }
 // 배송비 입력칸: 숫자만 남기고 천 단위 쉼표 자동
 function rtShipInput(el){
   const d = String(el.value||'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
