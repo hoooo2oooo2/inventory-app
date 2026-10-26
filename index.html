@@ -1068,6 +1068,35 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .sim-why .ln b{color:var(--tx);}
 .sim-why .ln span{color:var(--tx2);}
 .sim-note{margin-top:10px;font-size:12px;color:var(--tx2);line-height:1.6;}
+.sim-whybtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:10px;padding:10px 12px;border:1.5px solid var(--purple-brand);border-radius:10px;background:var(--bg);color:var(--purple-brand);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+.sim-whybtn:hover{background:var(--purple-brand);color:#fff;}
+/* 📋 분석 근거 큰 팝업 — 홈 업무캘린더 팝업과 같은 형태(어두운 배경막 + 둥근 큰 카드 + 구획 카드) */
+.simx-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99950;display:none;align-items:center;justify-content:center;padding:3vh 3vw;}
+.simx-ov.on{display:flex;}
+.simx-pop{width:min(900px,96vw);max-height:92vh;background:var(--bg);color:var(--tx);border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden;}
+.simx-hd{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--bd);flex-shrink:0;flex-wrap:wrap;}
+.simx-hd h2{font-size:17px;margin:0;color:var(--tx);} .simx-hd .sp{flex:1;}
+.simx-hd .nm{font-size:12.5px;color:var(--tx2);width:100%;margin-top:-4px;}
+.simx-x{border:none;background:var(--bg2);color:var(--tx2);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;}
+.simx-x:hover{color:var(--tx);}
+.simx-body{padding:16px 20px 20px;overflow-y:auto;overscroll-behavior:contain;background:var(--bg2);display:flex;flex-direction:column;gap:12px;}
+.simx-vd{border-radius:12px;padding:12px 16px;} .simx-vd .v1{font-size:16px;font-weight:800;} .simx-vd .v2{font-size:13.5px;line-height:1.6;margin-top:6px;}
+.simx-kpi{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.simx-kpi div{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:9px 12px;min-width:0;}
+.simx-kpi small{display:block;font-size:11.5px;color:var(--tx2);margin-bottom:2px;} .simx-kpi b{font-size:17px;color:var(--tx);}
+.simx-sec{background:var(--bg);border:1px solid var(--bd);border-left:4px solid var(--sc,#64748B);border-radius:12px;padding:12px 16px;}
+.simx-sec>h4,.simx-sec>summary{font-size:14px;margin:0 0 8px;display:flex;align-items:center;gap:8px;color:var(--tx);font-weight:800;cursor:default;}
+.simx-sec>summary{cursor:pointer;margin:0;} details.simx-sec[open]>summary{margin-bottom:8px;}
+.simx-ul{margin:0;padding:0;list-style:none;}
+.simx-ul li{position:relative;padding:3px 0 3px 16px;font-size:13.5px;line-height:1.7;color:var(--tx);word-break:keep-all;overflow-wrap:anywhere;}
+.simx-ul li::before{content:'•';position:absolute;left:3px;color:var(--sc,var(--tx2));font-weight:800;}
+.simx-ul li.arr{margin-top:6px;padding:7px 12px 7px 28px;background:var(--bg2);border-radius:8px;font-weight:600;}
+.simx-ul li.arr::before{content:'→';left:10px;}
+.simx-ul li b{font-weight:800;color:var(--tx);}
+.simx-dl{display:grid;grid-template-columns:104px 1fr;gap:4px 12px;padding:9px 0;border-top:1px solid var(--bd);}
+.simx-dl .k{font-size:13px;font-weight:800;color:var(--tx);}
+.simx-note{font-size:12px;color:var(--tx2);line-height:1.6;padding:0 4px;}
+@media(max-width:700px){.simx-kpi{grid-template-columns:repeat(2,1fr);}.simx-dl{grid-template-columns:1fr;}}
 html.mob-native .sim-fab{bottom:20px;right:74px;}
 html.mob-native .sim-pop{bottom:0;right:0;left:0;width:auto;max-width:none;max-height:88vh;border-radius:16px 16px 0 0;}
 html.mob-native .sim-in{font-size:16px;height:46px;}
@@ -30553,6 +30582,23 @@ function simNextWindow(wm){
   if(!end) end=new Date(start.getFullYear()+1,start.getMonth(),1);
   return {start,end};
 }
+// 긴 근거 문장을 문장 단위 줄로 나눔 — '→ 결론' 문장은 따로 강조
+function simLines(t){
+  const parts=String(t||'').replace(/\s*→\s*/g,'\n→ ').split(/\n|(?<=[.!?])\s+(?=\S)/).map(x=>x.trim()).filter(Boolean);
+  return '<ul class="simx-ul">'+parts.map(x=>x.startsWith('→')?`<li class="arr">${x.replace(/^→\s*/,'')}</li>`:`<li>${x}</li>`).join('')+'</ul>';
+}
+let _simWhyHtml='';
+function simWhyOpen(){
+  let ov=document.getElementById('simxOv');
+  if(!ov){
+    ov=document.createElement('div'); ov.className='simx-ov'; ov.id='simxOv';
+    ov.addEventListener('click',e=>{ if(e.target===ov) simWhyClose(); });
+    document.body.appendChild(ov);
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape' && document.getElementById('simxOv')?.classList.contains('on')) simWhyClose(); });
+  }
+  ov.innerHTML=_simWhyHtml; ov.classList.add('on');
+}
+function simWhyClose(){ document.getElementById('simxOv')?.classList.remove('on'); }
 function simRender(){
   const res=document.getElementById('simResult'); if(!res) return;
   const r=_simRow; if(!r){ res.innerHTML=''; return; }
@@ -30620,7 +30666,7 @@ function simRender(){
   else head+=`👉 현재고와 진행중 발주만으로도 충분해서 추가 주문이 필요 없어요.`;
   head+=`<div style="margin-top:6px;font-size:12px;opacity:.9;">📦 보유 계산: 현재고 ${n(S)} + 진행중 발주 ${n(P)}${P>0?`(가장 오래된 주문 ${r.pendingDays!=null?r.pendingDays+'일째':''}${wc&&wc.eta?`, 입고 예상 ${_insFmtMD(wc.eta)}경`:''})`:''} + 이번 주문 ${n(Q)} = <b>${n(T)}개</b>${P>0?' (진행중 발주분을 포함해 분석)':''}</div></div>`;
 
-  const ln=(lbl,txt)=>`<div class="ln"><b>${lbl}</b> <span>${txt}</span></div>`;
+  const dln=(lbl,txt)=>`<div class="simx-dl"><div class="k">${lbl}</div><div>${simLines(txt)}</div></div>`;
   // ── ① 판매 패턴 ──
   let s1='';
   const fl=(wc&&wc.status==='ok')?wc.flow:null;
@@ -30704,23 +30750,40 @@ function simRender(){
   }
   // ── 상세 계산(접기) ──
   let det='';
-  det+=ln('현재 재고',`현재고 ${n(S)}개 + 진행중 ${n(P)}개 = ${n(S+P)}개 · 일평균 ${c.avgDay}개 → 현재고만으론 ${r.daysLeft!=null?`약 ${r.daysLeft}일 뒤(${_insFmtMD(r.exhaustDate)}경) 소진`:'소진 시점 산출 불가'}`);
+  det+=dln('현재 재고',`현재고 ${n(S)}개 + 진행중 ${n(P)}개 = ${n(S+P)}개 · 일평균 ${c.avgDay}개 → 현재고만으론 ${r.daysLeft!=null?`약 ${r.daysLeft}일 뒤(${_insFmtMD(r.exhaustDate)}경) 소진`:'소진 시점 산출 불가'}`);
   let gap=''; if(r.daysLeft!=null && r.daysLeft<L) gap=` ⚠ 주문이 도착하기 전에 현재고가 먼저 바닥날 수 있어요(약 ${L-r.daysLeft}일 공백${P>0?' — 진행중 발주가 먼저 들어오면 완화':''}).`;
-  det+=ln('도착 시점',`리드타임 약 ${L}일 → 오늘 주문하면 ${_insFmtMD(new Date(today.getTime()+L*DAY))}경 도착${ls&&ls.a1!=null?` (이 제품 입고 실적 평균 1차 ${ls.a1}일${ls.a2!=null?` · 2차 ${ls.a2}일`:''})`:''}. 도착 시점 예상 재고 ${n(e?e.stockAtDelivery:c.stockAtDelivery)}개.${gap}`);
-  if(e) det+=ln('평상시 권장',`앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 예상 판매 ${n(e.dLR)}개 × 안전배수 ×${e.k.toFixed(2)}(${e.grade}등급 ${e.pct}${e.damped?`, 원래 ×${e.kRaw.toFixed(2)} 중 소량 제품이라 초과분 절반만 반영`:''}) = 목표 확보량 ${n(e.targetLR)}개${e.usedRecent?'(최근 30일 판매속도가 더 커서 그 값 사용)':''} − 현재고(리드타임 중 판매 반영) = 필요 ${n(c.needed)}개${P>0?` → 진행중 ${n(P)}개 차감 →`:' →'} 평상시 권장 ${n(reg)}개 ${regOk?'(✅ 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
+  det+=dln('도착 시점',`리드타임 약 ${L}일 → 오늘 주문하면 ${_insFmtMD(new Date(today.getTime()+L*DAY))}경 도착${ls&&ls.a1!=null?` (이 제품 입고 실적 평균 1차 ${ls.a1}일${ls.a2!=null?` · 2차 ${ls.a2}일`:''})`:''}. 도착 시점 예상 재고 ${n(e?e.stockAtDelivery:c.stockAtDelivery)}개.${gap}`);
+  if(e) det+=dln('평상시 권장',`앞으로 ${Math.round((e.L+e.R)/30*10)/10}개월(리드타임+발주주기) 예상 판매 ${n(e.dLR)}개 × 안전배수 ×${e.k.toFixed(2)}(${e.grade}등급 ${e.pct}${e.damped?`, 원래 ×${e.kRaw.toFixed(2)} 중 소량 제품이라 초과분 절반만 반영`:''}) = 목표 확보량 ${n(e.targetLR)}개${e.usedRecent?'(최근 30일 판매속도가 더 커서 그 값 사용)':''} − 현재고(리드타임 중 판매 반영) = 필요 ${n(c.needed)}개${P>0?` → 진행중 ${n(P)}개 차감 →`:' →'} 평상시 권장 ${n(reg)}개 ${regOk?'(✅ 충족)':`(❌ ${n(reg-Q)}개 부족)`}`);
   if(coverActive){
     const {low,base,high,target}=wc.scenarios, sup=wc.supply+Q, diff=sup-target.total, late=today>wc.closeStart;
-    det+=ln('구정 준비',`예상 판매(오늘~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))}) ${n(base.total)}개(낙관 ${n(low.total)} ~ 보수 ${n(high.total)}) → 안전 목표 ${n(target.total)}개. 확보분 ${n(wc.supply)} + 이번 주문 ${n(Q)} = ${n(sup)}개 → 목표 대비 ${diff>=0?'여유 '+n(diff):'부족 '+n(-diff)}개. 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착 예정${late?` → 🚨 공장 주문 마감(${_insFmtMD(wc.closeStart)})이 이미 지났어요(지금 주문하면 겨울 이후 입고)`:` (마감 ${_insFmtMD(wc.closeStart)} 전이지만 물량이 많으면 구정 이후 생산될 수 있어 일찍 주문 권장)`}.`);
-  } else if(wc && wc.status==='ok') det+=ln('구정 준비','구정 커버 점검은 9~11월에만 운영해 지금은 반영하지 않았어요.');
+    det+=dln('구정 준비',`예상 판매(오늘~${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))}) ${n(base.total)}개(낙관 ${n(low.total)} ~ 보수 ${n(high.total)}) → 안전 목표 ${n(target.total)}개. 확보분 ${n(wc.supply)} + 이번 주문 ${n(Q)} = ${n(sup)}개 → 목표 대비 ${diff>=0?'여유 '+n(diff):'부족 '+n(-diff)}개. 오늘 주문 시 ${_insFmtMD(wc.arriveIfOrderNow)}경 도착 예정${late?` → 🚨 공장 주문 마감(${_insFmtMD(wc.closeStart)})이 이미 지났어요(지금 주문하면 겨울 이후 입고)`:` (마감 ${_insFmtMD(wc.closeStart)} 전이지만 물량이 많으면 구정 이후 생산될 수 있어 일찍 주문 권장)`}.`);
+  } else if(wc && wc.status==='ok') det+=dln('구정 준비','구정 커버 점검은 9~11월에만 운영해 지금은 반영하지 않았어요.');
   const sp=r.seasonPre;
-  if(sp && sp.status==='flag' && sp.neededQty>0) det+=ln('계절 대비 칸',`${sp.kind==='winter'?'구정재고 대비':'계절성수기 대비'} 칸 기준으로는 추가 ${sp.boxes.toLocaleString()}박스(${n(sp.neededQty)}개)가 필요하다고 나옵니다(마감 ${fmtDate(sp.deadline)}${sp.overdue?' · 🚨지남':''}).`);
-  det+=ln('주문 후 재고',`보유 ${n(T)}개 ≈ 약 ${monthsRange}분(작년 월별 패턴 × 올해 흐름 ×${g.toFixed(2)} / 작년 그대로 두 시나리오). 지금 속도(월 ${n((e&&e.monthly)||(wc&&wc.level)||0)}개)를 1년 내내 단순 적용하면 훨씬 길게 나오지만 계절 편중 제품엔 맞지 않아 쓰지 않았어요.`);
-  res.innerHTML=`<div class="sim-verdict" style="background:${st.bg};color:${st.fg};"><div class="v1">${st.icon} ${n(Q)}개(${bx(Q)}박스) 주문 → ${vText}</div>${head.replace('class="v2"','class="v2" style="color:'+st.fg+';"')}</div>
-    <div class="sim-why"><div style="font-weight:800;margin-bottom:2px;">📋 분석 근거</div>
-      ${ln('① 판매 패턴(작년+올해)',s1)}${ln('② 앞으로 예상 판매',s2)}${ln('③ 필요한 재고',s3)}${ln('④ 요청 수량 평가',s4)}${s5?ln('⑤ 지연 위험',s5):''}
-      <details class="ln"><summary style="cursor:pointer;font-weight:700;">🔧 상세 계산 보기</summary>${det}</details>
-    </div>
-    <div class="sim-note">※ 발주 인사이트와 같은 계산(일평균·성수기 보정·등급별 안전배수·구정 커버)을 사용하며 저장되는 값은 없어요. 주문일을 오늘로 가정합니다.</div>`;
+  if(sp && sp.status==='flag' && sp.neededQty>0) det+=dln('계절 대비 칸',`${sp.kind==='winter'?'구정재고 대비':'계절성수기 대비'} 칸 기준으로는 추가 ${sp.boxes.toLocaleString()}박스(${n(sp.neededQty)}개)가 필요하다고 나옵니다(마감 ${fmtDate(sp.deadline)}${sp.overdue?' · 🚨지남':''}).`);
+  det+=dln('주문 후 재고',`보유 ${n(T)}개 ≈ 약 ${monthsRange}분(작년 월별 패턴 × 올해 흐름 ×${g.toFixed(2)} / 작년 그대로 두 시나리오). 지금 속도(월 ${n((e&&e.monthly)||(wc&&wc.level)||0)}개)를 1년 내내 단순 적용하면 훨씬 길게 나오지만 계절 편중 제품엔 맞지 않아 쓰지 않았어요.`);
+  const sec=(ico,title,txt,col)=>`<section class="simx-sec" style="--sc:${col};"><h4><span>${ico}</span>${title}</h4>${simLines(txt)}</section>`;
+  const vdHtml=`<div class="sim-verdict" style="background:${st.bg};color:${st.fg};"><div class="v1">${st.icon} ${n(Q)}개(${bx(Q)}박스) 주문 → ${vText}</div>${head.replace('class="v2"','class="v2" style="color:'+st.fg+';"')}</div>`;
+  const kp=(l,v)=>`<div><small>${l}</small><b>${v}</b></div>`;
+  _simWhyHtml=`<div class="simx-pop" role="dialog" aria-label="분석 근거">
+    <div class="simx-hd"><h2>📋 분석 근거</h2><span class="sp"></span>
+      <span style="display:inline-block;padding:3px 12px;border-radius:12px;font-size:12.5px;font-weight:700;background:${st.bg};color:${st.fg};">${st.icon} ${n(Q)}개(${bx(Q)}박스) 주문 → ${vText}</span>
+      <button class="simx-x" onclick="simWhyClose()" aria-label="닫기">✕</button>
+      <div class="nm">${_esc(String(p.name||''))} · ${_esc(String(p.code||''))}</div></div>
+    <div class="simx-body">
+      <div class="simx-vd" style="background:${st.bg};color:${st.fg};"><div class="v1">${st.icon} ${vText}</div>${head.replace('class="v2"','class="v2" style="color:'+st.fg+';"')}</div>
+      <div class="simx-kpi">${kp('현재고',n(S)+'개')}${kp('진행중 발주',n(P)+'개')}${kp('이번 주문',n(Q)+'개')}${kp('주문 후 보유',n(T)+'개')}${kp('앱 권장 주문',bx(need)+'박스')}</div>
+      ${sec('📈','① 판매 패턴 (작년+올해)',s1,'#3182F6')}
+      ${sec('🔮','② 앞으로 예상 판매',s2,'#8B5CF6')}
+      ${sec('📦','③ 필요한 재고',s3,'#F59E0B')}
+      ${sec('⚖️','④ 요청 수량 평가',s4,st.fg)}
+      ${s5?sec('⏰','⑤ 지연 위험',s5,'#DC2626'):''}
+      <details class="simx-sec" style="--sc:#64748B;"><summary>🔧 상세 계산 보기</summary>${det}</details>
+      <div class="simx-note">※ 발주 인사이트와 같은 계산(일평균·성수기 보정·등급별 안전배수·구정 커버)을 사용하며 저장되는 값은 없어요. 주문일을 오늘로 가정합니다.</div>
+    </div></div>`;
+  const wasOpen=document.getElementById('simxOv')?.classList.contains('on');
+  res.innerHTML=vdHtml+`<button class="sim-whybtn" onclick="simWhyOpen()">📋 분석 근거 자세히 보기</button>
+    <div class="sim-note">※ 발주 인사이트와 같은 계산을 사용하며 저장되는 값은 없어요. 주문일을 오늘로 가정합니다.</div>`;
+  if(wasOpen) simWhyOpen();   // 수량을 바꾸면 열려 있는 팝업도 새 값으로
 }
 try{ floatInitDrag(); }catch(e){ console.warn('floatInitDrag', e); }
 window.addEventListener('load', ()=>{ try{ floatInitDrag(); }catch(e){} });
