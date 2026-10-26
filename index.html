@@ -41390,5 +41390,83 @@ function kbDeleteEntry(id){
 }
 
 </script>
+<script>
+/* 금액 입력칸 공용 처리 (2026-10-26) — 앱 전체 금액 입력칸을 '천 단위 쉼표 + 오른쪽 원 표시'로 통일.
+   · 입력칸은 type=text로 바꾸되, 요소의 value를 "읽으면 쉼표 없는 숫자 문자열 / 쓰면 쉼표 표시"로 가로채서
+     기존 코드(Number(el.value), el.value = 숫자, oninput/onchange의 this.value)는 한 줄도 안 고쳐도 그대로 동작한다.
+   · 대상: 아래 ID 목록 + .rgs-price/.cmb-price-inp/.cs-cell-inp + 리뷰관리 금액칸 + data-money 속성이 붙은 칸.
+     동적으로 그려지는 표(innerHTML)는 MutationObserver가 그려지는 즉시 적용한다. 수량·% 칸은 대상이 아님. */
+(function(){
+  var IDS = ['lcrPrice','lbx_pricePerBox','lbx_unitPrice','pc-unit','pc-sale','cmbAddArrival','cmbAddSupply',
+    'moeumSell','moeumDiscount','moeumBase','csVShipFee','csPPrice','csPSale','csRinoShipFee',
+    'rgmPPrice','rgmPSupply','rgmPIo','rgmPShipFee','rgmPShipFeeD','rgmRetComp','foPrice','adAmount',
+    'bdPrice','bdResNewPrice','shipFee','wcLPrice','pbFAmount','pivFAmount','pivFMargin'];
+  var SEL = IDS.map(function(i){ return '#'+i; }).join(',') + ',input.rgs-price,input.cmb-price-inp,input.cs-cell-inp,input.rvw-amt-inp,input[data-money]';
+  var desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  function fmt(raw){
+    var t = String(raw==null?'':raw).trim(); if(!t) return '';
+    var neg = t.charAt(0)==='-';
+    t = t.replace(/[^\d.]/g,'');
+    var dot = t.indexOf('.');
+    var ip = dot<0 ? t : t.slice(0,dot), fp = dot<0 ? '' : t.slice(dot+1).replace(/\./g,'');
+    ip = ip.replace(/^0+(?=\d)/,'');
+    var out = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if(dot>=0) out += '.'+fp;
+    if(!out && !neg) return '';
+    return (neg?'-':'')+out;
+  }
+  function isMoneyEl(el){
+    if(!el || el.tagName!=='INPUT') return false;
+    if(el.classList.contains('rvw-amt-inp')){   // 리뷰관리: 수량 칸은 제외, 금액·원가·마진 칸만
+      return /'(productAmount|costAmount|marginAmount)'/.test(el.getAttribute('onchange')||'');
+    }
+    return el.matches(SEL);
+  }
+  function enhance(el){
+    if(el._money || !isMoneyEl(el)) return;
+    el._money = 1;
+    var cur = desc.get.call(el);
+    try{ el.type = 'text'; }catch(e){}
+    el.setAttribute('inputmode','decimal'); el.setAttribute('autocomplete','off'); el.setAttribute('data-money','1');
+    Object.defineProperty(el, 'value', {
+      configurable:true,
+      get:function(){ var v = desc.get.call(this).replace(/,/g,''); return (v==='-'||v==='.')?'':v; },
+      set:function(v){ desc.set.call(this, fmt(v)); }
+    });
+    desc.set.call(el, fmt(cur));
+  }
+  function scan(root){
+    if(!root || root.nodeType!==1) return;
+    if(root.tagName==='INPUT') enhance(root);
+    var list = root.querySelectorAll ? root.querySelectorAll('input') : [];
+    for(var i=0;i<list.length;i++) enhance(list[i]);
+  }
+  // 입력하는 순간(다른 입력 처리보다 먼저) 쉼표로 다시 표시하고 커서 위치 유지
+  document.addEventListener('input', function(e){
+    var el = e.target; if(!el || !el._money) return;
+    var cur = desc.get.call(el), pos = el.selectionStart==null ? cur.length : el.selectionStart;
+    var before = cur.slice(0,pos).replace(/[^\d.\-]/g,'').length;
+    var f = fmt(cur);
+    if(f===cur) return;
+    desc.set.call(el, f);
+    var n=0, i=0; for(; i<f.length && n<before; i++){ if(/[\d.\-]/.test(f.charAt(i))) n++; }
+    try{ el.setSelectionRange(i,i); }catch(_){}
+  }, true);
+  // 오른쪽 '원' 표시(배경 그림이라 칸 구조를 바꾸지 않음) — 이미 따로 '원'을 붙인 칸(.piv-won)은 제외
+  var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><text x='0' y='14' font-size='13' font-weight='700' fill='#8A8F98' font-family='Malgun Gothic,Apple SD Gothic Neo,sans-serif'>원</text></svg>";
+  var st = document.createElement('style');
+  st.textContent = "input[data-money]{text-align:right;padding-right:28px !important;background-repeat:no-repeat !important;background-position:right 8px center !important;background-size:18px 18px !important;background-image:url(\"data:image/svg+xml;utf8,"+encodeURIComponent(svg)+"\") !important;}"
+    + ".piv-won input[data-money]{background-image:none !important;}";
+  document.head.appendChild(st);
+  function start(){
+    scan(document.body);
+    new MutationObserver(function(muts){
+      for(var i=0;i<muts.length;i++){ var a = muts[i].addedNodes; for(var j=0;j<a.length;j++) scan(a[j]); }
+    }).observe(document.body, {childList:true, subtree:true});
+  }
+  if(document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  window.moneyEnhanceScan = scan;
+})();
+</script>
 </body>
 </html>
