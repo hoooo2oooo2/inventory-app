@@ -27739,6 +27739,9 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
   const isSharedCode = isBdCodeShared(code);
   // 대표 상품명 + 별칭 상품명(aliasNames — 공유코드끼리 병합해서 흡수된 상품명) 전부 대상
   const bdNameKeys = new Set([normName(bdRow.name), ...((bdRow.aliasNames||[]).map(normName))].filter(Boolean));
+  // 공용코드(ss소장) 판매 행은 코드로는 상품을 못 정하므로, 업로드 때와 똑같이 '상품명 매칭 결과가 이 백데이터 행'인 것만 대상
+  const _nameMap = getBdNameMap();
+  const ownsByName = r=>{ if(bdRow.id==null) return true; const o=_nameMap[normName(r.model_name)]; return !!o && String(o.id)===String(bdRow.id); };
 
   const today = new Date();
   const defEffDate=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
@@ -27762,7 +27765,7 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
         // ss소장은 아니지만 백데이터에 같은 코드를 쓰는 서로 다른 상품이 실제로 등록돼 있는 경우
         // (예: SSCOB100처럼 의도한 공유코드는 아니지만 결과적으로 겹치게 된 코드) — 이 코드(+별칭코드)로
         // 들어온 행 전체를 가져온 뒤 상품명으로 다시 걸러서, 코드가 같은 다른 상품 매출과 섞이지 않게 한다.
-        const codes=[...new Set([code, ...((bdRow.aliasCodes||[]).map(c=>String(c||'')).filter(Boolean))].filter(Boolean).map(c=>c.toLowerCase()))];
+        const codes=[...new Set([code, ...((bdRow.aliasCodes||[]).map(c=>String(c||'')).filter(Boolean))].filter(Boolean).map(c=>c.toLowerCase()))].filter(c=>c===String(code).toLowerCase() || !_bdIsSharedLit(c));
         const orParts=codes.map(c=>`item_code.ilike.${c}`);
         orParts.push('item_code.eq.');
         ({data,error}=await sb.from('revenue')
@@ -27772,10 +27775,11 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
           .gte('sale_date', monthMD));
       }
       if(error) throw error;
-      revRows=(data||[]).filter(r=>bdNameKeys.has(normName(r.model_name)));
+      revRows=(data||[]).filter(r=>bdNameKeys.has(normName(r.model_name)) && ownsByName(r));
     } else {
       // 대표코드 + 별칭코드(aliasCodes) 전부 대상 — 코드가 달라도 같은 상품이면 함께 반영
-      const codes=[code, ...((bdRow.aliasCodes||[]).map(c=>String(c||'')).filter(Boolean))];
+      // 공용코드(ss소장 등)는 별칭코드로 취급하지 않음 — 그 코드를 쓰는 다른 상품 행까지 번지는 사고 방지
+      const codes=[code, ...((bdRow.aliasCodes||[]).map(c=>String(c||'')).filter(Boolean))].filter(c=>!_bdIsSharedLit(c));
       const {data,error}=await sb.from('revenue')
         .select('id,order_qty,settlement,shipping_fee,sale_date,year')
         .in('item_code', codes)
@@ -27783,6 +27787,17 @@ async function propagateBdPriceChange(bdRow, oldPrice, effDate){
         .gte('sale_date', monthMD);
       if(error) throw error;
       revRows=data||[];
+      // 이 상품이 별칭 상품명으로도 팔리는 경우(공용코드로 들어온 판매): 상품명 매칭 결과가 이 행인 것만 추가
+      if(bdNameKeys.size){
+        const {data:sd,error:se}=await sb.from('revenue')
+          .select('id,order_qty,settlement,shipping_fee,model_name,sale_date,year')
+          .or('item_code.ilike.ss소장,item_code.ilike.ss 소장,item_code.ilike.소장,item_code.eq.')
+          .eq('year', curYear)
+          .gte('sale_date', monthMD);
+        if(se) throw se;
+        const have=new Set(revRows.map(r=>r.id));
+        (sd||[]).filter(r=>bdNameKeys.has(normName(r.model_name)) && ownsByName(r) && !have.has(r.id)).forEach(r=>revRows.push(r));
+      }
     }
   } catch(e){ console.warn('revenue 단가전파 조회 실패:',e); return 0; }
   if(!revRows.length) return 0;
@@ -28015,6 +28030,7 @@ function bdRenderAliasChips(){
 function bdAddAliasChip(){
   const inp=document.getElementById('bdAliasInput'); if(!inp) return;
   const v=(inp.value||'').trim(); if(!v) return;
+  if(_bdIsSharedLit(v)){ alert('"'+v+'"는 여러 상품이 함께 쓰는 공용코드라 별칭코드로 등록할 수 없습니다.\n공용코드 상품은 "별칭 상품명"으로 구분해서 등록해주세요.'); inp.value=''; return; }
   if(_bdAliasChips.some(c=>c.toLowerCase()===v.toLowerCase())){ inp.value=''; return; }
   _bdAliasChips.push(v); inp.value=''; bdRenderAliasChips();
 }
@@ -28046,7 +28062,7 @@ async function saveBdModal(){
   const name = document.getElementById('bdName').value.trim();
   const price = document.getElementById('bdPrice').value!==''?parseFloat(document.getElementById('bdPrice').value):null;
   const editKey = document.getElementById('bdEditKey').value;
-  const aliasCodes = _bdAliasChips.slice();
+  const aliasCodes = _bdAliasChips.filter(c=>!_bdIsSharedLit(c));
   const aliasNames = _bdAliasNameChips.slice();
   if(!code){alert('전체상품코드를 입력하세요.');return;}
   if(!name){alert('상품명을 입력하세요.');return;}
@@ -28164,7 +28180,7 @@ async function bdMergeConfirm(targetId){
     ? `\n\n⚠ 두 단가가 다릅니다 — "${src.code}"(${srcPriceTxt})가 대표 단가로 남고, "${tgt.code}"(${tgtPriceTxt})의 단가는 사라집니다.`
     : '';
   if(!confirm(`"${tgt.name}" (코드: ${tgt.code}, ${tgtPriceTxt})를\n"${src.name}" (코드: ${src.code}, ${srcPriceTxt})의 별칭코드로 합칠까요?\n\n합친 뒤 "${tgt.code}" 행은 삭제되고, 앞으로 이 코드로 들어오는 판매·재고 데이터는 전부 "${src.code}" 단가로 매칭됩니다.${priceWarn}`)) return;
-  const mergedAliases=[...new Set([...(src.aliasCodes||[]), tgt.code, ...(tgt.aliasCodes||[])].filter(Boolean))];
+  const mergedAliases=[...new Set([...(src.aliasCodes||[]), tgt.code, ...(tgt.aliasCodes||[])].filter(Boolean))].filter(c=>!_bdIsSharedLit(c));   // 공용코드는 별칭코드로 남기지 않음(아래 별칭 상품명으로 구분)
   // 코드가 ss소장처럼 여러 상품이 공유하는 코드면, 코드만으로는 흡수된 상품을 구분할 수 없어서
   // 앞으로 들어오는 판매 데이터는 "상품명"으로 매칭된다. 그래서 흡수되는 행의 상품명(과 그 행이
   // 이미 갖고 있던 별칭 상품명)을 잃어버리지 않도록 별칭 상품명(aliasNames)으로 남겨둔다.
@@ -28390,8 +28406,8 @@ async function bdConfirmDedupe(){
     for(const g of _bdDedupeGroups){
       const keeper=_bdDedupeKeeper(g);
       const others=g.filter(r=>r.id!==keeper.id);
-      const mergedAliases=[...new Set([...(keeper.aliasCodes||[]), ...others.flatMap(o=>[o.code, ...(o.aliasCodes||[])])].filter(Boolean).filter(c=>c.toLowerCase()!==keeper.code.toLowerCase()))];
-      const mergedNames=[...new Set([...(keeper.aliasNames||[]), ...others.flatMap(o=>o.aliasNames||[])].filter(Boolean))];
+      const mergedAliases=[...new Set([...(keeper.aliasCodes||[]), ...others.flatMap(o=>[o.code, ...(o.aliasCodes||[])])].filter(Boolean).filter(c=>c.toLowerCase()!==keeper.code.toLowerCase()))].filter(c=>!_bdIsSharedLit(c));
+      const mergedNames=[...new Set([...(keeper.aliasNames||[]), ...others.flatMap(o=>[...(o.aliasNames||[]), ...(_bdIsSharedLit(o.code)?[o.name]:[])])].filter(Boolean))].filter(n=>normName(n)!==normName(keeper.name));   // 공용코드 행은 이름으로 남김
       const updatedKeeper={...keeper, aliasCodes:mergedAliases, aliasNames:mergedNames};
       await saveBdToSupabase(updatedKeeper, true);
       for(const o of others){ await deleteBdFromSupabase(o.id); deleted++; }
@@ -28863,6 +28879,9 @@ function normName(s){ return String(s||'').toLowerCase()
   .replace(/\s+/g,''); }
 // 공유코드(ss소장 직접 소싱) — 상품명으로 매칭
 const SHARED_BD_CODES = new Set(['ss소장','ss 소장','소장','ss소장 ']);
+// ★ 공용코드(ss소장 등)는 여러 상품이 함께 쓰는 코드라 '별칭코드'로 저장·사용하면 안 된다 — 별칭코드로 두면 단가 전파·코드 매칭이
+//   그 코드를 쓰는 모든 상품에 번진다(2026-10-23, K-113 단가 변경이 ss소장 판매 행 전체를 덮은 사고). 공용코드 상품은 항상 '상품명'으로만 구분한다.
+function _bdIsSharedLit(c){ return SHARED_BD_CODES.has(String(c==null?'':c).trim().toLowerCase()); }
 // 코드만으로 매칭하면 위험한 "사실상 공유 코드"인지 판정 — ss소장처럼 원래부터 공유코드로 취급하는
 // 것(SHARED_BD_CODES)뿐 아니라, 지금 백데이터에 실제로 같은 코드(대표코드+별칭코드 기준)를 쓰는
 // 서로 다른 상품명이 2개 이상 등록돼 있으면(예: SSCOB100처럼 의도한 공유코드는 아니지만 결과적으로
@@ -28899,7 +28918,7 @@ function _bdSplitAliasCodes(rawAliasCodes){
       if(eq>0){ const code=rest.slice(0,eq), nm=rest.slice(eq+1); if(code&&nm) aliasCodeNames[code.toLowerCase()]=nm; }
     }
     else if(s.startsWith(BD_ALIAS_NAME_PREFIX)) aliasNames.push(s.slice(BD_ALIAS_NAME_PREFIX.length));
-    else aliasCodes.push(s);
+    else if(!_bdIsSharedLit(s)) aliasCodes.push(s);   // 이미 저장돼 있는 공용코드 별칭은 읽을 때 무시(상품명 매칭은 aliasNames로 유지됨)
   });
   return {aliasCodes, aliasNames, aliasCodeNames};
 }
