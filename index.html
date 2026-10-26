@@ -38212,10 +38212,26 @@ function rtRender(){
   document.getElementById('rtPager').innerHTML = _rgmPagerHtml(_rtPage, RT_PAGE_SIZE, list.length, 'rtGoto');
 }
 
+// 저장된 건의 구분을 [수정하기] 없이 바로 고르는 선택칸 (목록·상세 팝업 공용) — 고르면 구분만 저장
+function _rtCatSelectHtml(r, fromView){
+  const opts = [...RT_CATS]; if(r.cat && !opts.includes(r.cat)) opts.push(r.cat);   // 목록에 없는 옛 구분 값도 유지
+  const st = r.cat ? (RT_CAT_STYLE[r.cat]||'background:var(--slate-200);color:var(--slate-700);') : 'background:var(--bg2);color:var(--tx2);border:1px dashed var(--bd);';
+  return `<select class="cp-stsel" style="${st}" onclick="event.stopPropagation()" onchange="rtCatSave('${r.id}',this,${fromView?'true':'false'})"><option value="">구분 선택</option>${opts.map(o=>`<option value="${_esc(o)}" ${o===r.cat?'selected':''}>${_esc(o)}</option>`).join('')}</select>`;
+}
+async function rtCatSave(id, el, fromView){
+  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); rtRender(); return; }
+  const cat = el.value; el.disabled = true;
+  const res = await _rtMutate(id, (base)=> (base.cat||'')===cat ? null : { ...base, cat });   // 서버 최신본에 구분만 얹는다
+  if(!res.ok) toast(_rtMutMsg(res.err));
+  await rtReload();
+  if(res.ok){ toast(cat ? `구분이 '${cat}'(으)로 저장되었습니다.` : '구분이 비워졌습니다.'); }
+  if(fromView) rtOpenView(id);   // 상세 팝업도 저장된 값으로 다시 그림
+}
 function _rtRowHtml(r, canEdit){
   const wr = (v,cls)=>`<td class="rt-l rt-wrapc ${cls}">${_esc(v||'')}</td>`;
   const ell = (v,small)=>`<td class="rt-l"><div class="rt-ell${small?' rt-ell-s':''}">${_esc(v||'')}</div></td>`;   // 길면 … 으로 줄임(전체는 행을 눌러 팝업에서)
-  const cat = r.cat ? `<span class="rt-pill" style="${RT_CAT_STYLE[r.cat]||'background:var(--slate-200);color:var(--slate-700);'}">${_esc(r.cat)}</span>` : '';
+  const cat = canEdit ? _rtCatSelectHtml(r, false)
+    : (r.cat ? `<span class="rt-pill" style="${RT_CAT_STYLE[r.cat]||'background:var(--slate-200);color:var(--slate-700);'}">${_esc(r.cat)}</span>` : '');
   const done = r.done
     ? `<button class="rt-donebtn rt-ok" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 미완료로 되돌립니다"`:'disabled'}>✔ 완료</button>`
     : `<button class="rt-donebtn rt-wait" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 완료 처리합니다"`:'disabled'}>⏳ 미완료</button>`;
@@ -38251,7 +38267,7 @@ function rtOpenView(id){
   _rtViewId = id;
   const v = (label,val,cls)=>`<div class="rt-v ${cls||''}"><div class="rt-vl">${label}</div><div class="rt-vv">${_esc(val==null?'':String(val))||'&nbsp;'}</div></div>`;
   document.getElementById('rtViewBody').innerHTML =
-      v('구분',r.cat) + v('접수자',r.staff) + v('접수일',r.date)
+      (_rtCanEdit() ? `<div class="rt-v"><div class="rt-vl">구분</div><div class="rt-vv">${_rtCatSelectHtml(r,true)}</div></div>` : v('구분',r.cat)) + v('접수자',r.staff) + v('접수일',r.date)
     + v('구매일',r.buyDate) + v('배송비',_rtFmtShip(r.ship)) + v('수취인명',r.recipient)
     + v('연락처',r.phone) + v('주소',r.addr,'rt-v2')
     + v('상품명',(r.product||'') + (r.productCode ? '\n['+r.productCode+']' : ''),'rt-v2') + v('요청수량',r.qty)
