@@ -26733,6 +26733,16 @@ async function downloadDailyExcel(){
       else if(/<sheetView[^>]*>/.test(sx)) sx=sx.replace(/(<sheetView[^>]*>)/, `$1${paneXml}`);
       zip.file(`xl/worksheets/sheet${k}.xml`,sx);
     }
+    // 상세데이터: 1~3행(제목·빈줄·헤더) 틀고정 → A4가 스크롤 시작점. 시트 순서상 제품별_판매현황 바로 다음.
+    {
+      const k=uniProdSheetIdx+1;
+      const paneXml='<pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A4" sqref="A4"/>';
+      let sx=await zip.file(`xl/worksheets/sheet${k}.xml`).async('string');
+      if(/<pane /.test(sx)){ /* 이미 있으면 손대지 않음 */ }
+      else if(/<sheetView([^>]*)\/>/.test(sx)) sx=sx.replace(/<sheetView([^>]*)\/>/, `<sheetView$1>${paneXml}</sheetView>`);
+      else if(/<sheetView[^>]*>/.test(sx)) sx=sx.replace(/(<sheetView[^>]*>)/, `$1${paneXml}`);
+      zip.file(`xl/worksheets/sheet${k}.xml`,sx);
+    }
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     _saveBlob(blob,fileName);
     return;
