@@ -26670,12 +26670,12 @@ async function downloadDailyExcel(){
   const s3=[];
   s3.push([detailTitle]);
   s3.push([]);
-  s3.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2','우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수','배송비','판매가','매입액','마진','마진율','개당단가']);
-  detail.forEach(r=>s3.push([r.year,r.date,r.ch,r.orderNo,r.buyer,r.receiver,r.phone1,r.phone2,r.zip,r.addr,r.itemType,r.itemCode,r.modelName,r.orderQty,r.shipQty,r.shipping,r.salePrice,r.costPrice,r.margin,r.marginRate,r.unitCost]));
+  s3.push(['년도','날짜','판매처','주문번호','구매자명','수취인','연락처1','연락처2','우편번호','주소','제품구분','상품코드','모델명','주문수량','출고수','배송비','판매가','정산예정금액','매입액','마진','마진율','개당단가']);
+  detail.forEach(r=>s3.push([r.year,r.date,r.ch,r.orderNo,r.buyer,r.receiver,r.phone1,r.phone2,r.zip,r.addr,r.itemType,r.itemCode,r.modelName,r.orderQty,r.shipQty,r.shipping,r.salePrice,r.settlement,r.costPrice,r.margin,r.marginRate,r.unitCost]));
   const ws3=U.aoa_to_sheet(_xmlSafeAoa(s3));
-  ws3['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},{wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},{wch:8},{wch:10},{wch:10},{wch:12},{wch:8},{wch:10}];
-  sc(ws3,0,0,SECT); for(let c=0;c<21;c++) sc(ws3,2,c,HEAD);
-  for(let i=3;i<s3.length;i++){ [15,16,17,20].forEach(c=>fmt(ws3,i,c,WON)); fmt(ws3,i,18,MARGIN_FMT); fmt(ws3,i,19,PCT); }
+  ws3['!cols']=[{wch:6},{wch:8},{wch:12},{wch:18},{wch:10},{wch:10},{wch:14},{wch:14},{wch:8},{wch:30},{wch:10},{wch:12},{wch:35},{wch:8},{wch:8},{wch:8},{wch:10},{wch:12},{wch:10},{wch:12},{wch:8},{wch:10}];
+  sc(ws3,0,0,SECT); for(let c=0;c<22;c++) sc(ws3,2,c,HEAD);
+  for(let i=3;i<s3.length;i++){ [15,16,17,18,21].forEach(c=>fmt(ws3,i,c,WON)); fmt(ws3,i,19,MARGIN_FMT); fmt(ws3,i,20,PCT); }
   U.book_append_sheet(wb,ws3,'상세데이터');
 
   // ── 광고비 시트 (선택월 1일~기준일) ──
