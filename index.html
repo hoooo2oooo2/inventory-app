@@ -2978,6 +2978,11 @@ html.mob-native .lcr-det-val{font-size:15px;}
 /* 보기 모드: 값은 또렷하게 보이되 입력은 막음 */
 :is(#pivModal,#pivCoModal) .piv-view .field input:disabled,:is(#pivModal,#pivCoModal) .piv-view .field select:disabled,:is(#pivModal,#pivCoModal) .piv-view .field textarea:disabled{background:var(--bg2);color:var(--tx);opacity:1;-webkit-text-fill-color:var(--tx);cursor:default;}
 #pivModal .piv-view .piv-items button,#pivModal .piv-view .cs-mini-btn{display:none;}
+/* 발행금액 강조 — 배경·글자색을 함께 고정(다크모드에서도 대비 유지), 보기 모드(disabled) 규칙보다 우선 */
+#pivModal .field.piv-amt label{color:#B45309;font-weight:800;}
+#pivModal .field.piv-amt input,#pivModal .piv-view .field.piv-amt input:disabled{background:#FEF3C7;color:#7C2D12;-webkit-text-fill-color:#7C2D12;opacity:1;border:2px solid #F59E0B;font-size:17px;font-weight:800;}
+:root[data-theme="dark"] #pivModal .field.piv-amt label{color:#FBBF24;}
+:root[data-theme="dark"] #pivModal .field.piv-amt input,:root[data-theme="dark"] #pivModal .piv-view .field.piv-amt input:disabled{background:#4A3410;color:#FDE68A;-webkit-text-fill-color:#FDE68A;border-color:#F59E0B;}
 /* ── 가로 스크롤 제거: 표 폭을 창(한 화면)에 맞춤 (2026-10-21) ── */
 /* 발주 인사이트: 핵심 열만 한 줄로 보이는 구조로 바뀌어(2026-10) 여기 규칙은 #page-insight 쪽 CSS 로 이동 */
 /* 반품관리: 열 최소 폭·여백을 줄여 한 화면에 */
@@ -5164,13 +5169,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
         </div>
       </div>
 
-      <div class="field"><label>금액 (발행금액)</label><input type="number" id="pivFAmount" min="0" oninput="pivCalcMargin()"></div>
+      <div class="field piv-amt"><label>금액 (발행금액)</label><input type="number" id="pivFAmount" min="0" oninput="pivCalcMargin()"></div>
       <div class="field"><label>단가 합계 (품목 기준)</label><input type="text" id="pivFCostView" readonly disabled></div>
       <div class="field"><label>마진 (금액 − 단가 합계)</label><input type="number" id="pivFMargin"></div>
 
       <div class="field"><label>발행일자</label><input type="date" id="pivFIssueDate"></div>
       <div class="field"><label>발급여부</label>
-        <select id="pivFIssued" onchange="pivIssuedChanged()"><option value="미발급">미발급</option><option value="발행요청">발행요청</option><option value="발급완료">발급완료</option><option value="발급취소">발급취소</option></select></div>
+        <select id="pivFIssued" onchange="pivIssuedSel()"><option value="미발급">미발급</option><option value="발행요청">발행요청</option><option value="발급완료">발급완료</option><option value="발급취소">발급취소</option></select></div>
       <div class="field"><label>입금여부</label>
         <select id="pivFPaid" onchange="pivPaidChanged()"><option value="" hidden>— (발급취소)</option><option value="미입금">미입금</option><option value="입금완료">입금완료</option></select></div>
 
@@ -36914,7 +36919,9 @@ function _pivSetMode(mode){
   const modal = document.querySelector('#pivModal .modal'); if(!modal) return;
   modal.classList.toggle('piv-view', mode==='view');
   const ctrls = modal.querySelectorAll('.piv-grid input, .piv-grid select, .piv-grid textarea');
-  if(mode==='view'){ ctrls.forEach(c=>{ c.disabled = true; }); }
+  if(mode==='view'){ ctrls.forEach(c=>{ c.disabled = true; });
+    const is = document.getElementById('pivFIssued'); if(is && _pivEditId && _pivCanEdit()) is.disabled = false;   // 발급여부만은 [수정하기] 없이 바로 변경 가능
+  }
   else {
     ctrls.forEach(c=>{ if(c.id!=='pivFCostView') c.disabled = false; });
     pivApplyLock(); pivIssuedChanged();   // 영수처리·발급여부에 따른 잠금 상태 복원
@@ -36924,6 +36931,44 @@ function _pivSetMode(mode){
   if(sv) sv.disabled = (mode==='view');
   const t = document.getElementById('pivModalTitle');
   if(t) t.textContent = mode==='view' ? '🧾 계산서 상세' : (_pivEditId ? '🧾 계산서 수정' : '🧾 계산서 등록');
+}
+// 발급여부 선택 — 수정 모드면 폼만 갱신, 보기 모드면 발급여부만 바로 저장(나머지 항목은 그대로)
+function pivIssuedSel(){
+  if(_pivMode==='view') pivQuickIssued(); else pivIssuedChanged();
+}
+let _pivQuickBusy = false;
+async function pivQuickIssued(){
+  const sel = document.getElementById('pivFIssued');
+  const id = _pivEditId; if(!id || _pivQuickBusy) return;
+  const cur = _pivRows.find(x=>x.id===id);
+  const revert = ()=>{ if(sel && cur) sel.value = cur.issued || '미발급'; };
+  if(!cur || !_pivCanEdit()){ toast('수정 권한이 없습니다.'); revert(); return; }
+  const next = sel.value;
+  if(next===(cur.issued||'미발급')) return;
+  const patch = { issued: next };
+  if(next==='발급취소'){ patch.paid = ''; patch.dueDate = ''; }
+  else if(!cur.paid){   // 발급취소였던 건을 되살리면 입금여부는 미입금으로 — 입금예정일이 있어야 함
+    if(!cur.dueDate){ toast('발급취소였던 건은 [수정하기]에서 입금예정일을 지정한 뒤 변경해주세요.'); revert(); return; }
+    patch.paid = '미입금';
+  }
+  _pivQuickBusy = true; sel.disabled = true;
+  let savedRec = null;
+  const ok = await _pivMutate(PIV_KEY, list=>{
+    const i = list.findIndex(x=>x.id===id);
+    if(i<0) throw new Error('해당 건을 찾을 수 없습니다. 목록을 새로고침해주세요.');
+    list[i] = savedRec = { ...list[i], ...patch, updatedAt:new Date().toISOString() };
+    return list;
+  });
+  _pivQuickBusy = false;
+  if(!ok){ sel.disabled = false; revert(); return; }
+  try{ await _pbSyncFromInvoice(savedRec); }catch(e){ console.warn('전화구매건 연동 반영 실패', e); }
+  if(savedRec.issued==='발행요청'){
+    if(_pivIsAlertAdmin()) _pivReqLastCount = _pivRows.filter(r=>r.issued==='발행요청').length;
+    else _pivReqBroadcast();
+  }
+  pivRender();
+  pivOpenModal(id);   // 저장된 값으로 보기 화면 다시 그림(입금여부 등 연동 값 반영)
+  toast('발급여부가 '+next+'(으)로 변경되었습니다.');
 }
 function pivEnterEdit(){ _pivSetMode('edit'); setTimeout(()=>document.getElementById('pivFCompany')?.focus(), 50); }
 function pivCancelClick(){
