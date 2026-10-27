@@ -38380,7 +38380,7 @@ function rtRender(){
     + `<span class="rt-pill rt-pill-n">${mm} 접수 ${monthRows.length}건</span>`
     + `<span class="rt-pill rt-pill-ok">${mm} 완료 ${monthDone}건</span>`
     + (failN ? `<span class="rt-pill" style="background:var(--red-100);color:var(--red-700);">수거안됨 ${failN}건 · 재수거 필요</span>` : '')
-    + `<span class="rt-hint">맨 위 입력 줄: Tab=다음 칸 · Enter=저장하고 다음 줄 · 완료 전 건(미완료·입고)은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용</span>`;
+    + `<span class="rt-hint">맨 위 입력 줄: Tab·←→=칸 이동 · Enter=저장하고 다음 줄 · 완료 전 건(미완료·입고)은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용</span>`;
 
   const canEdit = _rtCanEdit();
   const maxP = Math.max(1, Math.ceil(list.length/RT_PAGE_SIZE));
@@ -38511,6 +38511,7 @@ function rtItemQty(i, el){ el.value = el.value.replace(/\D/g,''); if(_rtItems[i]
 function rtItemDel(i){ _rtItems.splice(i,1); rtItemsRender(); document.getElementById('rtE_product')?.focus(); }
 function rtChipKey(e){
   if(e.isComposing || e.keyCode===229) return;
+  if((e.key==='ArrowLeft' || e.key==='ArrowRight') && _rtArrowNav(e, e.target)) return;
   if(e.key==='Enter'){ e.preventDefault(); document.getElementById('rtE_product')?.focus(); }   // 수량 입력 끝 → 다음 제품 검색
 }
 function rtEntryItemPicked(el){
@@ -38618,8 +38619,27 @@ function rtEntryProdBlur(el){
     if(el.value.trim() && el.value.trim()!==pr.name){ el.value = ''; el._prod = { name:'', code:'' }; toast('상품명은 검색 목록에서 골라 선택해주세요.'); }
   }, 150);
 }
+// 입력 줄에서 ←/→ 로 칸 이동: 글자 입력칸은 커서가 맨 앞(←)/맨 뒤(→)일 때만 옆 칸으로(글자 편집은 방해하지 않음), 선택칸은 바로 이동
+function _rtArrowNav(e, el){
+  if(e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return false;
+  const dir = e.key==='ArrowRight' ? 1 : -1;
+  if(el.tagName==='INPUT'){
+    const s0 = el.selectionStart, s1 = el.selectionEnd, n = String(el.value||'').length;
+    if(s0!==s1) return false;                       // 글자를 선택해 둔 상태면 기본 동작
+    if(dir===1 && s0<n) return false;
+    if(dir===-1 && s0>0) return false;
+  }
+  const row = el.closest('tr'); if(!row) return false;
+  const f = [...row.querySelectorAll('.rt-in, .rt-car, .rt-chip-q')].filter(x=>!x.disabled && x.offsetParent!==null);
+  const i = f.indexOf(el); if(i<0) return false;
+  const t = f[i+dir]; if(!t) return false;
+  e.preventDefault(); t.focus();
+  if(t.tagName==='INPUT'){ const pos = dir===1 ? 0 : String(t.value||'').length; try{ t.setSelectionRange(pos,pos); }catch(x){} }
+  return true;
+}
 function rtEntryKey(e, el){
   if(e.isComposing || e.keyCode===229) return;   // 한글 조합 중
+  if((e.key==='ArrowLeft' || e.key==='ArrowRight') && _rtArrowNav(e, el)) return;
   const k = el.dataset.k;
   if(el.dataset.noSave && !(k==='product' && _rtDropOpen())) return;   // 팝업 안 검색칸: 목록이 닫혀 있으면 Enter 로 저장하지 않음
   if(k==='product' && _rtDropOpen()){
@@ -38977,7 +38997,7 @@ function cpRender(){
   document.getElementById('cpSumBar').innerHTML =
     `<span class="rt-pill rt-pill-wait">미처리 ${openN}건</span>`
     + `<span class="rt-pill rt-pill-n">${mm} 반품 ${nRet}건</span><span class="rt-pill rt-pill-n">${mm} 교환 ${nEx}건</span>`
-    + `<span class="rt-hint">맨 위 입력 줄: Tab=다음 칸 · Enter=저장하고 다음 줄 (엑셀 업로드도 가능) · 미처리 건은 월과 관계없이 항상 표시 · 처리여부는 목록에서 바로 변경</span>`;
+    + `<span class="rt-hint">맨 위 입력 줄: Tab·←→=칸 이동 · Enter=저장하고 다음 줄 (엑셀 업로드도 가능) · 미처리 건은 월과 관계없이 항상 표시 · 처리여부는 목록에서 바로 변경</span>`;
 
   const canEdit = _rtCanEdit();
   const maxP = Math.max(1, Math.ceil(list.length/CP_PAGE_SIZE));
