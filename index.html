@@ -1723,6 +1723,14 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .rt-drop-e{padding:10px 12px;color:var(--tx2);font-size:13px;}
 @keyframes rtflash{from{background:var(--prl);}to{background:transparent;}}
 .rt-table tbody tr.rt-flash td{animation:rtflash 2.2s ease-out;}
+.rt-chips{margin-top:6px;display:flex;flex-direction:column;gap:4px;}
+.rt-chip{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:3px 4px 3px 8px;}
+.rt-chip-n{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx);}
+.rt-chip-q{width:48px;text-align:center;border:1px solid var(--bd);border-radius:6px;background:var(--bg2);color:var(--tx);font-family:inherit;font-size:13.5px;padding:4px 2px;outline:none;}
+.rt-chip-q:focus{border-color:var(--pr);}
+.rt-chip-x{border:none;background:none;color:var(--tx2);cursor:pointer;font-size:13px;padding:0 4px;}
+.rt-chip-x:hover{color:var(--red-500);}
+.rt-it{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;line-height:1.7;}
 .rt-hfilter{display:block;margin:5px auto 0;width:92px;font-size:12.5px;font-weight:600;padding:3px 4px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-family:inherit;cursor:pointer;}
 .rt-hfilter.on{border-color:var(--brand);color:var(--brand);font-weight:800;}
 .rt-view{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;}
@@ -38386,6 +38394,15 @@ async function rtCatSave(id, el, fromView){
   if(res.ok){ toast(cat ? `구분이 '${cat}'(으)로 저장되었습니다.` : '구분이 비워졌습니다.'); }
   if(fromView) rtOpenView(id);   // 상세 팝업도 저장된 값으로 다시 그림
 }
+function _rtMulti(r){ return Array.isArray(r.items) && r.items.length>1; }
+function _rtProdCell(r){
+  if(!_rtMulti(r)) return `<td class="rt-l rt-wrapc rt-w-xl">${_esc(r.product||'')}</td>`;
+  return `<td class="rt-l rt-w-xl">${r.items.map(it=>`<div class="rt-it" title="${_esc(it.name)}">• ${_esc(it.name)}</div>`).join('')}</td>`;
+}
+function _rtQtyCell(r){
+  if(!_rtMulti(r)) return `<td class="rt-nw">${_esc(r.qty==null?'':r.qty)}</td>`;
+  return `<td class="rt-nw">${r.items.map(it=>`<div class="rt-it">${_esc(it.qty)}</div>`).join('')}</td>`;
+}
 function _rtRowHtml(r, canEdit){
   const wr = (v,cls)=>`<td class="rt-l rt-wrapc ${cls}">${_esc(v||'')}</td>`;
   const ell = (v,small)=>`<td class="rt-l"><div class="rt-ell${small?' rt-ell-s':''}">${_esc(v||'')}</div></td>`;   // 길면 … 으로 줄임(전체는 행을 눌러 팝업에서)
@@ -38407,8 +38424,8 @@ function _rtRowHtml(r, canEdit){
     <td class="rt-nw"><b>${_esc(r.recipient||'')}</b></td>
     <td class="rt-nw">${_esc(r.phone||'')}</td>
     ${ell(r.addr)}
-    ${wr(r.product,'rt-w-xl')}
-    <td class="rt-nw">${_esc(r.qty==null?'':r.qty)}</td>
+    ${_rtProdCell(r)}
+    ${_rtQtyCell(r)}
     ${ell(r.symptom,true)}
     ${ell(r.memo,true)}
     <td class="rt-nw" onclick="event.stopPropagation()">${trkCell}</td>
@@ -38429,7 +38446,9 @@ function rtOpenView(id){
       (_rtCanEdit() ? `<div class="rt-v"><div class="rt-vl">구분</div><div class="rt-vv">${_rtCatSelectHtml(r,true)}</div></div>` : v('구분',r.cat)) + v('접수자',r.staff) + v('접수일',r.date)
     + v('구매일',r.buyDate) + v('배송비',_rtFmtShip(r.ship)) + v('수취인명',r.recipient)
     + v('연락처',r.phone) + v('주소',r.addr,'rt-v2')
-    + v('상품명',(r.product||'') + (r.productCode ? '\n['+r.productCode+']' : ''),'rt-v2') + v('요청수량',r.qty)
+    + (_rtMulti(r)
+        ? v('상품명 (' + r.items.length + '종)', r.items.map(it=>'• ' + it.name + (it.code ? ' ['+it.code+']' : '') + '  × ' + it.qty).join('\n'), 'rt-v2') + v('요청수량(합계)', r.qty)
+        : v('상품명',(r.product||'') + (r.productCode ? '\n['+r.productCode+']' : ''),'rt-v2') + v('요청수량',r.qty))
     + v('증상',r.symptom,'rt-v3') + v('처리내용',r.memo,'rt-v3')
     + v('반송장번호', r.trackNo ? _rtCarName(r.carrier)+' '+r.trackNo : '', 'rt-v2')
     + (() => { const i = rtTrackInfo(r); if(!i) return v('배송상태',''); const t = i.t;
@@ -38449,15 +38468,42 @@ function rtPickProduct(){
   bdPickerOpen({ title:'🔍 수거 상품 선택 (코드·상품명)', initial:'', allowFree:false, onPick:r=>{
     document.getElementById('rtFProduct').value = r.name || r.code || '';
     document.getElementById('rtFProductCode').value = r.code || '';
+    document.getElementById('rtFQty').disabled = false;
   }});
 }
 function rtClearProduct(){
   document.getElementById('rtFProduct').value = '';
   document.getElementById('rtFProductCode').value = '';
+  document.getElementById('rtFQty').disabled = false;
 }
 // ───────────────── 엑셀처럼 바로 입력하는 줄 (표 맨 위) ─────────────────
 //  Tab=다음 칸 / Enter=저장하고 같은 자리에 새 빈 줄 / 구분=선택 / 접수자=입력하는 사람 자동 / 상품명=백데이터 검색해서 선택
 //  날짜는 숫자만 쳐도 됨(1022 → 올해 10-22, 20261022, 26.10.22 …). 한글 입력 중 Enter(조합 확정)는 저장으로 보지 않음.
+// 수거할 제품이 여러 종류일 때: 상품을 고를 때마다 아래에 한 줄씩 쌓임(제품별 수량 입력, ✕로 빼기)
+//  Enter(제품 선택) → 수량 입력 → Enter → 상품 검색칸으로 돌아와 다음 제품 추가 / 검색칸이 빈 채로 Enter → 저장
+let _rtItems = [];
+function _rtItemsTotal(){ return _rtItems.reduce((t,x)=>t+(parseInt(x.qty,10)||0),0); }
+function _rtItemsTotText(){ return _rtItems.length ? `${_rtItemsTotal()}개${_rtItems.length>1?` (${_rtItems.length}종)`:''}` : '—'; }
+function rtItemsRender(){
+  const box = document.getElementById('rtE_items'); if(!box) return;
+  box.innerHTML = _rtItems.map((it,i)=>`<div class="rt-chip"><span class="rt-chip-n" title="${_esc(it.name)}">${_esc(it.name)}</span><input class="rt-chip-q" inputmode="numeric" value="${_esc(it.qty)}" title="수량" onfocus="this.select()" oninput="rtItemQty(${i},this)" onkeydown="rtChipKey(event)"><button type="button" class="rt-chip-x" onclick="rtItemDel(${i})" title="이 제품 빼기">✕</button></div>`).join('');
+  const te = document.getElementById('rtE_qtyTot'); if(te) te.textContent = _rtItemsTotText();
+}
+function rtItemQty(i, el){ el.value = el.value.replace(/\D/g,''); if(_rtItems[i]) _rtItems[i].qty = el.value; const te = document.getElementById('rtE_qtyTot'); if(te) te.textContent = _rtItemsTotText(); }
+function rtItemDel(i){ _rtItems.splice(i,1); rtItemsRender(); document.getElementById('rtE_product')?.focus(); }
+function rtChipKey(e){
+  if(e.isComposing || e.keyCode===229) return;
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('rtE_product')?.focus(); }   // 수량 입력 끝 → 다음 제품 검색
+}
+function rtEntryItemPicked(el){
+  const pr = el._prod; if(!pr || !pr.name) return;
+  const ex = _rtItems.findIndex(x=>x.code===pr.code && x.name===pr.name);
+  if(ex>=0) _rtItems[ex].qty = String((parseInt(_rtItems[ex].qty,10)||0)+1); else _rtItems.push({ name:pr.name, code:pr.code, qty:'1' });
+  el.value = ''; el._prod = { name:'', code:'' };
+  rtItemsRender();
+  const q = document.querySelectorAll('#rtE_items .rt-chip-q'), t = q[ex>=0 ? ex : q.length-1];
+  if(t){ t.focus(); t.select(); }   // 바로 수량 입력
+}
 let _rtEntryBusy = false, _rtFlashId = null, _rtDropIdx = -1, _rtDropList = [], _rtDropEl = null;   // 선택된 상품은 각 입력칸(el._prod)에 보관
 function _rtUserName(){ const u = window.__CURRENT_USER || {}; return u.name || u.username || ''; }
 function rtBuildEntry(){
@@ -38473,8 +38519,8 @@ function rtBuildEntry(){
     <td class="rt-w-s">${inp('recipient','수취인명 *')}</td>
     <td class="rt-w-m">${inp('phone','연락처',' onblur="this.value=_rtFmtPhone(this.value)"')}</td>
     <td class="rt-w-l">${inp('addr','주소')}</td>
-    <td class="rt-w-xl">${inp('product','🔍 상품 검색(코드·이름)',' data-next="rtE_qty" oninput="rtEntryProdInput(this)" onfocus="rtEntryProdInput(this)" onblur="rtEntryProdBlur(this)"')}</td>
-    <td class="rt-w-s">${inp('qty','수량',' inputmode="numeric"')}</td>
+    <td class="rt-w-xl">${inp('product','🔍 상품 검색(코드·이름) — 여러 개 추가 가능',' data-onpick="rtEntryItemPicked" oninput="rtEntryProdInput(this)" onfocus="rtEntryProdInput(this)" onblur="rtEntryProdBlur(this)"')}<div class="rt-chips" id="rtE_items"></div></td>
+    <td class="rt-w-s rt-es" id="rtE_qtyTot" title="제품별 수량은 상품 칸에서 제품마다 입력합니다">—</td>
     <td class="rt-w-l">${inp('symptom','증상')}</td>
     <td class="rt-w-l">${inp('memo','처리내용')}</td>
     <td class="rt-w-trk"><div class="rt-trk"><select class="rt-car" id="rtE_carrier" data-k="carrier"${kd}>${RT_CARRIERS.map(c=>`<option value="${c[0]}" ${c[0]===RT_DEF_CAR?'selected':''}>${c[2]}</option>`).join('')}</select>${inp('trackNo','반송장번호',' inputmode="numeric" style="width:122px;min-width:0;"')}</div></td>
@@ -38572,7 +38618,7 @@ async function rtEntrySave(){
   const bad = (k, msg)=>{ const el = document.getElementById('rtE_'+k); el?.classList.add('rt-bad'); toast(msg); el?.focus(); };
   document.querySelectorAll('#rtEntry .rt-bad').forEach(x=>x.classList.remove('rt-bad'));
   // 비어 있는 줄(기본값만 있음)에서 Enter 는 아무 일도 하지 않음
-  const filled = ['cat','buyDate','ship','recipient','phone','addr','product','qty','symptom','memo','trackNo'].some(k=>g(k));
+  const filled = _rtItems.length>0 || ['cat','buyDate','ship','recipient','phone','addr','product','symptom','memo','trackNo'].some(k=>g(k));
   if(!filled) return;
   const date = _rtParseDate(g('date'));
   if(!date){ bad('date','접수일을 입력하세요. 예) 1022'); return; }
@@ -38581,11 +38627,12 @@ async function rtEntrySave(){
   if(!g('recipient')){ bad('recipient','수취인명을 입력하세요.'); return; }
   const trackNo = g('trackNo').replace(/\D/g,'');
   if(trackNo && (trackNo.length<9 || trackNo.length>15)){ bad('trackNo','반송장번호는 숫자 9~15자리로 입력하세요.'); return; }
-  const prodTxt = g('product'), prodSel = document.getElementById('rtE_product')._prod || { name:'', code:'' };
-  if(prodTxt && prodTxt!==prodSel.name){ bad('product','상품명은 검색 목록에서 골라 선택해주세요.'); return; }
+  if(g('product')){ bad('product','검색칸에 글자가 남아 있습니다. 목록에서 상품을 골라 선택하거나 지워주세요.'); return; }
+  const items = _rtItems.map(x=>({ name:x.name, code:x.code, qty:String(parseInt(x.qty,10)||1) }));
+  const prodTxt = items.map(x=>x.name).join(' / '), qtyTot = items.length ? String(items.reduce((t,x)=>t+(+x.qty),0)) : '';
   const carrier = g('carrier') || RT_DEF_CAR, now = new Date().toISOString();
   const full = { id:_pivNewId('rt'), cat:g('cat'), staff:_rtUserName(), date, buyDate, ship:g('ship').replace(/,/g,''), recipient:g('recipient'),
-    phone:_rtFmtPhone(g('phone')), addr:g('addr'), product:prodTxt, productCode: prodTxt ? prodSel.code : '', qty:g('qty'), symptom:g('symptom'), memo:g('memo'),
+    phone:_rtFmtPhone(g('phone')), addr:g('addr'), product:prodTxt, productCode: items.length ? items[0].code : '', items, qty:qtyTot, symptom:g('symptom'), memo:g('memo'),
     done:false, doneAt:'', source:'entry', createdAt:now, updatedAt:now, rev:_pivNewId('v'),
     trackNo, carrier, trackNoAt: trackNo ? now : '', cancel:false };
   const btn = document.getElementById('rtE_save');
@@ -38594,7 +38641,8 @@ async function rtEntrySave(){
   _rtEntryBusy = false; btn.disabled = false; btn.textContent = '↵ 저장';
   if(!ok){ toast('저장에 실패했습니다. 입력한 내용은 그대로 남아 있으니 다시 Enter 를 눌러주세요.'); return; }
   // 새 빈 줄: 접수일만 방금 값을 이어받음(같은 날 여러 건 입력용)
-  ['buyDate','ship','recipient','phone','addr','product','qty','symptom','memo','trackNo'].forEach(k=>{ const el = document.getElementById('rtE_'+k); if(el) el.value = ''; });
+  ['buyDate','ship','recipient','phone','addr','product','symptom','memo','trackNo'].forEach(k=>{ const el = document.getElementById('rtE_'+k); if(el) el.value = ''; });
+  _rtItems = []; rtItemsRender();
   document.getElementById('rtE_cat').value = ''; document.getElementById('rtE_carrier').value = RT_DEF_CAR;
   document.getElementById('rtE_product')._prod = { name:'', code:'' }; document.getElementById('rtE_date').value = date;
   const mEl = document.getElementById('rtMonth'); if(mEl && date.slice(0,7)!==mEl.value) mEl.value = date.slice(0,7);
@@ -38622,6 +38670,7 @@ function rtOpenModal(id){
     document.getElementById('rtF'+suffix).value = v==null ? '' : v;
   });
   document.getElementById('rtFProductCode').value = r.productCode || '';
+  document.getElementById('rtFQty').disabled = _rtMulti(r);   // 제품이 여러 종류인 건은 합계 수량을 직접 고치지 않음(상품 선택 버튼으로 한 제품으로 바꿀 수는 있음)
   _pbSetSelect('rtFCat', r.cat || '', RT_CATS, '선택');
   document.getElementById('rtFCarrier').innerHTML = RT_CARRIERS.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join('');
   document.getElementById('rtFCarrier').value = r.carrier || RT_DEF_CAR;
@@ -38665,6 +38714,9 @@ async function rtSave(){
     const res = await _rtMutate(_rtEditId, (base, t)=>{
       if(!Object.keys(patch).length && !doneChg && !trkChg && !cancelChg) return null;   // 바뀐 게 없으면 쓰지 않음
       const nx = { ...base, ...patch };
+      if('product' in patch || 'qty' in patch){   // 상품·수량이 바뀌면 제품 목록(items)도 맞춤 — 여러 제품 건에서 상품을 그대로 두면 목록 유지
+        if(!_rtMulti(base) || 'product' in patch) nx.items = nx.product ? [{ name:nx.product, code:nx.productCode||'', qty:String(nx.qty||'1') }] : [];
+      }
       if(doneChg){ nx.done = done; nx.doneAt = done ? t : ''; }
       if(trkChg){ nx.trackNo = trackNo; nx.carrier = carrier; nx.trackNoAt = trackNo ? t : ''; if(!cancelChg) nx.cancel = false; }   // 새 반송장 = 재수거 → 취소 해제
       if(cancelChg) nx.cancel = cancelSel;
