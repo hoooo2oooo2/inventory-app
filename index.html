@@ -23343,12 +23343,12 @@ function renderRevSummary(){
   // TOP10 상품 (로켓그로스는 매칭된 상품명 기준으로 병합 — 매칭 안 된 옵션은 "미상"으로 뭉치지 않게 원래 상품명 사용)
   const byProd={};
   thisMonth.forEach(r=>{
-    const k=r.modelName||r.itemCode||'미상';
+    const k=_pName(r);
     if(!byProd[k]) byProd[k]={qty:0,sale:0,settle:0,margin:0};
     byProd[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName); byProd[k].sale+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
   });
   (_rgProdCache[`${cy}-${ymStr(cm)}`]||[]).forEach(r=>{
-    const k=rgResolveName(r.optionId)||r.productName;
+    const k=_pCanon(rgResolveName(r.optionId)||r.productName);
     if(!byProd[k]) byProd[k]={qty:0,sale:0,settle:0,margin:0};
     const fin=rgCalcRowFinance(r);
     byProd[k].qty += (r.qty||0)*rgQtyMultiplier(r.optionId);
@@ -23534,10 +23534,10 @@ function renderRevMonthly(){
 
   // TOP15 (로켓그로스는 '전체' 판매처일 때만, 매칭된 상품명 기준으로 병합)
   const byP={};
-  rows.forEach(r=>{const k=r.modelName||r.itemCode||'미상';if(!byP[k])byP[k]={qty:0,sale:0,settle:0,margin:0};byP[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName);byP[k].sale+=r.salePrice||0;byP[k].settle+=r.settlement||0;byP[k].margin+=r.margin||0;});
+  rows.forEach(r=>{const k=_pName(r);if(!byP[k])byP[k]={qty:0,sale:0,settle:0,margin:0};byP[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName);byP[k].sale+=r.salePrice||0;byP[k].settle+=r.settlement||0;byP[k].margin+=r.margin||0;});
   if(_revSelCh==='ALL'){
     (_rgProdCache[rgYm]||[]).forEach(r=>{
-      const k=rgResolveName(r.optionId)||r.productName;
+      const k=_pCanon(rgResolveName(r.optionId)||r.productName);
       if(!byP[k]) byP[k]={qty:0,sale:0,settle:0,margin:0};
       const fin=rgCalcRowFinance(r);
       byP[k].qty += (r.qty||0)*rgQtyMultiplier(r.optionId);
@@ -23861,7 +23861,7 @@ function renderDailyReport(){
   //   주문수량은 백데이터에 설정된 개입수(코드별 몇개입 세트)를 곱해서 실제 판매 개수로 집계한다.
   const byProd={};
   rows.forEach(r=>{
-    const k=r.modelName||r.itemCode||'미상';
+    const k=_pName(r);
     if(!byProd[k]) byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
     byProd[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName); byProd[k].pkgs.add(pkgKey(r));
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
@@ -23875,7 +23875,7 @@ function renderDailyReport(){
         if(!r.date||r.date<curFrom||r.date>curTo) return;
         const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
         if(qty<=0) return;   // 로켓그로스 원본은 판매 0건인 날도 조회수 등 지표 행이 찍힘 — 실제 판매수량 있는 것만 반영
-        const name=rgResolveName(r.optionId)||r.productName||'미상';
+        const name=_pCanon(rgResolveName(r.optionId)||r.productName||'미상');
         const fin=rgCalcRowFinance(r);
         if(!byProd[name]) byProd[name]={type:rgResolveType(r.optionId)||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
         byProd[name].qty+=qty; byProd[name].saleTotal+=r.revenue||0; byProd[name].settle+=fin.settlement;
@@ -25378,7 +25378,7 @@ function _trendDayMap(year, mmdd, ch){
   _revData.forEach(r=>{
     if(r.year!==year||r.date!==mmdd) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
-    const k=r.modelName||r.itemCode||'미상';
+    const k=_pName(r);
     map[k]=(map[k]||0)+(r.orderQty||0);
   });
   return map;
@@ -25391,7 +25391,7 @@ function _trendTypeMap(years, ch){
     if(!years.includes(r.year)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
     if(!r.itemType) return;
-    const k=r.modelName||r.itemCode||'미상';
+    const k=_pName(r);
     map[k]=r.itemType;
   });
   return map;
@@ -25426,7 +25426,7 @@ function _trendFlagshipSet(ch, anchor){
     if(!keys.has(k)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
     const qty=r.orderQty||0;
-    const name=r.modelName||r.itemCode||'미상';
+    const name=_pName(r);
     if(!stats[name]) stats[name]={qty:0, days:new Set(), segDays:Array.from({length:TREND_FLAGSHIP_SEGMENTS},()=>new Set())};
     stats[name].qty+=qty;
     if(qty>0){
@@ -25483,7 +25483,7 @@ function _trendBulkMap(ch, anchor){
     const k=r.year+'|'+r.date;
     if(!avgKeys.has(k)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
-    const name=r.modelName||r.itemCode||'미상';
+    const name=_pName(r);
     (qtyByName[name]=qtyByName[name]||[]).push(r.orderQty);
   });
   const bulk=new Set();
@@ -25493,7 +25493,7 @@ function _trendBulkMap(ch, anchor){
     if(!recentKeys.has(k)) return;
     if(ch!=='ALL'&&r.ch!==ch) return;
     if(r.orderQty<TREND_BULK_MIN_QTY) return;
-    const name=r.modelName||r.itemCode||'미상';
+    const name=_pName(r);
     const arr=qtyByName[name]; if(!arr||arr.length<TREND_BULK_MIN_SAMPLE) return;
     if(r.orderQty<=Math.max(...arr)) return;   // 평소에도 있었던 수량이면 이례적이지 않음
     const mean=arr.reduce((s,v)=>s+v,0)/arr.length;
@@ -25533,7 +25533,7 @@ function computeWeeklySSReport(){
     const inWeek=weekKeys.has(k), inBase=baseKeys.has(k);
     if(!inWeek && !inBase) return;
     if(inWeek) activeWeekDates.add(k); else activeBaseDates.add(k);
-    const name=r.modelName||r.itemCode||'미상';
+    const name=_pName(r);
     if(r.itemType) typeOf[name]=r.itemType;
     const q=r.orderQty||0;
     if(inWeek){ (weekByName[name]=weekByName[name]||{})[k]=(weekByName[name][k]||0)+q; }
@@ -25780,7 +25780,7 @@ function openTrendBulkDetail(i){
   const keys=new Set([`${todayYmd.year}|${todayYmd.mmdd}`, `${baseYmd.year}|${baseYmd.mmdd}`]);
   const ch=_trendFilter.ch;
   const rows=_revData.filter(r=>{
-    if((r.modelName||r.itemCode||'미상')!==name) return false;
+    if((_pName(r))!==name) return false;
     if(ch!=='ALL'&&r.ch!==ch) return false;
     if(!r.date) return false;
     if(!keys.has(r.year+'|'+r.date)) return false;
@@ -26010,7 +26010,7 @@ async function _dlyProdDateBreakdown(name, year, month, day){
   await ensureRevYear(year);
   const monStr=String(month).padStart(2,'0'), dayStr=String(day).padStart(2,'0');
   const dateStr=`${monStr}-${dayStr}`;
-  const keyOf=r=>r.modelName||r.itemCode||'미상';
+  const keyOf=r=>_pName(r);
   const map={};
   _revData.forEach(r=>{
     if(r.year!==year||r.date!==dateStr||keyOf(r)!==name) return;
@@ -26022,7 +26022,7 @@ async function _dlyProdDateBreakdown(name, year, month, day){
   let rgQty=0;
   (_rgProdCache[ym]||[]).forEach(r=>{
     if(!r.date||r.date.slice(8,10)!==dayStr) return;
-    const rname=rgResolveName(r.optionId)||r.productName||'미상';
+    const rname=_pCanon(rgResolveName(r.optionId)||r.productName||'미상');
     if(rname!==name) return;
     rgQty+=(r.qty||0)*rgQtyMultiplier(r.optionId);
   });
@@ -26090,7 +26090,7 @@ async function dlyProdDailyQty(name, year, month, chKey){
   const daysInMonth=new Date(year,month,0).getDate();
   const arr=Array(daysInMonth).fill(0);
   const monStr=String(month).padStart(2,'0');
-  const keyOf=r=>r.modelName||r.itemCode||'미상';
+  const keyOf=r=>_pName(r);
   if(chKey!=='로켓그로스'){
     await ensureRevYear(year);
     _revData.forEach(r=>{
@@ -26106,7 +26106,7 @@ async function dlyProdDailyQty(name, year, month, chKey){
     await rgEnsureProdMonths(ym, ym);
     (_rgProdCache[ym]||[]).forEach(r=>{
       if(!r.date) return;
-      const rname=rgResolveName(r.optionId)||r.productName||'미상';
+      const rname=_pCanon(rgResolveName(r.optionId)||r.productName||'미상');
       if(rname!==name) return;
       const d=parseInt(r.date.slice(8,10));
       if(d<1||d>daysInMonth) return;
@@ -26532,7 +26532,7 @@ async function downloadDailyExcel(){
   //    주문수량은 백데이터에 설정된 개입수(코드별 몇개입 세트)를 곱해서 실제 판매 개수로 집계한다.
   const byProd={};
   dayRowsForBreakdown.forEach(r=>{
-    const k=r.modelName||r.itemCode||'미상';
+    const k=_pName(r);
     if(!byProd[k])byProd[k]={type:r.itemType||'',qty:0,pkgs:new Set(),saleTotal:0,settle:0,margin:0};
     byProd[k].qty+=(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName); byProd[k].pkgs.add(pkgKey(r));
     byProd[k].saleTotal+=r.salePrice||0; byProd[k].settle+=r.settlement||0; byProd[k].margin+=r.margin||0;
@@ -26550,7 +26550,7 @@ async function downloadDailyExcel(){
         if(!r.date||r.date<rgPeriodFrom||r.date>rgPeriodTo) return;
         const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
         if(qty<=0) return;   // 로켓그로스 원본은 판매 0건인 날도 조회수 등 지표 행이 찍힘 — 실제 판매수량 있는 것만 반영
-        const name=rgResolveName(r.optionId)||r.productName||'미상';
+        const name=_pCanon(rgResolveName(r.optionId)||r.productName||'미상');
         const fin=rgCalcRowFinance(r);
         if(!byProd[name]) byProd[name]={type:rgResolveType(r.optionId)||'',qty:0,cnt:0,saleTotal:0,settle:0,margin:0};
         byProd[name].qty+=qty; byProd[name].saleTotal+=r.revenue||0; byProd[name].settle+=fin.settlement;
@@ -26591,7 +26591,7 @@ async function downloadDailyExcel(){
     const [mm,dd]=r.date.split('-').map(Number);
     const d=new Date(r.year,mm-1,dd);
     if(d<histFrom||d>refDate) return;
-    const name=r.modelName||r.itemCode||'미상';
+    const name=_pName(r);
     const k=r.year+'|'+r.date;
     (dailyQty[name]=dailyQty[name]||{})[k]=(dailyQty[name][k]||0)+(r.orderQty||0)*bdQtyMultiplier(r.itemCode, r.modelName);
   });
@@ -26603,7 +26603,7 @@ async function downloadDailyExcel(){
         const [ry,rm,rd]=r.date.split('-').map(Number);
         const d=new Date(ry,rm-1,rd);
         if(d<histFrom||d>refDate) return;
-        const name=rgResolveName(r.optionId)||r.productName||'미상';
+        const name=_pCanon(rgResolveName(r.optionId)||r.productName||'미상');
         const qty=(r.qty||0)*rgQtyMultiplier(r.optionId);
         const k=ry+'|'+r.date.slice(5);
         (dailyQty[name]=dailyQty[name]||{})[k]=(dailyQty[name][k]||0)+qty;
@@ -28843,6 +28843,19 @@ function readXlsxRows(file){
   });
 }
 
+// ── 제품별 집계 키: 대소문자·공백만 다른 모델명(be-5611 / BE-5611)은 같은 제품으로 합침 ──
+//    표시 이름은 백데이터 상품명이 있으면 그것, 없으면 처음 나온 표기. 일일보고 화면·엑셀·차트가 같은 기준을 쓴다.
+var _pcBdRef=null, _pcBdLen=-1, _pcBdMap=null, _pcFirstSeen=new Map();   // var: 초기화 순서(TDZ) 걱정 없이 어디서든 호출 가능
+function _pCanon(raw){
+  const name=String(raw==null?'':raw).trim(); if(!name) return name;
+  const k=normName(name);
+  if(_pcBdRef!==_bdData || _pcBdLen!==_bdData.length){ _pcBdRef=_bdData; _pcBdLen=_bdData.length; _pcBdMap=getBdNameMap(); }
+  const bd=_pcBdMap[k];
+  if(bd && bd.name) return bd.name;
+  if(!_pcFirstSeen.has(k)) _pcFirstSeen.set(k,name);
+  return _pcFirstSeen.get(k);
+}
+function _pName(r){ return _pCanon(r.modelName||r.itemCode||'미상'); }
 // 백데이터 조회 맵 (code → row) — 대표코드 + 별칭코드(aliasCodes) 전부 같은 행으로 매칭
 // 대소문자 무시 조회: 키를 소문자로 저장
 // 엑셀 업로드 등으로 같은 코드에 서로 다른 상품명을 가진 행이 여러 개 등록된 경우(예: 세트
