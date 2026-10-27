@@ -1695,6 +1695,8 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .rt-table .rt-w-trk{min-width:210px;}
 .rt-table tbody tr.rt-done td{background:var(--green-100);color:var(--etc-14532d);border-bottom-color:var(--green-200);}
 .rt-table tbody tr.rt-done:hover td{background:var(--green-200);}
+.rt-table tbody tr.rt-recv td{background:var(--blue-100);color:var(--blue-800);border-bottom-color:var(--blue-300);}
+.rt-table tbody tr.rt-recv:hover td{background:var(--blue-300);}
 .rt-ell{max-width:165px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 auto 0 0;}
 .rt-ell.rt-ell-s{max-width:125px;}
 .rt-trk{display:flex;align-items:center;gap:4px;justify-content:center;}
@@ -5014,7 +5016,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="field"><label>택배사 (반송장)</label><select id="rtFCarrier"></select></div>
       <div class="field"><label>반송장번호</label><input type="text" id="rtFTrackNo" inputmode="numeric" autocomplete="off" placeholder="숫자만 (9~15자리)"></div>
       <div class="field"><label>배송상태</label><select id="rtFTrkMode"><option value="auto">자동 조회</option><option value="cancel">수거취소 (조회 중단)</option></select></div>
-      <div class="field"><label>완료여부</label><select id="rtFDone"><option value="0">미완료</option><option value="1">완료</option></select></div>
+      <div class="field"><label>완료여부</label><select id="rtFDone"><option value="0">미완료</option><option value="2">입고</option><option value="1">완료</option></select></div>
     </div>
     <div class="ma"><button class="btn" onclick="closeModal('rtModal')">취소</button>
       <button class="btn btn-pr" id="rtSaveBtn" onclick="rtSave()">저장</button></div>
@@ -5093,8 +5095,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
 <div class="modal-overlay" id="rtConfirmModal" style="z-index:330;">
   <div class="modal" style="max-width:380px;padding:24px 26px;">
     <h3 id="rtConfirmTitle" style="font-size:17px;margin-bottom:10px;">완료 처리하시겠습니까?</h3>
-    <div id="rtConfirmInfo" style="font-size:14px;line-height:1.6;color:var(--tx2);background:var(--bg2);border-radius:9px;padding:10px 12px;overflow-wrap:anywhere;"></div>
-    <div class="ma"><button class="btn" onclick="_rtConfirmId=null;closeModal('rtConfirmModal')">취소</button>
+    <div id="rtConfirmInfo" style="font-size:14px;line-height:1.6;color:var(--tx2);background:var(--bg2);border-radius:9px;padding:10px 12px;overflow-wrap:anywhere;white-space:pre-line;"></div>
+    <div class="ma"><button class="btn" onclick="rtStageCancel()">취소</button>
       <button class="btn btn-pr" id="rtConfirmOk" onclick="rtConfirmToggle()">확인</button></div>
   </div>
 </div>
@@ -38112,7 +38114,7 @@ let _rtLoaded = false;
 let _rtOpen = [];         // 서버에서 받은 미완료 건(전체 기간)
 let _rtMonthRows = [];    // 선택한 월의 건
 let _rtAll = [];          // 위 둘을 합친 목록
-let _rtFilter = 'all';    // all | open | done
+let _rtFilter = 'all';    // all | open | recv | done
 let _rtCatFilter = '';    // 헤더 구분 필터('' = 전체)
 let _rtViewId = null;
 let _rtTrack = {};        // 서버(return-track)가 조회해 기록한 상태 {접수id:{no,code,status,checkedAt,where,kind,...}} — 화면은 읽기만
@@ -38336,13 +38338,15 @@ function rtRender(){
   const byId = new Map(); _rtOpen.concat(_rtMonthRows).forEach(r=>byId.set(r.id,r));
   _rtAll = [...byId.values()];
   const ym = document.getElementById('rtMonth').value || '';
-  const openN = _rtAll.filter(r=>!r.done).length;                        // 전체 기간 미완료
+  const openN = _rtAll.filter(r=>_rtStage(r)==='미완료').length;           // 전체 기간 미완료(입고 전)
+  const recvN = _rtAll.filter(r=>_rtStage(r)==='입고').length;             // 입고(회수물 도착, 처리 전)
   const monthRows = _rtMonthRows;
   const failN = _rtAll.filter(r=>!r.done && (rtTrackInfo(r)||{}).st==='fail').length;
   const monthDone = monthRows.filter(r=>r.done).length;
   // 목록: 미완료는 월과 무관하게 포함, 완료 건은 선택한 월 것만
   let list = _rtAll.filter(r=> !r.done || String(r.date||'').startsWith(ym));
-  if(_rtFilter==='open') list = list.filter(r=>!r.done);
+  if(_rtFilter==='open') list = list.filter(r=>_rtStage(r)==='미완료');
+  else if(_rtFilter==='recv') list = list.filter(r=>_rtStage(r)==='입고');
   else if(_rtFilter==='done') list = list.filter(r=>r.done);
   // 헤더 구분 필터 (목록에 없는 옛 구분 값도 선택지에 포함)
   const catSel = document.getElementById('rtCatFilter');
@@ -38357,17 +38361,18 @@ function rtRender(){
 
   const seg = document.getElementById('rtFilterSeg');
   if(seg){
-    const items = [['all','전체'],['open',`미완료 ${openN}`],['done','완료']];
+    const items = [['all','전체'],['open',`미완료 ${openN}`],['recv',`입고 ${recvN}`],['done','완료']];
     seg.innerHTML = items.map(([k,l])=>`<button class="${_rtFilter===k?'on':''}${k==='open'&&_rtFilter===k?' piv-seg-warn':''}" onclick="rtSetFilter('${k}')">${l}</button>`).join('');
   }
   document.getElementById('rtCount').textContent = list.length;
   const mm = ym ? Number(ym.slice(5,7))+'월' : '';
   document.getElementById('rtSumBar').innerHTML =
     `<span class="rt-pill rt-pill-wait">미완료 ${openN}건</span>`
+    + `<span class="rt-pill" style="${CP_ST_STYLE['접수완료']}">입고 ${recvN}건</span>`
     + `<span class="rt-pill rt-pill-n">${mm} 접수 ${monthRows.length}건</span>`
     + `<span class="rt-pill rt-pill-ok">${mm} 완료 ${monthDone}건</span>`
     + (failN ? `<span class="rt-pill" style="background:var(--red-100);color:var(--red-700);">수거안됨 ${failN}건 · 재수거 필요</span>` : '')
-    + `<span class="rt-hint">맨 위 입력 줄: Tab=다음 칸 · Enter=저장하고 다음 줄 · 미완료 건은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용</span>`;
+    + `<span class="rt-hint">맨 위 입력 줄: Tab=다음 칸 · Enter=저장하고 다음 줄 · 완료 전 건(미완료·입고)은 월과 관계없이 항상 표시 · 행을 누르면 전체 내용</span>`;
 
   const canEdit = _rtCanEdit();
   const maxP = Math.max(1, Math.ceil(list.length/RT_PAGE_SIZE));
@@ -38394,6 +38399,10 @@ async function rtCatSave(id, el, fromView){
   if(res.ok){ toast(cat ? `구분이 '${cat}'(으)로 저장되었습니다.` : '구분이 비워졌습니다.'); }
   if(fromView) rtOpenView(id);   // 상세 팝업도 저장된 값으로 다시 그림
 }
+// 완료여부 3단계: 미완료 → 입고(회수물 도착) → 완료  (done=true 가 완료, received=true 가 입고)
+const RT_STAGES = ['미완료','입고','완료'];
+function _rtStage(r){ return r.done ? '완료' : (r.received ? '입고' : '미완료'); }
+function _rtStageStyle(st){ return st==='완료' ? CP_ST_STYLE['처리완료'] : st==='입고' ? CP_ST_STYLE['접수완료'] : CP_ST_STYLE['입고']; }
 function _rtMulti(r){ return Array.isArray(r.items) && r.items.length>1; }
 function _rtProdCell(r){
   if(!_rtMulti(r)) return `<td class="rt-l rt-wrapc rt-w-xl">${_esc(r.product||'')}</td>`;
@@ -38408,14 +38417,15 @@ function _rtRowHtml(r, canEdit){
   const ell = (v,small)=>`<td class="rt-l"><div class="rt-ell${small?' rt-ell-s':''}">${_esc(v||'')}</div></td>`;   // 길면 … 으로 줄임(전체는 행을 눌러 팝업에서)
   const cat = canEdit ? _rtCatSelectHtml(r, false)
     : (r.cat ? `<span class="rt-pill" style="${RT_CAT_STYLE[r.cat]||'background:var(--slate-200);color:var(--slate-700);'}">${_esc(r.cat)}</span>` : '');
-  const done = r.done
-    ? `<button class="rt-donebtn rt-ok" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 미완료로 되돌립니다"`:'disabled'}>✔ 완료</button>`
-    : `<button class="rt-donebtn rt-wait" ${canEdit?`onclick="event.stopPropagation();rtToggleDone('${r.id}')" title="누르면 완료 처리합니다"`:'disabled'}>⏳ 미완료</button>`;
+  const stg = _rtStage(r), stgStyle = _rtStageStyle(stg);
+  const done = canEdit
+    ? `<select class="cp-stsel" style="${stgStyle}" title="완료여부 변경(확인 팝업)" onclick="event.stopPropagation()" onchange="rtStageAsk('${r.id}',this)">${RT_STAGES.map(x=>`<option value="${x}" ${x===stg?'selected':''}>${x}</option>`).join('')}</select>`
+    : `<span class="rt-tst" style="${stgStyle}">${stg}</span>`;
   const trkCell = canEdit
     ? `<div class="rt-trk" data-no="${_esc(r.trackNo||'')}" data-car="${_esc(r.carrier||RT_DEF_CAR)}"><select class="rt-car" onchange="rtTrkDirty(this)">${RT_CARRIERS.map(c=>`<option value="${c[0]}" ${c[0]===(r.carrier||RT_DEF_CAR)?'selected':''}>${c[2]}</option>`).join('')}</select><input class="rt-trk-in" inputmode="numeric" placeholder="반송장번호" value="${_esc(r.trackNo||'')}" oninput="rtTrkDirty(this)" onkeydown="if(event.key==='Enter')rtTrkSave('${r.id}',this)"><button class="rt-trk-save" onclick="rtTrkSave('${r.id}',this)">저장</button></div>`
     : (r.trackNo ? `${_esc(_rtCarName(r.carrier,true))} ${_esc(r.trackNo)}` : '');
   const flash = (r.id===_rtFlashId) ? ' rt-flash' : '';
-  return `<tr class="rt-click${r.done?' rt-done':''}${flash}" onclick="rtOpenView('${r.id}')">
+  return `<tr class="rt-click${r.done?' rt-done':''}${stg==='입고'?' rt-recv':''}${flash}" onclick="rtOpenView('${r.id}')">
     <td class="rt-nw">${cat}</td>
     <td class="rt-nw">${_esc(r.staff||'')}</td>
     <td class="rt-nw">${_esc(r.date||'')}</td>
@@ -38453,7 +38463,7 @@ function rtOpenView(id){
     + v('반송장번호', r.trackNo ? _rtCarName(r.carrier)+' '+r.trackNo : '', 'rt-v2')
     + (() => { const i = rtTrackInfo(r); if(!i) return v('배송상태',''); const t = i.t;
         return v('배송상태', RT_TRK_ST[i.st][0] + (i.st==='fail' ? ' · 재수거 필요' : '') + (t&&t.where ? '\n'+[t.where,t.kind].filter(Boolean).join(' · ') : '') + (t&&t.checkedAt ? '\n조회 '+t.checkedAt.slice(0,16).replace('T',' ') : '')); })();
-  document.getElementById('rtViewDone').innerHTML = r.done ? '<span class="rt-pill rt-pill-ok">✔ 완료</span>' : '<span class="rt-pill rt-pill-wait">⏳ 미완료</span>';
+  { const st = _rtStage(r); document.getElementById('rtViewDone').innerHTML = st==='완료' ? '<span class="rt-pill rt-pill-ok">✔ 완료</span>' : st==='입고' ? `<span class="rt-pill" style="${CP_ST_STYLE['접수완료']}">📥 입고</span>` : '<span class="rt-pill rt-pill-wait">⏳ 미완료</span>'; }
   document.getElementById('rtViewEditBtn').style.display = _rtCanEdit() ? '' : 'none';
   openModal('rtViewModal');
 }
@@ -38676,7 +38686,7 @@ function rtOpenModal(id){
   document.getElementById('rtFCarrier').value = r.carrier || RT_DEF_CAR;
   document.getElementById('rtFTrackNo').value = r.trackNo || '';
   document.getElementById('rtFTrkMode').value = r.cancel ? 'cancel' : 'auto';
-  document.getElementById('rtFDone').value = r.done ? '1' : '0';
+  document.getElementById('rtFDone').value = r.done ? '1' : (r.received ? '2' : '0');
   openModal('rtModal');
   setTimeout(()=>document.getElementById('rtFRecipient')?.focus(), 100);
 }
@@ -38695,7 +38705,7 @@ async function rtSave(){
   const carrier = document.getElementById('rtFCarrier').value || RT_DEF_CAR;
   if(trackNo && (trackNo.length<9 || trackNo.length>15)){ toast('반송장번호는 숫자 9~15자리로 입력하세요.'); return; }
   const cancelSel = document.getElementById('rtFTrkMode').value==='cancel';
-  const done = document.getElementById('rtFDone').value==='1';
+  const stageV = document.getElementById('rtFDone').value, done = stageV==='1', received = stageV==='2';
   const btn = document.getElementById('rtSaveBtn');
   _rtSaving = true; btn.disabled = true; btn.textContent = '저장 중…';
   const fail = (msg)=>{ _rtSaving = false; btn.disabled = false; btn.textContent = '저장'; toast(msg); };
@@ -38707,17 +38717,17 @@ async function rtSave(){
     const patch = {};
     Object.keys(RT_FIELD_IDS).forEach(k=>{ if(nm(rec[k])!==nm(o[k])) patch[k] = rec[k]; });
     if(nm(rec.productCode)!==nm(o.productCode)) patch.productCode = rec.productCode;
-    const doneChg = done !== !!o.done;
+    const doneChg = done !== !!o.done, recvChg = received !== !!o.received;
     const trkChg = trackNo!==nm(o.trackNo) || carrier!==(o.carrier||RT_DEF_CAR);
     const cancelChg = cancelSel !== !!o.cancel;
     trkChangedFlag = trkChg;
     const res = await _rtMutate(_rtEditId, (base, t)=>{
-      if(!Object.keys(patch).length && !doneChg && !trkChg && !cancelChg) return null;   // 바뀐 게 없으면 쓰지 않음
+      if(!Object.keys(patch).length && !doneChg && !recvChg && !trkChg && !cancelChg) return null;   // 바뀐 게 없으면 쓰지 않음
       const nx = { ...base, ...patch };
       if('product' in patch || 'qty' in patch){   // 상품·수량이 바뀌면 제품 목록(items)도 맞춤 — 여러 제품 건에서 상품을 그대로 두면 목록 유지
         if(!_rtMulti(base) || 'product' in patch) nx.items = nx.product ? [{ name:nx.product, code:nx.productCode||'', qty:String(nx.qty||'1') }] : [];
       }
-      if(doneChg){ nx.done = done; nx.doneAt = done ? t : ''; }
+      if(doneChg || recvChg){ nx.done = done; nx.doneAt = done ? (base.done ? (base.doneAt||t) : t) : ''; nx.received = received; nx.receivedAt = received ? (base.received ? (base.receivedAt||t) : t) : (base.receivedAt||''); }
       if(trkChg){ nx.trackNo = trackNo; nx.carrier = carrier; nx.trackNoAt = trackNo ? t : ''; if(!cancelChg) nx.cancel = false; }   // 새 반송장 = 재수거 → 취소 해제
       if(cancelChg) nx.cancel = cancelSel;
       return nx;
@@ -38725,7 +38735,7 @@ async function rtSave(){
     if(!res.ok){ fail(_rtMutMsg(res.err)); return; }
     full = res.rec;
   } else {
-    full = { ...rec, id:_pivNewId('rt'), done, doneAt: done ? now : '', source:'manual', createdAt:now, updatedAt:now,
+    full = { ...rec, id:_pivNewId('rt'), done, doneAt: done ? now : '', received, receivedAt: received ? now : '', source:'manual', createdAt:now, updatedAt:now,
       trackNo, carrier, trackNoAt: trackNo ? now : '', cancel: cancelSel };
     const ok = await _rtUpsert([full]);
     if(!ok){ fail('저장에 실패했습니다. 다시 시도해주세요.'); return; }
@@ -38739,39 +38749,46 @@ async function rtSave(){
   // 반송장이 새로 들어갔거나 바뀌었으면(수거취소·완료 건 제외) 바로 1회 조회
   if(trackNo && !full.cancel && !full.done && (!_rtEditId || trkChangedFlag)) rtTrackNow(full.id);
 }
-// 완료/미완료 전환은 실수로 누르는 것을 막기 위해 확인 팝업을 거친다
-let _rtConfirmId = null, _rtConfirmTo = false;
-function rtToggleDone(id){
-  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
+// 완료여부(미완료·입고·완료) 변경은 실수로 누르는 것을 막기 위해 확인 팝업을 거친다
+let _rtConfirmId = null, _rtConfirmTo = '';
+const RT_STAGE_ASK = { '완료':['✅ 완료 처리하시겠습니까?','완료 처리'], '입고':['📥 입고 처리하시겠습니까?','입고 처리'], '미완료':['↩️ 미완료로 되돌리시겠습니까?','미완료로 변경'] };
+function rtStageAsk(id, selEl){
+  if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); rtRender(); return; }
   const cur = _rtFind(id); if(!cur) return;
-  _rtConfirmId = id;
-  const toDone = !cur.done;
-  _rtConfirmTo = toDone;
-  document.getElementById('rtConfirmTitle').textContent = toDone ? '✅ 완료 처리하시겠습니까?' : '↩️ 미완료로 되돌리시겠습니까?';
-  document.getElementById('rtConfirmInfo').textContent = [cur.recipient, cur.product].filter(Boolean).join(' · ');
+  const to = selEl.value, from = _rtStage(cur);
+  if(to===from) return;
+  _rtConfirmId = id; _rtConfirmTo = to;
+  document.getElementById('rtConfirmTitle').textContent = RT_STAGE_ASK[to][0];
+  document.getElementById('rtConfirmInfo').textContent = [cur.recipient, cur.product].filter(Boolean).join(' · ') + `\n${from} → ${to}`;
   const ok = document.getElementById('rtConfirmOk');
-  ok.textContent = toDone ? '완료 처리' : '미완료로 변경';
+  ok.textContent = RT_STAGE_ASK[to][1];
   ok.disabled = false;
   openModal('rtConfirmModal');
   setTimeout(()=>ok.focus(), 80);
 }
+function rtStageCancel(){ _rtConfirmId = null; closeModal('rtConfirmModal'); rtRender(); }   // 취소하면 선택칸을 원래 값으로
 async function rtConfirmToggle(){
   const id = _rtConfirmId; if(!id) return;
   const ok = document.getElementById('rtConfirmOk'); if(ok.disabled) return;
   ok.disabled = true;
   _rtConfirmId = null;
   closeModal('rtConfirmModal');
-  await _rtDoToggleDone(id, _rtConfirmTo);
+  await _rtDoStage(id, _rtConfirmTo);
 }
-async function _rtDoToggleDone(id, done){
+async function _rtDoStage(id, to){
   if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   const cur = _rtFind(id); if(!cur) return;
-  const u = window.__CURRENT_USER || {};
-  // 확인 팝업에서 고른 방향(done)으로 맞춘다 — 그 사이 다른 사람이 이미 바꿔 놨으면 쓰지 않음
-  const res = await _rtMutate(id, (base, now)=> (!!base.done===done) ? null : { ...base, done, doneAt: done ? now : '', doneBy: done ? (u.name||u.username||'') : '' });
-  if(!res.ok){ toast(_rtMutMsg(res.err)); return; }
+  const u = window.__CURRENT_USER || {}, who = u.name||u.username||'';
+  // 확인 팝업에서 고른 단계로 맞춘다 — 그 사이 다른 사람이 이미 같은 단계로 바꿔 놨으면 쓰지 않음
+  const res = await _rtMutate(id, (base, now)=>{
+    if(_rtStage(base)===to) return null;
+    if(to==='완료') return { ...base, done:true, doneAt:now, doneBy:who, received:false };
+    if(to==='입고') return { ...base, done:false, doneAt:'', doneBy:'', received:true, receivedAt:now, receivedBy:who };
+    return { ...base, done:false, doneAt:'', doneBy:'', received:false, receivedAt:'', receivedBy:'' };
+  });
+  if(!res.ok){ toast(_rtMutMsg(res.err)); rtRender(); return; }
   await rtReload();
-  toast(res.skipped ? '다른 사람이 이미 같은 상태로 바꿔 두었습니다.' : (done ? '완료 처리되었습니다.' : '미완료로 되돌렸습니다.'));
+  toast(res.skipped ? '다른 사람이 이미 같은 상태로 바꿔 두었습니다.' : (to==='완료' ? '완료 처리되었습니다.' : to==='입고' ? '입고 처리되었습니다.' : '미완료로 되돌렸습니다.'));
 }
 function rtDelete(id){
   if(!_rtCanEdit()){ toast('수정 권한이 없습니다.'); return; }
