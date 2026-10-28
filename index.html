@@ -1995,6 +1995,26 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 #page-quote .qt-wrap{display:flex;gap:14px;height:calc(100vh - 102px);overflow:hidden;}
 #page-quote .qt-main{flex:1;min-width:0;overflow-y:auto;padding:14px 16px 60px;}
 #page-quote .qt-side{width:300px;flex-shrink:0;border-left:1px solid var(--bd);overflow-y:auto;padding:12px;}
+/* 부가세 계산기 — 견적서 메뉴에서 여는 떠 있는 작은 창(배경 안 막음, 머리줄 드래그로 이동) */
+.vat-win{position:fixed;right:340px;top:150px;width:290px;z-index:1500;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.22);display:none;overflow:hidden;}
+.vat-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 10px 14px;background:var(--bg2);border-bottom:1px solid var(--bd);cursor:move;user-select:none;touch-action:none;font-size:13px;font-weight:700;}
+.vat-x{border:none;background:transparent;color:var(--tx2);font-size:16px;cursor:pointer;padding:0 4px;line-height:1;}
+.vat-x:hover{color:var(--tx);}
+.vat-body{padding:12px 14px 14px;}
+.vat-tabs{display:flex;gap:4px;margin-bottom:12px;}
+.vat-tab{flex:1;padding:7px 4px;font-size:11.5px;font-weight:600;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);cursor:pointer;}
+.vat-tab.active{background:var(--pr);border-color:var(--pr);color:#fff;}
+.vat-lbl{font-size:11.5px;color:var(--tx2);margin-bottom:5px;}
+.vat-in{width:100%;box-sizing:border-box;padding:9px 10px;font-size:16px;font-weight:700;text-align:right;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);}
+.vat-in:focus{outline:none;border-color:var(--pr);}
+.vat-res{margin-top:12px;border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
+.vat-row{display:flex;align-items:center;gap:8px;padding:9px 10px;font-size:13px;}
+.vat-row+.vat-row{border-top:1px solid var(--bd);}
+.vat-row .k{color:var(--tx2);width:62px;flex-shrink:0;font-size:12px;}
+.vat-row .v{flex:1;text-align:right;font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;}
+.vat-cp{border:1px solid var(--bd);background:var(--bg2);color:var(--tx2);border-radius:6px;font-size:11px;padding:3px 7px;cursor:pointer;}
+.vat-cp:hover{border-color:var(--pr);color:var(--pr);}
+.vat-note{margin-top:9px;font-size:10.5px;color:var(--tx2);line-height:1.5;}
 .qt-doc{background:#fff;border:1.5px solid #333;max-width:780px;margin:0 auto;font-size:13px;color:#000;}
 .qt-title{text-align:center;font-size:28px;font-weight:800;letter-spacing:18px;padding:14px 0 10px;border-bottom:2px solid #333;}
 [contenteditable="true"]:focus{outline:1px dashed var(--blue-300);outline-offset:2px;border-radius:3px;}
@@ -4545,6 +4565,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <button class="qt-btn" onclick="qtAddRow()" style="background:var(--bg2);color:var(--tx);border:1px solid var(--bd);">➕ 행 추가</button>
         <button class="qt-btn" onclick="qtReset()" style="background:var(--bg2);color:var(--tx2);border:1px solid var(--bd);">초기화</button>
         <button class="qt-btn" onclick="qtOpenLoadCalc()" style="background:var(--brand-50);color:var(--brand);border:1px solid var(--brand);">🧮 계산 불러오기</button>
+        <button class="qt-btn" onclick="vatToggle()" style="background:var(--bg2);color:var(--tx);border:1px solid var(--bd);">🧾 부가세 계산기</button>
         <div style="flex:1;"></div>
         <button class="qt-btn" onclick="qtDownloadPdf()" style="background:var(--red-600);color:#fff;">📄 PDF 다운로드</button>
         <button class="qt-btn" id="qtCopyImgBtn" onclick="qtCopyImage()" style="background:var(--violet-600);color:#fff;">🖼 이미지 복사</button>
@@ -4565,6 +4586,21 @@ html.mob-native .lcr-det-val{font-size:15px;}
       </div>
       <div id="qt-saved-list"></div>
     </div>
+  </div>
+</div>
+
+<!-- 부가세 계산기 (떠 있는 작은 창) -->
+<div id="vatWin" class="vat-win">
+  <div class="vat-head" id="vatHead"><span>🧾 부가세 계산기</span><button type="button" class="vat-x" onclick="vatClose()" title="닫기">✕</button></div>
+  <div class="vat-body">
+    <div class="vat-tabs">
+      <button type="button" class="vat-tab active" id="vatTabTotal" onclick="vatSetMode('total')">합계금액으로 계산</button>
+      <button type="button" class="vat-tab" id="vatTabSupply" onclick="vatSetMode('supply')">공급가액으로 계산</button>
+    </div>
+    <div class="vat-lbl" id="vatInLbl">합계금액 (부가세 포함)</div>
+    <input type="text" id="vatIn" class="vat-in" inputmode="numeric" placeholder="0" autocomplete="off" oninput="vatCalc()" onkeydown="if(event.key==='Escape')vatClose()">
+    <div class="vat-res" id="vatRes"></div>
+    <div class="vat-note">부가세 10% · 원 단위 반올림 (합계 ÷ 1.1 → 공급가액, 나머지는 세액)</div>
   </div>
 </div>
 
@@ -8991,6 +9027,57 @@ function goGrowthRevenue(){
   _revPage='rocket';
   goPage('revenue');
 }
+// ── 부가세 계산기 (견적서 메뉴 · 떠 있는 작은 창) ──
+let _vatMode = 'total';   // 'total'=합계금액으로 계산 / 'supply'=공급가액으로 계산
+function vatToggle(){
+  const w=document.getElementById('vatWin'); if(!w) return;
+  if(w.style.display==='block'){ vatClose(); return; }
+  w.style.display='block';
+  vatCalc();
+  const i=document.getElementById('vatIn'); if(i) setTimeout(()=>i.focus(),0);
+}
+function vatClose(){ const w=document.getElementById('vatWin'); if(w) w.style.display='none'; }
+function vatSetMode(m){
+  _vatMode=m;
+  document.getElementById('vatTabTotal').classList.toggle('active',m==='total');
+  document.getElementById('vatTabSupply').classList.toggle('active',m==='supply');
+  document.getElementById('vatInLbl').textContent = m==='total' ? '합계금액 (부가세 포함)' : '공급가액 (부가세 제외)';
+  vatCalc();
+  const i=document.getElementById('vatIn'); if(i) i.focus();
+}
+function vatCalc(){
+  const inp=document.getElementById('vatIn'), box=document.getElementById('vatRes'); if(!inp||!box) return;
+  const raw=inp.value.replace(/[^0-9]/g,'');
+  inp.value = raw ? Number(raw).toLocaleString() : '';   // 입력하는 대로 천 단위 쉼표
+  const n=Number(raw)||0;
+  let rows;
+  if(_vatMode==='total'){ const supply=Math.round(n/1.1); rows=[['공급가액',supply],['세액',n-supply]]; }
+  else { const tax=Math.round(n*0.1); rows=[['세액',tax],['합계금액',n+tax]]; }
+  box.innerHTML=rows.map(([k,v])=>`<div class="vat-row"><span class="k">${k}</span><span class="v">${v.toLocaleString()}원</span><button type="button" class="vat-cp" onclick="vatCopy(${v})">복사</button></div>`).join('');
+}
+function vatCopy(v){
+  const done=()=>toast('복사했습니다: '+Number(v).toLocaleString());
+  try{ navigator.clipboard.writeText(String(v)).then(done,()=>{}); }catch(e){}
+}
+// 머리줄 드래그로 창 이동
+(function(){
+  let drag=null;
+  document.addEventListener('pointerdown',e=>{
+    const h=e.target.closest&&e.target.closest('#vatHead'); if(!h||e.target.closest('.vat-x')) return;
+    const w=document.getElementById('vatWin'), r=w.getBoundingClientRect();
+    drag={dx:e.clientX-r.left,dy:e.clientY-r.top};
+    w.style.left=r.left+'px'; w.style.top=r.top+'px'; w.style.right='auto';
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove',e=>{
+    if(!drag) return;
+    const w=document.getElementById('vatWin');
+    w.style.left=Math.max(0,Math.min(innerWidth-w.offsetWidth,e.clientX-drag.dx))+'px';
+    w.style.top=Math.max(0,Math.min(innerHeight-60,e.clientY-drag.dy))+'px';
+  });
+  document.addEventListener('pointerup',()=>{ drag=null; });
+})();
+
 function goMenu(menuId){
   if(window.__CURRENT_USER && _menuPerm(menuId)==='none'){ toast('접근 권한이 없는 메뉴입니다.'); return; }
   if(menuId==='rgrevenue'){ goGrowthRevenue(); return; } // 실제 페이지가 아닌 매출관리 딥링크이므로 별도 처리
@@ -15303,6 +15390,7 @@ function goPage(p){
   if(p==='report') loadDailyCache().then(()=>renderReport());
   if(p==='revenue') loadRevenuePage().then(()=>{ goRevPage(_revPage); checkMarginDropAlerts(); checkSsPriceAlerts(); });
   if(p==='price'){ pcEnsureBackdata(); pcRenderEstimates(); pcLoadEstimatesCloud(); cmbInit(); }
+  if(p!=='quote') vatClose();   // 부가세 계산기는 견적서 메뉴에서만 — 다른 메뉴로 가면 닫음
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
