@@ -363,7 +363,8 @@
       <p class="sub">기존 상품을 선택하면 각 사이트의 상품번호가 표시됩니다. 번호를 추가·수정 후 저장하세요.</p>
       <div class="field" id="existSearchField">
         <label>상품명찾기 (별칭 / 검색용)</label>
-        <input type="text" id="existSearchInput" placeholder="예) 슬릿화분" autocomplete="off" oninput="renderExistList(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();const f=document.querySelector('#existList [data-epid]');if(f)f.click();}">
+        <input type="text" id="existSearchInput" placeholder="예) 슬릿화분" autocomplete="off" oninput="if(!existPid)renderExistList(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();if(!existPid){const f=document.querySelector('#existList [data-epid]');if(f)f.click();}}">
+        <div id="existSearchHint" style="display:none;margin-top:5px;font-size:11px;color:var(--ink-soft);">선택한 상품의 별칭입니다. 고치면 저장할 때 반영돼요.</div>
       </div>
       <div class="exist-list" id="existList"></div>
       <div class="field" id="existSelected" style="display:none;">
@@ -1605,6 +1606,7 @@ function setAddMode(mode){
     const exSearch = document.getElementById('existSearchInput');
     exSearch.value = '';
     document.getElementById('existSearchField').style.display = '';
+    document.getElementById('existSearchHint').style.display = 'none';
     renderExistList('');
     setTimeout(()=>exSearch.focus(), 0);
   }
@@ -1639,7 +1641,10 @@ function selectExisting(pid){
   const p = state.products.find(x=>x.id===pid);
   if(!p) return;
   document.getElementById('existList').classList.remove('show');
-  document.getElementById('existSearchField').style.display = 'none';   // 상품을 고르면 검색칸도 함께 숨김
+  // 상품을 고르면(수정 버튼으로 연 경우 포함) 같은 칸이 그 상품의 별칭(상품명찾기)을 보여주고 고칠 수 있다
+  document.getElementById('existSearchField').style.display = '';
+  document.getElementById('existSearchInput').value = p.searchName || '';
+  document.getElementById('existSearchHint').style.display = '';
   const sel = document.getElementById('existSelected');
   sel.style.display = '';
   document.getElementById('existNameInput').value = p.erpName;
@@ -1693,6 +1698,7 @@ async function confirmAddProduct(){
       return;
     }
     p.erpName = newName;
+    p.searchName = document.getElementById('existSearchInput').value.trim();   // 상품명찾기(별칭)
     p.siteData = collectSiteBlocks(p);
     await saveState();
     closeAddModal();
