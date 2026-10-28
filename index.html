@@ -37112,10 +37112,21 @@ function _pivFindCompany(regNo){
   if(d.length<5) return null;
   return _pivCoRows.find(c=>_pivDigits(c.regNo)===d) || null;
 }
+// 이미 발급완료된 건(저장된 상태 기준)은 발급 당시 업체 정보를 그대로 유지 — 업체등록이 나중에 수정돼도 덮어쓰지 않는다
+function _pivIsIssuedLocked(){
+  if(!_pivEditId) return false;
+  const cur = _pivRows.find(x=>x.id===_pivEditId);
+  return !!cur && cur.issued==='발급완료';
+}
 // 업체등록에 등록된 번호면 상호·대표자·사업장·업태·종목·이메일 자동 반영
 function pivApplyCompany(silent){
   const hint = document.getElementById('pivRegHint');
   const raw = _pivGet('RegNo');
+  if(_pivIsIssuedLocked()){
+    _pivMatchedCo = null;
+    hint.textContent = '🔒 발급완료된 건이라 업체등록 정보가 자동 반영되지 않습니다 (발급 당시 내용 유지)';
+    return;
+  }
   const c = _pivFindCompany(raw);
   _pivMatchedCo = c;
   if(!c){
