@@ -1327,6 +1327,9 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 #dlyProdChartModal .rev-filter-lbl{font-size:12px;color:var(--tx2);font-weight:500;white-space:nowrap;}
 #page-revenue .rfbtn{padding:4px 12px;border-radius:16px;border:0.5px solid var(--bd);background:var(--bg2);font-size:12px;cursor:pointer;transition:all .15s;}
 #page-revenue .rfbtn:hover{border-color:var(--pr);color:var(--pr);}
+#page-revenue .dly-sel{font-size:12px;font-weight:600;padding:5px 12px;min-width:84px;border-radius:16px;border:0.5px solid var(--bd);background:var(--bg2);color:var(--tx);cursor:pointer;}
+#page-revenue .dly-sel:hover,#page-revenue .dly-sel:focus{border-color:var(--pr);outline:none;}
+#page-revenue .dly-sel option{background:var(--bg);color:var(--tx);}
 #page-revenue .rfbtn.active{background:var(--pr);color:#fff;border-color:var(--pr);font-weight:700;box-shadow:0 2px 8px rgba(49,130,246,0.35);}
 #page-revenue .rev-tbl-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 #page-revenue .rev-tbl-head{padding:12px 16px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
@@ -1866,6 +1869,9 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .piv-badge.piv-tt-마을사업{background:var(--red-100);color:var(--red-700);}
 .piv-badge.piv-req{background:var(--etc-e0e7ff);color:var(--etc-3730a3);}
 .piv-badge.piv-type{background:var(--blue-50);color:var(--blue-600);}
+/* 영수처리 구분: 세금계산서=연한 파랑, 현금영수증=보라 단색(흰 글자)로 한눈에 구분 */
+.piv-badge.piv-rc-tax{background:var(--blue-100);color:var(--blue-700);}
+.piv-badge.piv-rc-cash{background:var(--violet-600);color:#fff;}
 .piv-sub{display:block;font-size:10.5px;color:var(--tx2);margin-top:2px;}
 .piv-act{border:1px solid var(--bd);background:var(--bg);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--tx2);cursor:pointer;font-family:inherit;}
 .piv-act:hover{border-color:var(--brand);color:var(--brand);}
@@ -23718,11 +23724,14 @@ function renderDailyReport(){
   const yEl=document.getElementById('revDlyYearBtns');
   if(yEl) yEl.innerHTML=years.map(y=>`<button class="rfbtn${y===_dlyFilter.year?' active':''}" onclick="setDlyFilter('year',${y})">${y}년</button>`).join('');
   const mEl=document.getElementById('revDlyMonthBtns');
-  if(mEl) mEl.innerHTML=monthsInYear.map(m=>`<button class="rfbtn${m===_dlyFilter.month?' active':''}" onclick="setDlyFilter('month',${m})">${m}월</button>`).join('');
+  // 월·일은 항목이 많아 버튼이 길어지므로 스크롤되는 드롭다운으로 선택
+  if(mEl) mEl.innerHTML=`<select class="dly-sel" onchange="setDlyFilter('month',Number(this.value))" title="월 선택">`
+    +monthsInYear.map(m=>`<option value="${m}"${m===_dlyFilter.month?' selected':''}>${m}월</option>`).join('')+`</select>`;
   const dEl=document.getElementById('revDlyDayBtns');
-  // 일 버튼: 토글 가능 (재클릭 시 해제 → 월 전체)
-  if(dEl) dEl.innerHTML=`<button class="rfbtn${_dlyFilter.day===null?' active':''}" onclick="setDlyFilter('day',null)" style="font-size:10px;">월전체</button>`
-    +daysInMonth.map(d=>`<button class="rfbtn${d===_dlyFilter.day?' active':''}" onclick="setDlyFilter('day',${d===_dlyFilter.day?'null':d})">${d}일</button>`).join('');
+  // 일 선택: 첫 항목 '월전체'(=일 선택 해제)
+  if(dEl) dEl.innerHTML=`<select class="dly-sel" onchange="setDlyFilter('day',this.value===''?null:this.value)" title="일 선택">`
+    +`<option value=""${_dlyFilter.day===null?' selected':''}>월전체</option>`
+    +daysInMonth.map(d=>`<option value="${d}"${d===_dlyFilter.day?' selected':''}>${d}일</option>`).join('')+`</select>`;
   // 판매처 버튼: 선택된 기간 기준, 일반 채널은 중복(다중) 선택 가능 — 여러 개 고르면 합계로 표시
   const monPfx=pad(_dlyFilter.month)+(_dlyFilter.day?('-'+pad(_dlyFilter.day)):'');
   const chs=sortCh([...new Set(_revData.filter(r=>r.year===_dlyFilter.year&&r.date&&r.date.startsWith(monPfx)).map(r=>r.ch).filter(Boolean))]);
@@ -36832,7 +36841,7 @@ function pivRender(){
         <td class="piv-r">${_pivNum(r.amount)}</td>
         <td class="piv-r ${m<0?'piv-neg':''}">${r.margin==null||r.margin===''?'':_pivNum(m)}</td>
         <td class="piv-r ${m<0?'piv-neg':''}">${_pivMarginRate(r)}</td>
-        <td><span class="piv-badge piv-type">${_esc(r.receiptType||'')}</span></td>
+        <td><span class="piv-badge ${r.receiptType==='현금영수증'?'piv-rc-cash':r.receiptType==='세금계산서'?'piv-rc-tax':'piv-type'}">${_esc(r.receiptType||'')}</span></td>
         <td>${_esc(r.issueDate||'')}</td>
         <td><span class="piv-badge ${r.issued==='발급완료'?'piv-ok':(r.issued==='발급취소'?'piv-late':(r.issued==='발행요청'?'piv-req':'piv-wait'))}">${_esc(r.issued||'미발급')}</span></td>
         <td>${paidCell}</td>
