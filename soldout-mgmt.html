@@ -361,12 +361,14 @@
     <!-- 기존 모드 -->
     <div id="modeExist" style="display:none;">
       <p class="sub">기존 상품을 선택하면 각 사이트의 상품번호가 표시됩니다. 번호를 추가·수정 후 저장하세요.</p>
+      <div class="field" id="existSearchField">
+        <label>상품명찾기 (별칭 / 검색용)</label>
+        <input type="text" id="existSearchInput" placeholder="예) 슬릿화분" autocomplete="off" oninput="renderExistList(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();const f=document.querySelector('#existList [data-epid]');if(f)f.click();}">
+      </div>
       <div class="exist-list" id="existList"></div>
       <div class="field" id="existSelected" style="display:none;">
         <label>상품명 (ERP 상품명)</label>
         <textarea id="existNameInput" rows="1"></textarea>
-        <label style="margin-top:12px;display:block;">상품명찾기 (별칭 / 검색용)</label>
-        <input type="text" id="existProdSearch" placeholder="예) 슬릿화분">
       </div>
     </div>
 
@@ -1600,7 +1602,11 @@ function setAddMode(mode){
     // 기존 모드: 상품 선택 전에는 사이트 입력칸 숨김
     document.getElementById('newProdSites').style.display = 'none';
     document.getElementById('newProdSites').innerHTML = '';
+    const exSearch = document.getElementById('existSearchInput');
+    exSearch.value = '';
+    document.getElementById('existSearchField').style.display = '';
     renderExistList('');
+    setTimeout(()=>exSearch.focus(), 0);
   }
 }
 
@@ -1633,10 +1639,10 @@ function selectExisting(pid){
   const p = state.products.find(x=>x.id===pid);
   if(!p) return;
   document.getElementById('existList').classList.remove('show');
+  document.getElementById('existSearchField').style.display = 'none';   // 상품을 고르면 검색칸도 함께 숨김
   const sel = document.getElementById('existSelected');
   sel.style.display = '';
   document.getElementById('existNameInput').value = p.erpName;
-  document.getElementById('existProdSearch').value = p.searchName || '';
   document.getElementById('newProdSites').style.display = '';
   renderAddSiteBlocks(p);
 }
@@ -1687,7 +1693,6 @@ async function confirmAddProduct(){
       return;
     }
     p.erpName = newName;
-    p.searchName = document.getElementById('existProdSearch').value.trim();
     p.siteData = collectSiteBlocks(p);
     await saveState();
     closeAddModal();
