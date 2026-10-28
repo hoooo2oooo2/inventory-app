@@ -1330,6 +1330,23 @@ html.mob-native .sim-in{font-size:16px;height:46px;}
 #page-revenue .dly-sel{font-size:12px;font-weight:600;padding:5px 12px;min-width:84px;border-radius:16px;border:0.5px solid var(--bd);background:var(--bg2);color:var(--tx);cursor:pointer;}
 #page-revenue .dly-sel:hover,#page-revenue .dly-sel:focus{border-color:var(--pr);outline:none;}
 #page-revenue .dly-sel option{background:var(--bg);color:var(--tx);}
+/* 일일보고: 판매 중단 의심 · 신규 제품 */
+#revDlyStopCard .dsn-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+#revDlyStopCard .dsn-box{border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;background:var(--bg);}
+#revDlyStopCard .dsn-h{padding:10px 14px;border-bottom:0.5px solid var(--bd);font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#revDlyStopCard .dsn-h .n{font-size:11px;font-weight:600;color:var(--tx2);}
+#revDlyStopCard .dsn-sc{max-height:360px;overflow-y:auto;}
+#revDlyStopCard table{width:100%;table-layout:fixed;border-collapse:collapse;}
+#revDlyStopCard th{padding:8px 10px;font-size:11.5px;font-weight:600;color:var(--tx2);background:var(--bg2);white-space:nowrap;position:sticky;top:0;}
+#revDlyStopCard td{padding:8px 10px;font-size:12.5px;border-bottom:0.5px solid var(--bd);font-variant-numeric:tabular-nums;}
+#revDlyStopCard td.nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+#revDlyStopCard tbody tr:nth-child(even){background:rgba(120,130,150,.07);}
+#revDlyStopCard .dsn-tag{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;}
+#revDlyStopCard .dsn-out{background:rgba(220,38,38,.12);color:#DC2626;}
+#revDlyStopCard .dsn-ok{background:rgba(5,150,105,.12);color:#059669;}
+#revDlyStopCard .dsn-empty{padding:22px 14px;text-align:center;color:var(--tx2);font-size:12px;}
+#revDlyStopCard .dsn-min{width:56px;padding:3px 6px;font-size:12px;text-align:right;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);}
+@media(max-width:1200px){#revDlyStopCard .dsn-grid{grid-template-columns:1fr;}}
 #page-revenue .rfbtn.active{background:var(--pr);color:#fff;border-color:var(--pr);font-weight:700;box-shadow:0 2px 8px rgba(49,130,246,0.35);}
 #page-revenue .rev-tbl-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;overflow:hidden;}
 #page-revenue .rev-tbl-head{padding:12px 16px;border-bottom:0.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
@@ -7354,6 +7371,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
         </table></div>
         <div id="revDlyRgPager" style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:0.5px solid var(--bd);font-size:11px;"></div>
       </div>
+
+      <!-- 판매 중단 의심 · 신규 제품 (최근 7일 vs 직전 7일) -->
+      <div class="rev-tbl-card" id="revDlyStopCard" style="margin-top:14px;padding:0;"></div>
 
       <!-- 제품별 판매량 증감 분석 (실시간) -->
       <div class="rev-tbl-card" style="margin-top:14px;">
@@ -15354,7 +15374,7 @@ function goPage(p){
   // 쿠팡광고: 처음 열 때만 iframe 로드(지연 로딩)
   if(p==='coupangad'){ const f=document.getElementById('coupangAdFrame'); if(f && !f.getAttribute('src')){ f.addEventListener('load', ()=>_taskWireIframeF9(f)); f.setAttribute('src','coupang-ad-dashboard.html?v=20260709a'); } }
   // 품절관리: 처음 열 때만 iframe 로드(지연 로딩)
-  if(p==='soldout'){ const f=document.getElementById('soldoutFrame'); if(f && !f.getAttribute('src')){ f.addEventListener('load', ()=>_taskWireIframeF9(f)); f.setAttribute('src','soldout-mgmt.html?v=20261019c'); } }
+  if(p==='soldout'){ const f=document.getElementById('soldoutFrame'); if(f && !f.getAttribute('src')){ f.addEventListener('load', ()=>_taskWireIframeF9(f)); f.setAttribute('src','soldout-mgmt.html?v=20261028a'); } }
   if(p==='home') homeOpen();
   if(p==='calendar') loadCalPage();
   if(_pageId==='collab') loadCollabPage();
@@ -23944,6 +23964,8 @@ function renderDailyReport(){
     document.getElementById('revDlyK4s').innerHTML=adPrev?diffHtml(adDly,adPrev):'<span style="color:var(--tx2);">해당 기간·판매처</span>';
   }
 
+  try{ renderDlyStopNew(); }catch(e){ console.warn('판매중단·신규 목록 실패', e); }
+
   // 로켓그로스가 선택 범위에 포함되면(단독 선택 포함) 일반 채널용 표에도 로켓그로스 제품을 합쳐서 보여준다.
   // 방문자·전환율 등 로켓그로스 전용 지표는 아래 전용 카드(rgCard)로 별도 표시.
   const mainGrid=document.getElementById('revDlyMainGrid');
@@ -24116,6 +24138,105 @@ function renderDailyReport(){
         </div>`).join('');
     } else { if(dnutEmpty) dnutEmpty.style.display='block'; dnutCtx.style.display='none'; }
   }
+}
+
+// ── 일일보고: 판매 중단 의심 · 신규 제품 ──
+//   기준일(선택한 날짜, 월전체면 그 달 데이터 마지막 날) 포함 최근 7일 vs 직전 7일을 제품별로 비교한다.
+//   · 판매 중단 의심 = 최근 7일 판매 0 + 직전 7일 판매 있음 (노이즈 제거: 직전 7일 N개 이상 또는 직전 4주 중 5일 이상 판매)
+//   · 신규 = 최근 7일 판매 있음 + 그 이전 6주(기준일-48일~기준일-7일) 판매 전무
+let _dlyStopMinQty=10;
+let _dlyStopTok=0;
+function setDlyStopMin(v){ _dlyStopMinQty=Math.max(1,parseInt(v)||10); renderDlyStopNew(); }
+async function renderDlyStopNew(){
+  const card=document.getElementById('revDlyStopCard'); if(!card) return;
+  if(!_dlyFilter.year||!_dlyFilter.month) return;
+  const tok=++_dlyStopTok;
+  const e2=t=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const pad=v=>String(v).padStart(2,'0');
+  const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const ch=_dlyFilter.ch;
+  const chOk=c=>ch==='ALL'?true:(Array.isArray(ch)?ch.includes(c):c===ch);
+  const rgInc=ch==='ALL'||(Array.isArray(ch)&&ch.includes('로켓그로스'));
+  const y=_dlyFilter.year, m=_dlyFilter.month;
+  let anchor;
+  if(_dlyFilter.day!==null) anchor=new Date(y,m-1,_dlyFilter.day);
+  else{
+    let maxD=0;
+    _revData.forEach(r=>{ if(r.year===y&&r.date&&r.date.startsWith(pad(m))){ const d=parseInt(r.date.split('-')[1]); if(d>maxD) maxD=d; } });
+    Object.keys(_rgDailyTotals).forEach(k=>{ if(k.startsWith(`${y}-${pad(m)}`)){ const d=parseInt(k.slice(8,10)); if(d>maxD) maxD=d; } });
+    anchor=new Date(y,m-1,maxD||1);
+  }
+  const off=n=>{ const d=new Date(anchor); d.setDate(d.getDate()-n); return ymd(d); };
+  const curFrom=off(6), curTo=off(0), prevFrom=off(13), dayFrom=off(34), oldFrom=off(48);
+  // 6주 전까지 거슬러 올라가므로 해당 연도 데이터가 없으면 로드 후 다시 그린다
+  const miss=[...new Set([anchor.getFullYear(), Number(oldFrom.slice(0,4))])].filter(yy=>!_revYearsLoaded.has(yy));
+  if(miss.length){
+    card.innerHTML='<div class="dsn-empty">데이터를 불러오는 중입니다…</div>';
+    Promise.all(miss.map(yy=>ensureRevYear(yy))).then(()=>{ if(tok===_dlyStopTok) renderDlyStopNew(); });
+    return;
+  }
+  if(rgInc){ try{ await rgEnsureProdMonths(oldFrom.slice(0,7), curTo.slice(0,7)); }catch(e){} }
+  if(tok!==_dlyStopTok) return;   // 그 사이 필터가 바뀌어 다른 렌더가 시작됨
+
+  const by={};
+  const add=(name,type,code,date,qty)=>{
+    if(!(qty>0)||date<oldFrom||date>curTo) return;
+    const o=by[name]||(by[name]={type:'',code:'',c:0,p:0,old:0,days:new Set(),last:'',first:''});
+    if(!o.type&&type) o.type=type;
+    if(!o.code&&code) o.code=code;
+    if(date>=curFrom){ o.c+=qty; if(!o.first||date<o.first) o.first=date; }
+    else{
+      o.old+=qty; if(date>=prevFrom) o.p+=qty;
+      if(date>o.last) o.last=date;
+      if(date>=dayFrom) o.days.add(date);
+    }
+  };
+  _revData.forEach(r=>{
+    if(!r.date||!r.year||!chOk(r.ch)) return;
+    add(r.modelName||r.itemCode||'미상', r.itemType, r.itemCode, `${r.year}-${r.date}`, (r.orderQty||0)*bdQtyMultiplier(r.itemCode,r.modelName));
+  });
+  if(rgInc){
+    Object.keys(_rgProdCache).forEach(ym=>{
+      (_rgProdCache[ym]||[]).forEach(r=>{
+        if(!r.date) return;
+        add(rgResolveName(r.optionId)||r.productName||'미상', rgResolveType(r.optionId), '', r.date, (r.qty||0)*rgQtyMultiplier(r.optionId));
+      });
+    });
+  }
+  const minQ=_dlyStopMinQty;
+  const E=Object.entries(by);
+  const stop=E.filter(([,v])=>v.c===0&&v.p>0&&(v.p>=minQ||v.days.size>=5)).sort((a,b)=>b[1].p-a[1].p);
+  const fresh=E.filter(([,v])=>v.c>0&&v.old===0).sort((a,b)=>b[1].c-a[1].c);
+  const md=s=>s?`${Number(s.slice(5,7))}/${Number(s.slice(8,10))}`:'-';
+  const chLabel=ch==='ALL'?'전체':(Array.isArray(ch)?ch.join('·'):ch);
+  const LIMIT=100;
+  const stopRows=stop.slice(0,LIMIT).map(([name,v])=>{
+    return `<tr><td class="nm" title="${e2(name)}">${e2(name)}</td><td>${e2(v.type)}</td><td style="text-align:right;font-weight:600;">${v.p.toLocaleString()}</td><td style="text-align:right;">${v.days.size}일</td><td style="text-align:right;">${md(v.last)}</td></tr>`;
+  }).join('');
+  const freshRows=fresh.slice(0,LIMIT).map(([name,v])=>
+    `<tr><td class="nm" title="${e2(name)}">${e2(name)}</td><td>${e2(v.type)}</td><td style="text-align:right;font-weight:600;">${v.c.toLocaleString()}</td><td style="text-align:right;">${md(v.first)}</td></tr>`).join('');
+  card.innerHTML=`
+    <div class="rev-tbl-head" style="flex-wrap:wrap;gap:8px;">
+      <span class="rev-tbl-title">🔎 판매 중단 의심 · 신규 제품</span>
+      <span style="font-size:11px;color:var(--tx2);">기준일 ${curTo} · 최근 7일(${md(curFrom)}~${md(curTo)}) vs 직전 7일 · ${e2(chLabel)}</span>
+      <label style="margin-left:auto;font-size:11px;color:var(--tx2);display:inline-flex;align-items:center;gap:5px;" title="직전 7일 판매량이 이 값 이상이거나, 직전 4주 중 5일 이상 팔린 제품만 중단 의심으로 표시합니다">
+        직전 7일 판매 <input type="number" min="1" class="dsn-min" value="${minQ}" onchange="setDlyStopMin(this.value)">개 이상</label>
+    </div>
+    <div style="padding:12px 14px 14px;">
+      <div class="dsn-grid">
+        <div class="dsn-box">
+          <div class="dsn-h">⚠️ 판매 중단 의심 <span class="n">${stop.length.toLocaleString()}개 · 최근 7일 0건</span></div>
+          <div class="dsn-sc">${stop.length?`<table><colgroup><col><col style="width:78px;"><col style="width:70px;"><col style="width:62px;"><col style="width:78px;"></colgroup>
+            <thead><tr><th style="text-align:left;">제품명</th><th style="text-align:left;">구분</th><th style="text-align:right;">직전7일</th><th style="text-align:right;" title="직전 4주 중 판매한 날 수">판매일</th><th style="text-align:right;">마지막판매</th></tr></thead><tbody>${stopRows}</tbody></table>`:'<div class="dsn-empty">조건에 맞는 제품이 없습니다.</div>'}</div>
+        </div>
+        <div class="dsn-box">
+          <div class="dsn-h">🆕 신규 제품 <span class="n">${fresh.length.toLocaleString()}개 · 직전 6주 판매 없다가 최근 7일에 판매</span></div>
+          <div class="dsn-sc">${fresh.length?`<table><colgroup><col><col style="width:78px;"><col style="width:72px;"><col style="width:72px;"></colgroup>
+            <thead><tr><th style="text-align:left;">제품명</th><th style="text-align:left;">구분</th><th style="text-align:right;">최근7일</th><th style="text-align:right;">첫판매</th></tr></thead><tbody>${freshRows}</tbody></table>`:'<div class="dsn-empty">조건에 맞는 제품이 없습니다.</div>'}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:10.5px;color:var(--tx2);line-height:1.5;">판매 0건이 곧 품절은 아닙니다 — 재고가 있는데 안 팔리면 노출·가격 점검, 품절이면 입고 확인이 필요합니다. 재고는 품절관리·재고관리 메뉴에서 확인하세요.</div>
+    </div>`;
 }
 
 // ── 일일보고: 판매처=로켓그로스 선택 시 전용 제품별 판매 현황 카드 ──

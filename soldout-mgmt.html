@@ -365,6 +365,8 @@
       <div class="field" id="existSelected" style="display:none;">
         <label>상품명 (ERP 상품명)</label>
         <textarea id="existNameInput" rows="1"></textarea>
+        <label style="margin-top:12px;display:block;">상품명찾기 (별칭 / 검색용)</label>
+        <input type="text" id="existProdSearch" placeholder="예) 슬릿화분">
       </div>
     </div>
 
@@ -1634,6 +1636,7 @@ function selectExisting(pid){
   const sel = document.getElementById('existSelected');
   sel.style.display = '';
   document.getElementById('existNameInput').value = p.erpName;
+  document.getElementById('existProdSearch').value = p.searchName || '';
   document.getElementById('newProdSites').style.display = '';
   renderAddSiteBlocks(p);
 }
@@ -1684,6 +1687,7 @@ async function confirmAddProduct(){
       return;
     }
     p.erpName = newName;
+    p.searchName = document.getElementById('existProdSearch').value.trim();
     p.siteData = collectSiteBlocks(p);
     await saveState();
     closeAddModal();
