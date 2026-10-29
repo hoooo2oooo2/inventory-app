@@ -3480,6 +3480,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
   <div class="ni" id="nav-quote" onclick="goMenu('quote')">📄 견적서</div>
   <div class="ni" id="nav-family" onclick="goMenu('family')">📦 패밀리 오더</div>
   <div class="ni" id="nav-consign" onclick="goMenu('consign')">🚚 위탁 배송건</div>
+  <div class="ni" id="nav-waybill" onclick="goMenu('waybill')">📑 송장파일 취합</div>
   <div class="ni" id="nav-accreq" onclick="goMenu('accreq')">🧩 부속요청 게시판</div>
   <div class="ni" id="nav-tcb" onclick="goMenu('tcb')">💸 택배사 보상목록</div>
   <div class="ni" id="nav-phoneorder" onclick="goMenu('phoneorder')">📞 전화구매건 관리</div>
@@ -5825,6 +5826,101 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button onclick="document.getElementById('rgmReturnModal').style.display='none'" style="flex:1;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:13px;cursor:pointer;">취소</button>
       <button onclick="rgmConfirmReturn()" style="flex:2;padding:10px;border:none;border-radius:8px;background:var(--emerald-600);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 송장파일 취합 (CX팀) ═══ -->
+<div class="page" id="page-waybill">
+  <style>
+  #page-waybill .wbm-wrap{max-width:1080px;margin:0 auto;padding:20px 0 40px;}
+  #page-waybill .wbm-title{font-size:22px;font-weight:800;letter-spacing:-.5px;color:var(--tx);margin:0 0 6px;}
+  #page-waybill .wbm-sub{font-size:13.5px;color:var(--tx2);line-height:1.6;margin:0 0 16px;}
+  #page-waybill .wbm-rules{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+  #page-waybill .wbm-rule{flex:1 1 240px;display:flex;gap:11px;align-items:flex-start;background:var(--bg);border:0.5px solid var(--bd);border-radius:12px;padding:13px 15px;}
+  #page-waybill .wbm-rule-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--pr);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  #page-waybill .wbm-rule-t{font-size:13.5px;font-weight:700;color:var(--tx);margin-bottom:2px;}
+  #page-waybill .wbm-rule-d{font-size:12.5px;color:var(--tx2);line-height:1.5;}
+  #page-waybill .wbm-card{background:var(--bg);border:0.5px solid var(--bd);border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:0 4px 16px rgba(0,0,0,.04);}
+  #page-waybill .wbm-card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  #page-waybill .wbm-card-t{font-size:16px;font-weight:800;color:var(--tx);letter-spacing:-.3px;}
+  #page-waybill .wbm-up{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap;}
+  #page-waybill .wbm-round-pick{flex:none;display:flex;flex-direction:column;gap:6px;justify-content:center;}
+  #page-waybill .wbm-round-pick label{font-size:13px;font-weight:700;color:var(--tx);}
+  #page-waybill .wbm-round-pick select{height:44px;min-width:110px;border:1px solid var(--bd);border-radius:9px;padding:0 12px;font-size:15px;font-weight:700;background:var(--bg);color:var(--tx);cursor:pointer;font-family:inherit;}
+  #page-waybill .wbm-drop{flex:1 1 320px;min-height:92px;border:2px dashed var(--bd);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;background:var(--bg2);color:var(--tx);transition:.15s;text-align:center;padding:12px;}
+  #page-waybill .wbm-drop:hover,#page-waybill .wbm-drop.drag{border-color:var(--pr);background:var(--prl);}
+  #page-waybill .wbm-drop b{font-size:15px;}
+  #page-waybill .wbm-drop span{font-size:12.5px;color:var(--tx2);}
+  #page-waybill .wbm-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  #page-waybill .wbm-stat{flex:1 1 130px;background:var(--bg2);border-radius:10px;padding:11px 14px;}
+  #page-waybill .wbm-stat-l{font-size:12px;color:var(--tx2);margin-bottom:3px;}
+  #page-waybill .wbm-stat-v{font-size:19px;font-weight:800;color:var(--tx);}
+  #page-waybill .wbm-tbl{width:100%;border-collapse:collapse;font-size:13.5px;color:var(--tx);}
+  #page-waybill .wbm-tbl th{background:var(--bg2);color:var(--tx2);font-size:12.5px;font-weight:700;text-align:left;padding:9px 12px;border-bottom:1px solid var(--bd);white-space:nowrap;}
+  #page-waybill .wbm-tbl td{padding:9px 12px;border-bottom:0.5px solid var(--bd);vertical-align:middle;}
+  #page-waybill .wbm-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}
+  #page-waybill .wbm-tbl .wbm-rd{display:inline-block;min-width:38px;text-align:center;padding:3px 9px;border-radius:999px;background:var(--prl);color:var(--pr);font-weight:800;font-size:12.5px;}
+  #page-waybill .wbm-btn{height:42px;padding:0 20px;border:0;border-radius:10px;background:var(--pr);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+  #page-waybill .wbm-btn:disabled{opacity:.4;cursor:not-allowed;}
+  #page-waybill .wbm-btn.sec{background:var(--bg);color:var(--tx2);border:1px solid var(--bd);font-weight:600;}
+  #page-waybill .wbm-x{border:0;background:none;color:var(--tx2);font-size:12.5px;cursor:pointer;padding:4px 8px;border-radius:6px;font-family:inherit;}
+  #page-waybill .wbm-x:hover{background:var(--bg2);color:#e5484d;}
+  #page-waybill .wbm-empty{padding:26px 10px;text-align:center;color:var(--tx2);font-size:13.5px;}
+  #page-waybill .wbm-warn{margin-top:10px;padding:9px 12px;border-radius:8px;background:#FEF3C7;color:#92400E;font-size:12.5px;line-height:1.5;}
+  #page-waybill .wbm-pv{max-height:460px;overflow:auto;border:0.5px solid var(--bd);border-radius:10px;}
+  #page-waybill .wbm-pv .wbm-tbl th{position:sticky;top:0;z-index:1;}
+  #page-waybill .wbm-pv .wbm-dup{background:#FFC7CE;color:#9C0006;font-weight:600;}
+  #page-waybill .wbm-pv tr.wbm-first td{background:#C6EFCE;color:#006100;}
+  #page-waybill .wbm-pv tr.wbm-first td.wbm-dup{background:#FFC7CE;color:#9C0006;}
+  #page-waybill .wbm-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--tx2);margin-bottom:10px;}
+  #page-waybill .wbm-chip{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:5px;}
+  </style>
+  <div class="wbm-wrap">
+    <h2 class="wbm-title">📑 송장파일 취합</h2>
+    <p class="wbm-sub">택배사 프로그램에서 출력한 <b>차수별 운송장 엑셀</b>을 올리면, 아래 규칙대로 하나의 파일로 합쳐서 다운로드할 수 있어요. 2차부터는 이전 차수가 자동으로 포함됩니다.</p>
+
+    <div class="wbm-rules">
+      <div class="wbm-rule"><div class="wbm-rule-n">1</div><div><div class="wbm-rule-t">운송장번호 열 이동</div><div class="wbm-rule-d">수하인명 ↔ 수하인기본주소 사이로 이동</div></div></div>
+      <div class="wbm-rule"><div class="wbm-rule-n">2</div><div><div class="wbm-rule-t">중복 항목 제거</div><div class="wbm-rule-d">수하인명·운송장번호·수하인기본주소가 모두 같은 행만 제거</div></div></div>
+      <div class="wbm-rule"><div class="wbm-rule-n">3</div><div><div class="wbm-rule-t">동명이인 표시</div><div class="wbm-rule-d">수하인명 중복값은 빨간 글씨 + 연한 빨강 채우기 (조건부서식)</div></div></div>
+    </div>
+
+    <div class="wbm-card">
+      <div class="wbm-card-h"><div class="wbm-card-t">① 차수별 원본 엑셀 업로드</div></div>
+      <div class="wbm-up">
+        <div class="wbm-round-pick">
+          <label for="wbmRoundSel">차수</label>
+          <select id="wbmRoundSel"></select>
+        </div>
+        <div class="wbm-drop" id="wbmDrop" onclick="document.getElementById('wbmFile').click()">
+          <b>📤 원본 운송장 엑셀 선택 (클릭 또는 끌어놓기)</b>
+          <span>선택한 차수에 등록됩니다 · 같은 차수를 다시 올리면 교체돼요</span>
+        </div>
+        <input type="file" id="wbmFile" accept=".xlsx,.xls" style="display:none;" onchange="wbmPickFile(event)">
+      </div>
+    </div>
+
+    <div class="wbm-card">
+      <div class="wbm-card-h">
+        <div class="wbm-card-t">② 등록된 차수</div>
+        <div style="display:flex;gap:8px;">
+          <button class="wbm-btn sec" id="wbmClearBtn" onclick="wbmClearAll()">전체 초기화</button>
+          <button class="wbm-btn" id="wbmDlBtn" onclick="wbmDownload()">📥 엑셀 다운로드</button>
+        </div>
+      </div>
+      <div class="wbm-stats" id="wbmStats"></div>
+      <div id="wbmRounds"></div>
+      <div id="wbmWarn"></div>
+    </div>
+
+    <div class="wbm-card">
+      <div class="wbm-card-h"><div class="wbm-card-t">③ 취합 결과 미리보기</div></div>
+      <div class="wbm-legend">
+        <span><i class="wbm-chip" style="background:#C6EFCE;"></i>새 차수 첫 행 (연한 초록)</span>
+        <span><i class="wbm-chip" style="background:#FFC7CE;"></i>수하인명 중복 (동명이인)</span>
+      </div>
+      <div id="wbmPreview"></div>
     </div>
   </div>
 </div>
@@ -8981,7 +9077,7 @@ function _axColor(){ return _currentTheme()==='dark' ? '#C7C7CC' : '#888'; }
 const MENUS = [
   {id:'inv',label:'재고관리'}, {id:'sales',label:'판매분석'}, {id:'order',label:'발주관리'}, {id:'insight',label:'📊 발주 인사이트'},
   {id:'rg',label:'그로스 출고'}, {id:'hist',label:'변동이력'}, {id:'revenue',label:'매출관리'},
-  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'tcb',label:'💸 택배사 보상목록'}, {id:'phoneorder',label:'📞 전화구매건 관리'}, {id:'retmgmt',label:'🔄 반품관리'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'knowledge',label:'📚 지식베이스'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'}, {id:'rgrevenue',label:'🚀 로켓그로스 매출'},
+  {id:'price',label:'단가계산기'}, {id:'quote',label:'견적서'}, {id:'family',label:'패밀리 오더'}, {id:'consign',label:'위탁 배송건'}, {id:'waybill',label:'📑 송장파일 취합'}, {id:'accreq',label:'🧩 부속요청 게시판'}, {id:'tcb',label:'💸 택배사 보상목록'}, {id:'phoneorder',label:'📞 전화구매건 관리'}, {id:'retmgmt',label:'🔄 반품관리'}, {id:'cost3day',label:'3일 비용계산'}, {id:'review',label:'⭐ 리뷰관리'}, {id:'knowledge',label:'📚 지식베이스'}, {id:'rgmgmt',label:'🚀 로켓그로스 관리'}, {id:'rgrevenue',label:'🚀 로켓그로스 매출'},
   {id:'collab',label:'🤝 협업업무'}, {id:'calendar',label:'📋 업무보고'},
   {id:'rpt_yuhyun',label:'📝 유현'}, {id:'rpt_bora',label:'📝 보라'}, {id:'rpt_yeonjeong',label:'📝 연정'},
   {id:'moeum',label:'🧮 모음전 계산기'},
@@ -9000,10 +9096,10 @@ const _PERM_RANK = { none:0, view:1, edit:2 };
 
 // 부서(상단 탭) → 하위 메뉴
 const DEPTS = [
-  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','insight','price','quote','family','consign','accreq','tcb','phoneorder','retmgmt','cost3day','review','knowledge'],
+  { id:'cx',     label:'CX팀',     menus:['inv','sales','order','insight','price','quote','family','consign','waybill','accreq','tcb','phoneorder','retmgmt','cost3day','review','knowledge'],
     groups:[
       { label:'재고·발주', menus:['inv','sales','order','family','insight'] },
-      { label:'CX업무',    menus:['phoneorder','retmgmt','price','quote','review','knowledge','consign'] },
+      { label:'CX업무',    menus:['phoneorder','retmgmt','price','quote','review','knowledge','consign','waybill'] },
       { label:'기타',      menus:['accreq','cost3day','tcb'] },
     ] },
   { id:'design', label:'디자인팀',  menus:['collab','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout'] },
@@ -9182,7 +9278,7 @@ function _syncNavGroups(){
 //  · 데이터 요약이 아직 없는 메뉴는 '바로가기' 위젯으로 표시(HOME_PROVIDERS에 함수를 추가하면 요약 데이터가 붙음)
 // ══════════════════════════════════════════════
 function _isAdminUser(){ const u=window.__CURRENT_USER; return !!u && u.username==='admin'; }
-const HOME_ICONS={inv:'📦',sales:'📈',order:'🧾',insight:'📊',rg:'🚀',hist:'🕘',revenue:'💰',price:'🧮',quote:'📄',family:'👪',consign:'🚚',accreq:'🧩',tcb:'💸',phoneorder:'📞',retmgmt:'🔄',cost3day:'📦',review:'⭐',knowledge:'📚',rgmgmt:'🚀',rgrevenue:'🚀',collab:'🤝',calendar:'📋',rpt_yuhyun:'📝',rpt_bora:'📝',rpt_yeonjeong:'📝',moeum:'🧮',soldout:'🚫',logihome:'🏠',logistock:'📦',logibox:'📮',logicarrot:'🥕',coupangad:'👥'};
+const HOME_ICONS={inv:'📦',sales:'📈',order:'🧾',insight:'📊',rg:'🚀',hist:'🕘',revenue:'💰',price:'🧮',quote:'📄',family:'👪',consign:'🚚',waybill:'📑',accreq:'🧩',tcb:'💸',phoneorder:'📞',retmgmt:'🔄',cost3day:'📦',review:'⭐',knowledge:'📚',rgmgmt:'🚀',rgrevenue:'🚀',collab:'🤝',calendar:'📋',rpt_yuhyun:'📝',rpt_bora:'📝',rpt_yeonjeong:'📝',moeum:'🧮',soldout:'🚫',logihome:'🏠',logistock:'📦',logibox:'📮',logicarrot:'🥕',coupangad:'👥'};
 let _homeCfg=null, _homeEdit=false, _homeTimer=null, _homeRefreshT=null, _homeDrag=null, _homeLanded=false;
 let _homeCalY=new Date().getFullYear(), _homeCalM=new Date().getMonth();
 let _homeSalesCache=null;
@@ -15375,7 +15471,7 @@ function goPage(p){
   // 디자인팀 직원별 업무보고(rpt_*)는 협업업무(page-collab)를 직원 스코프로 재사용
   _designScopePerson = PERSON_MENUS[p] || null;
   const _pageId = PERSON_MENUS[p] ? 'collab' : p;
-  ['home','inv','sales','order','insight','rg','hist','report','revenue','price','quote','family','consign','accreq','tcb','phoneorder','retmgmt','rgmgmt','cost3day','review','knowledge','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logicarrot','coupangad'].forEach(x=>{
+  ['home','inv','sales','order','insight','rg','hist','report','revenue','price','quote','family','consign','waybill','accreq','tcb','phoneorder','retmgmt','rgmgmt','cost3day','review','knowledge','collab','calendar','rpt_yuhyun','rpt_bora','rpt_yeonjeong','moeum','soldout','logihome','logistock','logibox','logicarrot','coupangad'].forEach(x=>{
     document.getElementById('nav-'+x)?.classList.toggle('active',x===p);
     document.getElementById('page-'+x)?.classList.toggle('active',x===_pageId);
   });
@@ -15422,6 +15518,7 @@ function goPage(p){
   if(p==='quote'){ qtInit(); qtLoadSavedCloud(); }
   if(p==='family') initFamilyPage();
   if(p==='consign') csInit();
+  if(p==='waybill') wbmInit();
   if(p==='accreq') arqInit();
   if(p==='tcb') tcbInit();
   if(p==='phoneorder') pivInit();
@@ -15438,6 +15535,269 @@ function goPage(p){
   _applyWriteLockUI();
   // 캘린더 페이지에서는 상단 엑셀 업로드 버튼 숨김 (해당 없음) — _applyWriteLockUI 이후 적용
   if(_pageId==='home'||_pageId==='calendar'||_pageId==='collab'||_pageId==='logihome'||_pageId==='logistock'||_pageId==='logibox'||_pageId==='logicarrot'||_pageId==='coupangad'||_pageId==='soldout'||_pageId==='knowledge'){ const upBtn=document.getElementById('uploadTopBtn'); if(upBtn) upBtn.style.display='none'; }
+}
+
+// ══════════════════════════════════════════════
+// 송장파일 취합 (CX팀) — 차수별 운송장 엑셀을 하나로 합침
+//  1) 운송장번호 열을 수하인명↔수하인기본주소 사이로 이동
+//  2) 수하인명+운송장번호+수하인기본주소가 모두 같은 행 제거
+//  3) 수하인명 열에 '중복값' 조건부서식(빨간 글씨+연한 빨강), 새 차수 첫 행은 연한 초록 채우기
+// 업로드 원본은 이 브라우저의 IndexedDB에만 보관한다(Supabase에 쓰지 않음 → 운영 DB·egress 영향 없음).
+// ══════════════════════════════════════════════
+let _wbmRounds = [];        // [{round,fileName,uploadedAt,header:[str],rows:[[{t,v,z}|null]]}] 원본 열 순서 그대로
+let _wbmLoaded = false;
+const _wbmEsc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const _wbmNorm = s => String(s==null?'':s).replace(/\s+/g,'');
+
+function _wbmDb(){
+  return new Promise(res=>{
+    try{
+      const r=indexedDB.open('wbm_v1',1);
+      r.onupgradeneeded=()=>r.result.createObjectStore('rounds',{keyPath:'round'});
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+async function _wbmIdb(mode, fn){
+  const db=await _wbmDb(); if(!db) return null;
+  return new Promise(res=>{
+    try{
+      const tx=db.transaction('rounds',mode); const out=fn(tx.objectStore('rounds'));
+      tx.oncomplete=()=>res(out&&'result' in out?out.result:true);
+      tx.onerror=tx.onabort=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+const _wbmIdbAll   = async()=> (await _wbmIdb('readonly', s=>s.getAll())) || [];
+const _wbmIdbPut   = rec=>_wbmIdb('readwrite', s=>s.put(rec));
+const _wbmIdbDel   = round=>_wbmIdb('readwrite', s=>s.delete(round));
+const _wbmIdbClear = ()=>_wbmIdb('readwrite', s=>s.clear());
+
+function wbmInit(){
+  const sel=document.getElementById('wbmRoundSel');
+  if(sel && !sel.options.length){
+    for(let i=1;i<=20;i++){ const o=document.createElement('option'); o.value=i; o.textContent=i+'차'; sel.appendChild(o); }
+  }
+  const drop=document.getElementById('wbmDrop');
+  if(drop && !drop._wbmWired){
+    drop._wbmWired=true;
+    ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop',e=>{ const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) wbmReadFile(f); });
+  }
+  if(!_wbmLoaded){
+    _wbmLoaded=true;
+    // 로드가 끝나기 전에 업로드된 차수가 있어도 덮어쓰지 않고 합친다(같은 차수는 방금 올린 쪽 우선)
+    _wbmIdbAll().then(list=>{
+      list.forEach(r=>{ if(!_wbmRounds.some(x=>x.round===r.round)) _wbmRounds.push(r); });
+      _wbmRounds.sort((a,b)=>a.round-b.round); _wbmPickNextRound(); wbmRender();
+    });
+  }
+  _wbmPickNextRound();
+  wbmRender();
+}
+function _wbmPickNextRound(){
+  const sel=document.getElementById('wbmRoundSel'); if(!sel) return;
+  const max=_wbmRounds.reduce((m,r)=>Math.max(m,r.round),0);
+  sel.value=String(Math.min(max+1,20));
+}
+
+// 헤더에서 필수 열 위치 찾기(공백 무시). 없으면 -1
+function _wbmCols(header){
+  const n=header.map(_wbmNorm);
+  let name=n.findIndex(h=>h==='수하인명'||h==='수화인명');
+  let wb=n.indexOf('운송장번호'); if(wb<0) wb=n.findIndex(h=>h.includes('운송장')&&!h.includes('이전'));
+  let addr=n.indexOf('수하인기본주소'); if(addr<0) addr=n.findIndex(h=>h.includes('수하인')&&h.includes('기본')&&h.includes('주소'));
+  return {name,wb,addr};
+}
+// 열 순서: 운송장번호를 빼서 수하인명 바로 뒤에 끼운다(이미 사이에 있어도 동일 결과)
+function _wbmOrder(header,c){
+  const order=header.map((_,i)=>i).filter(i=>i!==c.wb);
+  order.splice(order.indexOf(c.name)+1,0,c.wb);
+  return order;
+}
+const _wbmCellStr = c => c==null||c.v==null ? '' : String(c.v).trim();
+
+function _wbmParseSheet(ws){
+  if(!ws||!ws['!ref']) return null;
+  const U=XLSX.utils, rng=U.decode_range(ws['!ref']);
+  const header=[]; for(let c=rng.s.c;c<=rng.e.c;c++){ const x=ws[U.encode_cell({r:rng.s.r,c})]; header.push(x&&x.v!=null?String(x.v).trim():''); }
+  const rows=[];
+  for(let r=rng.s.r+1;r<=rng.e.r;r++){
+    const row=[]; let any=false;
+    for(let c=rng.s.c;c<=rng.e.c;c++){
+      const x=ws[U.encode_cell({r,c})];
+      if(x && x.v!==undefined && x.v!==''){ any=true; const o={t:x.t,v:x.v}; if(x.z) o.z=x.z; row.push(o); } else row.push(null);
+    }
+    if(any) rows.push(row);
+  }
+  return {header,rows};
+}
+
+function wbmPickFile(ev){ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(f) wbmReadFile(f); }
+function wbmReadFile(file){
+  const round=parseInt(document.getElementById('wbmRoundSel').value,10)||1;
+  if(!/\.(xlsx|xls)$/i.test(file.name)){ alert('엑셀 파일(.xlsx, .xls)만 올릴 수 있어요.'); return; }
+  if(_wbmRounds.some(r=>r.round===round) && !confirm(`${round}차가 이미 등록되어 있어요. 새 파일로 교체할까요?`)) return;
+  const fr=new FileReader();
+  fr.onload=async()=>{
+    let parsed;
+    try{
+      const wb=XLSX.read(fr.result,{type:'array'});
+      parsed=_wbmParseSheet(wb.Sheets[wb.SheetNames[0]]);
+    }catch(e){ console.warn('송장 엑셀 읽기 실패',e); alert('엑셀 파일을 읽지 못했어요. 택배사 프로그램에서 내려받은 원본 파일인지 확인해 주세요.'); return; }
+    if(!parsed||!parsed.rows.length){ alert('데이터 행이 없는 파일이에요.'); return; }
+    const c=_wbmCols(parsed.header);
+    const miss=[]; if(c.name<0) miss.push('수하인명'); if(c.wb<0) miss.push('운송장번호'); if(c.addr<0) miss.push('수하인기본주소');
+    if(miss.length){ alert('1행(헤더)에서 다음 열을 찾지 못했어요: '+miss.join(', ')+'\n\n운송장 원본 파일이 맞는지 확인해 주세요.'); return; }
+    const rec={round,fileName:file.name,uploadedAt:Date.now(),header:parsed.header,rows:parsed.rows};
+    const i=_wbmRounds.findIndex(r=>r.round===round);
+    if(i>=0) _wbmRounds[i]=rec; else _wbmRounds.push(rec);
+    _wbmRounds.sort((a,b)=>a.round-b.round);
+    const ok=await _wbmIdbPut(rec);
+    _wbmPickNextRound(); wbmRender();
+    toast(ok?`${round}차 등록 완료 (${parsed.rows.length}행)`:`${round}차 등록됨 — 이 브라우저에 저장하지 못해 새로고침하면 사라져요`);
+  };
+  fr.onerror=()=>alert('파일을 읽지 못했어요.');
+  fr.readAsArrayBuffer(file);
+}
+async function wbmDelRound(round){
+  if(!confirm(`${round}차를 목록에서 뺄까요?\n(다시 올리면 복구할 수 있어요)`)) return;
+  _wbmRounds=_wbmRounds.filter(r=>r.round!==round);
+  await _wbmIdbDel(round); _wbmPickNextRound(); wbmRender();
+}
+async function wbmClearAll(){
+  if(!_wbmRounds.length) return;
+  if(!confirm('등록된 모든 차수를 초기화할까요?\n(새로 시작하는 날 쓰는 기능이에요. 다시 올리면 복구할 수 있어요)')) return;
+  _wbmRounds=[]; await _wbmIdbClear(); _wbmPickNextRound(); wbmRender();
+}
+
+// 차수 순서대로 이어붙여 열 이동 → 중복 제거. 결과: {header,rows:[{round,cells,first}],stats,col:{name,wb,addr},mismatch}
+function _wbmBuild(){
+  const rounds=[..._wbmRounds].sort((a,b)=>a.round-b.round);
+  if(!rounds.length) return null;
+  const prep=rounds.map(r=>{ const c=_wbmCols(r.header); const order=_wbmOrder(r.header,c); return {r,order,header:order.map(i=>r.header[i])}; });
+  const header=prep[0].header;
+  const col=_wbmCols(header);
+  const seen=new Set(), rows=[], stats=[]; let mismatch=false;
+  prep.forEach((p,pi)=>{
+    const same=p.header.length===header.length && p.header.every((h,i)=>h===header[i]);
+    let map=null;
+    if(!same){   // 열 구성이 다른 차수는 헤더 이름으로 맞춘다(같은 이름이 여럿이면 순서대로)
+      mismatch=true;
+      const used={}; map=header.map(h=>{ const k=h; const from=used[k]||0; let idx=-1,cnt=0;
+        for(let i=0;i<p.header.length;i++){ if(p.header[i]===h){ if(cnt===from){ idx=i; break; } cnt++; } }
+        used[k]=from+1; return idx; });
+    }
+    let kept=0, removed=0, firstMarked=false;
+    p.r.rows.forEach(orig=>{
+      const ordered=p.order.map(i=>orig[i]==null?null:orig[i]);
+      const cells=same?ordered:map.map(i=>i<0?null:ordered[i]);
+      const w=_wbmCellStr(cells[col.wb]);
+      if(w){   // 운송장번호가 빈 행은 비교 대상에서 제외(지우지 않음)
+        const key=_wbmCellStr(cells[col.name])+'\u0001'+w+'\u0001'+_wbmCellStr(cells[col.addr]);
+        if(seen.has(key)){ removed++; return; }
+        seen.add(key);
+      }
+      const first = pi>0 && !firstMarked; firstMarked=true;
+      rows.push({round:p.r.round,cells,first}); kept++;
+    });
+    stats.push({round:p.r.round,fileName:p.r.fileName,uploadedAt:p.r.uploadedAt,total:p.r.rows.length,kept,removed});
+  });
+  return {header,rows,stats,col,mismatch};
+}
+
+function wbmRender(){
+  const m=_wbmBuild();
+  const dl=document.getElementById('wbmDlBtn'), clr=document.getElementById('wbmClearBtn');
+  if(dl) dl.disabled=!m; if(clr) clr.disabled=!m;
+  const stEl=document.getElementById('wbmStats'), rdEl=document.getElementById('wbmRounds'), pvEl=document.getElementById('wbmPreview'), wEl=document.getElementById('wbmWarn');
+  if(!stEl) return;
+  if(!m){
+    stEl.innerHTML=''; wEl.innerHTML='';
+    rdEl.innerHTML='<div class="wbm-empty">아직 등록된 차수가 없어요. 위에서 1차 원본 엑셀을 올려주세요.</div>';
+    pvEl.innerHTML='<div class="wbm-empty">차수를 등록하면 취합 결과가 여기에 표시돼요.</div>';
+    return;
+  }
+  const tot=m.stats.reduce((a,s)=>({total:a.total+s.total,removed:a.removed+s.removed,kept:a.kept+s.kept}),{total:0,removed:0,kept:0});
+  const nameCnt={}; m.rows.forEach(r=>{ const n=_wbmCellStr(r.cells[m.col.name]); if(n) nameCnt[n]=(nameCnt[n]||0)+1; });
+  const dupNames=Object.keys(nameCnt).filter(k=>nameCnt[k]>1).length;
+  const stat=(l,v)=>`<div class="wbm-stat"><div class="wbm-stat-l">${l}</div><div class="wbm-stat-v">${v}</div></div>`;
+  stEl.innerHTML=stat('등록 차수',m.stats.length+'개')+stat('원본 합계',tot.total.toLocaleString()+'행')+stat('중복 제거',tot.removed.toLocaleString()+'행')+stat('최종 행 수',tot.kept.toLocaleString()+'행')+stat('동명이인(중복 이름)',dupNames.toLocaleString()+'명');
+  const fmt=t=>{ const d=new Date(t); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  rdEl.innerHTML=`<table class="wbm-tbl"><thead><tr><th>차수</th><th>파일명</th><th class="num">원본 행</th><th class="num">중복 제거</th><th class="num">반영 행</th><th>업로드</th><th></th></tr></thead><tbody>`+
+    m.stats.map(s=>`<tr><td><span class="wbm-rd">${s.round}차</span></td><td>${_wbmEsc(s.fileName)}</td><td class="num">${s.total.toLocaleString()}</td><td class="num">${s.removed.toLocaleString()}</td><td class="num"><b>${s.kept.toLocaleString()}</b></td><td>${fmt(s.uploadedAt)}</td><td style="text-align:right;"><button class="wbm-x" onclick="wbmDelRound(${s.round})">✕ 빼기</button></td></tr>`).join('')+
+    `</tbody></table>`;
+  wEl.innerHTML=m.mismatch?'<div class="wbm-warn">⚠️ 일부 차수의 열 구성이 1차와 달라서 헤더 이름 기준으로 맞춰 합쳤어요. 없는 열은 빈칸으로 들어갑니다.</div>':'';
+  const LIM=300, cols=[['차수',null],['수하인명',m.col.name],['운송장번호',m.col.wb],['수하인기본주소',m.col.addr]];
+  pvEl.innerHTML=`<div class="wbm-pv"><table class="wbm-tbl"><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`+
+    m.rows.slice(0,LIM).map(r=>{
+      const n=_wbmCellStr(r.cells[m.col.name]);
+      return `<tr class="${r.first?'wbm-first':''}"><td>${r.round}차</td><td class="${n&&nameCnt[n]>1?'wbm-dup':''}">${_wbmEsc(n)}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.wb]))}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.addr]))}</td></tr>`;
+    }).join('')+`</tbody></table></div>`+
+    (m.rows.length>LIM?`<div class="wbm-sub" style="margin:8px 2px 0;">미리보기는 앞 ${LIM}행만 보여줘요. 다운로드 파일에는 전체 ${m.rows.length.toLocaleString()}행이 들어갑니다.</div>`:'');
+}
+
+// 합본 엑셀(Blob) 생성 — 다운로드와 분리해 둔 이유: 저장 없이 결과 검증 가능
+async function _wbmMakeXlsx(m){
+  const XS=window.XLSXStyle, U=XS.utils;
+  const GREEN={fill:{patternType:'solid',fgColor:{rgb:'C6EFCE'}}};
+  const ws={}, nC=m.header.length;
+  m.header.forEach((h,c)=>{ ws[U.encode_cell({r:0,c})]={t:'s',v:h}; });
+  m.rows.forEach((row,i)=>{
+    const r=i+1;
+    for(let c=0;c<nC;c++){
+      const x=row.cells[c], addr=U.encode_cell({r,c});
+      if(x){ const o={t:x.t,v:x.v}; if(x.z) o.z=x.z; if(row.first) o.s=GREEN; ws[addr]=o; }
+      else if(row.first) ws[addr]={t:'s',v:'',s:GREEN};
+    }
+  });
+  const lastRow=m.rows.length+1;
+  ws['!ref']=U.encode_range({s:{r:0,c:0},e:{r:lastRow-1,c:nC-1}});
+  ws['!cols']=m.header.map((h,c)=>({wch:c===m.col.addr?42:(c===m.col.wb?16:(c===m.col.name?12:Math.max(8,Math.min(20,_wbmNorm(h).length*2+2))))}));
+  const wb=U.book_new(); U.book_append_sheet(wb,ws,'운송장');
+  const out=XS.write(wb,{bookType:'xlsx',type:'array'});
+
+  // SheetJS 커뮤니티 빌드는 조건부서식·틀고정을 못 써서 생성된 zip의 XML을 직접 patch한다(일일보고 엑셀과 동일 방식)
+  const zip=await JSZip.loadAsync(out);
+  let st=await zip.file('xl/styles.xml').async('string');
+  const dxf='<dxf><font><color rgb="FF9C0006"/></font><fill><patternFill><bgColor rgb="FFFFC7CE"/></patternFill></fill></dxf>';
+  let dxfId=0;
+  if(/<dxfs[^>]*\/>/.test(st)) st=st.replace(/<dxfs[^>]*\/>/,`<dxfs count="1">${dxf}</dxfs>`);
+  else if(/<dxfs[^>]*>/.test(st)){
+    dxfId=parseInt((st.match(/<dxfs[^>]*count="(\d+)"/)||[])[1]||'0',10);
+    st=st.replace(/<dxfs([^>]*)count="\d+"/,`<dxfs$1count="${dxfId+1}"`).replace('</dxfs>',dxf+'</dxfs>');
+  } else {
+    const ins=`<dxfs count="1">${dxf}</dxfs>`;
+    const hit=['<tableStyles','<colors','<extLst','</styleSheet>'].find(t=>st.includes(t));
+    st=st.replace(hit,ins+hit);
+  }
+  zip.file('xl/styles.xml',st);
+
+  let sx=await zip.file('xl/worksheets/sheet1.xml').async('string');
+  const nameCol=U.encode_col(m.col.name);   // 열 이동 후 수하인명 열 (이동은 그 뒤쪽에만 영향)
+  const cf=`<conditionalFormatting sqref="${nameCol}2:${nameCol}${lastRow}"><cfRule type="duplicateValues" dxfId="${dxfId}" priority="1"/></conditionalFormatting>`;
+  // OOXML 요소 순서: sheetData → conditionalFormatting → (pageMargins·ignoredErrors 등). 순서가 틀리면 엑셀이 '손상된 파일'로 판단하므로 </sheetData> 바로 뒤에 넣는다
+  sx=sx.replace('</sheetData>','</sheetData>'+cf);
+  const pane='<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/>';
+  if(!/<pane /.test(sx)){
+    if(/<sheetView([^>]*)\/>/.test(sx)) sx=sx.replace(/<sheetView([^>]*)\/>/,`<sheetView$1>${pane}</sheetView>`);
+    else if(/<sheetView[^>]*>/.test(sx)) sx=sx.replace(/(<sheetView[^>]*>)/,`$1${pane}`);
+  }
+  zip.file('xl/worksheets/sheet1.xml',sx);
+  return zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+async function wbmDownload(){
+  if(!window.XLSXStyle||!window.JSZip){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  const m=_wbmBuild(); if(!m){ toast('등록된 차수가 없어요.'); return; }
+  try{
+    const blob=await _wbmMakeXlsx(m);
+    const d=new Date(), ymd=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    const maxR=m.stats[m.stats.length-1].round;
+    _saveBlob(blob,`송장취합_${ymd}_${maxR}차.xlsx`);
+    toast(`다운로드 완료 (${maxR}차까지 · ${m.rows.length.toLocaleString()}행)`);
+  }catch(e){ console.warn('송장 취합 엑셀 생성 실패',e); alert('엑셀 생성에 실패했어요: '+(e&&e.message||e)); }
 }
 
 // ══════════════════════════════════════════════
