@@ -3113,7 +3113,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
     </div>
     <button class="btn" id="uploadTopBtn">엑셀 업로드</button>
     <button class="btn btn-pr" id="addTopBtn" style="display:none;">+ 추가</button>
-    <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn">📱</button>
+    <button class="btn btn-sm" onclick="openTelegramSettings()" title="텔레그램 발주 알림 설정" id="tgBtn" style="display:none">📱</button>
     <span id="viewBadge" style="display:none;font-size:10px;color:var(--amber-500);border:1px solid #F59E0B66;border-radius:5px;padding:2px 6px;white-space:nowrap;">열람전용</span>
     <button class="btn btn-sm" id="taskBellBtn" onclick="taskOpenInbox()" title="받은 요청함 (F9 키: 어디서든 새 요청 보내기)" style="position:relative;">🔔<span id="taskBellBadge" style="display:none;position:absolute;top:-5px;right:-5px;background:var(--red-500);color:#fff;font-size:10px;line-height:1;border-radius:8px;padding:2px 5px;min-width:14px;text-align:center;"></span></button>
     <span id="whoami" onclick="openMyPage()" title="마이페이지" style="font-size:11px;color:var(--tx2);padding:3px 8px;white-space:nowrap;cursor:pointer;border-radius:6px;border:1px solid var(--bd);"></span>
@@ -9012,9 +9012,9 @@ function _startAppData(){
   if(_appDataStarted) return;
   _appDataStarted = true;
   loadAll().then(async ()=>{
-    checkTelegramAlert();
+    // 텔레그램 기능 비활성화(TG_ENABLED=false) — 이 브라우저에 남은 봇 토큰/채팅ID는 지워 노출 면적 축소
+    try{ ['tg_token','tg_chat','tg_groq_enabled','tg_update_offset','tg_last_sent','tg_interval'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
     checkWeeklySmartstoreReport();
-    startTgPolling();
     // 페이지 로드 시 월별집계 오류 자동 감지 & 수정
     const issues=_detectMonthlyBatch();
     if(issues.length){
@@ -26713,7 +26713,7 @@ async function checkWeeklySmartstoreReport(){
     const data=computeWeeklySSReport();
     showWeeklySSReportModal(data);
     const tok=localStorage.getItem('tg_token'), chat=localStorage.getItem('tg_chat');
-    if(tok && chat){
+    if(TG_ENABLED && tok && chat){
       try{ await _tgPost(tok, chat, buildWeeklySSReportTelegramText(data)); }
       catch(e){ console.warn('주간 스마트스토어 리포트 텔레그램 전송 실패', e); }
     }
@@ -31920,9 +31920,11 @@ window.addEventListener('load', ()=>{ try{ floatInitDrag(); }catch(e){} });
 function toggleFloat(){floatOpen=!floatOpen;document.getElementById('floatCard').classList.toggle('open',floatOpen);}
 
 // ══════════════════════════════════════════════
-// 텔레그램 알림
+// 텔레그램 알림 — 현재 미사용이라 전체 비활성화 (다시 쓰려면 TG_ENABLED=true + 📱 버튼 display:none 제거)
 // ══════════════════════════════════════════════
+const TG_ENABLED = false;
 function openTelegramSettings(){
+  if(!TG_ENABLED) return;
   document.getElementById('tg_token').value=localStorage.getItem('tg_token')||'';
   document.getElementById('tg_chat').value=localStorage.getItem('tg_chat')||'';
   document.getElementById('tg_interval').value=localStorage.getItem('tg_interval')||'8';
@@ -31935,6 +31937,7 @@ function openTelegramSettings(){
 }
 
 function saveTelegramSettings(){
+  if(!TG_ENABLED) return;
   const tok=document.getElementById('tg_token').value.trim();
   const chat=document.getElementById('tg_chat').value.trim();
   const interval=document.getElementById('tg_interval').value;
@@ -31958,6 +31961,7 @@ function saveTelegramSettings(){
 }
 
 async function _tgPost(token,chat,text){
+  if(!TG_ENABLED) return {ok:false,description:'telegram disabled'};
   return fetch(`https://api.telegram.org/bot${token}/sendMessage`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -31966,6 +31970,7 @@ async function _tgPost(token,chat,text){
 }
 
 async function testTelegram(){
+  if(!TG_ENABLED) return;
   const tok=document.getElementById('tg_token').value.trim();
   const chat=document.getElementById('tg_chat').value.trim();
   if(!tok||!chat){alert('Bot Token과 Chat ID를 입력해주세요.');return;}
@@ -31977,6 +31982,7 @@ async function testTelegram(){
 }
 
 async function checkTelegramAlert(){
+  if(!TG_ENABLED) return;
   const tok=localStorage.getItem('tg_token');
   const chat=localStorage.getItem('tg_chat');
   if(!tok||!chat) return;
@@ -32039,6 +32045,7 @@ async function _tgGroqReply(userText) {
 }
 
 async function _tgPollLoop() {
+  if(!TG_ENABLED) return;
   const tok=localStorage.getItem('tg_token');
   const chat=localStorage.getItem('tg_chat');
   if(!tok||!chat||!localStorage.getItem('tg_groq_enabled')) return;
@@ -32062,6 +32069,7 @@ async function _tgPollLoop() {
 
 function startTgPolling(){
   stopTgPolling();
+  if(!TG_ENABLED) return;
   if(!localStorage.getItem('tg_token')||!localStorage.getItem('tg_groq_enabled')) return;
   _tgPollTimer=setInterval(_tgPollLoop,8000);
   console.log('🤖 TG polling started');
