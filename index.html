@@ -33466,8 +33466,12 @@ function _rpFindLineItem(id){
   for(const s of ['am','pm']){ const it=_rpContentOf(entry,s).find(i=>i.id===id); if(it) return it; }
   return null;
 }
+// 미체크 이월 기능 시작일 — 이 날짜(포함)부터의 기록만 이월 대상. 이전 날짜 기록은 이월하지 않음
+const RP_YH_ROLL_START='2026-10-29';
+// 체크박스 줄(저장된 todo) 또는 아직 todo로 저장되지 않은 예전 '• 내용' 줄(화면엔 체크박스로 보임)
+function _rpIsTodoLike(i){ return i.type==='line' && (i.todo || /^•\s?\S/.test(i.text||'')); }
 function _rpHasTodo(entry){
-  return ['am','pm'].some(s=>_rpContentOf(entry,s).some(i=>i.type==='line' && i.todo));
+  return ['am','pm'].some(s=>_rpContentOf(entry,s).some(_rpIsTodoLike));
 }
 // 오늘 보고서를 처음 열 때, 직전 기록일의 '미체크' 체크박스를 오늘로 복사(원본은 그대로 유지).
 // 오늘 줄이 다음 날 미체크면 또 그다음 날로 이어짐. 이미 이월 처리된 날(rolled_done)은 다시 하지 않음.
@@ -33482,6 +33486,7 @@ function _rpYhRollover(){
   for(let i=1;i<=60;i++){
     const d=new Date(base); d.setDate(d.getDate()-i);
     const ds=_rpLocalDateStr(d);
+    if(ds<RP_YH_ROLL_START) break;   // 기능 시작일 이전 기록은 이월 대상 아님
     const e=_reportAllData[_reportPerson+'|'+ds];
     if(e && (e.rolled_done || _rpHasTodo(e))){ src=e; srcDate=ds; break; }
   }
@@ -33489,7 +33494,7 @@ function _rpYhRollover(){
   const carry={am:[],pm:[]};
   ['am','pm'].forEach(s=>{
     _rpContentOf(src,s).forEach(i=>{
-      if(i.type==='line' && i.todo && !i.checked && (i.text||'').trim()) carry[s].push(i);
+      if(_rpIsTodoLike(i) && !(i.todo && i.checked) && (i.text||'').replace(/^•\s?/,'').trim()) carry[s].push(i);
     });
   });
   if(!carry.am.length && !carry.pm.length) return;
@@ -33499,7 +33504,7 @@ function _rpYhRollover(){
     const arr=_rpContentOf(entry,s);
     const have=new Set(arr.filter(i=>i.origin).map(i=>i.origin));
     const add=carry[s].filter(i=>!have.has(i.origin||i.id)).map(i=>({
-      id:_rpNewLineId(), type:'line', text:i.text, todo:true, checked:false, origin:i.origin||i.id
+      id:_rpNewLineId(), type:'line', text:(i.text||'').replace(/^•\s?/,''), todo:true, checked:false, origin:i.origin||i.id
     }));
     if(!add.length) return;
     if(s==='am') entry.content_am=[...add,...arr]; else entry.content_pm=[...add,...arr];
