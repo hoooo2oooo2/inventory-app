@@ -700,6 +700,7 @@ body.design-scope #collabManager .postit-foot{margin-top:2px;}
 .rp-line.rp-todo.rp-done{color:var(--tx2);text-decoration:line-through;}
 /* 유현 업무보고서 — 메모장 스타일: 줄별 점선 칸(포커스 윤곽) 제거 */
 #rpEditorWrap.rp-yh .rp-line:focus{outline:none;}
+#rpEditorWrap.rp-yh .rp-line-pin-btn{user-select:none;-webkit-user-select:none;}
 /* 블럭 카드 */
 .rp-block{border:1px solid var(--etc-d1e9ff);border-left:3px solid var(--brand);border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:var(--etc-f5faff);display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:text;-webkit-user-select:text;cursor:default;}
 .rp-block:active{cursor:default;}
@@ -32948,6 +32949,93 @@ function _rpFocusLineAt(line, offset){
   else { r.selectNodeContents(line); r.collapse(false); }
   const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
 }
+// 여러 줄 드래그 선택(메모장처럼): 줄마다 별도 편집칸이라 브라우저가 한 줄 안에서만 선택하므로,
+// 마우스를 누르는 동안만 줄들을 비편집으로 바꿔 줄 경계를 넘어 선택되게 하고, 놓으면 편집 상태로 복원
+// (한 번 여러 줄이 선택되면 브라우저가 서로 다른 편집칸에 걸친 선택을 유지하지 못하므로, 다음 클릭/키 입력 전까지 줄을 비편집 상태로 유지)
+let _rpYhExitMulti=null;
+function _rpYhDragSelectStart(){
+  const wrap=document.getElementById('rpEditorWrap'); if(!wrap) return;
+  if(_rpYhExitMulti) _rpYhExitMulti();
+  const lines=[...wrap.querySelectorAll('.rp-line')];
+  const setEditable=on=>lines.forEach(l=>{ if(l.isConnected) l.contentEditable=on?'true':'false'; });
+  setEditable(false);
+  const lineOf=n=>(n&&(n.nodeType===3?n.parentElement:n))?.closest?.('.rp-line');
+  const done=()=>{
+    document.removeEventListener('mouseup',done,true);
+    window.removeEventListener('blur',done);
+    const sel=window.getSelection();
+    const rng=sel.rangeCount?sel.getRangeAt(0).cloneRange():null;
+    const a=rng&&lineOf(rng.startContainer), b=rng&&lineOf(rng.endContainer);
+    if(rng && !rng.collapsed && a && b && a!==b){
+      // 여러 줄 선택 유지 모드 — 복사(Ctrl+C)·삭제/잘라내기/글자입력은 _rpYhMultiLineKey 가 처리
+      const exit=()=>{
+        document.removeEventListener('mousedown',exit,true);
+        document.removeEventListener('keydown',onKey,true);
+        document.removeEventListener('selectionchange',onSel);
+        _rpYhExitMulti=null;
+        setEditable(true);
+      };
+      const onKey=e=>{ if(e.key==='Control'||e.key==='Shift'||e.key==='Meta'||e.key==='Alt') return; if((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C'||e.key==='a'||e.key==='A')) return; if(e.key==='Backspace'||e.key==='Delete'||e.key==='x'||e.key==='X'||(e.key&&e.key.length===1&&!e.ctrlKey&&!e.metaKey)) return; exit(); };
+      const onSel=()=>{ const s=window.getSelection(); if(!s.rangeCount||s.isCollapsed) exit(); };
+      document.addEventListener('mousedown',exit,true);
+      document.addEventListener('keydown',onKey,true);
+      document.addEventListener('selectionchange',onSel);
+      _rpYhExitMulti=exit;
+      return;
+    }
+    setEditable(true);
+    if(!rng) return;
+    if(a && a===b) a.focus();     // 한 줄 안 클릭/선택은 그 줄에서 바로 편집 이어가기
+    sel.removeAllRanges(); sel.addRange(rng);
+  };
+  document.addEventListener('mouseup',done,true);
+  window.addEventListener('blur',done);
+}
+// 여러 줄에 걸친 선택에서 Delete/Backspace/잘라내기(Ctrl+X)/글자 입력 → 선택 범위를 줄 단위 데이터까지 맞춰 삭제
+function _rpYhMultiLineKey(e){
+  if(!_rpIsYh()) return;
+  const isDel=(e.key==='Backspace'||e.key==='Delete');
+  const isCut=((e.ctrlKey||e.metaKey) && (e.key==='x'||e.key==='X'));
+  const isType=(e.key && e.key.length===1 && !e.ctrlKey && !e.metaKey && !e.altKey);
+  if(!isDel && !isCut && !isType) return;
+  const ae=document.activeElement;
+  if(ae && ae.closest && ae.closest('.rp-line,input,textarea,select')) return;
+  const wrap=document.getElementById('rpEditorWrap'); const sel=window.getSelection();
+  if(!wrap || !sel.rangeCount || sel.isCollapsed) return;
+  let rng=sel.getRangeAt(0);
+  if(!wrap.contains(rng.commonAncestorContainer)) return;
+  rng=rng.cloneRange();
+  const lines=[...wrap.querySelectorAll('.rp-line')].filter(l=>rng.intersectsNode(l));
+  if(lines.length<2) return;
+  e.preventDefault();
+  if(isCut){ try{ document.execCommand('copy'); }catch(_){} }
+  const S=lines[0], E=lines[lines.length-1];
+  const section=_rpSectionOf(S);
+  if(_rpSectionOf(E)!==section){ toast('오전/오후에 걸친 선택은 삭제할 수 없습니다.'); return; }
+  const sibs=[...S.parentElement.children];
+  if(sibs.slice(sibs.indexOf(S),sibs.indexOf(E)+1).some(n=>n.classList.contains('rp-block')||n.classList.contains('rp-bp-form'))){
+    toast('블럭이 포함된 선택은 삭제할 수 없습니다.'); return;
+  }
+  const textUpTo=(line,node,o)=>{ const r=document.createRange(); r.selectNodeContents(line); try{ r.setEnd(node,o); }catch(_){ return line.textContent.length; } return r.toString().length; };
+  const so=S.contains(rng.startContainer)?textUpTo(S,rng.startContainer,rng.startOffset):0;
+  const eo=E.contains(rng.endContainer)?textUpTo(E,rng.endContainer,rng.endOffset):E.textContent.length;
+  const newText=S.textContent.slice(0,so)+E.textContent.slice(eo);
+  const rmIds=lines.slice(1).map(l=>l.dataset.id);
+  if(_rpYhExitMulti) _rpYhExitMulti();   // 줄을 다시 편집 가능 상태로 복원한 뒤 삭제 반영
+  lines.slice(1).forEach(l=>{ if(l.nextElementSibling?.classList?.contains('rp-line-pin-btn')) l.nextElementSibling.remove(); l.remove(); });
+  S.textContent=newText;
+  const entry=_reportAllData[_reportKey()];
+  if(entry){
+    const keep=_rpContentOf(entry,section).filter(i=>!rmIds.includes(i.id));
+    if(section==='am') entry.content_am=keep; else entry.content_pm=keep;
+  }
+  _reportSyncLine(S.dataset.id,newText);
+  _rpFocusLineAt(S,so);
+  if(isType) document.execCommand('insertText',false,e.key);
+  _reportAutoSave();
+}
+document.addEventListener('keydown',_rpYhMultiLineKey,true);
+
 // 프로젝트 카드 한 번 클릭 → 업무보고서에 Alt+Enter 와 동일하게 연동 블럭 자동 입력
 let _rpYhClickTimer=null, _rpLastLineId=null;
 function rpYhCardClick(ev, taskId){
@@ -33021,7 +33109,7 @@ function _rpBuildEditorSection(section){
     if(item.type==='line'){
       // 유현: 예전 '• ' 글머리 표시는 숨김(저장값은 그 줄을 수정할 때 반영) / 안내문구는 빈 보고서의 첫 줄에만
       // 유현: 예전 '• 내용' 줄은 그 자리에 미체크 체크박스로 표시 (저장은 그 날 보고서가 수정될 때 함께 반영)
-      if(yh && !item.todo && /^•\s?\S/.test(item.text||'')){ item.todo=true; item.checked=false; item.text=item.text.replace(/^•\s?/,''); }
+      if(yh && !item.todo && /^•/.test(item.text||'')){ item.todo=true; item.checked=false; item.text=item.text.replace(/^•\s?/,''); }
       const shown=yh ? (item.text||'').replace(/^•\s?/,'') : (item.text||'');
       const isEmpty=!shown.trim();
       const lineEl=document.createElement('div');
@@ -33650,9 +33738,11 @@ async function rpBlockSave(){
   newLine.className='rp-line'; newLine.dataset.id=newLineId;
   const _pre=_rpIsYh()?'':'• ';
   newLine.contentEditable='true'; newLine.textContent=_pre;
+  const _yhTodo=_rpIsYh();   // 유현: 블럭 뒤 새 줄도 체크박스 줄
+  if(_yhTodo) newLine.classList.add('rp-todo');
   blockEl.after(newLine);
   newLine.after(_rpCreateLinePinBtn(newLineId,section));
-  content.splice(content.indexOf(newBlock)+1,0,{id:newLineId,type:'line',text:_pre});
+  content.splice(content.indexOf(newBlock)+1,0,_yhTodo?{id:newLineId,type:'line',text:'',todo:true,checked:false}:{id:newLineId,type:'line',text:_pre});
   newLine.focus();
   const r=document.createRange(); r.selectNodeContents(newLine); r.collapse(false);
   window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
@@ -33856,8 +33946,9 @@ function _reportSetupKeyboard(){
     });
     // 체크박스(줄 왼쪽 20px) 클릭 → 체크/해제. 박스 영역 mousedown은 커서 이동 없이 처리
     editor.addEventListener('mousedown',e=>{
-      const l=e.target.closest?.('.rp-line.rp-todo'); if(!l) return;
-      if(e.clientX-l.getBoundingClientRect().left<=20) e.preventDefault();
+      const l=e.target.closest?.('.rp-line'); if(!l) return;
+      if(l.classList.contains('rp-todo') && e.clientX-l.getBoundingClientRect().left<=20){ e.preventDefault(); return; }
+      if(_rpIsYh() && e.button===0 && !e.altKey) _rpYhDragSelectStart();
     });
     editor.addEventListener('click',e=>{
       const l=e.target.closest?.('.rp-line.rp-todo'); if(!l) return;
@@ -33869,18 +33960,20 @@ function _reportSetupKeyboard(){
       const block=e.target.closest?.('.rp-block');
       if(block && e.key==='Enter' && !e.altKey && !e.ctrlKey){
         e.preventDefault();
-        const pre=_rpIsYh()?'':'• ';
+        const yh=_rpIsYh();
+        const pre=yh?'':'• ';
         const newId='l'+Date.now()+Math.random().toString(36).slice(2,4);
         const newLine=document.createElement('div');
         newLine.className='rp-line'; newLine.dataset.id=newId;
         newLine.contentEditable='true'; newLine.textContent=pre;
+        if(yh) newLine.classList.add('rp-todo');
         block.after(newLine);
         newLine.after(_rpCreateLinePinBtn(newId,section));
         _rpFocusLineAt(newLine, pre.length);
         const entry=_reportEnsureEntry();
         const content=_rpContentOf(entry,section);
         const idx=content.findIndex(i=>i.id===block.dataset.id);
-        content.splice(idx<0?content.length:idx+1,0,{id:newId,type:'line',text:pre});
+        content.splice(idx<0?content.length:idx+1,0,yh?{id:newId,type:'line',text:'',todo:true,checked:false}:{id:newId,type:'line',text:pre});
         _reportAutoSave();
         return;
       }
@@ -33897,13 +33990,12 @@ function _reportSetupKeyboard(){
         return;
       }
 
-      // Enter → 새 줄 (유현: 글머리·체크박스 없이 빈 줄 / 그 외: • 자동)
+      // Enter → 새 줄 (유현: 항상 체크박스 줄(이전 • 자동과 동일), 빈 체크박스 줄에서 Enter → 박스 해제하고 종료 / 그 외: • 자동)
       if(e.key==='Enter' && !e.altKey && !e.ctrlKey){
         e.preventDefault();
         const pre=_rpIsYh()?'':'• ';
-        // 유현: 체크박스 줄에서 Enter → 다음 줄도 체크박스(이전 • 이어쓰기와 동일) / 빈 체크박스 줄에서 Enter → 박스 해제하고 종료
-        const cont=_rpIsYh() && line.classList.contains('rp-todo');
-        if(cont && line.textContent===''){ _rpYhUntodo(line); return; }
+        const cont=_rpIsYh();
+        if(cont && line.classList.contains('rp-todo') && line.textContent===''){ _rpYhUntodo(line); return; }
         const sel=window.getSelection();
         if(!sel.rangeCount) return;
         const range=sel.getRangeAt(0);
@@ -34039,6 +34131,7 @@ function _reportSetupKeyboard(){
     // 빈 공간 클릭 → 마지막 라인 포커스
     editor.addEventListener('click',e=>{
       if(e.target!==editor) return;
+      if(_rpYhExitMulti || !window.getSelection().isCollapsed) return;   // 여러 줄 드래그 직후의 click(대상=에디터)이 선택을 풀지 않게
       const lines=editor.querySelectorAll('.rp-line');
       if(!lines.length){
         const newId='l_c'+Date.now();
