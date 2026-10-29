@@ -5878,7 +5878,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
   </style>
   <div class="wbm-wrap">
     <h2 class="wbm-title">📑 송장파일 취합</h2>
-    <p class="wbm-sub">택배사 프로그램에서 출력한 <b>차수별 운송장 엑셀</b>을 올리면, 아래 규칙대로 하나의 파일로 합쳐서 다운로드할 수 있어요. 2차부터는 이전 차수가 자동으로 포함됩니다.</p>
+    <p class="wbm-sub">택배사 프로그램에서 출력한 <b>차수별 운송장 엑셀</b>을 올리면, 아래 규칙대로 하나의 파일로 합쳐서 다운로드할 수 있어요. 2차부터는 이전 차수가 자동으로 포함됩니다. 올린 내용은 서버에 저장돼 <b>다른 PC에서도 볼 수 있고</b>, 다음 날 첫 업로드 때 비울지 물어본 뒤 정리돼요.</p>
 
     <div class="wbm-rules">
       <div class="wbm-rule"><div class="wbm-rule-n">1</div><div><div class="wbm-rule-t">운송장번호 열 이동</div><div class="wbm-rule-d">수하인명 ↔ 수하인기본주소 사이로 이동</div></div></div>
@@ -5905,6 +5905,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="wbm-card-h">
         <div class="wbm-card-t">② 등록된 차수</div>
         <div style="display:flex;gap:8px;">
+          <button class="wbm-btn sec" id="wbmRefreshBtn" onclick="wbmRefresh()" title="다른 PC에서 올린 내용을 다시 불러오기">🔄 새로고침</button>
           <button class="wbm-btn sec" id="wbmClearBtn" onclick="wbmClearAll()">전체 초기화</button>
           <button class="wbm-btn" id="wbmDlBtn" onclick="wbmDownload()">📥 엑셀 다운로드</button>
         </div>
@@ -11427,7 +11428,8 @@ async function runDailyKvBackupIfNeeded(){
     const { data, error } = await sb.from('work_calendar')
       .select('kind,data,updated_at')
       .eq('person','__app__')
-      .not('kind','like','kv_backup_%');
+      .not('kind','like','kv_backup_%')
+      .not('kind','like','waybill_r%');   // 송장 취합(CX)은 하루짜리 임시 데이터 + 이름·주소 포함 → 30일 백업에서 제외
     if(error || !data){ console.warn('일일 백업 실패(조회)', error?.message); return; }
 
     const snapshot = {};
@@ -15542,37 +15544,64 @@ function goPage(p){
 //  1) 운송장번호 열을 수하인명↔수하인기본주소 사이로 이동
 //  2) 수하인명+운송장번호+수하인기본주소가 모두 같은 행 제거
 //  3) 수하인명 열에 '중복값' 조건부서식(빨간 글씨+연한 빨강), 새 차수 첫 행은 연한 초록 채우기
-// 업로드 원본은 이 브라우저의 IndexedDB에만 보관한다(Supabase에 쓰지 않음 → 운영 DB·egress 영향 없음).
+// 저장: 서버(cloudKv)에 차수별로 1행씩(waybill_r01~r20) — 다른 PC에서도 보이고, 차수끼리 저장 충돌이 없다.
+//  · 데이터엔 올린 '날짜'가 같이 저장된다. 날짜가 바뀐 뒤 첫 업로드 때 확인을 받고 이전 날 데이터를 비운다(열람만으로는 지우지 않음).
+//  · 일일 백업(runDailyKvBackupIfNeeded)에서는 제외(이름·주소가 30일간 남지 않도록).
 // ══════════════════════════════════════════════
-let _wbmRounds = [];        // [{round,fileName,uploadedAt,header:[str],rows:[[{t,v,z}|null]]}] 원본 열 순서 그대로
+let _wbmRounds = [];        // [{round,fileName,uploadedAt,date,header:[str],rows:[[{t,v,z}|null]]}] 원본 열 순서 그대로
 let _wbmLoaded = false;
+let _wbmSig = null;         // 서버 버전 시그니처 — 같으면 전체 재다운로드 생략
+const _wbmKinds = Array.from({length:20},(_,i)=>'waybill_r'+String(i+1).padStart(2,'0'));
+const _wbmKindOf = round => _wbmKinds[round-1];
 const _wbmEsc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const _wbmNorm = s => String(s==null?'':s).replace(/\s+/g,'');
+const _wbmToday = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const _wbmStale = () => _wbmRounds.filter(r=>r.date!==_wbmToday());   // 오늘이 아닌 날 올린 차수
 
-function _wbmDb(){
-  return new Promise(res=>{
-    try{
-      const r=indexedDB.open('wbm_v1',1);
-      r.onupgradeneeded=()=>r.result.createObjectStore('rounds',{keyPath:'round'});
-      r.onsuccess=()=>res(r.result);
-      r.onerror=()=>res(null);
-    }catch(e){ res(null); }
-  });
+// 저장 크기 절약: 서식 없는 문자열·숫자 셀은 값만, 나머지는 {t,v,z} 그대로
+const _wbmPackCell = c => c==null ? null : (!c.z && ((c.t==='s'&&typeof c.v==='string')||(c.t==='n'&&typeof c.v==='number')) ? c.v : c);
+const _wbmUnpackCell = c => c==null ? null : (typeof c==='string' ? {t:'s',v:c} : typeof c==='number' ? {t:'n',v:c} : c);
+function _wbmUnpack(d){
+  if(!d || !Array.isArray(d.header) || !Array.isArray(d.rows) || !(d.round>=1)) return null;
+  return {round:d.round,fileName:d.fileName||'',uploadedAt:d.uploadedAt||0,date:d.date||'',header:d.header,rows:d.rows.map(r=>r.map(_wbmUnpackCell))};
 }
-async function _wbmIdb(mode, fn){
-  const db=await _wbmDb(); if(!db) return null;
-  return new Promise(res=>{
-    try{
-      const tx=db.transaction('rounds',mode); const out=fn(tx.objectStore('rounds'));
-      tx.oncomplete=()=>res(out&&'result' in out?out.result:true);
-      tx.onerror=tx.onabort=()=>res(null);
-    }catch(e){ res(null); }
-  });
+async function _wbmSaveRound(rec){
+  try{
+    const data={round:rec.round,fileName:rec.fileName,uploadedAt:rec.uploadedAt,date:rec.date,header:rec.header,rows:rec.rows.map(r=>r.map(_wbmPackCell))};
+    const { error } = await sb.from('work_calendar').upsert(
+      { person:'__app__', kind:_wbmKindOf(rec.round), data, updated_at:new Date().toISOString() },
+      { onConflict:'person,kind' });
+    if(error) throw error;
+    return true;
+  }catch(e){ console.warn('송장 차수 저장 실패', e); return false; }
 }
-const _wbmIdbAll   = async()=> (await _wbmIdb('readonly', s=>s.getAll())) || [];
-const _wbmIdbPut   = rec=>_wbmIdb('readwrite', s=>s.put(rec));
-const _wbmIdbDel   = round=>_wbmIdb('readwrite', s=>s.delete(round));
-const _wbmIdbClear = ()=>_wbmIdb('readwrite', s=>s.clear());
+// 삭제 후 서버에서 실제로 없어졌는지 버전 조회로 확인(RLS 때문에 error 없이 0건 삭제되는 경우 대비)
+async function _wbmDeleteRounds(rounds){
+  if(!rounds.length) return true;
+  const kinds=rounds.map(_wbmKindOf);
+  try{
+    const { error } = await sb.from('work_calendar').delete().eq('person','__app__').in('kind',kinds);
+    if(error) throw error;
+    const ver=await cloudKvVersions(kinds);
+    return !!ver && Object.keys(ver).length===0;
+  }catch(e){ console.warn('송장 차수 삭제 실패', e); return false; }
+}
+async function _wbmLoadServer(force){
+  const ver=await cloudKvVersions(_wbmKinds);
+  const sig=ver?JSON.stringify(ver):null;
+  if(!force && _wbmLoaded && sig && sig===_wbmSig) return true;
+  try{
+    const { data, error } = await sb.from('work_calendar').select('kind,data').eq('person','__app__').in('kind',_wbmKinds);
+    if(error) throw error;
+    _wbmRounds=(data||[]).map(r=>_wbmUnpack(r.data)).filter(Boolean).sort((a,b)=>a.round-b.round);
+    _wbmSig=sig; _wbmLoaded=true; return true;
+  }catch(e){ console.warn('송장 서버 불러오기 실패', e); toast('서버에서 송장 데이터를 불러오지 못했어요'); return false; }
+}
+async function wbmRefresh(){
+  const b=document.getElementById('wbmRefreshBtn'); if(b) b.disabled=true;
+  await _wbmLoadServer(true); _wbmPickNextRound(); wbmRender();
+  if(b) b.disabled=false; toast('서버 최신 상태로 새로고침했어요');
+}
 
 function wbmInit(){
   const sel=document.getElementById('wbmRoundSel');
@@ -15586,19 +15615,13 @@ function wbmInit(){
     ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('drag'); }));
     drop.addEventListener('drop',e=>{ const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) wbmReadFile(f); });
   }
-  if(!_wbmLoaded){
-    _wbmLoaded=true;
-    // 로드가 끝나기 전에 업로드된 차수가 있어도 덮어쓰지 않고 합친다(같은 차수는 방금 올린 쪽 우선)
-    _wbmIdbAll().then(list=>{
-      list.forEach(r=>{ if(!_wbmRounds.some(x=>x.round===r.round)) _wbmRounds.push(r); });
-      _wbmRounds.sort((a,b)=>a.round-b.round); _wbmPickNextRound(); wbmRender();
-    });
-  }
   _wbmPickNextRound();
-  wbmRender();
+  wbmRender();   // 처음엔 '불러오는 중' → 서버 로드 뒤 다시 그림(바뀐 게 없으면 재다운로드 없이 즉시)
+  _wbmLoadServer(false).then(()=>{ _wbmPickNextRound(); wbmRender(); });
 }
 function _wbmPickNextRound(){
   const sel=document.getElementById('wbmRoundSel'); if(!sel) return;
+  if(_wbmStale().length){ sel.value='1'; return; }   // 이전 날 데이터가 남아 있으면 새 하루의 1차부터
   const max=_wbmRounds.reduce((m,r)=>Math.max(m,r.round),0);
   sel.value=String(Math.min(max+1,20));
 }
@@ -15636,10 +15659,15 @@ function _wbmParseSheet(ws){
 }
 
 function wbmPickFile(ev){ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(f) wbmReadFile(f); }
-function wbmReadFile(file){
+async function wbmReadFile(file){
   const round=parseInt(document.getElementById('wbmRoundSel').value,10)||1;
   if(!/\.(xlsx|xls)$/i.test(file.name)){ alert('엑셀 파일(.xlsx, .xls)만 올릴 수 있어요.'); return; }
-  if(_wbmRounds.some(r=>r.round===round) && !confirm(`${round}차가 이미 등록되어 있어요. 새 파일로 교체할까요?`)) return;
+  await _wbmLoadServer(false);   // 다른 PC가 방금 올린 차수·어제 데이터 여부를 최신으로 확인한 뒤 진행
+  wbmRender();
+  const stale=_wbmStale();
+  if(stale.length){
+    if(!confirm(`${stale[0].date}에 올린 송장 데이터(${stale.map(r=>r.round+'차').join(', ')})가 남아 있어요.\n\n[확인] 이전 데이터를 비우고 오늘 ${round}차로 새로 시작\n[취소] 업로드 취소`)) return;
+  } else if(_wbmRounds.some(r=>r.round===round) && !confirm(`${round}차가 이미 등록되어 있어요. 새 파일로 교체할까요?`)) return;
   const fr=new FileReader();
   fr.onload=async()=>{
     let parsed;
@@ -15651,26 +15679,33 @@ function wbmReadFile(file){
     const c=_wbmCols(parsed.header);
     const miss=[]; if(c.name<0) miss.push('수하인명'); if(c.wb<0) miss.push('운송장번호'); if(c.addr<0) miss.push('수하인기본주소');
     if(miss.length){ alert('1행(헤더)에서 다음 열을 찾지 못했어요: '+miss.join(', ')+'\n\n운송장 원본 파일이 맞는지 확인해 주세요.'); return; }
-    const rec={round,fileName:file.name,uploadedAt:Date.now(),header:parsed.header,rows:parsed.rows};
+    // 이전 날 데이터를 비우기로 했다면 먼저 지운다(지우기 실패 시 업로드도 중단 — 어제·오늘 데이터가 섞이면 안 됨)
+    if(stale.length){
+      if(!await _wbmDeleteRounds(stale.map(r=>r.round))){ alert('이전 데이터를 비우지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+      _wbmRounds=_wbmRounds.filter(r=>!stale.includes(r));
+    }
+    const rec={round,fileName:file.name,uploadedAt:Date.now(),date:_wbmToday(),header:parsed.header,rows:parsed.rows};
+    if(!await _wbmSaveRound(rec)){ alert('서버에 저장하지 못했어요. 네트워크를 확인하고 다시 올려 주세요.'); wbmRender(); return; }
     const i=_wbmRounds.findIndex(r=>r.round===round);
     if(i>=0) _wbmRounds[i]=rec; else _wbmRounds.push(rec);
     _wbmRounds.sort((a,b)=>a.round-b.round);
-    const ok=await _wbmIdbPut(rec);
+    _wbmSig=null;   // 다음 열람 때 서버 버전 다시 확인
     _wbmPickNextRound(); wbmRender();
-    toast(ok?`${round}차 등록 완료 (${parsed.rows.length}행)`:`${round}차 등록됨 — 이 브라우저에 저장하지 못해 새로고침하면 사라져요`);
+    toast(`${round}차 등록 완료 (${parsed.rows.length}행) · 서버에 저장됨`);
   };
   fr.onerror=()=>alert('파일을 읽지 못했어요.');
   fr.readAsArrayBuffer(file);
 }
 async function wbmDelRound(round){
-  if(!confirm(`${round}차를 목록에서 뺄까요?\n(다시 올리면 복구할 수 있어요)`)) return;
-  _wbmRounds=_wbmRounds.filter(r=>r.round!==round);
-  await _wbmIdbDel(round); _wbmPickNextRound(); wbmRender();
+  if(!confirm(`${round}차를 서버에서 뺄까요?\n(다른 PC에서도 사라져요. 다시 올리면 복구할 수 있어요)`)) return;
+  if(!await _wbmDeleteRounds([round])){ alert('삭제하지 못했어요. 새로고침 후 다시 확인해 주세요.'); await _wbmLoadServer(true); wbmRender(); return; }
+  _wbmRounds=_wbmRounds.filter(r=>r.round!==round); _wbmSig=null; _wbmPickNextRound(); wbmRender();
 }
 async function wbmClearAll(){
   if(!_wbmRounds.length) return;
-  if(!confirm('등록된 모든 차수를 초기화할까요?\n(새로 시작하는 날 쓰는 기능이에요. 다시 올리면 복구할 수 있어요)')) return;
-  _wbmRounds=[]; await _wbmIdbClear(); _wbmPickNextRound(); wbmRender();
+  if(!confirm('등록된 모든 차수를 서버에서 초기화할까요?\n(다른 PC에서도 사라져요. 다시 올리면 복구할 수 있어요)')) return;
+  if(!await _wbmDeleteRounds(_wbmRounds.map(r=>r.round))){ alert('초기화하지 못했어요. 새로고침 후 다시 확인해 주세요.'); await _wbmLoadServer(true); wbmRender(); return; }
+  _wbmRounds=[]; _wbmSig=null; _wbmPickNextRound(); wbmRender();
 }
 
 // 차수 순서대로 이어붙여 열 이동 → 중복 제거. 결과: {header,rows:[{round,cells,first}],stats,col:{name,wb,addr},mismatch}
@@ -15716,7 +15751,7 @@ function wbmRender(){
   if(!stEl) return;
   if(!m){
     stEl.innerHTML=''; wEl.innerHTML='';
-    rdEl.innerHTML='<div class="wbm-empty">아직 등록된 차수가 없어요. 위에서 1차 원본 엑셀을 올려주세요.</div>';
+    rdEl.innerHTML=_wbmLoaded?'<div class="wbm-empty">아직 등록된 차수가 없어요. 위에서 1차 원본 엑셀을 올려주세요.</div>':'<div class="wbm-empty">서버에서 불러오는 중…</div>';
     pvEl.innerHTML='<div class="wbm-empty">차수를 등록하면 취합 결과가 여기에 표시돼요.</div>';
     return;
   }
@@ -15729,7 +15764,9 @@ function wbmRender(){
   rdEl.innerHTML=`<table class="wbm-tbl"><thead><tr><th>차수</th><th>파일명</th><th class="num">원본 행</th><th class="num">중복 제거</th><th class="num">반영 행</th><th>업로드</th><th></th></tr></thead><tbody>`+
     m.stats.map(s=>`<tr><td><span class="wbm-rd">${s.round}차</span></td><td>${_wbmEsc(s.fileName)}</td><td class="num">${s.total.toLocaleString()}</td><td class="num">${s.removed.toLocaleString()}</td><td class="num"><b>${s.kept.toLocaleString()}</b></td><td>${fmt(s.uploadedAt)}</td><td style="text-align:right;"><button class="wbm-x" onclick="wbmDelRound(${s.round})">✕ 빼기</button></td></tr>`).join('')+
     `</tbody></table>`;
-  wEl.innerHTML=m.mismatch?'<div class="wbm-warn">⚠️ 일부 차수의 열 구성이 1차와 달라서 헤더 이름 기준으로 맞춰 합쳤어요. 없는 열은 빈칸으로 들어갑니다.</div>':'';
+  const stale=_wbmStale();
+  wEl.innerHTML=(stale.length?`<div class="wbm-warn">📅 <b>${_wbmEsc(stale[0].date)}</b>에 올린 데이터(${stale.map(r=>r.round+'차').join(', ')})예요. 다운로드는 가능하고, 오늘 첫 업로드 때 비울지 물어봐요. <button class="wbm-x" style="color:inherit;text-decoration:underline;" onclick="wbmClearAll()">지금 비우고 새로 시작</button></div>`:'')+
+    (m.mismatch?'<div class="wbm-warn">⚠️ 일부 차수의 열 구성이 1차와 달라서 헤더 이름 기준으로 맞춰 합쳤어요. 없는 열은 빈칸으로 들어갑니다.</div>':'');
   const LIM=300, cols=[['차수',null],['수하인명',m.col.name],['운송장번호',m.col.wb],['수하인기본주소',m.col.addr]];
   pvEl.innerHTML=`<div class="wbm-pv"><table class="wbm-tbl"><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`+
     m.rows.slice(0,LIM).map(r=>{
@@ -15790,6 +15827,8 @@ async function _wbmMakeXlsx(m){
 }
 async function wbmDownload(){
   if(!window.XLSXStyle||!window.JSZip){ alert('엑셀 모듈 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  await _wbmLoadServer(false);   // 다른 PC에서 올린 차수가 있으면 반영(바뀐 게 없으면 버전만 확인)
+  wbmRender();
   const m=_wbmBuild(); if(!m){ toast('등록된 차수가 없어요.'); return; }
   try{
     const blob=await _wbmMakeXlsx(m);
