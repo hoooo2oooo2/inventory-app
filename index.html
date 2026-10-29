@@ -33007,6 +33007,8 @@ function _rpBuildEditorSection(section){
   content.forEach(item=>{
     if(item.type==='line'){
       // 유현: 예전 '• ' 글머리 표시는 숨김(저장값은 그 줄을 수정할 때 반영) / 안내문구는 빈 보고서의 첫 줄에만
+      // 유현: 예전 '• 내용' 줄은 그 자리에 미체크 체크박스로 표시 (저장은 그 날 보고서가 수정될 때 함께 반영)
+      if(yh && !item.todo && /^•\s?\S/.test(item.text||'')){ item.todo=true; item.checked=false; item.text=item.text.replace(/^•\s?/,''); }
       const shown=yh ? (item.text||'').replace(/^•\s?/,'') : (item.text||'');
       const isEmpty=!shown.trim();
       const lineEl=document.createElement('div');
@@ -33886,6 +33888,9 @@ function _reportSetupKeyboard(){
       if(e.key==='Enter' && !e.altKey && !e.ctrlKey){
         e.preventDefault();
         const pre=_rpIsYh()?'':'• ';
+        // 유현: 체크박스 줄에서 Enter → 다음 줄도 체크박스(이전 • 이어쓰기와 동일) / 빈 체크박스 줄에서 Enter → 박스 해제하고 종료
+        const cont=_rpIsYh() && line.classList.contains('rp-todo');
+        if(cont && line.textContent===''){ _rpYhUntodo(line); return; }
         const sel=window.getSelection();
         if(!sel.rangeCount) return;
         const range=sel.getRangeAt(0);
@@ -33899,6 +33904,7 @@ function _reportSetupKeyboard(){
         const newLine=document.createElement('div');
         newLine.className='rp-line'; newLine.dataset.id=newId;
         newLine.contentEditable='true'; newLine.textContent=pre+afterText;
+        if(cont) newLine.classList.add('rp-todo');
         // 폼 또는 핀버튼 다음에 삽입
         let insertAfter=line;
         if(insertAfter.nextSibling?.classList?.contains('rp-line-pin-btn')) insertAfter=insertAfter.nextSibling;
@@ -33913,7 +33919,7 @@ function _reportSetupKeyboard(){
         const entry=_reportEnsureEntry();
         const content=_rpContentOf(entry,section);
         const idx=content.findIndex(i=>i.id===line.dataset.id);
-        content.splice(idx<0?content.length:idx+1,0,{id:newId,type:'line',text:pre+afterText});
+        content.splice(idx<0?content.length:idx+1,0,cont?{id:newId,type:'line',text:afterText,todo:true,checked:false}:{id:newId,type:'line',text:pre+afterText});
         _reportAutoSave();
         return;
       }
