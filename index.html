@@ -31763,6 +31763,11 @@ function loadCollabPage(){
   if(!_collabGaugeTimer) _collabGaugeTimer = setInterval(_collabUpdateGauges, 60000);
   // 업무보고서 패널 초기화 + 구 calendar.html 데이터 1회 마이그레이션
   if(!_reportDate) _reportDate = _reportTodayStr();
+  // 유현: 하루가 지난 뒤 다시 들어오면(탭을 켜 둔 채 날짜가 바뀐 경우 포함) 오늘(로컬 날짜)로 열기
+  if(_designScopePerson==='유현'){
+    const _td=_rpLocalDateStr();
+    if(_rpYhOpenDay!==_td){ _rpYhOpenDay=_td; _reportDate=_td; }
+  }
   _renderCatSidebar();
   _reportLoaded = false;   // 유현 체크박스 이월은 방금 불러온 최신 데이터로만 실행
   loadReport().then(async ()=>{
@@ -32511,7 +32516,9 @@ const REPORT_CAT_COLOR = {
   '디자인':'#3B82F6','광고관리':'#F59E0B','품절관리':'#EF4444','매출관리':'#10B981','기타':'#8B5CF6'
 };
 
-function _reportTodayStr(){ return new Date().toISOString().slice(0,10); }
+// 유현 화면만 로컬(PC) 날짜 기준 — 그 외(보라·연정·협업업무)는 기존 UTC 기준 그대로
+function _reportTodayStr(){ return _designScopePerson==='유현' ? _rpLocalDateStr() : new Date().toISOString().slice(0,10); }
+function _reportDateStr(d){ return _designScopePerson==='유현' ? _rpLocalDateStr(d) : d.toISOString().slice(0,10); }
 function _reportKey(p,d){ return `${p||_reportPerson}|${d||_reportDate}`; }
 
 // 구 포맷(text+blocks) → 신 포맷(content[]) 마이그레이션
@@ -32753,14 +32760,14 @@ function reportPrevDay(){
   const d=new Date(base+'T00:00:00');
   if(isNaN(d)){ _reportDate=_reportTodayStr(); renderReportPanel(); return; }
   d.setDate(d.getDate()-1);
-  _reportDate=d.toISOString().slice(0,10); renderReportPanel();
+  _reportDate=_reportDateStr(d); renderReportPanel();
 }
 function reportNextDay(){
   const base=_reportDate||_reportTodayStr();
   const d=new Date(base+'T00:00:00');
   if(isNaN(d)){ _reportDate=_reportTodayStr(); renderReportPanel(); return; }
   d.setDate(d.getDate()+1);
-  _reportDate=d.toISOString().slice(0,10); renderReportPanel();
+  _reportDate=_reportDateStr(d); renderReportPanel();
 }
 function reportTodayBtn(){ _reportDate=_reportTodayStr(); renderReportPanel(); }
 // 캘린더 iframe에서 날짜 클릭 시 업무보고서 날짜 연동
@@ -32949,6 +32956,31 @@ function _rpFocusLineAt(line, offset){
   else { r.selectNodeContents(line); r.collapse(false); }
   const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
 }
+// 유현: 프로젝트 블럭을 오전↔오후로 이동 (버튼 / 드래그). 도착 구역에서는 targetId 앞, 없으면 마지막 내용(글이 있는 줄·블럭) 뒤에 놓임
+function _rpYhMoveBlockTo(dragId, fromSec, toSec, targetId){
+  const entry=_reportGetEntry();
+  if(!entry.content_am) entry.content_am=[];
+  if(!entry.content_pm) entry.content_pm=[];
+  const src=_rpContentOf(entry,fromSec);
+  const i=src.findIndex(x=>x.id===dragId); if(i<0) return false;
+  const [b]=src.splice(i,1);
+  const dst=_rpContentOf(entry,toSec);
+  let at=targetId?dst.findIndex(x=>x.id===targetId):-1;
+  if(at<0){
+    at=0;
+    for(let k=dst.length-1;k>=0;k--){ const it=dst[k]; if(it.type==='block'||(it.type==='line'&&(it.text||'').trim())){ at=k+1; break; } }
+  }
+  dst.splice(at,0,b);
+  _rpBuildEditorSection('am'); _rpBuildEditorSection('pm');
+  _rpRenderPinned();
+  _reportAutoSave();
+  return true;
+}
+function rpYhMoveBlock(id, sec){
+  if(!_rpIsYh()) return;
+  _rpYhMoveBlockTo(id, sec, sec==='am'?'pm':'am', null);
+}
+
 // 여러 줄 선택(메모장처럼): 줄마다 별도 편집칸이라 브라우저가 한 줄 안에서만 선택하므로,
 // 마우스 드래그 또는 Shift+방향키로 줄 경계를 넘는 동안 줄들을 비편집 상태로 바꿔 선택이 이어지게 한다.
 // (서로 다른 편집칸에 걸친 선택은 편집 상태에선 유지되지 않으므로, 다음 클릭/키 입력 전까지 비편집 유지 → 복사·삭제·입력은 아래 핸들러가 처리)
@@ -33128,6 +33160,7 @@ function _rpYhMultiLineKey(e){
 document.addEventListener('keydown',_rpYhMultiLineKey,true);
 
 // 프로젝트 카드 한 번 클릭 → 업무보고서에 Alt+Enter 와 동일하게 연동 블럭 자동 입력
+var _rpYhOpenDay='';   // (var: 호이스팅 — 초기화 순서 영향 없음) 유현 보고서 화면을 마지막으로 연 로컬 날짜
 let _rpYhClickTimer=null, _rpLastLineId=null;
 let _rpLastTypedId=null;   // 마지막으로 타이핑한 줄(또는 마지막으로 붙인 프로젝트 블럭) id — 프로젝트 클릭 시 이 밑에 붙음
 function rpYhCardClick(ev, taskId){
@@ -33144,9 +33177,7 @@ function _rpYhInsertProject(taskId){
   const t=(_collabTasks||[]).find(x=>x.id===taskId); if(!t) return;
   if(t.status==='done'){ toast('완료된 업무는 보고서에 추가하지 않습니다.'); return; }
   const entry=_reportEnsureEntry();
-  if([..._rpContentOf(entry,'am'),..._rpContentOf(entry,'pm')].some(i=>i.type==='block' && i.linked_task_id===t.id)){
-    toast('이미 이 날짜 보고서에 들어 있습니다.'); return;
-  }
+  // (같은 프로젝트를 오전/오후에 따로 기록할 수 있도록 중복 등록 허용)
   // 붙일 위치: 마지막으로 타이핑한 줄(또는 마지막으로 붙인 프로젝트 블럭) 바로 밑.
   // 없으면 오전/오후(현재 시각 기준) 구역의 맨 아래 내용(글이 있는 줄/블럭) 밑
   let afterId=null;
@@ -33248,7 +33279,7 @@ function _rpDropTargetEl(editor, clientY){
   return null;
 }
 function _rpEditorDragOver(ev, sec){
-  if(!_rpDragBlockId || _rpDragBlockSec!==sec) return;
+  if(!_rpDragBlockId || (_rpDragBlockSec!==sec && !_rpIsYh())) return;
   ev.preventDefault();
   try{ ev.dataTransfer.dropEffect='move'; }catch{}
   const editor=ev.currentTarget;
@@ -33257,13 +33288,14 @@ function _rpEditorDragOver(ev, sec){
   if(t) t.classList.add('rp-drop-mark');
 }
 function _rpEditorDrop(ev, sec){
-  if(!_rpDragBlockId || _rpDragBlockSec!==sec){ _rpBlockDragEnd(); return; }
+  if(!_rpDragBlockId || (_rpDragBlockSec!==sec && !_rpIsYh())){ _rpBlockDragEnd(); return; }
   ev.preventDefault();
   const editor=ev.currentTarget;
   const targetEl=_rpDropTargetEl(editor, ev.clientY);
   const targetId=targetEl?targetEl.dataset.id:null;
-  const dragId=_rpDragBlockId;
+  const dragId=_rpDragBlockId, fromSec=_rpDragBlockSec;
   _rpBlockDragEnd();
+  if(fromSec!==sec){ _rpYhMoveBlockTo(dragId, fromSec, sec, targetId); _reportSetupKeyboard(); return; }   // 유현: 오전↔오후 드래그 이동
   if(_rpReorderBlock(sec, dragId, targetId)){
     _rpBuildEditorSection(sec);
     _reportSetupKeyboard();
@@ -33400,6 +33432,7 @@ function _rpBlockHTML(item, section){
       ${textInner}
     </div>
     <div class="rp-block-btns">
+      ${(_rpIsYh()&&!_reportCategoryFilter)?`<button class="rp-block-btn" title="${sec==='am'?'오후로 이동':'오전으로 이동'}" onclick="rpYhMoveBlock('${item.id}','${sec}')" style="font-size:10.5px;font-weight:700;white-space:nowrap;">${sec==='am'?'→오후':'→오전'}</button>`:''}
       <button class="rp-block-btn" title="수정" onclick="reportEditBlock('${item.id}')">✏️</button>
       <button class="rp-block-btn" title="${item.pinned?'고정 해제':'상단 고정'}" onclick="reportTogglePin('${item.id}','${sec}')">${item.pinned?'📌':'📍'}</button>
       <button class="rp-block-btn" title="협업업무 연동 / 이전 블럭" onclick="reportLinkBlock(event,'${item.id}')">▼</button>
