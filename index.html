@@ -693,6 +693,13 @@ body.design-scope #collabManager .postit-foot{margin-top:2px;}
 .rp-editor{min-height:80px;padding:6px 10px 10px;outline:none;}
 .rp-line{display:inline-block;box-sizing:border-box;width:calc(100% - 22px);vertical-align:top;outline:none;min-height:18px;font-size:12.5px;line-height:1.5;color:var(--tx);word-break:break-word;white-space:pre-wrap;}
 .rp-line[data-empty-ph]:empty::before{content:attr(data-empty-ph);color:var(--tx2);opacity:.4;pointer-events:none;font-style:italic;}
+/* 체크박스 줄(유현 업무보고서) — 박스는 ::before, 클릭은 줄 왼쪽 20px 영역으로 판정 */
+.rp-line.rp-todo{position:relative;padding-left:22px;}
+.rp-line.rp-todo::before{content:'';position:absolute;left:2px;top:3px;width:13px;height:13px;box-sizing:border-box;border:1.5px solid var(--tx2);border-radius:3px;background:var(--bg);cursor:pointer;font-size:10px;font-weight:900;line-height:10px;text-align:center;color:#fff;}
+.rp-line.rp-todo.rp-done::before{content:'✓';background:var(--brand);border-color:var(--brand);}
+.rp-line.rp-todo.rp-done{color:var(--tx2);text-decoration:line-through;}
+/* 유현 업무보고서 — 메모장 스타일: 줄별 점선 칸(포커스 윤곽) 제거 */
+#rpEditorWrap.rp-yh .rp-line:focus{outline:none;}
 /* 블럭 카드 */
 .rp-block{border:1px solid var(--etc-d1e9ff);border-left:3px solid var(--brand);border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:var(--etc-f5faff);display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:text;-webkit-user-select:text;cursor:default;}
 .rp-block:active{cursor:default;}
@@ -31743,6 +31750,7 @@ function loadCollabPage(){
   // 업무보고서 패널 초기화 + 구 calendar.html 데이터 1회 마이그레이션
   if(!_reportDate) _reportDate = _reportTodayStr();
   _renderCatSidebar();
+  _reportLoaded = false;   // 유현 체크박스 이월은 방금 불러온 최신 데이터로만 실행
   loadReport().then(async ()=>{
     await _reportMigrateFromCalendar();
     _rpMigratePins();
@@ -32111,7 +32119,9 @@ function _collabCardHTML(t, canEdit, editOnDbl){
   const pcolor = COLLAB_PERSON_COLOR[t.assignee] || '#888';
   const isExp = _collabExpanded.has(t.id);
   // 직원 페이지: 더블클릭 시 수정 팝업 / 협업업무 보드: 더블클릭 시 펼치기
-  const dblAction = (editOnDbl && canEdit) ? `collabOpenEdit('${t.id}')` : `collabToggleExpand(event,'${t.id}')`;
+  // 유현 페이지만: 한 번 클릭 → 업무보고서 자동 입력(rpYhCardClick), 더블클릭은 수정창 + 대기 중인 단일클릭 취소
+  const yhClick = !!(editOnDbl && canEdit && _designScopePerson==='유현');
+  const dblAction = (editOnDbl && canEdit) ? `${yhClick?'clearTimeout(_rpYhClickTimer);':''}collabOpenEdit('${t.id}')` : `collabToggleExpand(event,'${t.id}')`;
   const doneBox = (t.status==='done' && t.completed_at)
     ? `<div class="postit-done">✅ 완료 ${_collabFmtTime(t.completed_at)}<br>⏱ 소요시간 <b>${_collabFmtMinutes(_collabTaskLoggedMinutes(t))}</b></div>`
     : '';
@@ -32119,6 +32129,7 @@ function _collabCardHTML(t, canEdit, editOnDbl){
   return `<div class="postit${isExp?' expanded':''}" style="border-left-color:${st.color};background:${cardBg};" draggable="${canEdit&&!isExp}"
       ondragstart="collabDragStart(event,'${t.id}')" ondragend="collabDragEnd(event)"
       ondragover="collabCardOver(event)" ondragleave="collabCardLeave(event)" ondrop="collabCardDrop(event,'${t.id}')"
+      ${yhClick?`onclick="rpYhCardClick(event,'${t.id}')" title="한 번 클릭: 업무보고서에 입력 / 더블클릭: 수정"`:''}
       ondblclick="${dblAction}">
     <div class="postit-top">
       <span class="postit-badge" style="background:${st.color};">${st.label}</span>
@@ -32817,12 +32828,153 @@ function _rpRenderPinned(){
   });
 }
 
+// ── 유현 업무보고서 전용: 체크박스 / 메모장 스타일 / 미체크 이월 / 프로젝트 클릭 입력 ──
+// (보라·연정 보고서는 기존 동작 그대로 — 아래 기능은 모두 _rpIsYh()일 때만 동작)
+function _rpIsYh(){ return _designScopePerson==='유현' && _reportPerson==='유현'; }
+function _rpLocalDateStr(d){ d=d||new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function _rpNewLineId(){ return 'l'+Date.now()+Math.random().toString(36).slice(2,5); }
+function _rpApplyTodoClass(lineEl, item){
+  const todo=!!(item&&item.todo);
+  lineEl.classList.toggle('rp-todo', todo);
+  lineEl.classList.toggle('rp-done', todo && !!item.checked);
+  if(todo) lineEl.removeAttribute('data-empty-ph');
+}
+function _rpFindLineItem(id){
+  const entry=_reportAllData[_reportKey()]; if(!entry) return null;
+  for(const s of ['am','pm']){ const it=_rpContentOf(entry,s).find(i=>i.id===id); if(it) return it; }
+  return null;
+}
+function _rpHasTodo(entry){
+  return ['am','pm'].some(s=>_rpContentOf(entry,s).some(i=>i.type==='line' && i.todo));
+}
+// 오늘 보고서를 처음 열 때, 직전 기록일의 '미체크' 체크박스를 오늘로 복사(원본은 그대로 유지).
+// 오늘 줄이 다음 날 미체크면 또 그다음 날로 이어짐. 이미 이월 처리된 날(rolled_done)은 다시 하지 않음.
+function _rpYhRollover(){
+  if(!_rpIsYh() || !_reportLoaded) return;
+  const today=_rpLocalDateStr();
+  if(_reportDate!==today) return;
+  const cur=_reportAllData[_reportKey()];
+  if(cur && cur.rolled_done) return;
+  let src=null, srcDate='';
+  const base=new Date(today+'T00:00:00');
+  for(let i=1;i<=60;i++){
+    const d=new Date(base); d.setDate(d.getDate()-i);
+    const ds=_rpLocalDateStr(d);
+    const e=_reportAllData[_reportPerson+'|'+ds];
+    if(e && (e.rolled_done || _rpHasTodo(e))){ src=e; srcDate=ds; break; }
+  }
+  if(!src) return;
+  const carry={am:[],pm:[]};
+  ['am','pm'].forEach(s=>{
+    _rpContentOf(src,s).forEach(i=>{
+      if(i.type==='line' && i.todo && !i.checked && (i.text||'').trim()) carry[s].push(i);
+    });
+  });
+  if(!carry.am.length && !carry.pm.length) return;
+  const entry=_reportEnsureEntry();
+  ['am','pm'].forEach(s=>{
+    if(!carry[s].length) return;
+    const arr=_rpContentOf(entry,s);
+    const have=new Set(arr.filter(i=>i.origin).map(i=>i.origin));
+    const add=carry[s].filter(i=>!have.has(i.origin||i.id)).map(i=>({
+      id:_rpNewLineId(), type:'line', text:i.text, todo:true, checked:false, origin:i.origin||i.id
+    }));
+    if(!add.length) return;
+    if(s==='am') entry.content_am=[...add,...arr]; else entry.content_pm=[...add,...arr];
+  });
+  entry.rolled_done=true; entry.rolled_from=srcDate;
+  _reportAutoSave();
+}
+// 줄 앞에 [ ] 를 입력하면 체크박스 줄로 변환
+function _rpYhMaybeTodo(line){
+  const m=/^\[([ xX]?)\]\s?/.exec(line.textContent||'');
+  if(!m) return false;
+  const item=_rpFindLineItem(line.dataset.id);
+  if(!item || item.todo) return false;
+  const rest=line.textContent.slice(m[0].length);
+  item.todo=true; item.checked=(m[1]==='x'||m[1]==='X'); item.text=rest;
+  line.textContent=rest;
+  _rpApplyTodoClass(line,item);
+  const r=document.createRange(); r.selectNodeContents(line); r.collapse(false);
+  const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  return true;
+}
+function _rpYhToggleTodo(line){
+  const item=_rpFindLineItem(line.dataset.id); if(!item||!item.todo) return;
+  item.checked=!item.checked;
+  _rpApplyTodoClass(line,item);
+  _reportAutoSave();
+}
+function _rpYhUntodo(line){
+  const item=_rpFindLineItem(line.dataset.id); if(!item||!item.todo) return;
+  item.todo=false; delete item.checked; delete item.origin;
+  _rpApplyTodoClass(line,item);
+  _reportAutoSave();
+}
+// 줄 경계 이동(메모장처럼): 이웃 줄(.rp-line)을 핀버튼/블럭 건너뛰지 않고 바로 인접한 것만
+function _rpAdjLine(line, dir){
+  let n=dir<0?line.previousElementSibling:line.nextElementSibling;
+  if(n && n.classList.contains('rp-line-pin-btn')) n=dir<0?n.previousElementSibling:n.nextElementSibling;
+  return (n && n.classList.contains('rp-line')) ? n : null;
+}
+function _rpCaretAtStart(line){
+  const sel=window.getSelection(); if(!sel.rangeCount||!sel.isCollapsed) return false;
+  const r=document.createRange(); r.selectNodeContents(line); r.setEnd(sel.anchorNode,sel.anchorOffset);
+  return r.toString().length===0;
+}
+function _rpCaretAtEnd(line){
+  const sel=window.getSelection(); if(!sel.rangeCount||!sel.isCollapsed) return false;
+  const r=document.createRange(); r.selectNodeContents(line); r.setStart(sel.anchorNode,sel.anchorOffset);
+  return r.toString().length===0;
+}
+function _rpFocusLineAt(line, offset){
+  line.focus();
+  const r=document.createRange();
+  const tn=line.firstChild;
+  if(tn && tn.nodeType===3){ r.setStart(tn, Math.min(offset, tn.length)); r.collapse(true); }
+  else { r.selectNodeContents(line); r.collapse(false); }
+  const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+// 프로젝트 카드 한 번 클릭 → 업무보고서에 Alt+Enter 와 동일하게 연동 블럭 자동 입력
+let _rpYhClickTimer=null, _rpLastLineId=null;
+function rpYhCardClick(ev, taskId){
+  if(!_rpIsYh()) return;
+  if(ev.target.closest && ev.target.closest('a,button')) return;
+  if(ev.detail>1) return;                       // 더블클릭(수정창)의 두 번째 클릭
+  if(String(window.getSelection()||'')) return; // 글자 드래그 선택 중이면 무시
+  clearTimeout(_rpYhClickTimer);
+  _rpYhClickTimer=setTimeout(()=>_rpYhInsertProject(taskId),260);
+}
+function _rpYhInsertProject(taskId){
+  if(!_rpIsYh() || !_collabCanEdit()) return;
+  if(!document.getElementById('rpEditorAm')){ toast('업무보고서 편집 화면에서 사용하세요.'); return; }
+  const t=(_collabTasks||[]).find(x=>x.id===taskId); if(!t) return;
+  if(t.status==='done'){ toast('완료된 업무는 보고서에 추가하지 않습니다.'); return; }
+  const entry=_reportEnsureEntry();
+  if([..._rpContentOf(entry,'am'),..._rpContentOf(entry,'pm')].some(i=>i.type==='block' && i.linked_task_id===t.id)){
+    toast('이미 이 날짜 보고서에 들어 있습니다.'); return;
+  }
+  let afterId=null;
+  const last=_rpLastLineId && document.querySelector(`.rp-line[data-id="${_rpLastLineId}"]`);
+  if(last) afterId=_rpLastLineId;
+  else{
+    const sec=new Date().getHours()<12?'am':'pm';
+    const lines=document.querySelectorAll(`#${sec==='pm'?'rpEditorPm':'rpEditorAm'} .rp-line`);
+    if(lines.length) afterId=lines[lines.length-1].dataset.id;
+  }
+  _rpLinkedSel={id:t.id,title:t.title,type:'task'};
+  _rpInsertAfterId=afterId;
+  rpBlockSave();
+}
+
 // 에디터 전체 재빌드 (담당자/날짜 전환 시)
 function _rpBuildEditor(){
   const wrap=document.getElementById('rpEditorWrap');
   if(!wrap) return;
   if(_reportSearchQuery){ _rpBuildSearchResults(); return; }
   if(_reportCategoryFilter){ _rpBuildEditorFiltered(); return; }
+  _rpYhRollover();
+  wrap.classList.toggle('rp-yh', _rpIsYh());
   wrap.innerHTML=`
     <div class="rp-section">
       <div class="rp-section-header">오전</div>
@@ -32851,14 +33003,18 @@ function _rpBuildEditorSection(section){
   const content=_rpContentOf(entry,section);
   if(!content.some(i=>i.type==='line')) content.push({id:'l_s'+Date.now()+section,type:'line',text:''});
   editor.innerHTML='';
+  const yh=_rpIsYh();
   content.forEach(item=>{
     if(item.type==='line'){
-      const isEmpty=!(item.text||'').trim();
+      // 유현: 예전 '• ' 글머리 표시는 숨김(저장값은 그 줄을 수정할 때 반영) / 안내문구는 빈 보고서의 첫 줄에만
+      const shown=yh ? (item.text||'').replace(/^•\s?/,'') : (item.text||'');
+      const isEmpty=!shown.trim();
       const lineEl=document.createElement('div');
       lineEl.className='rp-line'; lineEl.dataset.id=item.id;
       lineEl.contentEditable='true';
-      if(isEmpty) lineEl.setAttribute('data-empty-ph',section==='am'?'오전 업무 내용… (Alt+Enter: 블럭 추가)':'오후 업무 내용…');
-      lineEl.textContent=item.text||'';
+      if(isEmpty && (!yh || content.length===1)) lineEl.setAttribute('data-empty-ph',section==='am'?'오전 업무 내용… (Alt+Enter: 블럭 추가)':'오후 업무 내용…');
+      lineEl.textContent=shown;
+      _rpApplyTodoClass(lineEl,item);
       editor.appendChild(lineEl);
       editor.appendChild(_rpCreateLinePinBtn(item.id,section));
     } else if(item.type==='block'){
@@ -33477,10 +33633,11 @@ async function rpBlockSave(){
   const newLineId='l'+Date.now()+Math.random().toString(36).slice(2,4);
   const newLine=document.createElement('div');
   newLine.className='rp-line'; newLine.dataset.id=newLineId;
-  newLine.contentEditable='true'; newLine.textContent='• ';
+  const _pre=_rpIsYh()?'':'• ';
+  newLine.contentEditable='true'; newLine.textContent=_pre;
   blockEl.after(newLine);
   newLine.after(_rpCreateLinePinBtn(newLineId,section));
-  content.splice(content.indexOf(newBlock)+1,0,{id:newLineId,type:'line',text:'• '});
+  content.splice(content.indexOf(newBlock)+1,0,{id:newLineId,type:'line',text:_pre});
   newLine.focus();
   const r=document.createRange(); r.selectNodeContents(newLine); r.collapse(false);
   window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
@@ -33671,8 +33828,25 @@ function _reportSetupKeyboard(){
     editor.addEventListener('input',e=>{
       const line=e.target.closest?.('.rp-line');
       if(!line) return;
+      // 유현: 줄 앞에 [ ] 입력 → 체크박스 줄로 변환
+      if(_rpIsYh() && !e.isComposing) _rpYhMaybeTodo(line);
       _reportSyncLine(line.dataset.id, line.textContent);
       _reportAutoSave();
+    });
+
+    // 마지막으로 커서가 있던 줄 기억 (프로젝트 카드 클릭 시 이 줄 아래에 삽입)
+    editor.addEventListener('focusin',e=>{
+      const l=e.target.closest?.('.rp-line');
+      if(l) _rpLastLineId=l.dataset.id;
+    });
+    // 체크박스(줄 왼쪽 20px) 클릭 → 체크/해제. 박스 영역 mousedown은 커서 이동 없이 처리
+    editor.addEventListener('mousedown',e=>{
+      const l=e.target.closest?.('.rp-line.rp-todo'); if(!l) return;
+      if(e.clientX-l.getBoundingClientRect().left<=20) e.preventDefault();
+    });
+    editor.addEventListener('click',e=>{
+      const l=e.target.closest?.('.rp-line.rp-todo'); if(!l) return;
+      if(e.clientX-l.getBoundingClientRect().left<=20) _rpYhToggleTodo(l);
     });
 
     // 블럭 포커스 Enter → 새 라인
@@ -33680,21 +33854,18 @@ function _reportSetupKeyboard(){
       const block=e.target.closest?.('.rp-block');
       if(block && e.key==='Enter' && !e.altKey && !e.ctrlKey){
         e.preventDefault();
+        const pre=_rpIsYh()?'':'• ';
         const newId='l'+Date.now()+Math.random().toString(36).slice(2,4);
         const newLine=document.createElement('div');
         newLine.className='rp-line'; newLine.dataset.id=newId;
-        newLine.contentEditable='true'; newLine.textContent='• ';
+        newLine.contentEditable='true'; newLine.textContent=pre;
         block.after(newLine);
         newLine.after(_rpCreateLinePinBtn(newId,section));
-        const tn=newLine.firstChild;
-        const r=document.createRange();
-        if(tn){r.setStart(tn,2);r.collapse(true);}
-        window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
-        newLine.focus();
+        _rpFocusLineAt(newLine, pre.length);
         const entry=_reportEnsureEntry();
         const content=_rpContentOf(entry,section);
         const idx=content.findIndex(i=>i.id===block.dataset.id);
-        content.splice(idx<0?content.length:idx+1,0,{id:newId,type:'line',text:'• '});
+        content.splice(idx<0?content.length:idx+1,0,{id:newId,type:'line',text:pre});
         _reportAutoSave();
         return;
       }
@@ -33711,9 +33882,10 @@ function _reportSetupKeyboard(){
         return;
       }
 
-      // Enter → 새 줄 + • 자동
+      // Enter → 새 줄 (유현: 글머리·체크박스 없이 빈 줄 / 그 외: • 자동)
       if(e.key==='Enter' && !e.altKey && !e.ctrlKey){
         e.preventDefault();
+        const pre=_rpIsYh()?'':'• ';
         const sel=window.getSelection();
         if(!sel.rangeCount) return;
         const range=sel.getRangeAt(0);
@@ -33726,7 +33898,7 @@ function _reportSetupKeyboard(){
         const newId='l'+Date.now()+Math.random().toString(36).slice(2,4);
         const newLine=document.createElement('div');
         newLine.className='rp-line'; newLine.dataset.id=newId;
-        newLine.contentEditable='true'; newLine.textContent='• '+afterText;
+        newLine.contentEditable='true'; newLine.textContent=pre+afterText;
         // 폼 또는 핀버튼 다음에 삽입
         let insertAfter=line;
         if(insertAfter.nextSibling?.classList?.contains('rp-line-pin-btn')) insertAfter=insertAfter.nextSibling;
@@ -33735,15 +33907,90 @@ function _reportSetupKeyboard(){
         newLine.after(_rpCreateLinePinBtn(newId,section));
         const r=document.createRange();
         const tn=newLine.firstChild;
-        if(tn){r.setStart(tn,2);r.collapse(true);}
+        if(tn){r.setStart(tn,pre.length);r.collapse(true);}
         else{r.selectNodeContents(newLine);r.collapse(false);}
         sel.removeAllRanges(); sel.addRange(r);
         const entry=_reportEnsureEntry();
         const content=_rpContentOf(entry,section);
         const idx=content.findIndex(i=>i.id===line.dataset.id);
-        content.splice(idx<0?content.length:idx+1,0,{id:newId,type:'line',text:'• '+afterText});
+        content.splice(idx<0?content.length:idx+1,0,{id:newId,type:'line',text:pre+afterText});
         _reportAutoSave();
         return;
+      }
+
+      // 유현 메모장 동작: 체크박스 줄 맨 앞 Backspace → 박스 해제 / 줄 맨 앞 Backspace → 윗줄과 합치기 / 줄 맨 끝 Delete → 아랫줄 합치기 / ↑↓ 줄 이동
+      if(_rpIsYh() && !e.isComposing && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey){
+        if(e.key==='Backspace' && line.classList.contains('rp-todo') && _rpCaretAtStart(line)){
+          e.preventDefault(); _rpYhUntodo(line); return;
+        }
+        if(e.key==='Backspace' && line.textContent!=='' && _rpCaretAtStart(line)){
+          const prev=_rpAdjLine(line,-1);
+          if(prev){
+            e.preventDefault();
+            const joinAt=prev.textContent.length;
+            prev.textContent=prev.textContent+line.textContent;
+            _reportSyncLine(prev.dataset.id, prev.textContent);
+            const entry=_reportAllData[_reportKey()];
+            if(entry){
+              const keep=_rpContentOf(entry,section).filter(i=>i.id!==line.dataset.id);
+              if(section==='am') entry.content_am=keep; else entry.content_pm=keep;
+            }
+            if(line.nextElementSibling?.classList?.contains('rp-line-pin-btn')) line.nextElementSibling.remove();
+            line.remove();
+            _rpFocusLineAt(prev, joinAt);
+            _reportAutoSave();
+            return;
+          }
+        }
+        if(e.key==='Delete' && line.textContent!=='' && _rpCaretAtEnd(line)){
+          const next=_rpAdjLine(line,1);
+          if(next){
+            e.preventDefault();
+            const joinAt=line.textContent.length;
+            line.textContent=line.textContent+next.textContent;
+            _reportSyncLine(line.dataset.id, line.textContent);
+            const entry=_reportAllData[_reportKey()];
+            if(entry){
+              const keep=_rpContentOf(entry,section).filter(i=>i.id!==next.dataset.id);
+              if(section==='am') entry.content_am=keep; else entry.content_pm=keep;
+            }
+            if(next.nextElementSibling?.classList?.contains('rp-line-pin-btn')) next.nextElementSibling.remove();
+            next.remove();
+            _rpFocusLineAt(line, joinAt);
+            _reportAutoSave();
+            return;
+          }
+        }
+        if((e.key==='ArrowUp'||e.key==='ArrowDown')){
+          const dir=e.key==='ArrowUp'?-1:1;
+          const sel=window.getSelection();
+          if(sel.rangeCount && sel.isCollapsed){
+            const lr=line.getBoundingClientRect();
+            const rects=sel.getRangeAt(0).getClientRects();
+            const cr=rects.length?rects[0]:null;
+            const lh=parseFloat(getComputedStyle(line).lineHeight)||18;
+            const onEdge=!cr || (dir<0 ? cr.top-lr.top<lh*0.8 : lr.bottom-cr.bottom<lh*0.8);
+            const adj=onEdge ? _rpAdjLine(line,dir) : null;
+            if(adj){
+              e.preventDefault();
+              const x=cr?cr.left:lr.left+24;
+              const ar=adj.getBoundingClientRect();
+              adj.focus();
+              const y=dir<0?ar.bottom-4:ar.top+4;
+              let rg=null;
+              if(document.caretPositionFromPoint){
+                const pt=document.caretPositionFromPoint(x,y);
+                if(pt && adj.contains(pt.offsetNode)){ rg=document.createRange(); rg.setStart(pt.offsetNode,pt.offset); rg.collapse(true); }
+              } else if(document.caretRangeFromPoint){
+                const c=document.caretRangeFromPoint(x,y);
+                if(c && adj.contains(c.startContainer)) rg=c;
+              }
+              if(!rg){ rg=document.createRange(); rg.selectNodeContents(adj); rg.collapse(dir>0); }
+              sel.removeAllRanges(); sel.addRange(rg);
+              return;
+            }
+          }
+        }
       }
 
       // Backspace on empty line → 제거
