@@ -5877,6 +5877,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
   #page-waybill .wbm-chip{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:5px;}
   #page-waybill .wbm-input{height:44px;width:150px;border:1px solid var(--bd);border-radius:9px;padding:0 12px;font-size:15px;background:var(--bg);color:var(--tx);font-family:inherit;}
   #page-waybill .wbm-chk{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px;color:var(--tx2);cursor:pointer;}
+  #page-waybill .wbm-juso{margin-top:12px;border:1px solid var(--bd);border-radius:10px;padding:12px 14px;background:var(--bg2);color:var(--tx);}
+  #page-waybill .wbm-juso summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--tx);}
+  #page-waybill .wbm-juso-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:12px;}
+  #page-waybill .wbm-juso-grid label{display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:700;color:var(--tx);}
+  #page-waybill .wbm-juso-grid .wbm-input{width:100%;box-sizing:border-box;}
+  #page-waybill .wbm-juso a{color:var(--pr);}
+  @media(max-width:700px){ #page-waybill .wbm-juso-grid{grid-template-columns:1fr;} }
   #page-waybill .wbm-st{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;}
   #page-waybill .wbm-st.ok{background:#D1FAE5;color:#065F46;}
   #page-waybill .wbm-st.check,#page-waybill .wbm-st.hold{background:#FFFF00;color:#5F5000;}
@@ -5951,6 +5958,23 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <input type="file" id="wbmMFile" accept=".xlsx" style="display:none;" onchange="wbmMatchPick(event)">
       </div>
       <label class="wbm-chk"><input type="checkbox" id="wbmLenient" onchange="wbmMatchRerun()"> 주소가 달라도 송장 데이터에 같은 이름이 한 명뿐이면 입력하고 노란색으로 표시</label>
+      <label class="wbm-chk"><input type="checkbox" id="wbmJusoOn" onchange="wbmMatchRerun()" disabled> 도로명 주소를 <b>지번 주소로 변환</b>해서 동·리까지 확인 (행안부 API · 고객 <b>주소만</b> 전송, 이름·연락처 제외)</label>
+      <div id="wbmJusoStatus" class="wbm-sub" style="margin:6px 0 0;"></div>
+      <details id="wbmJusoBox" class="wbm-juso" style="display:none;">
+        <summary>🔑 승인키 등록·갱신 (관리자)</summary>
+        <div class="wbm-juso-grid">
+          <label>승인키<input id="wbmJusoKey" class="wbm-input" style="width:100%;" type="text" autocomplete="off" placeholder="행안부에서 발급받은 승인키(confmKey)"></label>
+          <label>발급일<input id="wbmJusoIssued" class="wbm-input" type="date" onchange="wbmJusoIssuedChange()"></label>
+          <label>만료 예정일 (발급일+90일, 직접 고칠 수 있어요)<input id="wbmJusoExpires" class="wbm-input" type="date"></label>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+          <button class="wbm-btn" id="wbmJusoSaveBtn" onclick="wbmJusoSave()">저장</button>
+          <span class="wbm-sub" style="margin:0;">저장하면 공개 주소로 키를 먼저 확인해요. 만료 14·7·3·1일 전과 만료일에 admin 계정에 팝업 알림이 가요.</span>
+        </div>
+        <div class="wbm-sub" style="margin:10px 0 0;line-height:1.7;">
+          <b>갱신 방법</b> ① <a href="https://business.juso.go.kr/jst/jstAddressApiList" target="_blank" rel="noopener">business.juso.go.kr</a> 접속 → 도로명주소 · <b>검색 API</b> [신청하기] → 서비스 용도 <b>개발</b>로 신청서 작성 → 새 승인키 발급 ② 위 칸에 승인키와 발급일(오늘)을 넣고 저장
+        </div>
+      </details>
       <div class="wbm-legend" style="margin-top:12px;">
         <span><i class="wbm-chip" style="background:#FFFF00;"></i>노랑 — 동명이인(주소로 골라 입력, 재확인) 또는 같은 이름·주소에 운송장번호가 여러 개(입력 안 함)</span>
         <span><i class="wbm-chip" style="background:#FF5C5C;"></i>맞는 송장 없음 (빨강)</span>
@@ -9004,6 +9028,7 @@ function _startAppData(){
       }
     }
     runDailyKvBackupIfNeeded();   // 하루 1회 전체 데이터 스냅샷 백업(비동기, 실패해도 앱 동작엔 영향 없음)
+    setTimeout(()=>{ try{ jusoKeyExpiryCheck(); }catch(e){ console.warn('주소 API 키 만료 점검 실패', e); } }, 4000);   // admin 로그인 시 승인키 만료 임박 알림(알림 체계 준비 후 실행)
   });
 }
 
@@ -15650,6 +15675,7 @@ function wbmInit(){
     ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('drag'); }));
     drop.addEventListener('drop',e=>{ const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) wbmReadFile(f); });
   }
+  jusoRefreshUi();   // 승인키 상태 표시(마스터에겐 등록 폼도)
   const mdrop=document.getElementById('wbmMDrop');
   if(mdrop && !mdrop._wbmWired){
     mdrop._wbmWired=true;
@@ -15912,7 +15938,9 @@ function _wbmAddrMatch(wbAddr,chAddr){
   if(!A.length||!B.length) return false;
   if(A[0]!==B[0] && _wbmRegionSet.has(A[0]) && _wbmRegionSet.has(B[0])) return false;
   const as=A.join(''), bs=B.join('');
-  return A.every(t=>bs.includes(t)) || B.every(t=>as.includes(t));
+  // 시 아래의 일반구(화성시 만세구, 천안시 서북구 …)는 판매처·변환 주소에 없는 경우가 있어 없어도 일치로 본다
+  const A2=A.filter((t,i)=>!(i>0 && /구$/.test(t) && /시$/.test(A[i-1])));
+  return A2.every(t=>bs.includes(t)) || B.every(t=>as.includes(t));
 }
 // 약한 일치: 송장 주소 앞 2토큰(시도 + 시군구)만 판매처 주소에 있으면 일치 — 판매처 도로명 주소엔 '동'이 없는 경우 대비
 function _wbmAddrWeak(wbAddr,chAddr){
@@ -15936,23 +15964,144 @@ function _wbmMatchIndex(){
   });
   return byName;
 }
-// 한 행 매칭 → {st:'ok'(입력)|'check'(동명이인, 입력+노랑)|'hold'(같은 이름·주소·다른 송장, 입력 안 함+노랑)|'none'(없음, 빨강), wb, why}
-function _wbmMatchRow(g,chAddr,lenient){
+// 한 행 매칭 → {st:'ok'(입력)|'check'(동명이인 등, 입력+노랑)|'hold'(같은 이름·주소·다른 송장, 입력 안 함+노랑)|'none'(없음, 빨강), wb, why, tier}
+//  tier: ''(송장 주소 전체 일치) | 'jibun'(도로명→지번 변환 결과로 일치) | 'weak'(시도·시군구까지만 일치)
+//  jibuns: 판매처 도로명 주소를 행안부 API로 변환한 지번주소 목록(없으면 undefined; 변환 실패·결과 없음이면 [])
+function _wbmMatchRow(g,chAddr,lenient,jibuns){
   if(!g) return {st:'none',why:'송장 데이터에 같은 이름이 없음'};
-  const entries=[...g.values()], dup=entries.length>1;
-  // 1단계: 송장 주소 전체(시도 시군구 읍면 동/리)가 판매처 주소에 있음 → 2단계: 없으면 시도+시군구까지만 맞아도 일치로 본다
-  // (송장 주소 끝의 법정동/리 이름은 판매처의 도로명 주소에 없는 경우가 많음)
+  const entries=[...g.values()], dup=entries.length>1, hasJ=!!(jibuns&&jibuns.length);
+  // 1단계: 송장 주소 전체(시도 시군구 읍면 동/리)가 판매처 주소에 있음
   let pass=entries.filter(e=>e.addrs.some(a=>_wbmAddrMatch(a,chAddr))), tier='';
-  if(!pass.length){ pass=entries.filter(e=>e.addrs.some(a=>_wbmAddrWeak(a,chAddr))); tier='시도·시군구가 같은 '; }
+  // 2단계: 도로명 주소를 지번으로 바꾼 결과에서 송장의 동/리까지 일치
+  if(!pass.length && hasJ){ pass=entries.filter(e=>e.addrs.some(a=>jibuns.some(j=>_wbmAddrMatch(a,j)))); if(pass.length) tier='jibun'; }
+  // 3단계: 그래도 없으면 시도+시군구까지만 맞아도 일치로 본다(송장 주소 끝의 법정동/리는 판매처 도로명 주소에 없는 경우가 많음)
+  if(!pass.length){ pass=entries.filter(e=>e.addrs.some(a=>_wbmAddrWeak(a,chAddr))); if(pass.length) tier='weak'; }
   if(!pass.length){
     if(!dup && lenient) return {st:'check',wb:entries[0].wb,why:'주소가 달라 확인 필요(이름이 한 명뿐이라 입력)'};
     return {st:'none',why:dup?'동명이인 — 주소가 맞는 송장이 없음':'이름은 있으나 주소가 다름'};
   }
   // 이름·주소가 맞는 송장이 운송장번호만 다르게 여러 개 → 어느 것인지 알 수 없으니 입력하지 않고 노랑(직접 확인)
-  if(pass.length>1) return {st:'hold',why:(tier?tier:'이름·주소가 같은데 운송장번호가 다른 ')+'송장이 '+pass.length+'개 — 입력 안 함, 직접 확인 (후보: '+pass.map(e=>e.wb).join(', ')+')'};
+  if(pass.length>1){
+    const lead=tier==='weak'?'시도·시군구가 같은 송장이 '+pass.length+'개'+(hasJ?' — 지번 변환 결과로도 구분이 안 됨':''):tier==='jibun'?'지번 변환으로도 구분이 안 되는 송장이 '+pass.length+'개':'이름·주소가 같은데 운송장번호가 다른 송장이 '+pass.length+'개';
+    return {st:'hold',tier,why:lead+' — 입력 안 함, 직접 확인 (후보: '+pass.map(e=>e.wb).join(', ')+')'};
+  }
   const pick=pass[0];
-  if(dup) return {st:'check',wb:pick.wb,why:'동명이인 — 주소로 골라 입력'};
-  return {st:'ok',wb:pick.wb,why:''};
+  // 지번 변환까지 했는데 동/리가 송장과 다름 → 시군구만 같은 다른 사람일 수 있어 입력은 하되 노랑으로 확인 요청
+  if(tier==='weak' && hasJ) return {st:'check',wb:pick.wb,tier,why:'시군구는 같은데 지번 변환 결과의 동·리가 송장과 다름 — 확인 필요'};
+  if(dup) return {st:'check',wb:pick.wb,tier,why:tier==='jibun'?'동명이인 — 지번 변환으로 주소 확인해 입력':'동명이인 — 주소로 골라 입력'};
+  return {st:'ok',wb:pick.wb,tier,why:tier==='jibun'?'지번 변환으로 확인':''};
+}
+
+// ── 도로명 → 지번 변환(행안부 도로명주소 검색 API) ──
+// 보내는 것은 '시도 시군구 읍면 도로명 건물번호'까지만(괄호·상세주소·이름 제외). 검색어 규칙: 특수문자/SQL 예약어 포함 시 IP 차단될 수 있어 제거, 한글 40자 이하.
+const _wbmJusoCache = new Map();   // 도로명 핵심주소 → {jibuns:[…]} | {err}
+function _wbmRoadCore(addr){
+  const s=String(addr==null?'':addr).replace(/\([^)]*\)/g,' ').replace(/[%=><\[\]]/g,' ').replace(/\s+/g,' ').trim();
+  const m=s.match(/^(.+?[로길])\s*(\d+)(?:-(\d+))?(?=\s|$|,)/);   // '…로/길 + 건물번호'까지. 도로명에 숫자가 붙은 '…로40번길 17-1'도 처리
+  if(!m) return null;                                            // 이미 지번 주소 등 → 변환 불필요
+  let core=m[1]+' '+m[2]+(m[3]?'-'+m[3]:'');
+  if(/[A-Za-z]/.test(core)) return null;   // 안전 장치: 영문이 섞이면(SQL 예약어와 겹칠 수 있음: OR·UNION 등) 호출하지 않고 시군구 비교로 대체
+  return core.length>40?core.slice(0,40):core;
+}
+async function _wbmJusoLookup(core,key,fresh){
+  if(!fresh && _wbmJusoCache.has(core)) return _wbmJusoCache.get(core);
+  const url='https://business.juso.go.kr/addrlink/addrLinkApi.do?confmKey='+encodeURIComponent(key)+'&currentPage=1&countPerPage=5&resultType=json&keyword='+encodeURIComponent(core);
+  let out;
+  const ctl=(typeof AbortController!=='undefined')?new AbortController():null, tm=ctl?setTimeout(()=>ctl.abort(),10000):null;
+  try{
+    const r=await fetch(url,ctl?{signal:ctl.signal}:undefined), j=await r.json(), c=j&&j.results&&j.results.common;
+    if(!c) out={err:'FORMAT',msg:'응답 형식 오류'};
+    else if(c.errorCode!=='0') out={err:c.errorCode,msg:c.errorMessage||''};
+    else { const list=(j.results.juso||[]).map(x=>x.jibunAddr).filter(Boolean); out=list.length?{jibuns:[...new Set(list)].slice(0,3)}:{err:'EMPTY',msg:'검색 결과 없음'}; }
+  }catch(e){ out={err:'NET',msg:String(e&&e.message||e)}; }
+  finally{ if(tm) clearTimeout(tm); }
+  if(!fresh && (!out.err||out.err==='EMPTY')) _wbmJusoCache.set(core,out);   // 오류(키·네트워크)는 캐시하지 않음
+  return out;
+}
+
+// ── 행안부 주소 API 승인키: 서버(cloudKv 'juso_api')에 보관 + 만료 임박 시 admin 알림 ──
+//  개발용 승인키는 기간이 지나면 만료(E0014)된다. 발급일 기준 90일을 기본 만료일로 보고, 14·7·3·1일 전과 만료일에 admin에게 팝업 알림.
+//  키는 코드(공개 저장소)에 넣지 않고 이 저장소에만 둔다.
+const JUSO_KEY_KIND='juso_api', JUSO_KEY_DAYS=90, JUSO_ALERT_THRESHOLDS=[14,7,3,1,0];
+const _jusoYmd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function _jusoAddDays(ymd,n){ const [y,m,d]=ymd.split('-').map(Number); return _jusoYmd(new Date(y,m-1,d+n)); }
+function _jusoDaysLeft(cfg){
+  if(!cfg||!/^\d{4}-\d{2}-\d{2}$/.test(cfg.expiresAt||'')) return null;
+  const [y,m,d]=cfg.expiresAt.split('-').map(Number), t=new Date(); t.setHours(0,0,0,0);
+  return Math.round((new Date(y,m-1,d)-t)/86400000);
+}
+async function jusoLoadCfg(){ const c=await cloudKvLoad(JUSO_KEY_KIND); return (c&&c.key)?c:null; }
+function _jusoAlertText(cfg,left){
+  const when = left>0?`${cfg.expiresAt}에 만료됩니다 (D-${left})`:left===0?'오늘 만료됩니다':`${cfg.expiresAt}에 만료됐습니다`;
+  return `행안부 도로명주소 API(개발용) 승인키가 ${when}.\n만료되면 송장 매칭의 '도로명→지번 변환'이 멈추고 시도·시군구까지만 비교합니다.\n\n[갱신 방법]\n1) 행안부 '주소기반산업지원서비스' 접속\n   https://business.juso.go.kr/jst/jstAddressApiList\n2) 도로명주소 > 검색 API 의 [신청하기] → 서비스 용도 '개발' 선택 → 신청서(업체명·시스템명·URL) 작성 → 새 승인키 발급\n   (마이페이지에 재발급·연장 메뉴가 있으면 그걸 써도 됩니다)\n3) 새 승인키를 앱에 입력\n   CX팀 > CX업무 > 송장파일 취합 > ④ 판매처 송장번호 자동 입력 > '승인키 등록·갱신'에 승인키와 발급일(오늘)을 넣고 저장\n   (아래 [바로가기]를 누르면 그 화면으로 이동해요)\n\n※ 만료일은 발급일 + ${JUSO_KEY_DAYS}일로 계산해요. 실제 만료일이 다르면 입력 화면에서 직접 고칠 수 있어요.`;
+}
+// 로그인할 때마다 조용히 점검 — 임계 구간마다 한 번씩만 알림(같은 키·만료일 기준 기록은 sys_alert_log_juso)
+async function jusoKeyExpiryCheck(){
+  const me=window.__CURRENT_USER; if(!me || !_taskSeesSys()) return;   // admin 로그인 때만(팝업이 바로 뜨도록)
+  const cfg=await jusoLoadCfg(); if(!cfg) return;
+  const left=_jusoDaysLeft(cfg); if(left==null) return;
+  const level=JUSO_ALERT_THRESHOLDS.filter(t=>left<=t).sort((a,b)=>a-b)[0];   // 지금 해당하는 가장 가까운 임계값
+  if(level===undefined) return;
+  let log={}; try{ log=(await cloudKvLoad('sys_alert_log_juso'))||{}; }catch{}
+  if(log.sig!==cfg.expiresAt) log={sig:cfg.expiresAt,sent:[]};
+  if(log.sent.includes(level)) return;
+  const masters=await _sysAlertMasters(); if(!masters.length) return;
+  const rec=m=>({
+    id:'sys'+Date.now()+Math.random().toString(36).slice(2,8),
+    fromUsername:'__system__', fromName:'🤖 시스템 알림',
+    toUsername:m.username, toName:m.name||m.username,
+    menu:'waybill', dept:'cx', menuLabel:'송장파일 취합',
+    popTitle:left>0?`🔑 주소 API 승인키 갱신 필요 (D-${left})`:'🔑 주소 API 승인키 만료',
+    content:_jusoAlertText(cfg,left), createdAt:new Date().toISOString(), read:false, resolvedAt:null
+  });
+  log.sent=[...new Set([...log.sent,...JUSO_ALERT_THRESHOLDS.filter(t=>t>=level)])];   // 더 큰 임계값 알림은 이미 지난 걸로 처리
+  await cloudKvSave('sys_alert_log_juso',log);   // 먼저 기록(동시 접속 중복 발송 최소화)
+  await _sysAlertSend(masters.map(rec));
+}
+
+// 화면: 승인키 상태·등록 폼(마스터만 보임)
+async function jusoRefreshUi(){
+  const cfg=await jusoLoadCfg();
+  const st=document.getElementById('wbmJusoStatus'); if(!st) return;
+  const box=document.getElementById('wbmJusoBox'), on=document.getElementById('wbmJusoOn');
+  const isMaster=!!(window.__CURRENT_USER&&window.__CURRENT_USER.role==='master');
+  if(box) box.style.display=isMaster?'':'none';
+  if(on){ on.disabled=!cfg; if(!cfg) on.checked=false; else if(!on._jusoInit){ on.checked=true; on._jusoInit=true; } }
+  if(!cfg){ st.innerHTML='🔑 승인키가 등록되지 않았어요 — 지금은 시도·시군구까지만 비교해요.'+(isMaster?' 아래 “승인키 등록·갱신”에서 등록해 주세요.':' 관리자에게 등록을 요청해 주세요.'); }
+  else{
+    const left=_jusoDaysLeft(cfg), mask=cfg.key.slice(0,4)+'…('+cfg.key.length+'자)';
+    const tone=left==null?'':left<0?'background:#FF5C5C;color:#fff;':left<=14?'background:#FFFF00;color:#5F5000;':'background:#D1FAE5;color:#065F46;';
+    st.innerHTML=`🔑 승인키 등록됨 (${_wbmEsc(mask)}) · 만료 예정 <b>${_wbmEsc(cfg.expiresAt||'-')}</b> `+(left==null?'':`<span class="wbm-st" style="${tone}">${left<0?'만료됨':left===0?'오늘 만료':'D-'+left}</span>`);
+  }
+  const iss=document.getElementById('wbmJusoIssued'), exp=document.getElementById('wbmJusoExpires'), key=document.getElementById('wbmJusoKey');
+  if(iss && !iss.value){ iss.value=(cfg&&cfg.issuedAt)||_jusoYmd(new Date()); }
+  if(exp && !exp.value){ exp.value=(cfg&&cfg.expiresAt)||_jusoAddDays(iss.value,JUSO_KEY_DAYS); }
+  if(key && !key.value && !isMaster) key.value='';
+}
+function wbmJusoIssuedChange(){ const iss=document.getElementById('wbmJusoIssued'), exp=document.getElementById('wbmJusoExpires'); if(iss&&exp&&/^\d{4}-\d{2}-\d{2}$/.test(iss.value)) exp.value=_jusoAddDays(iss.value,JUSO_KEY_DAYS); }
+async function wbmJusoSave(){
+  const key=(document.getElementById('wbmJusoKey').value||'').trim(), issuedAt=document.getElementById('wbmJusoIssued').value, expiresAt=document.getElementById('wbmJusoExpires').value;
+  const btn=document.getElementById('wbmJusoSaveBtn');
+  if(!key){
+    if(!confirm('승인키를 지울까요? 지번 변환 기능이 꺼져요.')) return;
+    await cloudKvSave(JUSO_KEY_KIND,{key:'',savedAt:new Date().toISOString()},{force:true});
+    document.getElementById('wbmJusoKey').value=''; await jusoRefreshUi(); toast('승인키를 지웠어요'); return;
+  }
+  if(!/^[\x21-\x7E]{10,}$/.test(key)){ alert('승인키 형식이 이상해요. 공백 없이 영문·숫자 위주로 10자 이상이어야 해요. 복사한 값을 다시 확인해 주세요.'); return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(issuedAt)||!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)){ alert('발급일과 만료 예정일을 입력해 주세요.'); return; }
+  if(expiresAt<issuedAt){ alert('만료 예정일이 발급일보다 빠를 수 없어요.'); return; }
+  if(btn) btn.disabled=true;
+  try{
+    // 저장 전에 공개 주소(세종시청)로 키가 승인된 키인지 확인 — 고객 주소는 보내지 않음
+    const t=await _wbmJusoLookup('세종특별자치시 한누리대로 2130',key,true);
+    if(t.err==='E0001'||t.err==='E0014'){ alert(t.err==='E0014'?'이 승인키는 기간이 만료됐어요. 새로 발급받은 키를 입력해 주세요.':'승인되지 않은 키예요. 복사한 값이 맞는지, 검색 API용 키가 맞는지 확인해 주세요.\n('+t.msg+')'); return; }
+    if(t.err&&t.err!=='EMPTY'&&!confirm('키를 확인하지 못했어요('+t.err+' '+(t.msg||'')+').\n그래도 저장할까요?')) return;
+    await cloudKvSave(JUSO_KEY_KIND,{key,issuedAt,expiresAt,savedAt:new Date().toISOString()});
+    const back=await cloudKvLoad(JUSO_KEY_KIND);
+    if(!back||back.key!==key){ alert('서버에 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+    document.getElementById('wbmJusoKey').value='';   // 화면에 키가 남지 않게
+    await jusoRefreshUi(); toast('승인키를 저장했어요 · 만료 예정 '+expiresAt);
+  } finally { if(btn) btn.disabled=false; }
 }
 
 let _wbmM = null;   // {buf,fileName,wb,encrypted,pw,channel,results,sum}
@@ -16003,19 +16152,51 @@ async function _wbmMatchRun(){
   const idx=_wbmMatchIndex(), lenient=document.getElementById('wbmLenient').checked;
   const results=[], ncols=vals[hr].length;
   const FILL={check:'FFFF00',hold:'FFFF00',none:'FF5C5C'};
+  // 1차: 행마다 1·3단계(전체 일치/시도·시군구)로 판정. 시도·시군구까지만 맞은 행(tier 'weak')은 지번 변환 대상
+  const rowsInfo=[];
   for(let r=hr+1;r<vals.length;r++){
     const row=vals[r];
     const name=String(row[ci.nm]==null?'':row[ci.nm]).trim(), addr=String(row[ci.ad]==null?'':row[ci.ad]).trim();
     if(!name&&!addr) continue;
     const cur=row[ci.w];
-    if(cur!=null && String(cur).trim()!==''){ results.push({row:r0+r,name,addr,st:'skip',wb:String(cur),why:'이미 송장번호가 있어 그대로 둠'}); continue; }
-    const res=_wbmMatchRow(idx.get(_wbmNameKey(name)),addr,lenient);
-    if(res.wb) ws.cell(r0+r,c0+ci.w).value(String(res.wb));   // 문자로 입력(긴 숫자가 지수표기로 바뀌지 않게)
-    if(FILL[res.st]) for(let c=0;c<ncols;c++) ws.cell(r0+r,c0+c).style('fill',FILL[res.st]);
-    results.push({row:r0+r,name,addr,st:res.st,wb:res.wb||'',why:res.why});
+    if(cur!=null && String(cur).trim()!==''){ rowsInfo.push({r,name,addr,skip:String(cur)}); continue; }
+    const g=idx.get(_wbmNameKey(name));
+    rowsInfo.push({r,name,addr,g,res:_wbmMatchRow(g,addr,lenient)});
   }
-  const cnt=k=>results.filter(x=>x.st===k).length;
-  _wbmM=Object.assign(M,{wb,encrypted,pw,channel,results});
+  // 지번 변환(행안부 API): 키가 있고 체크돼 있을 때만, 대상 행의 도로명 핵심주소(괄호·상세주소·이름 제외)만 조회
+  const api={on:false,calls:0,fail:0,fatal:null,note:''};
+  const jcfg=await jusoLoadCfg();
+  const wantJ=document.getElementById('wbmJusoOn')&&document.getElementById('wbmJusoOn').checked;
+  if(wantJ && jcfg && jcfg.key){
+    api.on=true;
+    const need=rowsInfo.filter(x=>x.res&&x.res.tier==='weak'&&x.res.st!=='none');
+    const cores=[...new Set(need.map(x=>_wbmRoadCore(x.addr)).filter(Boolean))];
+    let qi=0;
+    const worker=async()=>{
+      while(qi<cores.length && !api.fatal){
+        const core=cores[qi++], hit=_wbmJusoCache.has(core);
+        const o=await _wbmJusoLookup(core,jcfg.key);
+        if(!hit) api.calls++;
+        if(o.err && o.err!=='EMPTY'){ api.fail++; if(/^E000[1]$|^E0014$/.test(o.err)) api.fatal={code:o.err,msg:o.msg}; }
+      }
+    };
+    await Promise.all([worker(),worker(),worker(),worker()]);   // 동시 4건
+    need.forEach(x=>{
+      const core=_wbmRoadCore(x.addr), o=core&&_wbmJusoCache.get(core);
+      if(o&&o.jibuns) x.res=_wbmMatchRow(x.g,x.addr,lenient,o.jibuns);
+    });
+    if(api.fatal) api.note=api.fatal.code==='E0014'?'행안부 승인키(개발용) 기간이 만료돼 지번 변환을 못 했어요. 시도·시군구까지만 비교했습니다. 키를 갱신해 주세요.':'승인키 오류('+api.fatal.code+') — 지번 변환을 못 했어요. 시도·시군구까지만 비교했습니다.';
+    else api.note='지번 변환 '+api.calls+'건 조회'+(api.fail?' · 실패 '+api.fail+'건(시도·시군구로 대체)':'');
+  }
+  // 2차: 엑셀에 반영(송장번호 입력 + 색)
+  rowsInfo.forEach(x=>{
+    if(x.skip!==undefined){ results.push({row:r0+x.r,name:x.name,addr:x.addr,st:'skip',wb:x.skip,why:'이미 송장번호가 있어 그대로 둠'}); return; }
+    const res=x.res;
+    if(res.wb) ws.cell(r0+x.r,c0+ci.w).value(String(res.wb));   // 문자로 입력(긴 숫자가 지수표기로 바뀌지 않게)
+    if(FILL[res.st]) for(let c=0;c<ncols;c++) ws.cell(r0+x.r,c0+c).style('fill',FILL[res.st]);
+    results.push({row:r0+x.r,name:x.name,addr:x.addr,st:res.st,wb:res.wb||'',why:res.why});
+  });
+  _wbmM=Object.assign(M,{wb,encrypted,pw,channel,results,api});
   dl.disabled=false;
   wbmMatchRender();
 }
@@ -16024,7 +16205,7 @@ function wbmMatchRender(){
   const sumEl=document.getElementById('wbmMSummary'), resEl=document.getElementById('wbmMResult');
   const cnt=k=>M.results.filter(x=>x.st===k).length;
   const stat=(l,v)=>`<div class="wbm-stat"><div class="wbm-stat-l">${l}</div><div class="wbm-stat-v">${v}</div></div>`;
-  sumEl.innerHTML=`<div style="margin:14px 0 8px;font-size:13.5px;color:var(--tx);"><b>${M.channel}</b> 파일 · ${_wbmEsc(M.fileName)}${M.encrypted?' · 비밀번호 파일(저장할 때 같은 비밀번호로 다시 잠가요)':''}</div><div class="wbm-stats">`+
+  sumEl.innerHTML=`<div style="margin:14px 0 8px;font-size:13.5px;color:var(--tx);"><b>${M.channel}</b> 파일 · ${_wbmEsc(M.fileName)}${M.encrypted?' · 비밀번호 파일(저장할 때 같은 비밀번호로 다시 잠가요)':''}</div>${M.api&&M.api.note?`<div class="${M.api.fatal?'wbm-warn':'wbm-sub'}" style="margin:0 0 10px;">🗺️ ${_wbmEsc(M.api.note)}</div>`:''}<div class="wbm-stats">`+
     stat('전체',M.results.length+'건')+stat('입력 완료',(cnt('ok')+cnt('check')).toLocaleString()+'건')+stat('동명이인 확인(노랑·입력됨)',cnt('check')+'건')+stat('입력 보류(노랑·직접 확인)',cnt('hold')+'건')+stat('송장 없음(빨강)',cnt('none')+'건')+stat('이미 입력됨',cnt('skip')+'건')+`</div>`;
   const LIM=300, lbl={ok:'입력',check:'확인',hold:'보류',none:'없음',skip:'유지'};
   resEl.innerHTML=`<div class="wbm-pv"><table class="wbm-tbl"><thead><tr><th>엑셀 행</th><th>수취인</th><th>주소</th><th>상태</th><th>운송장번호</th><th>비고</th></tr></thead><tbody>`+
