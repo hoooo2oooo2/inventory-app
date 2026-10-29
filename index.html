@@ -17233,14 +17233,27 @@ async function qtCopyImage(){
   const orig=btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.textContent='복사 중...'; }
   try{
-    const canvas=await qtCaptureDoc(doc);
-    const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
-    if(!blob) throw new Error('이미지 변환 실패');
+    // 캡처에 시간이 걸려 그 사이 다른 탭/창으로 가면 clipboard.write가 "Document is not focused"로 실패한다.
+    // → 클릭 직후(포커스·사용자 제스처가 살아있을 때) 클립보드 쓰기를 먼저 시작하고, 이미지는 Promise로 나중에 채운다.
+    const blobPromise=qtCaptureDoc(doc).then(canvas=>new Promise((res,rej)=>{
+      canvas.toBlob(b=>b?res(b):rej(new Error('이미지 변환 실패')),'image/png');
+    }));
     if(navigator.clipboard && window.ClipboardItem){
-      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      const writeClip=()=>navigator.clipboard.write([new ClipboardItem({'image/png':blobPromise})]);
+      try{
+        await writeClip();
+      }catch(err){
+        // 포커스를 잃은 상태면 창으로 돌아올 때까지 기다렸다가 한 번 재시도
+        if(!/focus/i.test(err&&err.message||'')) throw err;
+        if(btn) btn.textContent='창으로 돌아오면 복사됩니다...';
+        if(!document.hasFocus()) await new Promise(res=>window.addEventListener('focus',res,{once:true}));
+        await blobPromise;
+        await navigator.clipboard.write([new ClipboardItem({'image/png':blobPromise})]);
+      }
       if(btn){ btn.textContent='✅ 복사됨'; setTimeout(()=>{btn.textContent=orig;},1500); }
     } else {
       // 클립보드 미지원 → 다운로드로 대체
+      const blob=await blobPromise;
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url; a.download=`${(document.getElementById('qt-name').value.trim()||'견적서')}.png`;
