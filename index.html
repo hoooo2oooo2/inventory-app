@@ -15896,8 +15896,10 @@ async function wbmDownload(){
 //  · 맞는 송장이 없음 → 입력 없이 행 빨간색
 //  · 네이버 엑셀은 비밀번호 파일이라 xlsx-populate(복호화·재암호화 지원)로 열고, 저장할 때 같은 비밀번호로 다시 암호화
 //    (SheetJS는 서식을 잃고 암호도 못 풀어서 사용 안 함). 쓰기는 브라우저 메모리에서만 — 서버 저장 없음.
-const _wbmRegion = {'서울특별시':'서울','서울시':'서울','부산광역시':'부산','대구광역시':'대구','인천광역시':'인천','광주광역시':'광주','대전광역시':'대전','울산광역시':'울산','세종특별자치시':'세종','세종시':'세종','경기도':'경기','강원도':'강원','강원특별자치도':'강원','충청북도':'충북','충청남도':'충남','전라북도':'전북','전북특별자치도':'전북','전라남도':'전남','경상북도':'경북','경상남도':'경남','제주특별자치도':'제주','제주도':'제주'};
-const _wbmRegionSet = new Set(['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주']);
+// 광주광역시+전라남도는 통합돼 택배사가 '광주'(또는 전남광주)로 표기 → 광주·전남을 한 지역('광주전남')으로 본다. 시군구는 별개라 혼동 없음(광주 북구 vs 전남 고흥군)
+const _wbmRegion = {'서울특별시':'서울','서울시':'서울','부산광역시':'부산','대구광역시':'대구','인천광역시':'인천','대전광역시':'대전','울산광역시':'울산','세종특별자치시':'세종','세종시':'세종','경기도':'경기','강원도':'강원','강원특별자치도':'강원','충청북도':'충북','충청남도':'충남','전라북도':'전북','전북특별자치도':'전북','경상북도':'경북','경상남도':'경남','제주특별자치도':'제주','제주도':'제주',
+  '광주광역시':'광주전남','광주':'광주전남','전라남도':'광주전남','전남':'광주전남','전남광주':'광주전남','광주전남':'광주전남','전남광주통합특별시':'광주전남','광주전남통합특별시':'광주전남','전남광주특별시':'광주전남'};
+const _wbmRegionSet = new Set(['서울','부산','대구','인천','광주전남','대전','울산','세종','경기','강원','충북','충남','전북','경북','경남','제주']);
 const _wbmNameKey = s => String(s==null?'':s).replace(/\s+/g,'').toLowerCase();
 function _wbmAddrTokens(s){
   const t=String(s==null?'':s).replace(/[(),]/g,' ').split(/\s+/).filter(Boolean);
@@ -15938,18 +15940,16 @@ function _wbmMatchIndex(){
 function _wbmMatchRow(g,chAddr,lenient){
   if(!g) return {st:'none',why:'송장 데이터에 같은 이름이 없음'};
   const entries=[...g.values()], dup=entries.length>1;
-  let pass=entries.filter(e=>e.addrs.some(a=>_wbmAddrMatch(a,chAddr)));
-  if(!pass.length){   // 전체 주소는 안 맞아도 시도+시군구까지 맞으면 후보로 — 한 명이면 입력+노랑, 여럿이면 보류
-    const weak=entries.filter(e=>e.addrs.some(a=>_wbmAddrWeak(a,chAddr)));
-    if(weak.length===1) return {st:'check',wb:weak[0].wb,why:'시도·시군구까지만 일치 — 확인 필요'};
-    if(weak.length>1) return {st:'hold',why:'시도·시군구가 같은 송장이 '+weak.length+'개 — 입력 안 함, 직접 확인 (후보: '+weak.map(e=>e.wb).join(', ')+')'};
-  }
+  // 1단계: 송장 주소 전체(시도 시군구 읍면 동/리)가 판매처 주소에 있음 → 2단계: 없으면 시도+시군구까지만 맞아도 일치로 본다
+  // (송장 주소 끝의 법정동/리 이름은 판매처의 도로명 주소에 없는 경우가 많음)
+  let pass=entries.filter(e=>e.addrs.some(a=>_wbmAddrMatch(a,chAddr))), tier='';
+  if(!pass.length){ pass=entries.filter(e=>e.addrs.some(a=>_wbmAddrWeak(a,chAddr))); tier='시도·시군구가 같은 '; }
   if(!pass.length){
     if(!dup && lenient) return {st:'check',wb:entries[0].wb,why:'주소가 달라 확인 필요(이름이 한 명뿐이라 입력)'};
     return {st:'none',why:dup?'동명이인 — 주소가 맞는 송장이 없음':'이름은 있으나 주소가 다름'};
   }
   // 이름·주소가 맞는 송장이 운송장번호만 다르게 여러 개 → 어느 것인지 알 수 없으니 입력하지 않고 노랑(직접 확인)
-  if(pass.length>1) return {st:'hold',why:'이름·주소가 같은데 운송장번호가 다른 송장이 '+pass.length+'개 — 입력 안 함, 직접 확인 (후보: '+pass.map(e=>e.wb).join(', ')+')'};
+  if(pass.length>1) return {st:'hold',why:(tier?tier:'이름·주소가 같은데 운송장번호가 다른 ')+'송장이 '+pass.length+'개 — 입력 안 함, 직접 확인 (후보: '+pass.map(e=>e.wb).join(', ')+')'};
   const pick=pass[0];
   if(dup) return {st:'check',wb:pick.wb,why:'동명이인 — 주소로 골라 입력'};
   return {st:'ok',wb:pick.wb,why:''};
