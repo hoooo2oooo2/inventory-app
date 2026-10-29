@@ -32949,47 +32949,138 @@ function _rpFocusLineAt(line, offset){
   else { r.selectNodeContents(line); r.collapse(false); }
   const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
 }
-// 여러 줄 드래그 선택(메모장처럼): 줄마다 별도 편집칸이라 브라우저가 한 줄 안에서만 선택하므로,
-// 마우스를 누르는 동안만 줄들을 비편집으로 바꿔 줄 경계를 넘어 선택되게 하고, 놓으면 편집 상태로 복원
-// (한 번 여러 줄이 선택되면 브라우저가 서로 다른 편집칸에 걸친 선택을 유지하지 못하므로, 다음 클릭/키 입력 전까지 줄을 비편집 상태로 유지)
+// 여러 줄 선택(메모장처럼): 줄마다 별도 편집칸이라 브라우저가 한 줄 안에서만 선택하므로,
+// 마우스 드래그 또는 Shift+방향키로 줄 경계를 넘는 동안 줄들을 비편집 상태로 바꿔 선택이 이어지게 한다.
+// (서로 다른 편집칸에 걸친 선택은 편집 상태에선 유지되지 않으므로, 다음 클릭/키 입력 전까지 비편집 유지 → 복사·삭제·입력은 아래 핸들러가 처리)
 let _rpYhExitMulti=null;
-function _rpYhDragSelectStart(){
+function _rpYhLineOf(n){ return (n&&(n.nodeType===3?n.parentElement:n))?.closest?.('.rp-line')||null; }
+function _rpYhSetLinesEditable(on){
   const wrap=document.getElementById('rpEditorWrap'); if(!wrap) return;
+  wrap.querySelectorAll('.rp-line').forEach(l=>{ l.contentEditable=on?'true':'false'; });
+}
+function _rpYhLinesInSel(rng){
+  const wrap=document.getElementById('rpEditorWrap'); if(!wrap) return [];
+  return [...wrap.querySelectorAll('.rp-line')].filter(l=>rng.intersectsNode(l));
+}
+// Shift+방향키로 선택 확장 (Ctrl 이면 단어 단위)
+function _rpYhExtend(e){
+  const sel=window.getSelection(); if(!sel.rangeCount || !sel.modify) return;
+  const word=(e.ctrlKey||e.metaKey);
+  const m={ArrowUp:['backward','line'],ArrowDown:['forward','line'],ArrowLeft:['backward',word?'word':'character'],
+    ArrowRight:['forward',word?'word':'character'],Home:['backward','lineboundary'],End:['forward','lineboundary']}[e.key];
+  if(!m) return;
+  sel.modify('extend',m[0],m[1]);
+  const fn=sel.focusNode, el=fn&&(fn.nodeType===3?fn.parentElement:fn);
+  if(el && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
+}
+function _rpYhMultiEnter(){
+  if(_rpYhExitMulti) return;
+  _rpYhSetLinesEditable(false);
+  // keep===true: 현재 선택(접힌 커서 포함)을 유지한 채 그 줄에서 편집 복귀
+  const exit=keep=>{
+    document.removeEventListener('mousedown',onMouse,true);
+    document.removeEventListener('keydown',onKey,true);
+    document.removeEventListener('selectionchange',onSel);
+    _rpYhExitMulti=null;
+    const sel=window.getSelection();
+    const rng=(keep===true && sel.rangeCount)?sel.getRangeAt(0).cloneRange():null;
+    _rpYhSetLinesEditable(true);
+    if(rng){
+      const a=_rpYhLineOf(rng.startContainer), b=_rpYhLineOf(rng.endContainer);
+      if(a && a===b){ a.focus(); sel.removeAllRanges(); sel.addRange(rng); }
+      else if(rng.collapsed && !a){
+        // 커서가 줄 사이(요소 경계)에 있으면 가장 가까운 줄로 보냄
+        const c=rng.startContainer; let ln=null, atEnd=false;
+        const pin=(c.nodeType===3?c.parentElement:c).closest?.('.rp-line-pin-btn');
+        if(pin){   // 줄 끝 📌 버튼 위치 = 다음 줄의 맨 앞
+          ln=pin.nextElementSibling; if(!(ln&&ln.classList.contains('rp-line'))){ ln=pin.previousElementSibling; atEnd=true; }
+        }else{
+          const n=c.nodeType===1?c.childNodes[rng.startOffset]:null;
+          for(let x=n; x && !ln; x=x.nextSibling) if(x.classList&&x.classList.contains('rp-line')) ln=x;
+          if(!ln && c.nodeType===1){ atEnd=true; for(let x=(n?n.previousSibling:c.lastChild); x && !ln; x=x.previousSibling) if(x.classList&&x.classList.contains('rp-line')) ln=x; }
+        }
+        if(ln) _rpFocusLineAt(ln, atEnd?99999:0);
+        else { sel.removeAllRanges(); sel.addRange(rng); }
+      } else { sel.removeAllRanges(); sel.addRange(rng); }
+    }
+  };
+  const onMouse=()=>exit(false);
+  const onSel=()=>{ const s=window.getSelection(); if(!s.rangeCount||s.isCollapsed) exit(true); };
+  const onKey=e=>{
+    if(e.key==='Control'||e.key==='Shift'||e.key==='Meta'||e.key==='Alt') return;
+    const ctrl=e.ctrlKey||e.metaKey;
+    if(ctrl && (e.key==='c'||e.key==='C'||e.key==='a'||e.key==='A')) return;
+    const sel=window.getSelection();
+    if(e.key.indexOf('Arrow')===0||e.key==='Home'||e.key==='End'){
+      e.preventDefault();
+      if(e.shiftKey){ _rpYhExtend(e); return; }
+      if(sel.rangeCount){
+        if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='Home') sel.collapseToStart(); else sel.collapseToEnd();
+        if(e.key==='ArrowUp') sel.modify('move','backward','line');
+        else if(e.key==='ArrowDown') sel.modify('move','forward','line');
+        else if(e.key==='Home') sel.modify('move','backward','lineboundary');
+        else if(e.key==='End') sel.modify('move','forward','lineboundary');
+      }
+      exit(true);
+      return;
+    }
+    if(e.key==='Backspace'||e.key==='Delete'||e.key==='x'||e.key==='X'||(e.key.length===1&&!ctrl)){
+      // 여러 줄이면 _rpYhMultiLineKey 가 먼저 처리함. 한 줄 안 선택이면 그 줄에서 편집 복귀 후 기본 동작
+      if(sel.rangeCount && _rpYhLinesInSel(sel.getRangeAt(0)).length<2) exit(true);
+      return;
+    }
+    exit(true);
+  };
+  document.addEventListener('mousedown',onMouse,true);
+  document.addEventListener('keydown',onKey,true);
+  document.addEventListener('selectionchange',onSel);
+  _rpYhExitMulti=exit;
+}
+function _rpYhDragSelectStart(){
+  if(!document.getElementById('rpEditorWrap')) return;
   if(_rpYhExitMulti) _rpYhExitMulti();
-  const lines=[...wrap.querySelectorAll('.rp-line')];
-  const setEditable=on=>lines.forEach(l=>{ if(l.isConnected) l.contentEditable=on?'true':'false'; });
-  setEditable(false);
-  const lineOf=n=>(n&&(n.nodeType===3?n.parentElement:n))?.closest?.('.rp-line');
+  _rpYhSetLinesEditable(false);
   const done=()=>{
     document.removeEventListener('mouseup',done,true);
     window.removeEventListener('blur',done);
     const sel=window.getSelection();
     const rng=sel.rangeCount?sel.getRangeAt(0).cloneRange():null;
-    const a=rng&&lineOf(rng.startContainer), b=rng&&lineOf(rng.endContainer);
-    if(rng && !rng.collapsed && a && b && a!==b){
-      // 여러 줄 선택 유지 모드 — 복사(Ctrl+C)·삭제/잘라내기/글자입력은 _rpYhMultiLineKey 가 처리
-      const exit=()=>{
-        document.removeEventListener('mousedown',exit,true);
-        document.removeEventListener('keydown',onKey,true);
-        document.removeEventListener('selectionchange',onSel);
-        _rpYhExitMulti=null;
-        setEditable(true);
-      };
-      const onKey=e=>{ if(e.key==='Control'||e.key==='Shift'||e.key==='Meta'||e.key==='Alt') return; if((e.ctrlKey||e.metaKey)&&(e.key==='c'||e.key==='C'||e.key==='a'||e.key==='A')) return; if(e.key==='Backspace'||e.key==='Delete'||e.key==='x'||e.key==='X'||(e.key&&e.key.length===1&&!e.ctrlKey&&!e.metaKey)) return; exit(); };
-      const onSel=()=>{ const s=window.getSelection(); if(!s.rangeCount||s.isCollapsed) exit(); };
-      document.addEventListener('mousedown',exit,true);
-      document.addEventListener('keydown',onKey,true);
-      document.addEventListener('selectionchange',onSel);
-      _rpYhExitMulti=exit;
-      return;
-    }
-    setEditable(true);
+    const a=rng&&_rpYhLineOf(rng.startContainer), b=rng&&_rpYhLineOf(rng.endContainer);
+    if(rng && !rng.collapsed && a && b && a!==b){ _rpYhMultiEnter(); return; }
+    _rpYhSetLinesEditable(true);
     if(!rng) return;
     if(a && a===b) a.focus();     // 한 줄 안 클릭/선택은 그 줄에서 바로 편집 이어가기
     sel.removeAllRanges(); sel.addRange(rng);
   };
   document.addEventListener('mouseup',done,true);
   window.addEventListener('blur',done);
+}
+// 줄 안에서 Shift+방향키가 줄 경계를 넘으면 여러 줄 선택 모드로 전환 (넘지 않으면 기본 동작)
+function _rpYhShiftCross(line,e){
+  const sel=window.getSelection();
+  if(!sel.rangeCount || !sel.focusNode || !line.contains(sel.focusNode)) return false;
+  const dir=(e.key==='ArrowUp'||e.key==='ArrowLeft')?-1:1;
+  if(!_rpAdjLine(line,dir)) return false;
+  let cross;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){
+    const r=document.createRange(); r.selectNodeContents(line);
+    if(dir<0) r.setEnd(sel.focusNode,sel.focusOffset); else r.setStart(sel.focusNode,sel.focusOffset);
+    cross=(r.toString().length===0);
+  }else{
+    const fr=document.createRange(); fr.setStart(sel.focusNode,sel.focusOffset); fr.collapse(true);
+    const lr=line.getBoundingClientRect();
+    let rect=fr.getClientRects()[0]||fr.getBoundingClientRect();
+    if(!rect || !rect.height) rect=lr;
+    const lh=parseFloat(getComputedStyle(line).lineHeight)||18;
+    cross = dir<0 ? (rect.top-lr.top<lh*0.8) : (lr.bottom-rect.bottom<lh*0.8);
+  }
+  if(!cross) return false;
+  e.preventDefault();
+  const an=sel.anchorNode, ao=sel.anchorOffset, fn=sel.focusNode, fo=sel.focusOffset;
+  _rpYhMultiEnter();
+  sel.setBaseAndExtent(an,ao,fn,fo);
+  _rpYhExtend(e);
+  return true;
 }
 // 여러 줄에 걸친 선택에서 Delete/Backspace/잘라내기(Ctrl+X)/글자 입력 → 선택 범위를 줄 단위 데이터까지 맞춰 삭제
 function _rpYhMultiLineKey(e){
@@ -34027,6 +34118,11 @@ function _reportSetupKeyboard(){
         content.splice(idx<0?content.length:idx+1,0,cont?{id:newId,type:'line',text:afterText,todo:true,checked:false}:{id:newId,type:'line',text:pre+afterText});
         _reportAutoSave();
         return;
+      }
+
+      // 유현: Shift+방향키로 줄 경계를 넘는 선택 확장(메모장처럼)
+      if(_rpIsYh() && !e.isComposing && e.shiftKey && !e.altKey && (e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='ArrowLeft'||e.key==='ArrowRight')){
+        if(_rpYhShiftCross(line,e)) return;
       }
 
       // 유현 메모장 동작: 체크박스 줄 맨 앞 Backspace → 박스 해제 / 줄 맨 앞 Backspace → 윗줄과 합치기 / 줄 맨 끝 Delete → 아랫줄 합치기 / ↑↓ 줄 이동
