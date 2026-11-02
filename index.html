@@ -417,6 +417,7 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;line-height:1.3;}
 .ct-drh{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bd);flex-shrink:0;}
 .ct-id{border:1px solid var(--cc);color:var(--cf);border-radius:9px;padding:1px 9px;font-size:11.5px;font-weight:700;}
 .ct-drb{flex:1;overflow-y:auto;padding:14px 20px 20px;}
+.ct-drf{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--bd);flex-shrink:0;background:var(--bg);}
 .ct-drb h2{font-size:19px;letter-spacing:-.3px;margin-bottom:4px;color:var(--tx);word-break:break-all;} .ct-meta{font-size:12px;color:var(--tx2);margin-bottom:14px;}
 .ct-edl{cursor:pointer;font-size:13px;color:var(--tx2);margin-left:4px;} .ct-edl:hover{color:var(--pr);}
 .ct-lnk{cursor:pointer;color:var(--pr);font-size:11.5px;margin-left:6px;}
@@ -10324,10 +10325,20 @@ function ctRenderDetail(){
         +`</div></div>`; }).join(''))
      :((t.lg||[]).map(l=>`<div class="ct-lg">${_hmEsc(_ctName(l.w))}님이 ${_hmEsc(l.t)} · ${_ctRel(l.tm)}</div>`).join('')||'<div class="ct-lock">기록이 없습니다.</div>')}
    ${ctCanDelTask(t)?`<div style="margin-top:22px;padding-top:12px;border-top:1px solid var(--bd);text-align:right"><button class="ct-btn dgr" onclick="ctAskDel('task','${t.id}')">🗑 업무 삭제</button></div>`:''}
-  </div>`;
+  </div>
+  <div class="ct-drf"><button class="ct-btn" onclick="ctCloseDetail()">닫기</button><button class="ct-btn pri" onclick="ctSaveClose('${t.id}')">저장하고 닫기</button></div>`;
   const set=(id,v)=>{ const e=document.getElementById(id); if(e&&v) e.value=v; }; set('ctCkIn',kCk); set('ctSubIn',kSub); set('ctCmIn',kCm);
 }
 function ctCloseDetail(){ _ct.open=null; _ct.edit=null; ctRenderDetail(); }
+// 변경은 입력하는 즉시 저장됨 — 이 버튼은 쓰다 만 댓글·항목까지 저장하고, 모두 저장된 것을 확인한 뒤 안내하고 닫음
+async function ctSaveClose(id){
+  const has=i=>{ const e=document.getElementById(i); return e&&e.value.trim(); };
+  if(has('ctCmIn')) await ctCmAdd(id,true);
+  if(has('ctCkIn')) await ctItemAdd(id,'ck',true);
+  if(has('ctSubIn')) await ctItemAdd(id,'sub',true);
+  await (_ct.q||Promise.resolve());
+  toast('저장되었습니다.'); ctCloseDetail();
+}
 function _ctItemRow(k,t,c){
   const me=_ctMe(), editing=_ct.edit&&_ct.edit.k===k&&_ct.edit.id===t.id&&_ct.edit.i===c.id;
   const can=ctCanEdit(t), canTog=k==='ck'?can:(can||c.w===me);
@@ -10380,12 +10391,16 @@ async function ctOpenTaskById(id){   // 알림의 [바로가기] — 업무가 �
 
 // ── 변경(저장) 함수들: 항상 최신본 위에 내 변경만 적용 ──
 function _ctLog(t,msg){ (t.lg=t.lg||[]).unshift({w:_ctMe(),t:msg,tm:new Date().toISOString()}); if(t.lg.length>80) t.lg.length=80; }
-async function ctUpdate(id,fn){
-  const f=ctFind(id); if(!f) return false;
-  let ok=false;
-  try{ ok=await ctMut(f.ym,doc=>{ const t=(doc.tasks||[]).find(x=>x.id===id); if(!t) throw new Error('이미 삭제된 업무입니다.'); fn(t); }); }
-  catch(e){ toast(e&&e.message?e.message:'저장하지 못했습니다.'); }
-  ctRenderAll(); return ok;
+function ctUpdate(id,fn,msg){   // 저장은 한 줄로 순서대로 처리(연달아 바꿔도 서로 덮어쓰지 않음). msg가 있으면 저장 후 안내
+  const run=async()=>{
+    const f=ctFind(id); if(!f) return false;
+    let ok=false;
+    try{ ok=await ctMut(f.ym,doc=>{ const t=(doc.tasks||[]).find(x=>x.id===id); if(!t) throw new Error('이미 삭제된 업무입니다.'); fn(t); }); }
+    catch(e){ toast(e&&e.message?e.message:'저장하지 못했습니다.'); }
+    if(ok&&msg) toast(msg);
+    ctRenderAll(); return ok;
+  };
+  const p=(_ct.q||Promise.resolve()).then(run,run); _ct.q=p.catch(()=>{}); return p;
 }
 async function ctCreate(d){
   const ym=_ctYm(d.s), me=_ctMe(); await ctEnsure([ym]);
@@ -10405,12 +10420,12 @@ async function ctCreate(d){
 }
 async function ctSetField(id,k,v,msg){
   if(k==='as'){ const f=ctFind(id); if(f&&f.t.vis==='private'){ toast('나만 보기 업무는 담당자를 바꿀 수 없어요. 공개 범위를 먼저 바꿔 주세요.'); ctRenderDetail(); return; } }
-  await ctUpdate(id,t=>{ const old=t[k]; t[k]=v; if(k==='st') _ctLog(t,'상태를 '+_ctStK(v)+'(으)로 변경'); else if(k==='as') _ctLog(t,'담당자를 '+_ctName(v)+'(으)로 변경'); else if(k==='desc') _ctLog(t,'설명을 수정'); else _ctLog(t,msg+' ('+(old||'-')+' → '+v+')'); });
+  await ctUpdate(id,t=>{ const old=t[k]; t[k]=v; if(k==='st') _ctLog(t,'상태를 '+_ctStK(v)+'(으)로 변경'); else if(k==='as') _ctLog(t,'담당자를 '+_ctName(v)+'(으)로 변경'); else if(k==='desc') _ctLog(t,'설명을 수정'); else _ctLog(t,msg+' ('+(old||'-')+' → '+v+')'); },'저장되었습니다.');
 }
 async function ctSetDates(id,s,e){
   const f=ctFind(id); if(!f) return; const t=f.t; let ns=s||t.s, ne=e||t.e; if(ne<ns){ if(s) ne=ns; else ns=ne; }
   const nym=_ctYm(ns);
-  if(nym===f.ym){ await ctUpdate(id,x=>{ x.s=ns; x.e=ne; _ctLog(x,'기간을 '+ns+' ~ '+ne+'로 변경'); }); return; }
+  if(nym===f.ym){ await ctUpdate(id,x=>{ x.s=ns; x.e=ne; _ctLog(x,'기간을 '+ns+' ~ '+ne+'로 변경'); },'저장되었습니다.'); return; }
   // 시작 월이 바뀌면 저장 위치(월)도 옮김: 새 달에 먼저 넣고 → 옛 달에서 제거
   await ctEnsure([nym]);
   let snap=null; await ctMut(f.ym,doc=>{ const x=(doc.tasks||[]).find(y=>y.id===id); if(x) snap=JSON.parse(JSON.stringify(x)); });
@@ -10418,27 +10433,28 @@ async function ctSetDates(id,s,e){
   snap.s=ns; snap.e=ne; snap.ym=nym; _ctLog(snap,'기간을 '+ns+' ~ '+ne+'로 변경');
   const ok1=await ctMut(nym,doc=>{ if(!(doc.tasks||[]).some(y=>y.id===id)) doc.tasks.push(snap); });
   if(ok1) await ctMut(f.ym,doc=>{ doc.tasks=(doc.tasks||[]).filter(y=>y.id!==id); });
+  if(ok1) toast('저장되었습니다.');
   ctRenderAll();
 }
 async function ctSetVis(id,v){
-  await ctUpdate(id,t=>{ t.vis=v; if(v==='private'){ t.as=_ctMe(); t.refs=[]; (t.sub||[]).forEach(s=>{ s.w=_ctMe(); }); } _ctLog(t,'공개 범위를 '+(CT_VIS.find(x=>x[0]===v)||[])[1]+'(으)로 변경'); });
+  await ctUpdate(id,t=>{ t.vis=v; if(v==='private'){ t.as=_ctMe(); t.refs=[]; (t.sub||[]).forEach(s=>{ s.w=_ctMe(); }); } _ctLog(t,'공개 범위를 '+(CT_VIS.find(x=>x[0]===v)||[])[1]+'(으)로 변경'); },'저장되었습니다.');
 }
 async function ctRef(id,u,add){ if(!u) return;
   const f0=ctFind(id), was=!!(f0&&(f0.t.refs||[]).includes(u));
   const ok=await _ctRefApply(id,u,add);
   if(ok&&add&&!was){ const f=ctFind(id); if(f&&f.t.vis!=='private') _ctNotify([{to:u,id,pop:'🗓 참조로 지정된 업무가 있습니다',content:`「${f.t.title}」 업무에 참조로 추가되었습니다.\n담당: ${_ctName(f.t.as)} · 기간: ${f.t.s===f.t.e?f.t.s:f.t.s+' ~ '+f.t.e}`}]); }
 }
-async function _ctRefApply(id,u,add){ return await ctUpdate(id,t=>{ t.refs=t.refs||[]; if(add){ if(!t.refs.includes(u)) t.refs.push(u); _ctLog(t,'참조에 '+_ctName(u)+'을(를) 추가'); } else { t.refs=t.refs.filter(x=>x!==u); _ctLog(t,'참조에서 '+_ctName(u)+'을(를) 제거'); } }); }
-async function ctEditTitle(id){ const f=ctFind(id); if(!f) return; const v=prompt('업무 제목',f.t.title); if(v===null) return; const nv=v.trim(); if(!nv) return; await ctUpdate(id,t=>{ _ctLog(t,'제목을 수정 ('+t.title+' → '+nv+')'); t.title=nv; }); }
+async function _ctRefApply(id,u,add){ return await ctUpdate(id,t=>{ t.refs=t.refs||[]; if(add){ if(!t.refs.includes(u)) t.refs.push(u); _ctLog(t,'참조에 '+_ctName(u)+'을(를) 추가'); } else { t.refs=t.refs.filter(x=>x!==u); _ctLog(t,'참조에서 '+_ctName(u)+'을(를) 제거'); } },'저장되었습니다.'); }
+async function ctEditTitle(id){ const f=ctFind(id); if(!f) return; const v=prompt('업무 제목',f.t.title); if(v===null) return; const nv=v.trim(); if(!nv) return; await ctUpdate(id,t=>{ _ctLog(t,'제목을 수정 ('+t.title+' → '+nv+')'); t.title=nv; },'저장되었습니다.'); }
 async function ctItemTog(id,k,iid){
   const f=ctFind(id); if(!f) return; const t=f.t, c=(k==='ck'?t.ck:t.sub).find(x=>x.id===iid); if(!c) return;
   const ok=k==='ck'?ctCanEdit(t):(ctCanEdit(t)||c.w===_ctMe());
   if(!ok){ toast(k==='ck'?'체크리스트는 담당자(또는 관리자)만 체크할 수 있어요':'하위 업무는 그 업무의 담당자 또는 상위 업무 담당자가 체크할 수 있어요'); return; }
   await ctUpdate(id,t2=>{ const x=(k==='ck'?t2.ck:t2.sub).find(y=>y.id===iid); if(!x) return; x.d=x.d?0:1; _ctLog(t2,(k==='ck'?'체크리스트':'하위 업무')+' 「'+x.t+'」을(를) '+(x.d?'완료':'미완료로 변경')); });
 }
-async function ctItemAdd(id,k){
+async function ctItemAdd(id,k,quiet){
   const inp=document.getElementById(k==='ck'?'ctCkIn':'ctSubIn'); const v=(inp.value||'').trim(); if(!v) return;
-  await ctUpdate(id,t=>{ const a=(t[k]=t[k]||[]); a.push(k==='ck'?{id:_ctNid(),t:v,d:0}:{id:_ctNid(),t:v,d:0,w:t.as}); _ctLog(t,(k==='ck'?'체크리스트':'하위 업무')+' 「'+v+'」을(를) 추가'); });
+  await ctUpdate(id,t=>{ const a=(t[k]=t[k]||[]); a.push(k==='ck'?{id:_ctNid(),t:v,d:0}:{id:_ctNid(),t:v,d:0,w:t.as}); _ctLog(t,(k==='ck'?'체크리스트':'하위 업무')+' 「'+v+'」을(를) 추가'); },quiet?'':'저장되었습니다.');
   const n=document.getElementById(k==='ck'?'ctCkIn':'ctSubIn'); if(n){ n.value=''; n.focus(); }
 }
 function ctItemEdit(k,id,iid){ _ct.edit={k,id,i:iid}; ctRenderDetail(); setTimeout(()=>{ const e=document.getElementById('ctItemEd')||document.getElementById('ctCmEd'); if(e){ e.focus(); e.select&&e.select(); } },30); }
@@ -10446,11 +10462,11 @@ function ctItemCancel(){ _ct.edit=null; ctRenderDetail(); }
 async function ctItemSave(id,k,iid){
   const v=(document.getElementById('ctItemEd').value||'').trim(); if(!v){ document.getElementById('ctItemEd').focus(); return; }
   const who=k==='sub'?document.getElementById('ctItemWho').value:null; _ct.edit=null;
-  await ctUpdate(id,t=>{ const x=(k==='ck'?t.ck:t.sub).find(y=>y.id===iid); if(!x) return; const old=x.t; x.t=v; if(who) x.w=who; _ctLog(t,(k==='ck'?'체크리스트':'하위 업무')+' 항목을 수정 (「'+old+'」 → 「'+v+'」)'); });
+  await ctUpdate(id,t=>{ const x=(k==='ck'?t.ck:t.sub).find(y=>y.id===iid); if(!x) return; const old=x.t; x.t=v; if(who) x.w=who; _ctLog(t,(k==='ck'?'체크리스트':'하위 업무')+' 항목을 수정 (「'+old+'」 → 「'+v+'」)'); },'저장되었습니다.');
 }
-async function ctCmAdd(id){
+async function ctCmAdd(id,quiet){
   const inp=document.getElementById('ctCmIn'); const v=(inp.value||'').trim(); if(!v) return;
-  const ok=await ctUpdate(id,t=>{ if(!ctCanComment(t)) throw new Error('댓글은 담당자·참조 인원만 작성할 수 있습니다.'); (t.cm=t.cm||[]).push({id:_ctNid(),w:_ctMe(),t:v,tm:new Date().toISOString(),lk:[]}); });
+  const ok=await ctUpdate(id,t=>{ if(!ctCanComment(t)) throw new Error('댓글은 담당자·참조 인원만 작성할 수 있습니다.'); (t.cm=t.cm||[]).push({id:_ctNid(),w:_ctMe(),t:v,tm:new Date().toISOString(),lk:[]}); },quiet?'':'댓글을 저장했습니다.');
   if(ok){   // 내 업무(담당자·등록자)에 달린 댓글이면 그 사람에게 알림 (댓글 쓴 본인은 제외)
     const f=ctFind(id); if(f){ const t=f.t, me=_ctMe(), nm=(window.__CURRENT_USER&&(window.__CURRENT_USER.name||window.__CURRENT_USER.username))||me;
       const snip=v.length>60?v.slice(0,60)+'…':v;
@@ -10459,7 +10475,7 @@ async function ctCmAdd(id){
 }
 async function ctCmSave(id,cid){
   const v=(document.getElementById('ctCmEd').value||'').trim(); if(!v) return; _ct.edit=null;
-  await ctUpdate(id,t=>{ const c=(t.cm||[]).find(x=>x.id===cid); if(c&&c.w===_ctMe()){ c.t=v; c.ed=1; } });
+  await ctUpdate(id,t=>{ const c=(t.cm||[]).find(x=>x.id===cid); if(c&&c.w===_ctMe()){ c.t=v; c.ed=1; } },'저장되었습니다.');
 }
 async function ctLike(id,cid){
   await ctUpdate(id,t=>{ const c=(t.cm||[]).find(x=>x.id===cid); if(!c) return; c.lk=c.lk||[]; const me=_ctMe(), i=c.lk.indexOf(me); if(i<0) c.lk.push(me); else c.lk.splice(i,1); });
@@ -10482,13 +10498,14 @@ async function ctCfYes(){
     const ok=await ctMut(f.ym,doc=>{ doc.tasks=(doc.tasks||[]).filter(x=>x.id!==q.id); });
     if(ok){ _ct.open=null; toast('업무를 삭제했습니다.'); ctRenderAll(); } return;
   }
-  if(q.k==='cm'){ await ctUpdate(q.id,t=>{ t.cm=(t.cm||[]).filter(x=>!(x.id===q.iid&&x.w===_ctMe())); }); return; }
-  await ctUpdate(q.id,t=>{ const a=q.k==='ck'?t.ck:t.sub, x=a.find(y=>y.id===q.iid); if(!x) return; const nm=x.t; const i=a.indexOf(x); a.splice(i,1); _ctLog(t,(q.k==='ck'?'체크리스트':'하위 업무')+' 항목 「'+nm+'」을(를) 삭제'); });
+  if(q.k==='cm'){ await ctUpdate(q.id,t=>{ t.cm=(t.cm||[]).filter(x=>!(x.id===q.iid&&x.w===_ctMe())); },'삭제했습니다.'); return; }
+  await ctUpdate(q.id,t=>{ const a=q.k==='ck'?t.ck:t.sub, x=a.find(y=>y.id===q.iid); if(!x) return; const nm=x.t; const i=a.indexOf(x); a.splice(i,1); _ctLog(t,(q.k==='ck'?'체크리스트':'하위 업무')+' 항목 「'+nm+'」을(를) 삭제'); },'삭제했습니다.');
 }
 
 // ── 업무 등록 ──
 function ctOpenReg(){
-  _ctEnsureDom(); _ct.reg={refs:[],ck:[],sub:[],vis:'members'}; document.getElementById('ctOvReg').classList.add('on'); ctRenderReg();
+  _ctEnsureDom(); _ct.reg={refs:[],ck:[],sub:[],vis:'members'}; document.getElementById('ctRegBox').innerHTML='';   // 지난번에 입력한 값이 남지 않게 비움(ctRenderReg는 화면의 입력값을 유지하는 방식)
+  document.getElementById('ctOvReg').classList.add('on'); ctRenderReg();
   ctLoadPeople().then(()=>{ if(document.getElementById('ctOvReg').classList.contains('on')) ctRenderReg(); });
 }
 function ctCloseReg(){ document.getElementById('ctOvReg')?.classList.remove('on'); }
@@ -10514,7 +10531,7 @@ async function ctSaveReg(){
   const btn=document.getElementById('ctrSave'); btn.disabled=true; btn.textContent='등록 중…';
   const ok=await ctCreate({title,cat:g('ctrC'),pri:g('ctrP')||'보통',s,e,as:R.vis==='private'?me:(g('ctrA')||me),refs:R.vis==='private'?[]:R.refs.slice(),vis:R.vis,desc:g('ctrD'),ck:R.ck.slice(),sub:R.sub.slice()});
   btn.disabled=false; btn.textContent='등록';
-  if(ok){ ctCloseReg(); _ct.sel=s; _ct.vy=+s.slice(0,4); _ct.vm=+s.slice(5,7)-1; await ctEnsure(_ctMonths()); toast('업무를 등록했습니다.'); ctRenderAll(); }
+  if(ok){ ctCloseReg(); document.getElementById('ctRegBox').innerHTML=''; _ct.sel=s; _ct.vy=+s.slice(0,4); _ct.vm=+s.slice(5,7)-1; await ctEnsure(_ctMonths()); toast('업무를 등록했습니다.'); ctRenderAll(); }
 }
 
 // ══════════════════════════════════════════════
