@@ -28,9 +28,9 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>재고관리 시스템</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js" integrity="sha384-y49Zu59jZHJL/PLKgZPv3k2WI9c0Yp3pWB76V8OBVCb0QBKS8l4Ff3YslzHVX76Y" crossorigin="anonymous"></script>
 <script>
   Chart.register(ChartDataLabels);
   Chart.defaults.font.family = "'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif";
@@ -39,14 +39,14 @@
   Chart.defaults.set('plugins.datalabels', { display:false });
 </script>
 <!-- 위 register 누락 시 앱 전체 차트의 datalabels 옵션이 조용히 무시됨(플러그인이 로드만 되고 등록은 안 된 상태였음) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 <script>window._XLSX_PLAIN = window.XLSX;</script>
 <!-- 셀 스타일 지원 빌드(xlsx-js-style) + JSZip(차트 주입용) — 일일보고 엑셀 전용 -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" integrity="sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb" crossorigin="anonymous"></script>
 <script>window.XLSXStyle = window.XLSX; window.XLSX = window._XLSX_PLAIN;</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400..800&display=swap">
@@ -9015,21 +9015,8 @@ function _startAppData(){
     // 텔레그램 기능 비활성화(TG_ENABLED=false) — 이 브라우저에 남은 봇 토큰/채팅ID는 지워 노출 면적 축소
     try{ ['tg_token','tg_chat','tg_groq_enabled','tg_update_offset','tg_last_sent','tg_interval'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
     checkWeeklySmartstoreReport();
-    // 페이지 로드 시 월별집계 오류 자동 감지 & 수정
-    const issues=_detectMonthlyBatch();
-    if(issues.length){
-      const {fixed,failed}=await applyMonthlyBatchFix(issues);
-      if(fixed>0){
-        renderInv(); updateFloat();
-        console.log(`✅ 자동 데이터 정상화: ${fixed}개 수정됨`);
-        // 우상단에 5초 알림 표시
-        const n=document.createElement('div');
-        n.style.cssText='position:fixed;top:56px;right:12px;z-index:9999;background:var(--emerald-600);color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);';
-        n.textContent=`✅ 데이터 자동 정상화 ${fixed}건 완료`;
-        document.body.appendChild(n);
-        setTimeout(()=>n.remove(),5000);
-      }
-    }
+    // (보안 점검 2026-10-29) 월별집계 "자동 정상화"는 접속할 때마다 daily_sales를 삭제·재입력해 오탐 시 판매데이터가 오염될 수 있어 자동 실행을 중단.
+    //  필요하면 수동 진단 도구(openDataDiagModal)에서 항목을 직접 확인하고 적용한다.
     runDailyKvBackupIfNeeded();   // 하루 1회 전체 데이터 스냅샷 백업(비동기, 실패해도 앱 동작엔 영향 없음)
     setTimeout(()=>{ try{ jusoKeyExpiryCheck(); }catch(e){ console.warn('주소 API 키 만료 점검 실패', e); } }, 4000);   // admin 로그인 시 승인키 만료 임박 알림(알림 체계 준비 후 실행)
   });
@@ -11443,10 +11430,21 @@ async function cloudKvSave(kind, dataArr, opts={}){
         return;
       }
     }
-    await sb.from('work_calendar').upsert(
+    const { error } = await sb.from('work_calendar').upsert(
       { person:'__app__', kind, data:dataArr, updated_at:new Date().toISOString() },
       { onConflict:'person,kind' });
-  }catch(e){ console.warn('cloudKvSave 실패', kind, e); }
+    if(error) _cloudKvSaveFailed(kind, error);
+  }catch(e){ _cloudKvSaveFailed(kind, e); }
+}
+// supabase-js는 저장이 거부(RLS)·실패해도 예외를 던지지 않고 error만 돌려준다 → 확인하지 않으면 "저장된 줄 알았는데 안 됨"이 된다.
+// 사용자에겐 1분에 한 번만 알리고(백업 같은 백그라운드 저장은 제외), 원인은 콘솔에 남긴다.
+let _kvFailToastAt = 0;
+function _cloudKvSaveFailed(kind, err){
+  console.warn('cloudKvSave 실패', kind, err);
+  if(/^kv_backup/.test(kind)) return;
+  if(Date.now()-_kvFailToastAt < 60000) return;
+  _kvFailToastAt = Date.now();
+  try{ toast('⚠️ 저장에 실패했습니다. 네트워크·권한을 확인하고 다시 시도하세요.'); }catch(e){}
 }
 async function cloudKvLoad(kind){
   try{
@@ -17555,7 +17553,7 @@ function pcLoadEstimateForEdit(id){
       banner.style.cssText='margin-bottom:8px;padding:6px 12px;background:var(--orange-50);border:1px solid var(--amber-600);border-radius:6px;font-size:11px;color:var(--amber-600);font-weight:600;display:flex;justify-content:space-between;align-items:center;';
       saveArea.parentNode.insertBefore(banner,saveArea);
     }
-    banner.innerHTML=`✏️ "${e.name}" 수정 중 — 항목 편집 후 💾 견적 저장하기를 누르세요. <button onclick="_pcEditEstId=null;document.getElementById('pc-edit-banner').remove();" style="font-size:10px;padding:2px 7px;border:1px solid var(--amber-600);border-radius:4px;background:transparent;color:var(--amber-600);cursor:pointer;font-family:inherit;">취소</button>`;
+    banner.innerHTML=`✏️ "${escAttr(e.name)}" 수정 중 — 항목 편집 후 💾 견적 저장하기를 누르세요. <button onclick="_pcEditEstId=null;document.getElementById('pc-edit-banner').remove();" style="font-size:10px;padding:2px 7px;border:1px solid var(--amber-600);border-radius:4px;background:transparent;color:var(--amber-600);cursor:pointer;font-family:inherit;">취소</button>`;
     banner.style.display='';
   }
   document.getElementById('pcViewModal').style.display='none';
@@ -17601,7 +17599,7 @@ function pcViewEstimate(id){
   window._pcViewingEstId=id;
   const fmt=n=>n.toLocaleString('ko-KR')+'원';
   const mc=v=>v>=0?'#16A34A':'#DC2626';
-  document.getElementById('pcViewTitle').innerHTML=`📋 ${e.name} <span style="font-size:11px;color:var(--tx2);font-weight:400;margin-left:8px;">${e.date}</span>`;
+  document.getElementById('pcViewTitle').innerHTML=`📋 ${escAttr(e.name)} <span style="font-size:11px;color:var(--tx2);font-weight:400;margin-left:8px;">${escAttr(e.date)}</span>`;
   const rows=e.items.map((it,i)=>`
     <tr style="border-bottom:0.5px solid var(--bd);">
       <td style="padding:7px 10px;text-align:center;color:var(--tx2);">${i+1}</td>
@@ -30503,7 +30501,7 @@ function updateSalesSummary(datasets){
   const el=document.getElementById('salesSum');
   if(el) el.innerHTML=`<div class="sc"><div class="sl">선택상품</div><div class="sv">${salesSel.size}개</div></div><div class="sc"><div class="sl">합계</div><div class="sv">${tot.toLocaleString()}개</div></div><div class="sc"><div class="sl">평균</div><div class="sv">${avg.toLocaleString()}개</div></div><div class="sc"><div class="sl">최대</div><div class="sv">${all.length?Math.max(...all).toLocaleString():0}개</div></div>`;
   const ll=document.getElementById('salesCurLbl'); if(ll) ll.textContent=`조회: ${periodLabel(salesPeriod,salesYear)}`;
-  const lg=document.getElementById('salesLegend'); if(lg) lg.innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${ds.name||ds.label}</span>`).join('');
+  const lg=document.getElementById('salesLegend'); if(lg) lg.innerHTML=datasets.map(ds=>`<span><span class="ldot" style="background:${ds.borderColor};"></span>${escAttr(ds.name||ds.label)}</span>`).join('');
 }
 function periodLabel(per,yr){return{lastweek:'저번주',daily:'이번주',weekly:`${yr}년 주별`,monthly:`${yr}년 월별`,q1:`${yr}년 1분기`,q2:`${yr}년 2분기`,q3:`${yr}년 3분기`,q4:`${yr}년 4분기`}[per]||per;}
 
@@ -30728,7 +30726,7 @@ function renderSalesTbody(){
 function renderProdPanel(){
   const srch=document.getElementById('prodSrch').value.toLowerCase();
   const tf=document.getElementById('prodTyF').value;
-  document.getElementById('prodPanel').innerHTML=products.filter(p=>!p.hidden&&(!tf||p.type===tf)&&(!srch||p.name.toLowerCase().includes(srch)||p.code.toLowerCase().includes(srch))).map(p=>`<div class="prod-panel-item ${salesSel.has(p.id)?'sel':''}" onclick="toggleSalesProd(${p.id})"><span class="pcheck ${salesSel.has(p.id)?'on':''}">${salesSel.has(p.id)?'✓':''}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">${p.name}</span><span style="font-size:10px;color:var(--tx2);">${p.type}</span></div>`).join('');
+  document.getElementById('prodPanel').innerHTML=products.filter(p=>!p.hidden&&(!tf||p.type===tf)&&(!srch||p.name.toLowerCase().includes(srch)||p.code.toLowerCase().includes(srch))).map(p=>`<div class="prod-panel-item ${salesSel.has(p.id)?'sel':''}" onclick="toggleSalesProd(${p.id})"><span class="pcheck ${salesSel.has(p.id)?'on':''}">${salesSel.has(p.id)?'✓':''}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">${escAttr(p.name)}</span><span style="font-size:10px;color:var(--tx2);">${escAttr(p.type)}</span></div>`).join('');
 }
 function toggleSalesProd(id){salesSel.has(id)?salesSel.delete(id):salesSel.add(id);renderProdPanel();renderSalesPeriod();}
 function clearSalesSel(){salesSel=new Set();renderProdPanel();renderSalesPeriod();}
@@ -30789,14 +30787,14 @@ function recalcOrders(){
   document.getElementById('orderBadge').textContent=orderList.length;
   const actives=products.filter(p=>isInSeason(detectSeason(getYearData(p,getBestYear(p)).data).type));
   const sb_el=document.getElementById('seasonBar');
-  if(actives.length){const hasSu=actives.some(p=>detectSeason(getYearData(p,getBestYear(p)).data).type==='summer');sb_el.innerHTML=`<div class="sbar ${hasSu?'summer':'winter'}"><span>${hasSu?'☀':'❄'}</span><strong>현재 성수기 ${actives.length}개</strong><span class="sbar-toggle" onclick="const n=this.nextElementSibling;n.classList.toggle('open');this.textContent=n.classList.contains('open')?'접기 ▴':'제품 보기 ▾';">제품 보기 ▾</span><span class="sbar-names">${actives.map(p=>p.name).join(', ')}</span></div>`;}
+  if(actives.length){const hasSu=actives.some(p=>detectSeason(getYearData(p,getBestYear(p)).data).type==='summer');sb_el.innerHTML=`<div class="sbar ${hasSu?'summer':'winter'}"><span>${hasSu?'☀':'❄'}</span><strong>현재 성수기 ${actives.length}개</strong><span class="sbar-toggle" onclick="const n=this.nextElementSibling;n.classList.toggle('open');this.textContent=n.classList.contains('open')?'접기 ▴':'제품 보기 ▾';">제품 보기 ▾</span><span class="sbar-names">${actives.map(p=>escAttr(p.name)).join(', ')}</span></div>`;}
   else sb_el.innerHTML=`<div class="sbar normal"><span>✓</span><span>${MNAMES[MONTH]} 기준 평시</span></div>`;
 
   document.getElementById('formulaBox').innerHTML=`<strong style="color:var(--tx);">발주 계산 기준 (${MNAMES[MONTH]})</strong> | 최신 데이터 기준 최근7일→최근30일 일평균 월환산 (없으면 월별 데이터 폴백) | 리드타임+0.5개월 재고 확보 | 진행중 주문 자동 반영`;
 
   const alerts=[];
   products.forEach(p=>{const s=detectSeason(getYearData(p,getBestYear(p)).data);if(s.type==='all')return;const mu=(s.peakStart-MONTH+12)%12;if(mu>0&&mu<=2){const c=calcNeeded(p);alerts.push({p,s,mu,c});}});
-  document.getElementById('alertWrap').innerHTML=alerts.length?`<div class="alert-wrap">`+alerts.slice(0,5).map(a=>`<div class="alert-item ${a.mu===1?'urg':'warn'}"><span>${a.mu===1?'🚨':'⚠'}</span><div><div class="alert-title">${a.mu===1?'[긴급]':'[사전알림]'} ${a.p.name} — ${a.s.label} ${a.mu}개월 전</div><div class="alert-desc">권장: <strong>${a.c.needed.toLocaleString()}개 (${a.c.boxes}박스)</strong> | 현재고: ${a.p.stock.toLocaleString()}개</div></div></div>`).join('')+'</div>':'';
+  document.getElementById('alertWrap').innerHTML=alerts.length?`<div class="alert-wrap">`+alerts.slice(0,5).map(a=>`<div class="alert-item ${a.mu===1?'urg':'warn'}"><span>${a.mu===1?'🚨':'⚠'}</span><div><div class="alert-title">${a.mu===1?'[긴급]':'[사전알림]'} ${escAttr(a.p.name)} — ${escAttr(a.s.label)} ${a.mu}개월 전</div><div class="alert-desc">권장: <strong>${a.c.needed.toLocaleString()}개 (${a.c.boxes}박스)</strong> | 현재고: ${a.p.stock.toLocaleString()}개</div></div></div>`).join('')+'</div>':'';
 
   const urg=orderList.filter(x=>!x.isAdditional&&x.stock<=x.reorderPoint*0.3).length;
   const addCnt=orderList.filter(x=>x.isAdditional).length;
@@ -30926,7 +30924,7 @@ async function saveIn(){
   const in1=parseInt(document.getElementById('in1').value)||0,in2=parseInt(document.getElementById('in2').value)||0;
   const dateVal=document.getElementById('inDate').value;
   const inD1=in1>0?(document.getElementById('inD1').value||fmtDate(new Date())):'', inD2=in2>0?(document.getElementById('inD2').value||fmtDate(new Date())):'';
-  if(isDup({code:p.code,name:p.name,orderDate:dateVal,orderQty:qty})){document.getElementById('dupMsg').innerHTML=`<strong>${p.name}</strong> (${p.code})<br>주문날짜: ${dateVal} | 수량: ${qty}개<br><br>동일한 데이터가 이미 존재합니다.`;closeModal('inModal');openModal('dupModal');return;}
+  if(isDup({code:p.code,name:p.name,orderDate:dateVal,orderQty:qty})){document.getElementById('dupMsg').innerHTML=`<strong>${escAttr(p.name)}</strong> (${escAttr(p.code)})<br>주문날짜: ${escAttr(dateVal)} | 수량: ${escAttr(qty)}개<br><br>동일한 데이터가 이미 존재합니다.`;closeModal('inModal');openModal('dupModal');return;}
   const {data}=await sb.from('receive_list').insert({code:p.code,name:p.name,order_date:dateVal,upload_time:fmtFull(new Date()),order_qty:qty,in1,in2,memos:[],done:false}).select();
   _bumpReceive();
   if(data?.[0]){ if(inD1||inD2) await saveRecvDates(data[0].id,inD1,inD2); receiveList.unshift(mapRecv(data[0])); }
@@ -38605,6 +38603,7 @@ function pivOpenModal(id){
   _pivSetEmail(r.email); _pivSet('Addr', r.addr); _pivSet('BizType', r.bizType); _pivSet('BizItem', r.bizItem);
   _pivSet('Amount', r.amount); _pivSet('Margin', r.margin); _pivSet('IssueDate', r.issueDate);
   _pivSet('Issued', r.issued || '미발급'); _pivSet('Paid', r.paid || '미입금'); _pivSet('DueDate', r.dueDate); _pivSet('Note', r.note);
+  _pivIssuedPrev = r.issued || '미발급';
   document.getElementById('pivFPaid').disabled = false;
   document.getElementById('pivFRepairOn').checked = !!r.repairOn;
   document.getElementById('pivFShipOn').checked = !!r.shipOn;
@@ -38645,8 +38644,14 @@ function _pivSetMode(mode){
   if(t) t.textContent = mode==='view' ? '🧾 계산서 상세' : (_pivEditId ? '🧾 계산서 수정' : '🧾 계산서 등록');
 }
 // 발급여부 선택 — 수정 모드면 폼만 갱신, 보기 모드면 발급여부만 바로 저장(나머지 항목은 그대로)
+let _pivIssuedPrev = '미발급';   // 팝업을 열었을 때/마지막으로 선택했던 발급여부 — '발급완료로 바뀌는 순간' 판정용
 function pivIssuedSel(){
-  if(_pivMode==='view') pivQuickIssued(); else pivIssuedChanged();
+  if(_pivMode==='view'){ pivQuickIssued(); return; }
+  const v = document.getElementById('pivFIssued').value;
+  // 발급완료로 바뀌는 날 = 발행일자 자동 입력(수정 화면에서도 필요하면 직접 고칠 수 있음)
+  if(v==='발급완료' && _pivIssuedPrev!=='발급완료') _pivSet('IssueDate', _pivToday());
+  _pivIssuedPrev = v;
+  pivIssuedChanged();
 }
 let _pivQuickBusy = false;
 async function pivQuickIssued(){
@@ -38658,6 +38663,7 @@ async function pivQuickIssued(){
   const next = sel.value;
   if(next===(cur.issued||'미발급')) return;
   const patch = { issued: next };
+  if(next==='발급완료') patch.issueDate = _pivToday();   // 발급완료로 바뀐 날을 발행일자로 자동 등록
   if(next==='발급취소'){ patch.paid = ''; patch.dueDate = ''; }
   else if(!cur.paid){   // 발급취소였던 건을 되살리면 입금여부는 미입금으로 — 입금예정일이 있어야 함
     if(!cur.dueDate){ toast('발급취소였던 건은 [수정하기]에서 입금예정일을 지정한 뒤 변경해주세요.'); revert(); return; }
