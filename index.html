@@ -5900,7 +5900,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
   </style>
   <div class="wbm-wrap">
     <h2 class="wbm-title">📑 송장파일 취합</h2>
-    <p class="wbm-sub">택배사 프로그램에서 출력한 <b>차수별 운송장 엑셀</b>을 올리면, 아래 규칙대로 하나의 파일로 합쳐서 다운로드할 수 있어요. 2차부터는 이전 차수가 자동으로 포함됩니다. 올린 내용은 서버에 저장돼 <b>다른 PC에서도 볼 수 있고</b>, 다음 날 첫 업로드 때 비울지 물어본 뒤 정리돼요.</p>
+    <p class="wbm-sub">택배사 프로그램에서 출력한 <b>차수별 운송장 엑셀</b>을 올리면, 아래 규칙대로 하나의 파일로 합쳐서 다운로드할 수 있어요. 2차부터는 이전 차수가 자동으로 포함됩니다. 올린 내용은 서버에 저장돼 <b>다른 PC에서도 볼 수 있고</b>, <b>날짜가 바뀌면 자동으로 지워져요</b> (당일 작업용).</p>
 
     <div class="wbm-rules">
       <div class="wbm-rule"><div class="wbm-rule-n">1</div><div><div class="wbm-rule-t">운송장번호 열 이동</div><div class="wbm-rule-d">수하인명 ↔ 수하인기본주소 사이로 이동</div></div></div>
@@ -5966,8 +5966,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
         </div>
         <input type="file" id="wbmMFile" accept=".xlsx" style="display:none;" onchange="wbmMatchPick(event)">
       </div>
-      <label class="wbm-chk"><input type="checkbox" id="wbmLenient" onchange="wbmMatchRerun()"> 주소가 달라도 송장 데이터에 같은 이름이 한 명뿐이면 입력하고 노란색으로 표시</label>
-      <label class="wbm-chk"><input type="checkbox" id="wbmJusoOn" onchange="wbmMatchRerun()" disabled> 도로명 주소를 <b>지번 주소로 변환</b>해서 동·리까지 확인 (행안부 API · 고객 <b>주소만</b> 전송, 이름·연락처 제외)</label>
+      <label class="wbm-chk"><input type="checkbox" id="wbmLenient" onchange="wbmPrefChange()"> 주소가 달라도 송장 데이터에 같은 이름이 한 명뿐이면 입력하고 노란색으로 표시</label>
+      <label class="wbm-chk"><input type="checkbox" id="wbmJusoOn" onchange="wbmPrefChange()" disabled> 도로명 주소를 <b>지번 주소로 변환</b>해서 동·리까지 확인 (행안부 API · 고객 <b>주소만</b> 전송, 이름·연락처 제외)</label>
       <div id="wbmJusoStatus" class="wbm-sub" style="margin:6px 0 0;"></div>
       <details id="wbmJusoBox" class="wbm-juso" style="display:none;">
         <summary>🔑 승인키 등록·갱신 (관리자)</summary>
@@ -9025,6 +9025,7 @@ function _startAppData(){
     //  필요하면 수동 진단 도구(openDataDiagModal)에서 항목을 직접 확인하고 적용한다.
     runDailyKvBackupIfNeeded();   // 하루 1회 전체 데이터 스냅샷 백업(비동기, 실패해도 앱 동작엔 영향 없음)
     setTimeout(()=>{ try{ jusoKeyExpiryCheck(); }catch(e){ console.warn('주소 API 키 만료 점검 실패', e); } }, 4000);   // admin 로그인 시 승인키 만료 임박 알림(알림 체계 준비 후 실행)
+    setTimeout(()=>{ try{ wbmAutoPurge(); }catch(e){ console.warn('송장 자동 정리 실패', e); } }, 6000);   // 날짜가 바뀐 뒤 첫 로그인 때 이전 날 송장 차수 자동 삭제
   });
 }
 
@@ -15721,8 +15722,9 @@ const _wbmKinds = Array.from({length:20},(_,i)=>'waybill_r'+String(i+1).padStart
 const _wbmKindOf = round => _wbmKinds[round-1];
 const _wbmEsc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const _wbmNorm = s => String(s==null?'':s).replace(/\s+/g,'');
-const _wbmToday = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-const _wbmStale = () => _wbmRounds.filter(r=>r.date!==_wbmToday());   // 오늘이 아닌 날 올린 차수
+const _wbmYmd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const _wbmToday = () => _wbmYmd(new Date());
+const _wbmStale = () => _wbmRounds.filter(r=>(r.date||'')<_wbmToday());   // 오늘보다 이전 날 올린 차수(자동 삭제가 실패했을 때만 화면에 남는다)
 
 // 저장 크기 절약: 서식 없는 문자열·숫자 셀은 값만, 나머지는 {t,v,z} 그대로
 const _wbmPackCell = c => c==null ? null : (!c.z && ((c.t==='s'&&typeof c.v==='string')||(c.t==='n'&&typeof c.v==='number')) ? c.v : c);
@@ -15752,8 +15754,24 @@ async function _wbmDeleteRounds(rounds){
     return !!ver && Object.keys(ver).length===0;
   }catch(e){ console.warn('송장 차수 삭제 실패', e); return false; }
 }
+// 날짜가 바뀌면 이전 날 송장 차수를 자동 삭제한다(송장 파일은 당일 작업용). 서버에 자정 작업이 없어서
+// 누가 로그인하거나 이 메뉴를 열고·올리고·받을 때 점검한다. 판단은 각 차수가 서버에 저장된 시각(updated_at)의 '날짜'(접속 PC 시계 기준)가
+// 오늘보다 이전인지 — 데이터 본문은 내려받지 않아 전송량이 거의 없다. 대상은 waybill_rNN(송장 차수)뿐이고, 오늘·미래 날짜는 건드리지 않는다.
+async function _wbmPurgeStale(ver){
+  const today=_wbmToday();
+  const rounds=Object.keys(ver||{}).filter(k=>/^waybill_r\d\d$/.test(k)).filter(k=>{ const t=new Date(ver[k]); return !isNaN(t) && _wbmYmd(t)<today; }).map(k=>parseInt(k.slice(-2),10));
+  if(!rounds.length) return 0;
+  if(!await _wbmDeleteRounds(rounds)){ console.warn('이전 날 송장 자동 삭제 실패', rounds); return 0; }
+  _wbmRounds=_wbmRounds.filter(r=>!rounds.includes(r.round)); _wbmSig=null;
+  toast(`이전 날짜 송장 ${rounds.length}개 차수를 자동으로 정리했어요`);
+  return rounds.length;
+}
+async function wbmAutoPurge(){   // 로그인 직후 등 메뉴를 열지 않아도 정리되도록 따로 호출
+  try{ const ver=await cloudKvVersions(_wbmKinds); if(ver) await _wbmPurgeStale(ver); }catch(e){ console.warn('송장 자동 정리 점검 실패',e); }
+}
 async function _wbmLoadServer(force){
-  const ver=await cloudKvVersions(_wbmKinds);
+  let ver=await cloudKvVersions(_wbmKinds);
+  if(ver && await _wbmPurgeStale(ver)){ ver=await cloudKvVersions(_wbmKinds); force=true; }   // 지난 날짜 데이터를 지웠으면 다시 불러오기
   const sig=ver?JSON.stringify(ver):null;
   if(!force && _wbmLoaded && sig && sig===_wbmSig) return true;
   try{
@@ -15781,6 +15799,7 @@ function wbmInit(){
     ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('drag'); }));
     drop.addEventListener('drop',e=>{ const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) wbmReadFile(f); });
   }
+  const lc=document.getElementById('wbmLenient'); if(lc&&!lc._wbmInit){ lc.checked=_wbmPref('lenient',false); lc._wbmInit=true; }   // 기억해 둔 선택 복원
   jusoRefreshUi();   // 승인키 상태 표시(마스터에겐 등록 폼도)
   const mdrop=document.getElementById('wbmMDrop');
   if(mdrop && !mdrop._wbmWired){
@@ -15948,7 +15967,7 @@ function wbmRender(){
     m.stats.map(s=>`<tr><td><span class="wbm-rd">${s.round}차</span></td><td>${_wbmEsc(s.fileName)}</td><td class="num">${s.total.toLocaleString()}</td><td class="num">${s.skipped.toLocaleString()}</td><td class="num">${s.removed.toLocaleString()}</td><td class="num"><b>${s.kept.toLocaleString()}</b></td><td>${fmt(s.uploadedAt)}</td><td style="text-align:right;"><button class="wbm-x" onclick="wbmDelRound(${s.round})">✕ 빼기</button></td></tr>`).join('')+
     `</tbody></table>`;
   const stale=_wbmStale();
-  wEl.innerHTML=(stale.length?`<div class="wbm-warn">📅 <b>${_wbmEsc(stale[0].date)}</b>에 올린 데이터(${stale.map(r=>r.round+'차').join(', ')})예요. 다운로드는 가능하고, 오늘 첫 업로드 때 비울지 물어봐요. <button class="wbm-x" style="color:inherit;text-decoration:underline;" onclick="wbmClearAll()">지금 비우고 새로 시작</button></div>`:'')+
+  wEl.innerHTML=(stale.length?`<div class="wbm-warn">📅 <b>${_wbmEsc(stale[0].date)}</b>에 올린 데이터(${stale.map(r=>r.round+'차').join(', ')})인데 자동 정리가 되지 않았어요. 다운로드는 가능하고, 새로 올리려면 먼저 비워 주세요. <button class="wbm-x" style="color:inherit;text-decoration:underline;" onclick="wbmClearAll()">지금 비우고 새로 시작</button></div>`:'')+
     (m.mismatch?'<div class="wbm-warn">⚠️ 일부 차수의 열 구성이 1차와 달라서 헤더 이름 기준으로 맞춰 합쳤어요. 없는 열은 빈칸으로 들어갑니다.</div>':'');
   const LIM=300, cols=[['차수',null],['수하인명',m.col.name],['운송장번호',m.col.wb],['수하인기본주소',m.col.addr]];
   pvEl.innerHTML=`<div class="wbm-pv"><table class="wbm-tbl"><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`+
@@ -16172,7 +16191,7 @@ async function jusoRefreshUi(){
   const box=document.getElementById('wbmJusoBox'), on=document.getElementById('wbmJusoOn');
   const isMaster=!!(window.__CURRENT_USER&&window.__CURRENT_USER.role==='master');
   if(box) box.style.display=isMaster?'':'none';
-  if(on){ on.disabled=!cfg; if(!cfg) on.checked=false; else if(!on._jusoInit){ on.checked=true; on._jusoInit=true; } }
+  if(on){ on.disabled=!cfg; if(!cfg) on.checked=false; else if(!on._jusoInit){ on.checked=_wbmPref('jusoOn',true); on._jusoInit=true; } }   // 기억해 둔 선택(없으면 켜짐)
   if(!cfg){ st.innerHTML='🔑 승인키가 등록되지 않았어요 — 지금은 시도·시군구까지만 비교해요.'+(isMaster?' 아래 “승인키 등록·갱신”에서 등록해 주세요.':' 관리자에게 등록을 요청해 주세요.'); }
   else{
     const left=_jusoDaysLeft(cfg), mask=cfg.key.slice(0,4)+'…('+cfg.key.length+'자)';
@@ -16229,6 +16248,15 @@ async function wbmMatchFile(file){
   await _wbmMatchRun();
 }
 function wbmMatchRerun(){ if(_wbmM&&_wbmM.buf) _wbmMatchRun(); }
+// 체크박스 선택은 이 PC 브라우저에 기억해 둔다(새로고침해도 유지). 저장이 막힌 환경이면 기본값으로 동작
+function _wbmPref(k,def){ try{ const v=localStorage.getItem('wbm_pref_'+k); return v===null?def:v==='1'; }catch(e){ return def; } }
+function _wbmSetPref(k,v){ try{ localStorage.setItem('wbm_pref_'+k,v?'1':'0'); }catch(e){} }
+function wbmPrefChange(){
+  const l=document.getElementById('wbmLenient'), j=document.getElementById('wbmJusoOn');
+  if(l) _wbmSetPref('lenient',l.checked);
+  if(j && !j.disabled) _wbmSetPref('jusoOn',j.checked);   // 승인키가 없어 잠긴 상태의 체크 해제는 저장하지 않음
+  wbmMatchRerun();
+}
 async function _wbmMatchRun(){
   const M=_wbmM; if(!M) return;
   const sumEl=document.getElementById('wbmMSummary'), resEl=document.getElementById('wbmMResult'), dl=document.getElementById('wbmMDlBtn');
