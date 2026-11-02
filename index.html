@@ -2486,6 +2486,14 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .lcr-del-btn:hover{color:var(--red-600);}
 .lcr-visit-tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:var(--green-100);color:var(--green-700);white-space:nowrap;}
 /* 당근 판매 주문 상세보기 팝업 */
+.lcr-item{display:flex;gap:6px;align-items:center;}
+.lcr-item input{height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 10px;font-size:14px;outline:none;box-sizing:border-box;background:var(--bg);color:var(--tx);font-family:inherit;}
+.lcr-item input:focus{border-color:#3182F6;}
+.lcr-item .lcr-i-name{width:100%;}
+.lcr-item .lcr-i-qty{width:66px;flex-shrink:0;}
+.lcr-item .lcr-i-price{width:112px;flex-shrink:0;}
+.lcr-items-hd{display:flex;gap:6px;font-size:11.5px;font-weight:700;color:var(--tx2);padding:0 2px;}
+.lcr-prodlines div{line-height:1.45;}
 .lcr-det-row{display:flex;align-items:flex-start;gap:12px;padding-bottom:9px;border-bottom:0.5px solid var(--bd);}
 .lcr-det-row:last-child{border-bottom:none;padding-bottom:0;}
 .lcr-det-lbl{flex-shrink:0;width:72px;font-size:12.5px;font-weight:700;color:var(--tx2);padding-top:1px;}
@@ -3222,7 +3230,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
 <!-- ═══ 당근 판매 주문건 등록 ═══ -->
 <div class="modal-overlay" id="logiCarrotAddModal" style="z-index:340;" data-keep-open>
-  <div class="modal" style="max-width:460px;">
+  <div class="modal" style="max-width:560px;">
     <h3 id="lcrModalTitle">🥕 당근 판매 주문건 등록</h3>
     <input type="hidden" id="lcrEditId">
     <div style="display:flex;flex-direction:column;gap:13px;margin-top:6px;">
@@ -3243,21 +3251,14 @@ html.mob-native .lcr-det-val{font-size:15px;}
         </div>
         <input id="lcrAddr" placeholder="배송지 주소" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
-      <div style="position:relative;">
-        <div class="cl-lbl">제품명</div>
-        <input id="lcrProdName" placeholder="제품명 검색 (운영관리 백데이터)" autocomplete="off"
-          oninput="lcrProdInput(this)" onfocus="lcrProdInput(this)" onblur="lcrProdBlur()"
-          style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
-      </div>
-      <div style="display:flex;gap:12px;">
-        <div style="flex:1;">
-          <div class="cl-lbl">수량</div>
-          <input id="lcrQty" type="number" min="0" placeholder="0" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
+      <div>
+        <div class="cl-lbl" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>제품 <span style="font-weight:600;color:var(--tx2);font-size:11.5px;">(여러 개 구매 시 추가)</span></span>
+          <button type="button" class="btn btn-sm" onclick="lcrAddItemRow()">＋ 제품 추가</button>
         </div>
-        <div style="flex:1;">
-          <div class="cl-lbl">판매금액</div>
-          <input id="lcrPrice" type="number" min="0" placeholder="0" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
-        </div>
+        <div class="lcr-items-hd" style="margin-top:4px;"><span style="flex:1;">제품명</span><span style="width:66px;">수량</span><span style="width:112px;">판매금액</span><span style="width:26px;"></span></div>
+        <div id="lcrItems" style="display:flex;flex-direction:column;gap:7px;margin-top:4px;"></div>
+        <div id="lcrItemsSum" class="lcr-meta" style="text-align:right;margin-top:8px;font-size:12.5px;"></div>
       </div>
     </div>
     <div class="ma">
@@ -14076,15 +14077,24 @@ function _lcrInRange(o, fy, fm){
 }
 // 집계: 판매가=price 합, 정산=판매가(당근은 수수료 없는 직거래라 판매가와 동일),
 // 매입=공급가스냅샷×수량, 마진=판매가−매입. 공급가 미등록 건은 마진·매입·마진율에서 제외(판매가·건수엔 포함)
+// 주문 1건 = 제품 여러 개(items) 가능. items 가 없는 기존 주문은 productName/qty/price/unitCost 한 줄로 취급(저장값 변환 없음)
+function _lcrItems(o){
+  if(Array.isArray(o.items) && o.items.length){
+    return o.items.map(it=>({productName:it.productName||'', qty:Number(it.qty)||0, price:Number(it.price)||0,
+      unit: it.unitCost!=null ? Number(it.unitCost) : lcrUnitCost(it.productName)}));
+  }
+  return [{productName:o.productName||'', qty:Number(o.qty)||0, price:Number(o.price)||0, unit:_lcrUnit(o)}];
+}
 function _lcrAgg(rows){
-  let cnt=0, qty=0, price=0, cost=0, mPrice=0, noCost=0;
+  let cnt=0, qty=0, price=0, cost=0, mPrice=0, noCost=0, nCost=0;
   rows.forEach(o=>{
-    const q=Number(o.qty)||0, p=Number(o.price)||0;
-    cnt++; qty+=q; price+=p;
-    const u=_lcrUnit(o);
-    if(u!=null){ cost+=u*q; mPrice+=p; } else noCost++;
+    cnt++;
+    _lcrItems(o).forEach(it=>{
+      qty+=it.qty; price+=it.price;
+      if(it.unit!=null){ cost+=it.unit*it.qty; mPrice+=it.price; nCost++; } else noCost++;
+    });
   });
-  const hasM = cnt-noCost>0;
+  const hasM = nCost>0;
   return { cnt, qty, price, settle:price, cost:hasM?cost:null,
     margin:hasM?(mPrice-cost):null, rate:(hasM&&mPrice!==0)?((mPrice-cost)/mPrice*100):null, noCost };
 }
@@ -14110,7 +14120,7 @@ function lcrRender(){
   _lcrFillSelects('lcrFy','lcrFm',_lcrFy,_lcrFm);
   const q = (document.getElementById('lcrSearch')?.value||'').trim().toLowerCase();
   let list = (_lcrOrders || []).filter(o=>_lcrInRange(o,_lcrFy,_lcrFm));
-  if(q) list = list.filter(o=>[o.customerName,o.phone,_lcrFmtPhone(o.phone),o.productName].some(v=>(v||'').toLowerCase().includes(q)));
+  if(q) list = list.filter(o=>[o.customerName,o.phone,_lcrFmtPhone(o.phone),o.productName,..._lcrItems(o).map(i=>i.productName)].some(v=>(v||'').toLowerCase().includes(q)));
   list = list.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')||String(b.id||'').localeCompare(String(a.id||'')));
   // 합계는 페이지가 아니라 필터된 전체 기준
   const agg = _lcrAgg(list);
@@ -14322,7 +14332,7 @@ function lcsRender(){
   // 제품별 랭킹 (연도+월 필터)
   const pRows = all.filter(o=>_lcrInRange(o,_lcsY,_lcsM));
   const byP = {};
-  pRows.forEach(o=>{ const n=(o.productName||'').trim()||'(제품명 없음)'; (byP[n]=byP[n]||[]).push(o); });
+  pRows.forEach(o=>_lcrItems(o).forEach(it=>{ const n=(it.productName||'').trim()||'(제품명 없음)'; (byP[n]=byP[n]||[]).push({productName:n, qty:it.qty, price:it.price, unitCost:it.unit}); }));
   const sortKey = {cnt:a=>a.cnt, qty:a=>a.qty, price:a=>a.price, margin:a=>(a.margin==null?-Infinity:a.margin)}[_lcsSort];
   let prods = Object.entries(byP).map(([n,rs])=>({n,a:_lcrAgg(rs)}))
     .sort((x,y)=>(sortKey(y.a)-sortKey(x.a))||(y.a.price-x.a.price)||x.n.localeCompare(y.n,'ko'));
@@ -14366,21 +14376,29 @@ function _lcrUnit(o){
   return lcrUnitCost(o.productName);
 }
 function lcrCostCell(o){
-  const unit=_lcrUnit(o);
+  const its=_lcrItems(o);
+  if(its.length>1){
+    const known=its.filter(i=>i.unit!=null);
+    if(!known.length) return '<span style="color:var(--tx2);">—</span>';
+    const tot=known.reduce((t,i)=>t+i.unit*i.qty,0);
+    return `${_lcrWon(tot)}<div class="lcr-meta">${known.length<its.length?'(일부 미등록)':`(${its.length}개 제품)`}</div>`;
+  }
+  const unit=its[0].unit;
   if(unit==null) return '<span style="color:var(--tx2);">—</span>';
-  const qty=Number(o.qty)||0;
+  const qty=its[0].qty;
   if(qty>1){
     return `${_lcrWon(unit*qty)}<div class="lcr-meta">(개당 ${_lcrWon(unit)})</div>`;
   }
   return _lcrWon(unit);
 }
-// 마진 = 판매금액(o.price, 행 전체 합산액) - 공급가(o.unitCost × 수량). 공급가 스냅샷이 없으면 계산 불가
+// 마진 = 판매금액 합 - Σ(공급가 스냅샷 × 수량). 제품 중 하나라도 공급가를 알 수 없으면 계산 불가
 function lcrMargin(o){
-  const unit=_lcrUnit(o);
-  if(unit==null || o.price==null) return null;
-  const qty=Number(o.qty)||0;
-  const margin=Number(o.price)-(unit*qty);
-  const rate=Number(o.price)!==0 ? (margin/Number(o.price)*100) : null;
+  if(!(Array.isArray(o.items) && o.items.length) && o.price==null) return null;
+  const its=_lcrItems(o);
+  if(its.some(i=>i.unit==null)) return null;
+  const price=its.reduce((t,i)=>t+i.price,0);
+  const margin=price-its.reduce((t,i)=>t+i.unit*i.qty,0);
+  const rate=price!==0 ? (margin/price*100) : null;
   return {margin,rate};
 }
 function _lcrMarginColor(n){ return n<0?'#DC2626':n>0?'#059669':''; }
@@ -14403,9 +14421,10 @@ function lcrOpenDetail(id, ev){
   document.getElementById('lcrDetName').textContent = o.customerName || '-';
   document.getElementById('lcrDetPhone').textContent = _lcrFmtPhone(o.phone) || '-';
   document.getElementById('lcrDetAddr').textContent = o.visitSale ? '🚶 방문판매' : (o.address || '-');
-  document.getElementById('lcrDetProd').textContent = o.productName || '-';
-  document.getElementById('lcrDetQty').textContent = _lbxNum(o.qty);
-  document.getElementById('lcrDetPrice').textContent = _lcrWon(o.price);
+  const _its=_lcrItems(o);
+  document.getElementById('lcrDetProd').innerHTML = _its.length>1 ? _its.map(i=>`<div>${_lcrEsc(i.productName)} <span style="color:var(--tx2);">× ${i.qty.toLocaleString('ko-KR')} · ${_lcrWon(i.price)}</span></div>`).join('') : (_lcrEsc(o.productName) || '-');
+  document.getElementById('lcrDetQty').textContent = _lbxNum(_its.reduce((t,i)=>t+i.qty,0));
+  document.getElementById('lcrDetPrice').textContent = _lcrWon(_its.reduce((t,i)=>t+i.price,0));
   document.getElementById('lcrDetMargin').innerHTML = lcrMarginCell(o);
   document.getElementById('lcrDetMarginRate').innerHTML = lcrMarginRateCell(o);
   document.getElementById('lcrDetTrack').textContent = o.trackNo ? ((LCR_CARRIERS.find(c=>c[0]===(o.carrier||'04'))||[,'CJ대한통운'])[1]+' '+o.trackNo) : '-';
@@ -14418,6 +14437,12 @@ function lcrCarrierSel(o){
   const opts=LCR_CARRIERS.filter(c=>c[0]==='04'||c[0]==='08'||c[0]===cur);
   return `<select class="lcr-car-sel" title="택배사 선택" onchange="lcrTrkDirty(this)">${opts.map(c=>`<option value="${c[0]}" ${c[0]===cur?'selected':''}>${c[1]==='CJ대한통운'?'CJ':c[1]}</option>`).join('')}</select>`;
 }
+// 제품명 칸: 여러 개면 한 줄씩(제품명 ×수량)
+function lcrProdCell(o){
+  const its=_lcrItems(o);
+  if(its.length<=1) return _lcrEsc(o.productName);
+  return `<div class="lcr-prodlines">${its.map(i=>`<div>${_lcrEsc(i.productName)} <span class="lcr-meta" style="display:inline;">×${i.qty.toLocaleString('ko-KR')}</span></div>`).join('')}</div>`;
+}
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
   const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
@@ -14426,10 +14451,10 @@ function lcrRowHtml(o){
     <td data-l="고객명" class="lcr-l lcr-nm">${_lcrEsc(o.customerName)}</td>
     <td data-l="연락처">${_lcrEsc(_lcrFmtPhone(o.phone))}</td>
     <td data-l="주소" class="lcr-l" title="${_lcrEsc(o.address)}">${addrDisp}</td>
-    <td data-l="제품명" class="lcr-l lcr-prod">${_lcrEsc(o.productName)}</td>
-    <td data-l="수량">${_lbxNum(o.qty)}</td>
+    <td data-l="제품명" class="lcr-l lcr-prod">${lcrProdCell(o)}</td>
+    <td data-l="수량">${_lbxNum(_lcrItems(o).reduce((t,i)=>t+i.qty,0))}</td>
     <td data-l="공급가" class="lcr-r">${lcrCostCell(o)}</td>
-    <td data-l="판매금액" class="lcr-r">${_lcrWon(o.price)}</td>
+    <td data-l="판매금액" class="lcr-r">${_lcrWon(Array.isArray(o.items)&&o.items.length ? _lcrItems(o).reduce((t,i)=>t+i.price,0) : o.price)}</td>
     <td data-l="마진" class="lcr-r">${lcrMarginCell(o)}</td>
     <td data-l="마진율" class="lcr-r">${lcrMarginRateCell(o)}</td>
     <td data-l="ERP 재고차감 확인"><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
@@ -14443,6 +14468,41 @@ function lcrToggleVisit(cb){
   if(cb.checked){ addrEl.value=''; addrEl.disabled=true; addrEl.placeholder='방문판매 (주소 불필요)'; }
   else { addrEl.disabled=false; addrEl.placeholder='배송지 주소'; }
 }
+// 제품 줄(여러 개 구매) — 각 줄: 제품명(백데이터 검색)·수량·판매금액. 수정 때 원래 제품명·공급가 스냅샷을 줄에 보관해 이름이 안 바뀐 줄은 공급가를 그대로 유지
+function lcrAddItemRow(it){
+  it=it||{};
+  const box=document.getElementById('lcrItems'); if(!box) return null;
+  const row=document.createElement('div');
+  row.className='lcr-item';
+  row.dataset.orig = it.productName||'';
+  row.dataset.unit = it.unitCost!=null ? String(it.unitCost) : '';
+  row.innerHTML=`<div style="position:relative;flex:1;min-width:0;"><input class="lcr-i-name" placeholder="제품명 검색 (운영관리 백데이터)" autocomplete="off" value="${_lcrEsc(it.productName||'')}" oninput="lcrProdInput(this)" onfocus="lcrProdInput(this)" onblur="lcrProdBlur()"></div>
+    <input class="lcr-i-qty" type="number" min="0" placeholder="0" value="${it.qty!=null?it.qty:''}" oninput="lcrItemsSum()">
+    <input class="lcr-i-price" data-money="1" placeholder="0" value="${it.price!=null?it.price:''}" oninput="lcrItemsSum()">
+    <button type="button" class="lcr-del-btn" title="이 제품 줄 삭제" onclick="lcrRemoveItemRow(this)">✕</button>`;
+  box.appendChild(row);
+  lcrItemsSum();
+  return row;
+}
+function lcrRemoveItemRow(btn){
+  const box=document.getElementById('lcrItems');
+  if(box.children.length<=1){ const row=btn.closest('.lcr-item'); row.querySelectorAll('input').forEach(i=>i.value=''); row.dataset.orig=''; row.dataset.unit=''; }
+  else btn.closest('.lcr-item').remove();
+  lcrItemsSum();
+}
+function lcrSetItemRows(list){
+  const box=document.getElementById('lcrItems'); box.innerHTML='';
+  (list&&list.length?list:[{}]).forEach(it=>lcrAddItemRow(it));
+}
+function lcrItemsSum(){
+  const el=document.getElementById('lcrItemsSum'); if(!el) return;
+  let q=0,p=0,n=0;
+  document.querySelectorAll('#lcrItems .lcr-item').forEach(r=>{
+    if(!(r.querySelector('.lcr-i-name').value||'').trim()) return;
+    n++; q+=_lbxNum(r.querySelector('.lcr-i-qty').value)||0; p+=_lbxNum(r.querySelector('.lcr-i-price').value)||0;
+  });
+  el.innerHTML = n>1 ? `제품 ${n}개 · 총 수량 <b>${q.toLocaleString('ko-KR')}</b> · 판매금액 합계 <b>${_lcrWon(p)}</b>` : '';
+}
 function lcrOpenAdd(){
   document.getElementById('lcrModalTitle').textContent = '🥕 당근 판매 주문건 등록';
   document.getElementById('lcrEditId').value = '';
@@ -14452,9 +14512,7 @@ function lcrOpenAdd(){
   document.getElementById('lcrAddr').disabled = false;
   document.getElementById('lcrAddr').placeholder = '배송지 주소';
   document.getElementById('lcrVisit').checked = false;
-  document.getElementById('lcrProdName').value = '';
-  document.getElementById('lcrQty').value = '';
-  document.getElementById('lcrPrice').value = '';
+  lcrSetItemRows([]);
   openModal('logiCarrotAddModal');
   setTimeout(()=>document.getElementById('lcrName')?.focus(), 50);
 }
@@ -14468,9 +14526,9 @@ function lcrOpenEdit(id){
   document.getElementById('lcrAddr').disabled = !!o.visitSale;
   document.getElementById('lcrAddr').placeholder = o.visitSale ? '방문판매 (주소 불필요)' : '배송지 주소';
   document.getElementById('lcrAddr').value = o.address||'';
-  document.getElementById('lcrProdName').value = o.productName||'';
-  document.getElementById('lcrQty').value = o.qty!=null?o.qty:'';
-  document.getElementById('lcrPrice').value = o.price!=null?o.price:'';
+  // 저장돼 있는 값(공급가 스냅샷 포함) 그대로 줄에 채움 — 표시용 보정값(_lcrItems)이 아니라 원본을 사용
+  const raw = (Array.isArray(o.items) && o.items.length) ? o.items : [{productName:o.productName, qty:o.qty, price:o.price, unitCost:o.unitCost}];
+  lcrSetItemRows(raw);
   openModal('logiCarrotAddModal');
   setTimeout(()=>document.getElementById('lcrName')?.focus(), 50);
 }
@@ -14480,24 +14538,35 @@ async function lcrSave(){
   const phone = _lcrFmtPhone(document.getElementById('lcrPhone').value);
   const visitSale = document.getElementById('lcrVisit').checked;
   const addr = visitSale ? '' : (document.getElementById('lcrAddr').value||'').trim();
-  const productName = (document.getElementById('lcrProdName').value||'').trim();
-  const qty = _lbxNum(document.getElementById('lcrQty').value);
-  const price = _lbxNum(document.getElementById('lcrPrice').value);
-  if(!productName){ toast('제품명을 입력하세요.'); document.getElementById('lcrProdName').focus(); return; }
   if(!_bdLoaded){ try{ await pcEnsureBackdata(); }catch{} }   // 공급가 스냅샷은 백데이터 기준 — 로드 전이면 빈 값으로 저장되므로 대기
+  // 제품 줄 수집 — 완전히 빈 줄은 무시, 제품명 없이 수량·금액만 있으면 막음. 같은 제품명은 합침
+  const items = [];
+  for(const row of document.querySelectorAll('#lcrItems .lcr-item')){
+    const nmEl=row.querySelector('.lcr-i-name');
+    const productName=(nmEl.value||'').trim();
+    const qty=_lbxNum(row.querySelector('.lcr-i-qty').value), price=_lbxNum(row.querySelector('.lcr-i-price').value);
+    if(!productName && !qty && !price) continue;
+    if(!productName){ toast('제품명을 입력하세요.'); nmEl.focus(); return; }
+    // 수정 시 제품명이 안 바뀐 줄은 기존 공급가 스냅샷 유지(백데이터 단가가 나중에 바뀌어도 이 주문건은 안 흔들림), 새로 넣거나 이름을 바꾼 줄만 새로 스냅샷
+    const keep = !!editId && row.dataset.orig!=='' && productName===row.dataset.orig;
+    const unitCost = keep ? (row.dataset.unit!=='' ? Number(row.dataset.unit) : null) : lcrUnitCost(productName);
+    const dup = items.find(x=>x.productName===productName && x.unitCost===unitCost);
+    if(dup){ dup.qty+=qty; dup.price+=price; } else items.push({productName, qty, price, unitCost});
+  }
+  if(!items.length){ toast('제품명을 입력하세요.'); document.querySelector('#lcrItems .lcr-i-name')?.focus(); return; }
+  const totQty = items.reduce((t,i)=>t+i.qty,0), totPrice = items.reduce((t,i)=>t+i.price,0);
+  // 최상위 productName/qty/price/unitCost 는 기존 형식 호환용 — 여러 제품이면 첫 제품명·합계·unitCost=null, items 가 정답
+  const flat = { productName:items[0].productName, qty:totQty, price:totPrice, unitCost: items.length===1 ? items[0].unitCost : null,
+    items: items.length>1 ? items : undefined };
   let latest = await cloudKvLoad('logi_carrot_orders');
   latest = Array.isArray(latest) ? latest : [];
   if(editId){
     const idx = latest.findIndex(o=>o.id===editId);
     if(idx<0){ toast('수정할 주문건을 찾을 수 없습니다.'); return; }
-    // 제품명을 바꾼 경우에만 공급가를 새로 스냅샷 — 그 외 필드(고객명 등)만 고친 거면
-    // 기존에 저장해둔 공급가를 그대로 유지해야 백데이터 단가가 나중에 바뀌어도 이 주문건은 안 흔들림
-    const unitCost = (productName !== latest[idx].productName) ? lcrUnitCost(productName) : latest[idx].unitCost;
-    latest[idx] = {...latest[idx], customerName:name, phone, address:addr, visitSale, productName, qty, price, unitCost};
+    latest[idx] = {...latest[idx], customerName:name, phone, address:addr, visitSale, ...flat};
   } else {
-    const unitCost = lcrUnitCost(productName);
     const row = { id:_lcrId(), createdAt:_lcrToday(), createdBy:_lcrActor(),
-      customerName:name, phone, address:addr, visitSale, productName, qty, price, unitCost,
+      customerName:name, phone, address:addr, visitSale, ...flat,
       erpChecked:false, erpCheckedAt:'', erpCheckedBy:'' };
     latest.push(row);
   }
@@ -14505,7 +14574,7 @@ async function lcrSave(){
   closeModal('logiCarrotAddModal');
   lcrRender();
   await cloudKvSave('logi_carrot_orders', latest);
-  toast(editId ? '✅ 주문건이 수정되었습니다.' : '✅ 주문건이 등록되었습니다.');
+  toast(editId ? '✅ 주문건이 수정되었습니다.' : `✅ 주문건이 등록되었습니다.${items.length>1?` (제품 ${items.length}개)`:''}`);
 }
 async function lcrToggleErp(id){
   let latest = await cloudKvLoad('logi_carrot_orders');
@@ -14533,13 +14602,15 @@ async function lcrDelete(id){
 
 // ── 제품명: 매출관리 백데이터(_bdData) 검색 드롭다운 (당근 판매 등록) ──
 let _lcrProdPicking = false;
+let _lcrProdTarget = null;   // 지금 검색 중인 제품명 입력칸(제품 줄이 여러 개라 칸마다 다름)
 function lcrProdInput(inputEl){
+  _lcrProdTarget = inputEl;
   // 모바일 전용 레이아웃에서는 작은 드롭다운 대신 큰 검색 팝업을 쓴다(키보드에 가려지는 문제도 없음)
   if(_mobIsNative()){
     inputEl.blur();
     if(document.getElementById('bdpModal').style.display==='flex') return;
     bdPickerOpen({title:'🔍 제품명 검색', initial:inputEl.value, allowFree:true, onPick:r=>{
-      if(r.free){ inputEl.value=r.name; const q=document.getElementById('lcrQty'); if(q) q.focus(); }
+      if(r.free){ inputEl.value=r.name; const q=inputEl.closest('.lcr-item')?.querySelector('.lcr-i-qty'); if(q) q.focus(); lcrItemsSum(); }
       else lcrPickProd(r.id);
     }});
     return;
@@ -14569,10 +14640,11 @@ function lcrHideProdDrop(){ const d=document.getElementById('lcrProdDrop'); if(d
 function lcrPickProd(prodId){
   const p = (typeof _bdData!=='undefined' ? _bdData : []).find(x=>String(x.id)===String(prodId)); if(!p) return;
   _lcrProdPicking = true;
-  const nameEl = document.getElementById('lcrProdName');
+  const nameEl = _lcrProdTarget;
   if(nameEl) nameEl.value = p.name;
   lcrHideProdDrop();
-  const qtyEl = document.getElementById('lcrQty'); if(qtyEl) qtyEl.focus();
+  const qtyEl = nameEl && nameEl.closest('.lcr-item')?.querySelector('.lcr-i-qty'); if(qtyEl) qtyEl.focus();
+  lcrItemsSum();
 }
 function lcrProdBlur(){
   setTimeout(()=>{ lcrHideProdDrop(); _lcrProdPicking=false; }, 150);
