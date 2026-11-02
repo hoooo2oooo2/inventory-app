@@ -2491,7 +2491,7 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .lcr-item input:focus{border-color:#3182F6;}
 .lcr-item .lcr-i-name{width:100%;}
 .lcr-item .lcr-i-qty{width:66px;flex-shrink:0;}
-.lcr-item .lcr-i-price{width:112px;flex-shrink:0;}
+.lcr-item .lcr-i-price{width:124px;flex-shrink:0;}
 .lcr-items-hd{display:flex;gap:6px;font-size:11.5px;font-weight:700;color:var(--tx2);padding:0 2px;}
 .lcr-prodlines div{line-height:1.45;}
 .lcr-det-row{display:flex;align-items:flex-start;gap:12px;padding-bottom:9px;border-bottom:0.5px solid var(--bd);}
@@ -3256,12 +3256,12 @@ html.mob-native .lcr-det-val{font-size:15px;}
           <span>제품 <span style="font-weight:600;color:var(--tx2);font-size:11.5px;">(여러 개 구매 시 추가)</span></span>
           <button type="button" class="btn btn-sm" onclick="lcrAddItemRow()">＋ 제품 추가</button>
         </div>
-        <div class="lcr-items-hd" style="margin-top:4px;"><span style="flex:1;">제품명</span><span style="width:66px;">수량</span><span style="width:26px;"></span></div>
+        <div class="lcr-items-hd" style="margin-top:4px;"><span style="flex:1;">제품명</span><span style="width:66px;">수량</span><span style="width:124px;">판매금액</span><span style="width:26px;"></span></div>
         <div id="lcrItems" style="display:flex;flex-direction:column;gap:7px;margin-top:4px;"></div>
         <div id="lcrItemsSum" class="lcr-meta" style="text-align:right;margin-top:8px;font-size:12.5px;"></div>
         <div style="margin-top:10px;">
-          <div class="cl-lbl">판매금액 <span style="font-weight:600;color:var(--tx2);font-size:11.5px;">(주문 전체 합계)</span></div>
-          <input id="lcrPrice" type="number" min="0" placeholder="0" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;">
+          <div class="cl-lbl">판매금액 합계 <span style="font-weight:600;color:var(--tx2);font-size:11.5px;">(제품별 판매금액 합산 · 자동입력)</span></div>
+          <input id="lcrPrice" readonly tabindex="-1" placeholder="0" style="width:100%;height:40px;border:1.5px solid var(--bd);border-radius:8px;padding:0 12px;font-size:14px;outline:none;box-sizing:border-box;background:var(--bg2);color:var(--tx);font-weight:700;cursor:default;">
         </div>
       </div>
     </div>
@@ -3272,6 +3272,18 @@ html.mob-native .lcr-det-val{font-size:15px;}
   </div>
 </div>
 <div class="arq-prod-drop" id="lcrProdDrop"></div>
+
+<!-- ═══ 당근 판매 체크 해제 확인 (예를 눌러야 해제) ═══ -->
+<div class="modal-overlay" id="lcrYnModal" style="z-index:390;" data-keep-open>
+  <div class="modal" style="max-width:380px;">
+    <h3>⚠️ 체크 해제 확인</h3>
+    <div id="lcrYnMsg" style="font-size:14px;color:var(--tx);line-height:1.6;margin-top:6px;"></div>
+    <div class="ma">
+      <button class="btn" onclick="lcrYnAnswer(false)">아니오</button>
+      <button class="btn btn-pr" onclick="lcrYnAnswer(true)">예</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ 🚚 송장번호 조회 (전역 팝업) ═══ -->
 <button class="trk-fab" id="trkFab" onclick="trkOpen()" title="송장번호 조회 (택배사 자동 판별)">🚚</button>
@@ -4106,7 +4118,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <table class="lcr-table">
         <thead><tr>
           <th style="width:84px;">등록일</th><th>고객명</th><th style="width:104px;">연락처</th><th style="width:130px;">주소</th><th>제품명</th>
-          <th style="width:44px;">수량</th><th style="width:84px;">공급가</th><th style="width:84px;">판매금액</th><th style="width:76px;">마진</th><th style="width:58px;">마진율</th><th style="width:84px;">ERP 재고<br>차감 확인</th><th style="width:250px;">송장번호<br>(택배사 선택 후 저장)</th><th style="width:92px;">배송상태</th><th style="width:60px;">관리</th>
+          <th style="width:44px;">수량</th><th style="width:84px;">공급가</th><th style="width:84px;">판매금액</th><th style="width:76px;">마진</th><th style="width:58px;">마진율</th><th style="width:56px;">입금<br>여부</th><th style="width:84px;">ERP 재고<br>차감 확인</th><th style="width:250px;">송장번호<br>(택배사 선택 후 저장)</th><th style="width:92px;">배송상태</th><th style="width:60px;">관리</th>
         </tr></thead>
         <tbody id="lcrBody"></tbody>
       </table>
@@ -14013,7 +14025,8 @@ async function lsoApply(){
 // ══════════════════════════════════════════════
 // 🥕 당근 판매 (물류팀) — 당근마켓으로 판매된 주문건 등록·취합
 //   레코드: {id,createdAt(등록일),createdBy,customerName,phone,address,productName,qty,price,
-//            erpChecked,erpCheckedAt,erpCheckedBy}
+//            erpChecked,erpCheckedAt,erpCheckedBy, paid,paidAt,paidBy(입금 여부),
+//            items?:[{productName,qty,price(제품별 판매금액, 수량 비례 아님),unitCost}] (제품 2개 이상일 때만, price=items 합계)}
 //   cloudKv 'logi_carrot_orders' 공유배열 — 여러 PC 동시 사용 대비, 매 저장 전 최신본을 다시 받아 병합
 // ══════════════════════════════════════════════
 let _lcrOrders = null;
@@ -14147,7 +14160,7 @@ function lcrRender(){
   if(_lcrPage>pages) _lcrPage = pages;
   const slice = list.slice((_lcrPage-1)*_lcrPageSize, _lcrPage*_lcrPageSize);
   tb.innerHTML = slice.length ? slice.map(lcrRowHtml).join('')
-    : `<tr><td colspan="14" style="text-align:center;padding:28px;color:var(--tx2);">${(q||(_lcrOrders||[]).length)?'조건에 맞는 주문건이 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
+    : `<tr><td colspan="15" style="text-align:center;padding:28px;color:var(--tx2);">${(q||(_lcrOrders||[]).length)?'조건에 맞는 주문건이 없습니다.':'등록된 주문건이 없습니다. <b>[＋ 주문건 등록]</b>으로 등록하세요.'}</td></tr>`;
   // 페이저: 이전/번호(현재 ±2)/다음
   const pg = document.getElementById('lcrPager');
   if(pg){
@@ -14438,7 +14451,7 @@ function lcrOpenDetail(id, ev){
   document.getElementById('lcrDetPhone').textContent = _lcrFmtPhone(o.phone) || '-';
   document.getElementById('lcrDetAddr').textContent = o.visitSale ? '🚶 방문판매' : (o.address || '-');
   const _its=_lcrItems(o);
-  document.getElementById('lcrDetProd').innerHTML = _its.length>1 ? _its.map(i=>`<div>${_lcrEsc(i.productName)} <span style="color:var(--tx2);">× ${i.qty.toLocaleString('ko-KR')}</span></div>`).join('') : (_lcrEsc(o.productName) || '-');
+  document.getElementById('lcrDetProd').innerHTML = _its.length>1 ? _its.map(i=>`<div>${_lcrEsc(i.productName)} <span style="color:var(--tx2);">× ${i.qty.toLocaleString('ko-KR')} · ${_lcrWon(i.price)}${i.est?'(추정)':''}</span></div>`).join('') : (_lcrEsc(o.productName) || '-');
   document.getElementById('lcrDetQty').textContent = _lbxNum(_its.reduce((t,i)=>t+i.qty,0));
   document.getElementById('lcrDetPrice').textContent = _lcrWon(_its.reduce((t,i)=>t+i.price,0));
   document.getElementById('lcrDetMargin').innerHTML = lcrMarginCell(o);
@@ -14453,14 +14466,16 @@ function lcrCarrierSel(o){
   const opts=LCR_CARRIERS.filter(c=>c[0]==='04'||c[0]==='08'||c[0]===cur);
   return `<select class="lcr-car-sel" title="택배사 선택" onchange="lcrTrkDirty(this)">${opts.map(c=>`<option value="${c[0]}" ${c[0]===cur?'selected':''}>${c[1]==='CJ대한통운'?'CJ':c[1]}</option>`).join('')}</select>`;
 }
-// 제품명 칸: 여러 개면 한 줄씩(제품명 ×수량)
+// 제품명 칸: 여러 개면 "첫 제품명 외 N건" (전체 목록은 마우스를 올리거나 행을 눌러 상세 팝업에서 확인)
 function lcrProdCell(o){
   const its=_lcrItems(o);
   if(its.length<=1) return _lcrEsc(o.productName);
-  return `<div class="lcr-prodlines">${its.map(i=>`<div>${_lcrEsc(i.productName)} <span class="lcr-meta" style="display:inline;">×${i.qty.toLocaleString('ko-KR')}</span></div>`).join('')}</div>`;
+  const tip=its.map(i=>`${i.productName} × ${i.qty.toLocaleString('ko-KR')}`).join('\n');
+  return `<span title="${_lcrEsc(tip)}">${_lcrEsc(its[0].productName)} <span class="lcr-meta" style="display:inline;font-weight:700;">외 ${its.length-1}건</span></span>`;
 }
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
+  const paidMeta = o.paid ? `<div class="lcr-meta">${_lcrEsc(o.paidBy||'-')} · ${_lcrEsc(o.paidAt||'-')}</div>` : '';
   const addrDisp = o.visitSale ? `<span class="lcr-visit-tag">🚶 방문판매</span>` : _lcrEsc(o.address);
   return `<tr data-row="${o.id}" class="lcr-row ${o.erpChecked?'lcr-erp-done':''}" onclick="lcrOpenDetail('${o.id}', event)">
     <td data-l="등록일">${_lcrEsc(o.createdAt)}</td>
@@ -14473,7 +14488,8 @@ function lcrRowHtml(o){
     <td data-l="판매금액" class="lcr-r">${_lcrWon(Array.isArray(o.items)&&o.items.length ? _lcrItems(o).reduce((t,i)=>t+i.price,0) : o.price)}</td>
     <td data-l="마진" class="lcr-r">${lcrMarginCell(o)}</td>
     <td data-l="마진율" class="lcr-r">${lcrMarginRateCell(o)}</td>
-    <td data-l="ERP 재고차감 확인"><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}')">${erpMeta}</div></td>
+    <td data-l="입금 여부"><div class="lcr-erp-cell"><input type="checkbox" ${o.paid?'checked':''} onchange="lcrTogglePaid('${o.id}', this)">${paidMeta}</div></td>
+    <td data-l="ERP 재고차감 확인"><div class="lcr-erp-cell"><input type="checkbox" ${o.erpChecked?'checked':''} onchange="lcrToggleErp('${o.id}', this)">${erpMeta}</div></td>
     <td data-l="송장번호">${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-trk-wrap" data-no="${_lcrEsc(o.trackNo||'')}" data-car="${o.carrier||'04'}">${lcrCarrierSel(o)}<input class="lcr-trk-in" value="${_lcrEsc(o.trackNo||'')}" placeholder="송장번호" inputmode="numeric" maxlength="20" oninput="lcrTrkDirty(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();const b=this.closest('.lcr-trk-wrap').querySelector('.lcr-trk-save');if(!b.disabled)b.click();}">${_lcrTrkBtnHtml(o)}</div>`}</td>
     <td data-l="배송상태">${o.visitSale?'<span style="color:var(--tx2);">—</span>':`<div class="lcr-st-cell">${lcrTrackBadge(o)}</div>`}</td>
     <td data-l="관리"><button class="lcr-del-btn" title="수정" onclick="lcrOpenEdit('${o.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcrDelete('${o.id}')">✕</button></td>
@@ -14494,6 +14510,7 @@ function lcrAddItemRow(it){
   row.dataset.unit = it.unitCost!=null ? String(it.unitCost) : '';
   row.innerHTML=`<div style="position:relative;flex:1;min-width:0;"><input class="lcr-i-name" placeholder="제품명 검색 (운영관리 백데이터)" autocomplete="off" value="${_lcrEsc(it.productName||'')}" oninput="lcrProdInput(this)" onfocus="lcrProdInput(this)" onblur="lcrProdBlur()"></div>
     <input class="lcr-i-qty" type="number" min="0" placeholder="0" value="${it.qty!=null?it.qty:''}" oninput="lcrItemsSum()">
+    <input class="lcr-i-price" data-money placeholder="0" value="${it.price!=null?it.price:''}" oninput="lcrItemsSum()" title="이 제품의 판매금액 — 수량과 무관하게 직접 입력한 금액이 그대로 판매금액입니다">
     <button type="button" class="lcr-del-btn" title="이 제품 줄 삭제" onclick="lcrRemoveItemRow(this)">✕</button>`;
   box.appendChild(row);
   lcrItemsSum();
@@ -14509,14 +14526,17 @@ function lcrSetItemRows(list){
   const box=document.getElementById('lcrItems'); box.innerHTML='';
   (list&&list.length?list:[{}]).forEach(it=>lcrAddItemRow(it));
 }
+// 제품 줄 요약 + 판매금액 합계(제품별 판매금액을 그대로 합산 — 수량에 비례하지 않음) 자동입력
 function lcrItemsSum(){
   const el=document.getElementById('lcrItemsSum'); if(!el) return;
-  let q=0,n=0;
+  let q=0,n=0,sum=0;
   document.querySelectorAll('#lcrItems .lcr-item').forEach(r=>{
+    sum+=_lbxNum(r.querySelector('.lcr-i-price')?.value)||0;
     if(!(r.querySelector('.lcr-i-name').value||'').trim()) return;
     n++; q+=_lbxNum(r.querySelector('.lcr-i-qty').value)||0;
   });
   el.innerHTML = n>1 ? `제품 ${n}개 · 총 수량 <b>${q.toLocaleString('ko-KR')}</b>` : '';
+  const tot=document.getElementById('lcrPrice'); if(tot) tot.value = sum>0 ? sum : '';
 }
 function lcrOpenAdd(){
   document.getElementById('lcrModalTitle').textContent = '🥕 당근 판매 주문건 등록';
@@ -14543,9 +14563,11 @@ function lcrOpenEdit(id){
   document.getElementById('lcrAddr').placeholder = o.visitSale ? '방문판매 (주소 불필요)' : '배송지 주소';
   document.getElementById('lcrAddr').value = o.address||'';
   // 저장돼 있는 값(공급가 스냅샷 포함) 그대로 줄에 채움 — 표시용 보정값(_lcrItems)이 아니라 원본을 사용
-  const raw = (Array.isArray(o.items) && o.items.length) ? o.items : [{productName:o.productName, qty:o.qty, price:o.price, unitCost:o.unitCost}];
+  // 제품별 판매금액이 저장돼 있지 않은 예전 다제품 주문은 표시용 배분값(_lcrItems)으로 채워 주문 합계가 그대로 유지되게 함
+  const est = _lcrItems(o);
+  const raw = (Array.isArray(o.items) && o.items.length) ? o.items.map((it,i)=>({...it, price: it.price!=null ? it.price : est[i].price}))
+    : [{productName:o.productName, qty:o.qty, price:o.price, unitCost:o.unitCost}];
   lcrSetItemRows(raw);
-  document.getElementById('lcrPrice').value = o.price!=null ? o.price : '';
   openModal('logiCarrotAddModal');
   setTimeout(()=>document.getElementById('lcrName')?.focus(), 50);
 }
@@ -14562,17 +14584,19 @@ async function lcrSave(){
     const nmEl=row.querySelector('.lcr-i-name');
     const productName=(nmEl.value||'').trim();
     const qty=_lbxNum(row.querySelector('.lcr-i-qty').value);
-    if(!productName && !qty) continue;
+    const price=_lbxNum(row.querySelector('.lcr-i-price').value)||0;
+    if(!productName && !qty && !price) continue;
     if(!productName){ toast('제품명을 입력하세요.'); nmEl.focus(); return; }
     // 수정 시 제품명이 안 바뀐 줄은 기존 공급가 스냅샷 유지(백데이터 단가가 나중에 바뀌어도 이 주문건은 안 흔들림), 새로 넣거나 이름을 바꾼 줄만 새로 스냅샷
     const keep = !!editId && row.dataset.orig!=='' && productName===row.dataset.orig;
     const unitCost = keep ? (row.dataset.unit!=='' ? Number(row.dataset.unit) : null) : lcrUnitCost(productName);
     const dup = items.find(x=>x.productName===productName && x.unitCost===unitCost);
-    if(dup){ dup.qty+=qty; } else items.push({productName, qty, unitCost});
+    if(dup){ dup.qty+=qty; dup.price+=price; } else items.push({productName, qty, price, unitCost});
   }
   if(!items.length){ toast('제품명을 입력하세요.'); document.querySelector('#lcrItems .lcr-i-name')?.focus(); return; }
-  const totQty = items.reduce((t,i)=>t+i.qty,0), totPrice = _lbxNum(document.getElementById('lcrPrice').value);   // 판매금액은 주문 전체 합계 1칸
-  // 최상위 productName/qty/price/unitCost 는 기존 형식 호환용 — 여러 제품이면 첫 제품명·총수량·총판매금액·unitCost=null (items 에는 제품명·수량·공급가만, 제품별 판매금액은 저장하지 않음)
+  // 판매금액 = 제품별로 직접 입력한 금액의 합계(수량에 비례하지 않음, 입력한 금액이 순수 판매금액)
+  const totQty = items.reduce((t,i)=>t+i.qty,0), totPrice = items.reduce((t,i)=>t+i.price,0);
+  // 최상위 productName/qty/price/unitCost 는 기존 형식 호환용 — 여러 제품이면 첫 제품명·총수량·총판매금액·unitCost=null (items 에는 제품별 수량·판매금액·공급가)
   const flat = { productName:items[0].productName, qty:totQty, price:totPrice, unitCost: items.length===1 ? items[0].unitCost : null,
     items: items.length>1 ? items : undefined };
   let latest = await cloudKvLoad('logi_carrot_orders');
@@ -14593,17 +14617,41 @@ async function lcrSave(){
   await cloudKvSave('logi_carrot_orders', latest);
   toast(editId ? '✅ 주문건이 수정되었습니다.' : `✅ 주문건이 등록되었습니다.${items.length>1?` (제품 ${items.length}개)`:''}`);
 }
-async function lcrToggleErp(id){
+// ── 체크박스(ERP 재고차감 확인 / 입금 여부) — 해제할 때는 "예"를 눌러야만 해제 ──
+let _lcrYnCb = null;
+function lcrAskYn(msg, onYes){
+  _lcrYnCb = onYes;
+  document.getElementById('lcrYnMsg').textContent = msg;
+  openModal('lcrYnModal');
+}
+function lcrYnAnswer(yes){
+  const cb = _lcrYnCb; _lcrYnCb = null;
+  closeModal('lcrYnModal');
+  if(yes && cb) cb();
+}
+// kind: 'erp' → erpChecked/At/By, 'paid' → paid/paidAt/paidBy. 토글이 아니라 명시한 값(val)으로 저장 — 다른 PC에서 먼저 바꿨어도 뒤집히지 않음
+async function _lcrApplyCheck(id, kind, val){
   let latest = await cloudKvLoad('logi_carrot_orders');
   latest = Array.isArray(latest) ? latest : [];
   const row = latest.find(o=>o.id===id); if(!row) return;
-  row.erpChecked = !row.erpChecked;
-  if(row.erpChecked){ row.erpCheckedAt=_lcrToday(); row.erpCheckedBy=_lcrActor(); }
-  else { row.erpCheckedAt=''; row.erpCheckedBy=''; }
+  const f = kind==='erp' ? {on:'erpChecked', at:'erpCheckedAt', by:'erpCheckedBy'} : {on:'paid', at:'paidAt', by:'paidBy'};
+  row[f.on] = val;
+  if(val){ row[f.at]=_lcrToday(); row[f.by]=_lcrActor(); }
+  else { row[f.at]=''; row[f.by]=''; }
   _lcrOrders = latest;
   lcrRender();
   await cloudKvSave('logi_carrot_orders', latest);
 }
+function _lcrCheckClick(id, el, kind, label){
+  if(el && !el.checked){   // 해제 시도 — 일단 체크 상태로 되돌려 두고 확인 후에만 실제 해제
+    el.checked = true;
+    lcrAskYn(`${label} 체크를 해제하시겠습니까?`, ()=>_lcrApplyCheck(id, kind, false));
+    return;
+  }
+  return _lcrApplyCheck(id, kind, true);
+}
+function lcrToggleErp(id, el){ return _lcrCheckClick(id, el, 'erp', 'ERP 재고 차감 확인'); }
+function lcrTogglePaid(id, el){ return _lcrCheckClick(id, el, 'paid', '입금 여부'); }
 async function lcrDelete(id){
   const pw = prompt('삭제 비밀번호를 입력하세요:');
   if(pw===null) return;
