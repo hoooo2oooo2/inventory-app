@@ -21998,6 +21998,65 @@ async function recalcShippingForKey(channel,item_no,feeObj){
   return totalChanged;
 }
 
+// 업로드 직후용 일괄 보정: 이번에 새로 등록한 (연도,날짜)의 행만 한 번에 읽어 현재 택배비 설정(_shipMap)으로
+// 다시 계산하고 bulk_update_revenue로 한 번에 저장한다. 계산식은 recalcShippingForKey와 동일하며,
+// 그 함수가 "택배비 설정 1개당" 판매처 과거 전체를 읽던 것을(설정 76개면 수십~수백 번 조회) 판매처당 1회로 줄인 것.
+// 설정된 상품(_shipMap)이 한 행이라도 있는 날짜만 대상으로 해서 기존 동작과 같은 범위를 유지한다.
+// 메모리(_revData) 갱신은 호출부가 마지막에 한 번만 한다.
+async function recalcShippingForUploadedDates(channel, ymList){
+  const byYear=new Map();
+  for(const ym of ymList){
+    const [y,d]=ym.split('|');
+    if(!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(d);
+  }
+  let totalChanged=0;
+  for(const [yStr, dates] of byYear){
+    const year=Number(yStr);
+    let rows=[], rFrom=0;
+    while(true){
+      const {data:chunk,error}=await sb.from('revenue')
+        .select('id,item_no,sale_date,receiver,phone1,address,settlement,cost_price,item_type,sale_price,shipping_fee,margin,margin_rate,order_qty,ship_qty')
+        .eq('channel',channel).eq('year',year).in('sale_date',dates).order('id',{ascending:true}).range(rFrom,rFrom+999);
+      if(error) throw error;   // 조회 실패 시 저장하지 않고 호출부로 알림(잘못된 부분 데이터로 계산하지 않음)
+      if(!chunk||!chunk.length) break;
+      rows=rows.concat(chunk);
+      if(chunk.length<1000) break;
+      rFrom+=1000;
+    }
+    if(!rows.length) continue;
+    // 설정된 상품이 판매된 날짜만 대상(기존 설정별 재계산과 같은 범위)
+    const cfgDates=new Set(rows.filter(r=>_shipMap[`${channel}|${r.item_no}`]!=null).map(r=>r.sale_date));
+    rows=rows.filter(r=>cfgDates.has(r.sale_date));
+    if(!rows.length) continue;
+    rows.forEach(r=>{ r.year=year; r.channel=channel; });
+
+    const before=new Map(rows.map(r=>[r.id,{shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}]));
+    for(const r of rows){
+      const f=_shipMap[`${channel}|${r.item_no}`];
+      const newFee = f!=null ? shipCfgFee(f, r.sale_price||0, r.order_qty||0) : calcShippingFee(channel,r.item_type,r.sale_price||0);
+      r.shipping_fee=newFee;
+      r.margin=Math.round((r.settlement||0)-(r.cost_price||0)-newFee);
+      r.margin_rate=r.settlement>0 ? Math.round(r.margin/r.settlement*10000)/10000 : 0;
+    }
+    applyShipGroupDedup(rows);
+
+    const upd=rows.filter(r=>{
+      const b=before.get(r.id);
+      return !b || b.shipping_fee!==r.shipping_fee || b.margin!==r.margin || b.margin_rate!==r.margin_rate || b.ship_qty!==r.ship_qty;
+    }).map(r=>({id:r.id, shipping_fee:r.shipping_fee, margin:r.margin, margin_rate:r.margin_rate, ship_qty:r.ship_qty}));
+
+    const CHUNK=2000;
+    for(let i=0;i<upd.length;i+=CHUNK){
+      const chunk=upd.slice(i,i+CHUNK);
+      const {error}=await sb.rpc('bulk_update_revenue',{updates:chunk});
+      if(error) console.error('택배비 재계산 저장 실패:', error.message);
+      else totalChanged+=chunk.length;
+    }
+  }
+  return totalChanged;
+}
+
 // ── 백데이터 엑셀 다운로드 / 업로드 ──
 function downloadBackdataExcel(){
   if(!_bdData.length){ alert('백데이터가 없습니다.'); return; }
@@ -30577,14 +30636,20 @@ async function submitRevUpload(){
     // ── 2단계: 전부 정상 → 저장 ──
     let skipped=[];
     const insertedChannels=new Set();
+    const insertedYm=new Map();   // 판매처 → 이번에 새로 등록한 'year|sale_date' 목록(택배비 보정 범위)
     for(const {ch, rows} of parsedList){
       // 파일에 포함된 (년도, 날짜) 조합 전체
       const ymSet=[...new Set(rows.map(r=>`${r.year}|${r.sale_date}`))];
       // 기존 데이터 존재 건수 (해당 채널의 업로드 날짜들)
       let existCnt=0;
-      for(const ym of ymSet){
-        const [y,d]=ym.split('|');
-        const {count}=await sb.from('revenue').select('*',{count:'exact',head:true}).eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+      const _datesByY=new Map();
+      for(const ym of ymSet){ const [y,d]=ym.split('|'); if(!_datesByY.has(y)) _datesByY.set(y,[]); _datesByY.get(y).push(d); }
+      for(const [y,ds] of _datesByY){   // 연도별로 날짜를 묶어 1회 조회(날짜마다 따로 조회하던 것을 단축)
+        const {count,error}=await sb.from('revenue').select('*',{count:'exact',head:true}).eq('year',Number(y)).in('sale_date',ds).eq('channel',ch);
+        if(error){   // 기존 건수를 못 읽으면 덮어쓰기/중복 판단이 틀어지므로 이 판매처는 저장 전에 중단
+          alert(`[${ch}] 기존 데이터 확인에 실패해 업로드를 중단했습니다. 잠시 후 다시 시도해주세요.\n(${error.message})`);
+          throw error;
+        }
         existCnt+=count||0;
       }
       let insRows = rows;
@@ -30608,17 +30673,23 @@ async function submitRevUpload(){
       await insertRevenueRows(insRows);
       totalRows += insRows.length;
       insertedChannels.add(ch);
+      insertedYm.set(ch, [...new Set(insRows.map(r=>`${r.year}|${r.sale_date}`))]);
       console.log(`${ch}: ${insRows.length}건 업로드 완료`);
     }
     if(skipped.length) errors.push('건너뜀: '+skipped.join(', '));
 
     // ★ 새로 등록된 통합 데이터에 설정된 택배비(판매처·상품번호별) 자동 반영 — 누락 방지
     //   업로드 시 이미 적용되지만, 혹시 모를 누락까지 보정(변경 없으면 DB 미접근)
+    //   판매처당 1회 일괄 계산(이번에 등록한 날짜만) — 설정 1개씩 과거 전체를 다시 읽던 방식은 3분 이상 걸렸음
     if(insertedChannels.size && _shipData.length){
       let shipFixed=0;
-      for(const r of _shipData){
-        if(insertedChannels.has(r.channel)){
-          shipFixed += await recalcShippingForKey(r.channel, r.item_no, {fee:r.fee, perUnit:!!r.perUnit, freeship:r.freeship||''});
+      for(const ch of insertedChannels){
+        if(!_shipData.some(r=>r.channel===ch)) continue;
+        try{
+          shipFixed += await recalcShippingForUploadedDates(ch, insertedYm.get(ch)||[]);
+        }catch(e){
+          console.error('택배비 자동 반영 실패', ch, e);
+          errors.push(`[${ch}] 업로드는 저장됐지만 택배비 자동 반영에 실패했습니다. 택배비 관리에서 재적용해주세요.`);
         }
       }
       if(shipFixed) console.log(`택배비 자동 반영: ${shipFixed}건 보정`);
