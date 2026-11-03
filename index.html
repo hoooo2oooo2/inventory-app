@@ -22665,20 +22665,74 @@ async function _loadRevenueYearImpl(year){
       }
     }
   }
-  const PAGE=1000; let all=[], from=0;
-  while(true){
-    const {data,error}=await sb.from('revenue').select(REV_COLS).eq('year',year)
-      .order('sale_date',{ascending:true}).range(from,from+PAGE-1);
-    if(error){ console.warn('revenue 연도 로드 오류',year,error.message); break; }
-    if(!data||data.length===0) break;
-    all=all.concat(data);
-    if(data.length<PAGE) break;
-    from+=PAGE;
+  // 병렬(id 구간) 다운로드 — 읽기 전용. 행 수 검증에 실패하면 null → 기존 순차 방식으로 폴백
+  let all=await _fetchRevenueYearParallel(year), verified=true;
+  if(!all){
+    verified=false;
+    const PAGE=1000; all=[]; let from=0;
+    while(true){
+      const {data,error}=await sb.from('revenue').select(REV_COLS).eq('year',year)
+        .order('sale_date',{ascending:true}).range(from,from+PAGE-1);
+      if(error){ console.warn('revenue 연도 로드 오류',year,error.message); break; }
+      if(!data||data.length===0) break;
+      all=all.concat(data);
+      if(data.length<PAGE) break;
+      from+=PAGE;
+    }
   }
   const mapped=all.map(_revMapRow);
   _revData=_revData.filter(r=>r.year!==year).concat(mapped);
   _revYearsLoaded.add(year);
-  if(ver){ _idbSet('rev_y_'+year,{ver,rows:mapped}); }   // 다음 새로고침부터 재사용
+  if(ver && verified){ _idbSet('rev_y_'+year,{ver,rows:mapped}); }   // 다음 새로고침부터 재사용(행 수 검증을 통과한 경우만)
+}
+
+// 한 연도 매출을 id 구간(1000개씩) 병렬로 받는다. SELECT만 사용 — 쓰기 없음.
+// 받은 행 수가 서버 행 수와 일치할 때만 결과를 돌려주고, 일치하지 않거나 한 구간이라도 실패하면 null
+// (호출부가 기존 순차 방식으로 안전하게 폴백). 1회 불일치(받는 중 다른 PC가 수정)는 한 번 더 시도.
+async function _fetchRevenueYearParallel(year){
+  const SPAN=1000, CONC=5;
+  for(let round=0; round<2; round++){
+    try{
+      const [lo,hi]=await Promise.all([
+        sb.from('revenue').select('id').eq('year',year).order('id',{ascending:true}).limit(1),
+        sb.from('revenue').select('id').eq('year',year).order('id',{ascending:false}).limit(1)
+      ]);
+      if(lo.error||hi.error) return null;
+      if(!lo.data||!lo.data.length) return [];   // 해당 연도 데이터 없음
+      const minId=lo.data[0].id, maxId=hi.data[0].id;
+      const starts=[]; for(let s=minId;s<=maxId;s+=SPAN) starts.push(s);
+      const parts=new Array(starts.length);
+      let next=0, failed=false, doneN=0;
+      const worker=async()=>{
+        while(!failed){
+          const i=next++; if(i>=starts.length) return;
+          let ok=false;
+          for(let a=0;a<3&&!ok;a++){
+            const {data,error}=await sb.from('revenue').select(REV_COLS).eq('year',year)
+              .gte('id',starts[i]).lt('id',starts[i]+SPAN).order('id',{ascending:true});
+            if(!error && data && data.length<=SPAN){ parts[i]=data; ok=true; }
+            else await new Promise(r=>setTimeout(r,400*(a+1)));
+          }
+          if(!ok){ failed=true; return; }
+          doneN++;
+          const cnt=document.getElementById('revUniCount');
+          if(cnt) cnt.textContent='로딩 중... '+Math.round(doneN/starts.length*100)+'%';
+        }
+      };
+      await Promise.all(Array.from({length:CONC},worker));
+      if(failed) return null;
+      const rows=[].concat(...parts);
+      const {count,error:ce}=await sb.from('revenue').select('id',{count:'exact',head:true}).eq('year',year);
+      if(ce||count==null) return null;
+      if(rows.length===count){
+        // 기존 순차 방식과 같은 순서(판매일 오름차순)로 맞춘다 — 같은 날짜 안에서는 id 순 유지
+        rows.sort((x,y)=> x.sale_date<y.sale_date?-1 : x.sale_date>y.sale_date?1 : 0);
+        return rows;
+      }
+      console.warn('revenue 병렬 로드 행수 불일치 — 재시도',year,rows.length,count);
+    }catch(e){ console.warn('revenue 병렬 로드 실패, 순차 방식으로 대체:',e); return null; }
+  }
+  return null;
 }
 
 // 캐시된 행 중 가장 최신 updated_at 이후로 바뀐 행만 받아와 캐시에 덮어씌운다.
