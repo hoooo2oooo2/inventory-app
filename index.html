@@ -30691,8 +30691,61 @@ async function buildAppendRows(ch, ymSet, rows){
   return {rows:fresh, dup};
 }
 
-// 업로드 실행
+// 판매처·날짜 범위의 실제 행 수(연도별로 묶어 조회). 조회 실패 시 null
+async function _revCountChannelDates(ch, ymList){
+  const byY=new Map();
+  for(const ym of ymList){ const [y,d]=ym.split('|'); if(!byY.has(y)) byY.set(y,[]); byY.get(y).push(d); }
+  let total=0;
+  for(const [y,ds] of byY){
+    const {count,error}=await sb.from('revenue').select('*',{count:'exact',head:true}).eq('year',Number(y)).in('sale_date',ds).eq('channel',ch);
+    if(error||count==null) return null;
+    total+=count;
+  }
+  return total;
+}
+
+// ── 업로드 잠금: 같은 판매처를 다른 창·다른 PC에서 동시에 올리지 못하게 한다 ──
+// 판매처별 cloudKv 키에 {active,id,user,ts}를 기록. 10분이 지난 잠금은 자동 무시(창이 강제로 닫힌 경우 대비).
+// 잠금 조회/기록이 안 되면(네트워크 등) 업로드를 막지 않는다(새 오류를 만들지 않기 위해).
+const _REV_LOCK_TTL=10*60*1000;
+const _revLockId=Math.random().toString(36).slice(2)+Date.now().toString(36);   // 이 화면(탭) 식별자
+async function _revAcquireUploadLock(chs){
+  const held=[];
+  for(const ch of chs){
+    const key='rev_upload_lock_'+ch;
+    const cur=await cloudKvLoad(key);
+    if(cur && cur.active && cur.id!==_revLockId && (Date.now()-(cur.ts||0))<_REV_LOCK_TTL){
+      await _revReleaseUploadLock(held);
+      return {ok:false, msg:`[${ch}] ${cur.user||'다른 사용자'}님이 업로드 중입니다 (${Math.max(1,Math.round((Date.now()-cur.ts)/60000))}분 전 시작).\n끝난 뒤 다시 시도하세요. (10분이 지나면 잠금이 자동으로 풀립니다)`};
+    }
+    await cloudKvSave(key,{active:true,id:_revLockId,user:window.__ACTOR||'',ts:Date.now()});
+    held.push(key);
+    await new Promise(r=>setTimeout(r,400));
+    const chk=await cloudKvLoad(key);   // 동시에 잡으려 한 경우 마지막 기록이 이김 → 내 것이 아니면 양보
+    if(chk && chk.id!==_revLockId){
+      await _revReleaseUploadLock(held.filter(k=>k!==key));
+      return {ok:false, msg:`[${ch}] 다른 곳에서 동시에 업로드를 시작했습니다. 잠시 후 다시 시도하세요.`};
+    }
+  }
+  return {ok:true, held};
+}
+async function _revReleaseUploadLock(keys){
+  for(const k of keys){
+    try{ await cloudKvSave(k,{active:false,id:_revLockId,user:window.__ACTOR||'',ts:Date.now()},{force:true}); }catch(e){}
+  }
+}
+
+// 업로드 실행 — 같은 화면에서 중복 실행 방지 + 처리 중 창 닫기 경고 후 본체 실행
+let _revUploading=false;
 async function submitRevUpload(){
+  if(_revUploading){ alert('이미 업로드가 진행 중입니다. 끝날 때까지 기다려주세요.'); return; }
+  _revUploading=true;
+  const onLeave=e=>{ e.preventDefault(); e.returnValue=''; };
+  window.addEventListener('beforeunload',onLeave);
+  try{ await _submitRevUploadImpl(); }
+  finally{ _revUploading=false; window.removeEventListener('beforeunload',onLeave); }
+}
+async function _submitRevUploadImpl(){
   const files=Object.entries(_revUpFiles);
   if(files.length===0){alert('업로드할 파일을 선택하세요.');return;}
 
@@ -30707,9 +30760,18 @@ async function submitRevUpload(){
   if(btn){ btn.disabled=true; btn.textContent='처리 중...'; }
 
   let totalRows=0, allMissing=[], errors=[], infos=[];
+  let lockKeys=[];
+  const setStage=t=>{ if(btn) btn.textContent=t; };
 
   try{
+    // 같은 판매처를 다른 곳에서 올리는 중이면 시작하지 않는다
+    setStage('업로드 확인 중...');
+    const lk=await _revAcquireUploadLock(files.map(([ch])=>ch));
+    if(!lk.ok){ alert(lk.msg); return; }
+    lockKeys=lk.held;
+
     // ── 1단계: 전체 파일 파싱·검증 (저장 전) ──
+    setStage('파일 확인 중...');
     const parsedList=[]; let rejected=[];
     for(const [ch, file] of files){
       try{
@@ -30742,7 +30804,10 @@ async function submitRevUpload(){
     let skipped=[];
     const insertedChannels=new Set();
     const insertedYm=new Map();   // 판매처 → 이번에 새로 등록한 'year|sale_date' 목록(택배비 보정 범위)
+    let _stageN=0;
     for(const {ch, rows} of parsedList){
+      _stageN++;
+      setStage(`저장 중 (${_stageN}/${parsedList.length}) ${ch}... 창을 닫지 마세요`);
       // 파일에 포함된 (년도, 날짜) 조합 전체
       const ymSet=[...new Set(rows.map(r=>`${r.year}|${r.sale_date}`))];
       // 기존 데이터 존재 건수 (해당 채널의 업로드 날짜들)
@@ -30758,6 +30823,7 @@ async function submitRevUpload(){
         existCnt+=count||0;
       }
       let insRows = rows;
+      let postCheckBase = 0;   // 저장 후 건수 점검용: 저장 직후 파일 날짜 범위에 "기존부터 있던 행"이 몇 건이어야 하는지(null이면 점검 생략)
       if(existCnt>0){
         const dateLabel = ymSet.length===1 ? ymSet[0].replace('|','-') : `${ymSet.length}개 날짜`;
         const mode = await askRevUpExistMode(ch, dateLabel, existCnt, rows.length);
@@ -30768,18 +30834,47 @@ async function submitRevUpload(){
           insRows = ap.rows;
           if(ap.dup>0) infos.push(`[${ch}] 이미 등록된 ${ap.dup}건은 중복이라 제외`);
           if(insRows.length===0){ infos.push(`[${ch}] 추가할 새 건이 없습니다 (기존 ${existCnt}건 유지)`); continue; }
+          postCheckBase=existCnt;
         } else {
+          // 덮어쓰기: 날짜별로 지운 뒤 "정말 0건이 됐는지" 건수로 확인한다(삭제 응답은 권한·시간초과 때 믿을 수 없음).
+          // 지워지지 않은 날짜에 새 데이터를 또 저장하면 중복이 되므로, 그 날짜는 저장하지 않고 기존 데이터를 그대로 둔다.
+          const keptDates=new Set();
           for(const ym of ymSet){
             const [y,d]=ym.split('|');
-            await sb.from('revenue').delete().eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+            const {error:delErr}=await sb.from('revenue').delete().eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+            if(delErr) console.warn('덮어쓰기 삭제 오류', ch, ym, delErr.message);
+            const {count:left,error:cntErr}=await sb.from('revenue').select('*',{count:'exact',head:true}).eq('year',Number(y)).eq('sale_date',d).eq('channel',ch);
+            if(cntErr || left!==0) keptDates.add(ym);
+          }
+          if(keptDates.size){
+            insRows = rows.filter(r=>!keptDates.has(`${r.year}|${r.sale_date}`));
+            errors.push(`⚠️ [${ch}] 기존 데이터 삭제를 확인하지 못한 날짜 ${keptDates.size}개(${[...keptDates].map(s=>s.split('|')[1]).join(', ')})는 중복 방지를 위해 새로 저장하지 않고 기존 데이터를 그대로 뒀습니다. 잠시 후 다시 업로드하세요.`);
+            if(insRows.length===0) continue;
+            postCheckBase=null;   // 일부 날짜는 기존 데이터가 남아 있어 저장 후 건수 점검 생략
+          } else {
+            postCheckBase=0;
           }
         }
       }
-      await insertRevenueRows(insRows);
+      try{
+        await insertRevenueRows(insRows);
+      }catch(e){
+        console.error('업로드 저장 오류', ch, e);
+        errors.push(`⛔ [${ch}] 저장 중 오류가 나 일부만 저장됐을 수 있습니다(${e&&e.message||e}). 통합 메뉴에서 확인하고, 다시 올릴 땐 "덮어쓰기"를 선택하세요.`);
+        continue;
+      }
       totalRows += insRows.length;
       insertedChannels.add(ch);
       insertedYm.set(ch, [...new Set(insRows.map(r=>`${r.year}|${r.sale_date}`))]);
       console.log(`${ch}: ${insRows.length}건 업로드 완료`);
+      // 저장 직후 점검: 파일 날짜 범위의 실제 건수가 "남아 있던 기존 + 이번에 저장한 건수"와 같은지 확인.
+      // 다르면 동시에 다른 곳에서 올렸거나 중복 등록됐을 수 있으므로 알린다(자동 삭제는 하지 않음).
+      if(postCheckBase!=null){
+        const act=await _revCountChannelDates(ch, ymSet);
+        const exp=postCheckBase+insRows.length;
+        if(act==null) console.warn('저장 후 건수 점검 생략(조회 실패)', ch);
+        else if(act!==exp) errors.push(`⚠️ [${ch}] 저장 후 건수가 예상과 다릅니다(예상 ${exp}건, 실제 ${act}건). 다른 곳에서 같은 판매처를 동시에 올렸거나 중복 등록됐을 수 있으니 통합 메뉴에서 해당 날짜를 확인하세요.`);
+      }
     }
     if(skipped.length) errors.push('건너뜀: '+skipped.join(', '));
 
@@ -30787,6 +30882,7 @@ async function submitRevUpload(){
     //   업로드 시 이미 적용되지만, 혹시 모를 누락까지 보정(변경 없으면 DB 미접근)
     //   판매처당 1회 일괄 계산(이번에 등록한 날짜만) — 설정 1개씩 과거 전체를 다시 읽던 방식은 3분 이상 걸렸음
     if(insertedChannels.size && _shipData.length){
+      setStage('택배비 반영 중...');
       let shipFixed=0;
       for(const ch of insertedChannels){
         if(!_shipData.some(r=>r.channel===ch)) continue;
@@ -30802,7 +30898,7 @@ async function submitRevUpload(){
 
     _revUpFiles = {};
     renderRevUpSlots();
-    if(totalRows > 0) await reloadRevLoadedYears(); // 업로드 반영(적재된 연도 + 범위 갱신). 업로드가 새 연도면 범위에 잡힘
+    if(totalRows > 0){ setStage('화면 갱신 중...'); await reloadRevLoadedYears(); } // 업로드 반영(적재된 연도 + 범위 갱신). 업로드가 새 연도면 범위에 잡힘
 
     let msg = `✅ ${totalRows}건 업로드 완료`;
     if(infos.length) msg += `\n\n${infos.join('\n')}`;
@@ -30810,6 +30906,7 @@ async function submitRevUpload(){
     if(!errors.length) alert(msg);
     else showUploadResult(totalRows, [], errors, infos);
   } finally {
+    if(lockKeys.length) await _revReleaseUploadLock(lockKeys);
     if(btn){ btn.disabled=false; btn.textContent='선택한 파일 업로드'; }
   }
 }
