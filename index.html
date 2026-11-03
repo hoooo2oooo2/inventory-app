@@ -702,6 +702,12 @@ body.design-scope #collabManager .postit-foot{margin-top:2px;}
 /* 유현 업무보고서 — 메모장 스타일: 줄별 점선 칸(포커스 윤곽) 제거 */
 #rpEditorWrap.rp-yh .rp-line:focus{outline:none;}
 #rpEditorWrap.rp-yh .rp-line-pin-btn{user-select:none;-webkit-user-select:none;}
+/* 유현 — 줄 왼쪽 ⋮⋮ 손잡이(마우스 올리면 표시)를 잡고 끌어 순서 변경·오전↔오후 이동 */
+#rpEditorWrap.rp-yh .rp-editor{padding-left:28px;}
+#rpEditorWrap.rp-yh .rp-line{position:relative;}
+#rpEditorWrap.rp-yh .rp-line::after{content:'⋮⋮';position:absolute;left:-20px;top:1px;width:16px;text-align:center;font-size:12px;font-weight:900;letter-spacing:-3px;line-height:1.5;color:var(--tx2);opacity:0;cursor:grab;user-select:none;-webkit-user-select:none;}
+#rpEditorWrap.rp-yh .rp-line:hover::after{opacity:.6;}
+.rp-editor.rp-drop-end{box-shadow:inset 0 -3px 0 -1px #3182F6;}
 /* 블럭 카드 */
 .rp-block{border:1px solid var(--etc-d1e9ff);border-left:3px solid var(--brand);border-radius:5px;padding:6px 8px 6px 9px;font-size:12px;line-height:1.4;color:var(--tx);background:var(--etc-f5faff);display:flex;align-items:center;gap:7px;margin:2px 0;min-height:40px;user-select:text;-webkit-user-select:text;cursor:default;}
 .rp-block:active{cursor:default;}
@@ -34118,6 +34124,7 @@ function _rpYhMoveBlockTo(dragId, fromSec, toSec, targetId){
   if(!entry.content_pm) entry.content_pm=[];
   const src=_rpContentOf(entry,fromSec);
   const i=src.findIndex(x=>x.id===dragId); if(i<0) return false;
+  if(fromSec===toSec && targetId && src[i+1] && src[i+1].id===targetId) return false;   // 제자리(변화 없음)
   const [b]=src.splice(i,1);
   const dst=_rpContentOf(entry,toSec);
   let at=targetId?dst.findIndex(x=>x.id===targetId):-1;
@@ -34130,6 +34137,66 @@ function _rpYhMoveBlockTo(dragId, fromSec, toSec, targetId){
   _rpRenderPinned();
   _reportAutoSave();
   return true;
+}
+// ── 유현: 타이핑한 줄(체크박스 포함) 드래그 이동 — 같은 구역 순서 변경 / 오전↔오후 이동 ──
+let _rpYhLd=null;   // {id, sec, el, x0, y0, moved}
+function _rpYhLdClearMarks(){
+  document.querySelectorAll('#rpEditorWrap .rp-drop-mark').forEach(el=>el.classList.remove('rp-drop-mark'));
+  document.querySelectorAll('#rpEditorWrap .rp-drop-end').forEach(el=>el.classList.remove('rp-drop-end'));
+}
+// 포인터 y 가 속한(가장 가까운) 구역 편집기와, 그 안에서 y 바로 아래에 올 항목(없으면 맨 끝)
+function _rpYhLdTarget(y){
+  if(!_rpYhLd) return null;
+  const eds=[['am',document.getElementById('rpEditorAm')],['pm',document.getElementById('rpEditorPm')]].filter(x=>x[1]);
+  let best=null, bd=1e9;
+  for(const [s,ed] of eds){
+    const r=ed.getBoundingClientRect();
+    const d=y<r.top?r.top-y:(y>r.bottom?y-r.bottom:0);
+    if(d<bd){ bd=d; best={sec:s,ed}; }
+  }
+  if(!best) return null;
+  const items=[...best.ed.children].filter(el=>(el.classList.contains('rp-line')||el.classList.contains('rp-block')) && el.dataset.id!==_rpYhLd.id);
+  let target=null;
+  for(const el of items){ const r=el.getBoundingClientRect(); if(y<r.top+r.height/2){ target=el; break; } }
+  return {sec:best.sec, ed:best.ed, target};
+}
+function _rpYhLineDragStart(e,line){
+  _rpYhLd={id:line.dataset.id, sec:_rpSectionOf(line), el:line, x0:e.clientX, y0:e.clientY, moved:false};
+  line.style.opacity='.45';
+  document.body.style.userSelect='none'; document.body.style.cursor='grabbing';
+  document.addEventListener('mousemove',_rpYhLineDragMove,true);
+  document.addEventListener('mouseup',_rpYhLineDragEnd,true);
+  document.addEventListener('keydown',_rpYhLineDragKey,true);
+}
+function _rpYhLineDragCleanup(){
+  document.removeEventListener('mousemove',_rpYhLineDragMove,true);
+  document.removeEventListener('mouseup',_rpYhLineDragEnd,true);
+  document.removeEventListener('keydown',_rpYhLineDragKey,true);
+  document.body.style.userSelect=''; document.body.style.cursor='';
+  if(_rpYhLd && _rpYhLd.el) _rpYhLd.el.style.opacity='';
+  _rpYhLdClearMarks();
+}
+function _rpYhLineDragMove(e){
+  if(!_rpYhLd) return;
+  e.preventDefault();
+  if(Math.abs(e.clientX-_rpYhLd.x0)+Math.abs(e.clientY-_rpYhLd.y0)>4) _rpYhLd.moved=true;
+  if(!_rpYhLd.moved) return;
+  _rpYhLdClearMarks();
+  const t=_rpYhLdTarget(e.clientY); if(!t) return;
+  if(t.target) t.target.classList.add('rp-drop-mark'); else t.ed.classList.add('rp-drop-end');
+  const wrap=document.getElementById('rpEditorWrap');   // 가장자리 근처에서 자동 스크롤
+  if(wrap){ const r=wrap.getBoundingClientRect(); if(e.clientY<r.top+30) wrap.scrollTop-=14; else if(e.clientY>r.bottom-30) wrap.scrollTop+=14; }
+}
+function _rpYhLineDragEnd(e){
+  const st=_rpYhLd; if(!st){ _rpYhLineDragCleanup(); return; }
+  const t=st.moved?_rpYhLdTarget(e.clientY):null;
+  _rpYhLineDragCleanup();
+  _rpYhLd=null;
+  if(t) _rpYhMoveBlockTo(st.id, st.sec, t.sec, t.target?t.target.dataset.id:null);
+  _reportSetupKeyboard();
+}
+function _rpYhLineDragKey(e){
+  if(e.key==='Escape'){ e.preventDefault(); _rpYhLineDragCleanup(); _rpYhLd=null; }
 }
 function rpYhMoveBlock(id, sec){
   if(!_rpIsYh()) return;
@@ -35245,6 +35312,8 @@ function _reportSetupKeyboard(){
     // 체크박스(줄 왼쪽 20px) 클릭 → 체크/해제. 박스 영역 mousedown은 커서 이동 없이 처리
     editor.addEventListener('mousedown',e=>{
       const l=e.target.closest?.('.rp-line'); if(!l) return;
+      // 유현: 줄 왼쪽 바깥(⋮⋮ 손잡이)을 잡으면 줄 드래그 이동
+      if(_rpIsYh() && e.button===0 && e.target===l && e.clientX<l.getBoundingClientRect().left){ e.preventDefault(); _rpYhLineDragStart(e,l); return; }
       if(l.classList.contains('rp-todo') && e.clientX-l.getBoundingClientRect().left<=20){ e.preventDefault(); return; }
       if(_rpIsYh() && e.button===0 && !e.altKey) _rpYhDragSelectStart();
     });
