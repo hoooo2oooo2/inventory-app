@@ -19394,7 +19394,8 @@ function insightCalcNeeded(p, mergedSeries, seasonIndex){
   const boxes=Math.ceil(needed/(p.boxQty||1));
   // 평상시 권장발주를 전문가 방식(서비스 수준 기반)으로 대체 — 계산 실패 시에만 기존 값 유지. 기존 값은 neededOld로 남겨 근거 팝업에서 비교.
   let expert=null;
-  try{ expert=insightExpertNeeded(p, dem.avg30, {expM}, seasonIndex); }catch(e){ console.warn('전문가 방식 권장발주 계산 실패', p.code, e); }
+  // c에 avg30(최근 30일 일평균)을 함께 넘겨야 insightFlowNow가 '지금 판매 속도'를 쓴다. 빠지면 수준이 expM×0.5로 떨어져 예측이 절반으로 계산됨
+  try{ expert=insightExpertNeeded(p, dem.avg30, {expM, avg30:dem.avg30}, seasonIndex); }catch(e){ console.warn('전문가 방식 권장발주 계산 실패', p.code, e); }
   const neededOld=needed, boxesOld=boxes;
   // 의심 플래그(calcNeeded와 동일) — 최근 30일 데이터가 적은데(10일 미만) 발주시점(재고회전 기준
   // 역산치)보다 2.5배 넘게 크면 배치 오염·이상치 등으로 부풀려졌을 가능성 경고
