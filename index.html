@@ -32168,7 +32168,8 @@ function simChannelSplitHtml(p, wc, fpat, n){
     else if(pct<=15) t+=`→ 최근 30일은 대부분 일반 채널 판매예요(로켓그로스 비중 ${pct}%). `;
     else t+=`→ 일반 채널과 로켓그로스가 함께 팔리고 있어요(로켓그로스 비중 ${pct}%). `;
     t+=tr('일반 채널',reg7,reg30)+tr('로켓그로스',rg7,rg30);
-    t+=`성수기·비수기 판단과 '작년 같은 달' 비교는 일반 채널 월별 실적 기준이고, 로켓그로스는 최근 ${yms.length}개월분만 연동돼 월별 패턴에는 들어가 있지 않아요. 반대로 최근 7일·30일 판매속도는 일반+로켓그로스 합계예요. `;
+    const rgFirst=Object.keys(rgSer).filter(d=>rgSer[d]>0).sort()[0];
+    t+=`성수기·비수기 판단과 '작년 같은 달' 비교는 일반 채널 월별 실적 기준이고, 로켓그로스는 월별 패턴에 들어가 있지 않아요(불러온 로켓그로스 판매 기록은 ${rgFirst?`${+rgFirst.slice(5,7)}/${+rgFirst.slice(8,10)}`:'-'}부터예요 — 기록이 더 쌓이면 월별 비교도 가능해져요). 반대로 최근 7일·30일 판매속도는 일반+로켓그로스 합계예요. `;
     if(wc && wc.status==='ok' && wc.growthOk && rg30>0 && wc.gPrev>0) t+=`올해 흐름 ×${wc.growth.toFixed(2)}는 '최근 30일 ${n(wc.gCur)}개(일반+로켓그로스) ÷ 작년 같은 30일 ${n(wc.gPrev)}개(일반 채널만)'로 계산돼서 로켓그로스만큼 높게 나올 수 있어요 — 일반 채널끼리만 비교하면 약 ×${(reg30/wc.gPrev).toFixed(2)}예요. `;
     t+=`(이 표는 참고용이라 위 계산 결과는 바뀌지 않아요.)`;
     return `<section class="simx-sec" style="--sc:#0EA5E9;"><h4><span>🛒</span>채널별 판매 (일반 채널 / 🚀 로켓그로스)</h4>${table}${simLines(t)}</section>`;
