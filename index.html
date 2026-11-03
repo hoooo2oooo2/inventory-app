@@ -6771,7 +6771,6 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <button class="btn btn-sm" id="insightDensBtn" onclick="insightToggleDens()" title="상품명과 코드를 한 줄에 / 두 줄에 나눠 보기">↕ 두 줄 보기</button>
       <span style="font-size:13px;color:var(--tx2);" id="insightCount"></span>
       <button class="btn btn-sm btn-or" onclick="insightOpenSeasonalSummary()" title="구정 주문 마감 전에 전체 제품을 한 번에 훑어보고 준비할 때 쓰는 요약 화면 — 마감임박순 정렬, 처리완료 체크, 재고여유 상품 구분까지 한 곳에서 볼 수 있어요">🎄 구정·성수기 준비 요약</button>
-      <button class="btn btn-sm" onclick="insightFcOpen()" title="매주 기록해 둔 예측을 실제 판매와 비교한 결과 — 예측이 얼마나 맞는지, 안전 목표가 실제로 품절을 막았는지 확인">📈 예측 정확도</button>
       <button class="btn btn-sm btn-pr" onclick="openErpUpload()" title="외부 ERP 엑셀을 그대로 업로드하면 재고관리·판매분석에 자동 반영됩니다">📤 ERP 엑셀 업로드</button>
       <button class="btn btn-sm" onclick="insightExportXlsx()" title="현재 화면에 보이는(검색·필터·정렬 적용된) 목록을 엑셀로 저장">📥 엑셀 다운로드</button>
     </div>
@@ -6932,15 +6931,6 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <div class="iss-banner" id="insightSeasSummaryBanner"></div>
     <div class="iss-list" id="insightSeasSummaryList"></div>
     <div class="ma"><button class="btn" onclick="closeModal('insightSeasSummaryModal')">닫기</button></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="insightFcModal">
-  <div class="modal" style="max-width:860px;">
-    <h3 style="font-size:16px;margin:0 0 4px;">📈 예측 정확도</h3>
-    <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;">매주 처음 발주 인사이트를 열 때 그 시점의 예측이 자동으로 기록되고, 기간이 끝나면 실제 판매와 비교해요. 기록이 쌓일수록 정확해지고, 안전 목표(등급별 배수)를 실제 결과로 다시 맞추는 근거가 됩니다.</div>
-    <div id="insightFcBody" style="max-height:62vh;overflow-y:auto;"></div>
-    <div class="ma"><button class="btn" onclick="closeModal('insightFcModal')">닫기</button></div>
   </div>
 </div>
 
@@ -20086,7 +20076,7 @@ function insightInit(){
   _insightEnsureConfirmData().then(renderInsight); // 오늘 발주 확인 체크 상태도 별도로 로드되는 대로 반영
   _insightEnsureSeasonalCheckData().then(renderInsight); // 구정·성수기 발주 처리 체크리스트도 별도로 로드되는 대로 반영
   // 품절 이력: 현재 재고·판매 상태를 기록에 반영(하루 한 번 이상) → 끝나면 표의 "품절 N일째" 배지를 다시 그림
-  stockoutLoad().then(async()=>{ try{ const rows=insightBuildRows(); await stockoutTrackRun(rows); await insightFcSnapshotRun(rows); }catch(e){} renderInsight(); });
+  stockoutLoad().then(async()=>{ try{ await stockoutTrackRun(insightBuildRows()); }catch(e){} renderInsight(); });
 }
 
 function insightSparkHtml(season){
@@ -20878,178 +20868,6 @@ async function stockoutTrackAfterUpload(){
     await stockoutTrackRun(rows);
     if(currentPage==='insight') renderInsight();
   }catch(e){ console.warn('업로드 후 품절 기록 실패', e); }
-}
-// ══════════════════════════════════════════════════════════════
-//  📈 예측 기록 · 정확도 추적 (2026-11-03)
-//  · 매주 처음 발주 인사이트를 열 때 그 시점의 예측(향후 30·60·90일 예상 판매, 권장발주 계산에 쓴 예상·목표량, 구정 커버 예상)을 cloudKv 'insight_fc_snap_YYYY-MM-DD'(그 주 월요일)에 한 번 기록한다.
-//    · 주마다 별도 키라 기존 기록을 덮어쓰거나 지우지 않고, 이미 있으면 다시 쓰지 않는다. 판매 업로드가 3일 넘게 밀렸거나 제품 수가 모자라면(불완전) 기록하지 않는다.
-//  · 나중에 실제 판매(일반+로켓그로스)와 비교해 오차·편향·안전 목표 커버율을 보여준다(📈 예측 정확도). 읽기 전용 — 저장은 위 스냅샷 한 가지뿐.
-//  · 기록 모양: {v:1, date, lastData, n, items:{상품id:{f:[30일,60일,90일], g:등급, t:'k'꾸준|'s'계절|'n'신제품, st:현재고, pd:진행중, rq:최종주문수량,
-//      h:리드타임+주기(일), fh:그 기간 예상, th:안전 목표, k:적용 배수, wb:구정구간 기준예상, wt:구정구간 안전목표, we:구정구간 끝(YYYY-MM-DD)}}}
-// ══════════════════════════════════════════════════════════════
-const INSIGHT_FC_PREFIX='insight_fc_snap_';
-let _insightFcSnapDone=false, _insightFcSnaps=null;
-function _insightLastDataDate(){
-  let m=''; Object.values(_dCache).forEach(o=>{ const ks=Object.keys(o); if(ks.length){ const x=ks.reduce((a,b)=>a>b?a:b); if(x>m) m=x; } });
-  return m;
-}
-function _fcAddDays(s,n){ const [y,m,d]=s.split('-').map(Number); return fmtDate(new Date(y,m-1,d+n)); }
-function _insightFcWeekKey(){
-  const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-((d.getDay()+6)%7));   // 그 주 월요일
-  return INSIGHT_FC_PREFIX+fmtDate(d);
-}
-function insightFcBuild(rows, today, lastData){
-  const seasonIndex=insightBuildSeasonIndex();
-  const r1=v=>Math.round(v*10)/10;
-  const items={}; let tried=0, n=0;
-  rows.forEach(r=>{
-    const p=r.p, c=r.c;
-    if(p.disc||p.hidden||c.noData) return;
-    tried++;
-    try{
-      const dr=insightDemandRates(p, c.avg30, c, seasonIndex, 91);
-      const cum=[30,60,90].map(h=>{ let s=0; for(let i=0;i<h&&i<dr.rates.length;i++) s+=dr.rates[i]; return r1(s); });
-      if(!cum.every(v=>isFinite(v)&&v>=0)) return;
-      const it={f:cum, g:r.grade, t:dr.useRef?(dr.peakR>=1.8?'s':'k'):'n', st:p.stock||0, pd:r.pending||0, rq:r.finalQty||0};
-      const e=c.expert;
-      if(e && isFinite(e.dLR) && isFinite(e.targetLR)){ it.h=Math.round(e.L+e.R); it.fh=r1(e.dLR); it.th=r1(e.targetLR); it.k=Math.round(e.k*100)/100; }
-      const wc=r.winterCover;
-      if(wc && wc.status==='ok' && wc.scenarios && isFinite(wc.scenarios.base.total) && isFinite(wc.scenarios.target.total)){
-        it.wb=Math.round(wc.scenarios.base.total); it.wt=Math.round(wc.scenarios.target.total); it.we=fmtDate(new Date(wc.windowEnd.getTime()-86400000));
-      }
-      items[p.id]=it; n++;
-    }catch(e){}
-  });
-  if(n<20 || n<tried*0.8) return null;   // 계산에 실패한 제품이 많으면 불완전 → 기록하지 않음
-  return {v:1, date:today, lastData, n, items};
-}
-async function insightFcSnapshotRun(rows){
-  if(_insightFcSnapDone) return;
-  try{
-    if(!rows||!rows.length) return;
-    const today=fmtDate(new Date()), lastData=_insightLastDataDate();
-    if(!lastData || _soDays(lastData,today)>3) return;   // 판매 데이터가 3일 넘게 안 올라왔으면 오늘 예측이 불완전 → 기록하지 않고 다음에 다시 시도
-    const key=_insightFcWeekKey();
-    const v0=await cloudKvVersion(key);
-    if(v0===undefined) return;                                  // 조회 실패 → 기록하지 않음
-    if(v0!==null){ _insightFcSnapDone=true; return; }          // 이번 주 기록이 이미 있음 → 다시 쓰지 않음
-    const snap=insightFcBuild(rows, today, lastData);
-    if(!snap) return;
-    const v1=await cloudKvVersion(key);                          // 계산하는 사이 다른 PC가 먼저 기록했을 수 있어 저장 직전 한 번 더 확인
-    if(v1!==null){ if(v1!==undefined) _insightFcSnapDone=true; return; }
-    await cloudKvSave(key, snap);
-    const v2=await cloudKvVersion(key);
-    if(v2){ _insightFcSnapDone=true; _insightFcSnaps=null; }
-  }catch(e){ console.warn('예측 기록 실패', e); }
-}
-async function insightFcLoadSnaps(force){
-  if(_insightFcSnaps && !force) return _insightFcSnaps;
-  const { data, error } = await sb.from('work_calendar').select('kind').eq('person','__app__').like('kind', INSIGHT_FC_PREFIX+'%');
-  if(error) throw error;
-  const kinds=(data||[]).map(r=>r.kind).sort();
-  const snaps=(await Promise.all(kinds.map(k=>cloudKvLoad(k)))).filter(s=>s&&s.items&&s.date);
-  snaps.sort((a,b)=>a.date.localeCompare(b.date));
-  _insightFcSnaps=snaps; return snaps;
-}
-// 기록된 예측과 실제 판매를 비교 — 읽기 전용
-function insightFcEvaluate(snaps){
-  const lastData=_insightLastDataDate();
-  const rgById=insightRgQtyById();
-  const rgStart=insightRgYms().slice(-1)[0]+'-01';   // 로켓그로스 판매를 불러온 가장 이른 날 — 이보다 이른 기간은 실제 판매가 모자라 비교에서 제외
-  const byId={}; products.forEach(p=>{ byId[p.id]=p; });
-  const serCache={};
-  const serOf=p=>serCache[p.id]||(serCache[p.id]=insightMergedSeriesFor(p, rgById, insightBdIdFor(p)));
-  const actual=(p,s,e)=>{ const ser=serOf(p); let t=0; for(let d=s; d<=e; d=_fcAddDays(d,1)) t+=ser[d]||0; return t; };
-  const soHit=(p,s,e)=>{ const it=_stockoutLog&&_stockoutLog.items&&_stockoutLog.items[p.code]; if(!it) return false; return (it.eps||[]).some(x=>x.s<=e&&x.e>=s) || !!(it.open&&it.open.s<=e); };
-  const out={lastData, nSnap:snaps.length, first:snaps.length?snaps[0].date:null, hz:{30:[],60:[],90:[]}, exp:[], cov:[], win:[], excluded:0, skippedRg:0};
-  snaps.forEach(sn=>{
-    Object.entries(sn.items).forEach(([id,it])=>{
-      const p=byId[id]; if(!p) return;
-      const base={id, p, g:it.g, t:it.t, sd:sn.date};
-      const ok=(s,e)=>{
-        if(e>lastData) return null;                   // 아직 기간이 안 끝남
-        if(s<rgStart){ out.skippedRg++; return null; } // 로켓그로스 판매가 없는 기간
-        if(soHit(p,s,e)){ out.excluded++; return null; }   // 품절이 끼면 실제 판매가 수요보다 작게 잡힘 → 제외
-        return true;
-      };
-      [30,60,90].forEach((h,i)=>{
-        const s=sn.date, e=_fcAddDays(s,h-1);
-        if(ok(s,e)) out.hz[h].push(Object.assign({F:it.f[i], A:actual(p,s,e)}, base));
-      });
-      if(it.h>0 && it.fh!=null){
-        const s=sn.date, e=_fcAddDays(s,it.h-1);
-        if(ok(s,e)){ const A=actual(p,s,e); out.exp.push(Object.assign({F:it.fh, A, T:it.th, k:it.k, covered:A<=it.th}, base)); }
-      }
-      if(it.we && it.wb!=null){
-        const s=sn.date, e=it.we;
-        if(ok(s,e)){ const A=actual(p,s,e); out.win.push(Object.assign({F:it.wb, A, T:it.wt, covered:A<=it.wt}, base)); }
-      }
-    });
-  });
-  return out;
-}
-function _fcAgg(list){
-  const L=list.filter(x=>x.F>=1||x.A>=1);   // 둘 다 거의 0인 제품은 의미 없어 제외
-  const F=L.reduce((s,x)=>s+x.F,0), A=L.reduce((s,x)=>s+x.A,0), E=L.reduce((s,x)=>s+Math.abs(x.F-x.A),0);
-  return {n:L.length, F, A, wmape:A>0?E/A:null, bias:A>0?F/A-1:null};
-}
-function _fcCov(list){
-  const L=list.filter(x=>x.F>=3);
-  return {n:L.length, pct:L.length?Math.round(L.filter(x=>x.covered).length/L.length*100):null};
-}
-const _FC_TYPE={k:'꾸준한 제품', s:'계절 제품', n:'신제품(1년 미만)'};
-async function insightFcOpen(){
-  openModal('insightFcModal');
-  const box=document.getElementById('insightFcBody');
-  box.innerHTML='<div style="padding:18px;color:var(--tx2);font-size:13px;">기록을 불러오는 중… ⏳</div>';
-  try{
-    const snaps=await insightFcLoadSnaps(true);
-    await simEnsureRows();      // 로켓그로스·백데이터까지 불러온 상태에서 실제 판매를 합산
-    await stockoutLoad();
-    box.innerHTML=insightFcRender(snaps, insightFcEvaluate(snaps));
-  }catch(e){ console.warn('예측 정확도 계산 실패', e); box.innerHTML='<div style="padding:18px;color:var(--red-600);font-size:13px;">불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.</div>'; }
-}
-function insightFcRender(snaps, ev){
-  const pc=v=>v==null?'-':Math.round(v*100)+'%';
-  const sg=v=>v==null?'-':(v>=0?'+':'')+Math.round(v*100)+'%';
-  const n0=v=>Math.round(v).toLocaleString('ko-KR');
-  const th='style="text-align:right;"';
-  if(!snaps.length) return `<div class="sim-note" style="padding:14px;font-size:13px;line-height:1.7;">아직 기록된 예측이 없어요. 발주 인사이트를 열면 매주 한 번 그 시점의 예측이 자동으로 기록되고, 30일이 지나면 실제 판매와 비교한 결과가 여기에 나타나요.</div>`;
-  const firstEval=_fcAddDays(snaps[0].date,29);
-  let h=`<div style="font-size:12.5px;color:var(--tx2);line-height:1.7;margin-bottom:10px;">기록된 예측 <b style="color:var(--tx);">${snaps.length}회</b>(첫 기록 ${snaps[0].date}, 판매 데이터 ${ev.lastData||'-'}까지). 실제 판매는 일반 채널+로켓그로스 합계예요. <b style="color:var(--tx);">품절이 낀 제품·기간은 실제 판매가 수요보다 작게 잡혀서 제외</b>했어요(품절 기록은 10/7부터 있어 그 전 기록은 제외하지 못해요)${ev.excluded?` — 제외 ${n0(ev.excluded)}건`:''}.</div>`;
-  const any=ev.hz[30].length+ev.hz[60].length+ev.hz[90].length+ev.exp.length+ev.win.length;
-  if(!any){ return h+`<div class="sim-note" style="padding:14px;font-size:13px;line-height:1.7;">아직 비교할 수 있는 기간이 끝나지 않았어요. 첫 비교는 <b>${firstEval}</b> 이후부터 나타나요(30일 예측 기준).</div>`; }
-  // ① 기본 예측 오차
-  const groups=[['전체',()=>true],...['k','s','n'].map(t=>[_FC_TYPE[t],x=>x.t===t]),...['A','B','C'].map(g=>[g+'등급',x=>x.g===g])];
-  h+=`<h4 style="font-size:13.5px;margin:12px 0 6px;">① 앞으로 N일 예상 판매 vs 실제</h4><div style="font-size:11.5px;color:var(--tx2);margin-bottom:6px;">오차 = 틀린 양의 합 ÷ 실제 판매 합(작을수록 좋음). 편향 = 예측 합계가 실제보다 많으면 +, 적으면 −(0에 가까울수록 좋음).</div>`;
-  h+=`<div class="tw"><table><thead><tr><th>구분</th>${[30,60,90].map(d=>`<th ${th}>${d}일 오차</th><th ${th}>${d}일 편향</th><th ${th}>제품수</th>`).join('')}</tr></thead><tbody>`;
-  groups.forEach(([nm,f])=>{
-    h+=`<tr><td>${nm}</td>`+[30,60,90].map(d=>{ const a=_fcAgg(ev.hz[d].filter(f)); return `<td ${th}>${a.n?pc(a.wmape):'-'}</td><td ${th}>${a.n?sg(a.bias):'-'}</td><td ${th}>${a.n||'-'}</td>`; }).join('')+`</tr>`;
-  });
-  h+=`</tbody></table></div>`;
-  // ② 권장발주 계산이 쓴 예상 + 안전 목표 커버율
-  if(ev.exp.length){
-    h+=`<h4 style="font-size:13.5px;margin:16px 0 6px;">② 권장발주 계산(리드타임+발주주기 기간) — 예상 오차와 안전 목표 커버율</h4><div style="font-size:11.5px;color:var(--tx2);margin-bottom:6px;">커버율 = 실제 판매가 안전 목표 이하였던 제품 비율(그 목표만큼 확보했다면 품절 안 났을 비율). 등급 설계값은 A 약 90% · B 약 80% · C 약 70%예요.</div>`;
-    h+=`<div class="tw"><table><thead><tr><th>구분</th><th ${th}>예상 오차</th><th ${th}>예상 편향</th><th ${th}>안전 목표 커버율</th><th ${th}>제품수</th></tr></thead><tbody>`;
-    groups.forEach(([nm,f])=>{ const L=ev.exp.filter(f), a=_fcAgg(L), c=_fcCov(L); h+=`<tr><td>${nm}</td><td ${th}>${a.n?pc(a.wmape):'-'}</td><td ${th}>${a.n?sg(a.bias):'-'}</td><td ${th}>${c.pct!=null?c.pct+'%':'-'}</td><td ${th}>${c.n||'-'}</td></tr>`; });
-    h+=`</tbody></table></div>`;
-  }
-  // ③ 구정 구간
-  if(ev.win.length){
-    h+=`<h4 style="font-size:13.5px;margin:16px 0 6px;">③ 구정 커버 점검 구간(기록일~입고 재개일) 예상 vs 실제</h4><div class="tw"><table><thead><tr><th>구분</th><th ${th}>예상 오차</th><th ${th}>예상 편향</th><th ${th}>안전 목표 커버율</th><th ${th}>제품수</th></tr></thead><tbody>`;
-    groups.forEach(([nm,f])=>{ const L=ev.win.filter(f), a=_fcAgg(L), c=_fcCov(L); h+=`<tr><td>${nm}</td><td ${th}>${a.n?pc(a.wmape):'-'}</td><td ${th}>${a.n?sg(a.bias):'-'}</td><td ${th}>${c.pct!=null?c.pct+'%':'-'}</td><td ${th}>${c.n||'-'}</td></tr>`; });
-    h+=`</tbody></table></div>`;
-  } else {
-    h+=`<div class="sim-note" style="margin-top:14px;font-size:12px;line-height:1.7;">③ 구정 구간 비교는 입고 재개일(약 4월 초)이 지나야 나타나요.</div>`;
-  }
-  // ④ 가장 크게 빗나간 제품(30일)
-  const miss=ev.hz[30].filter(x=>x.F>=10||x.A>=10).map(x=>Object.assign({d:Math.abs(x.F-x.A)},x)).sort((a,b)=>b.d-a.d).slice(0,10);
-  if(miss.length){
-    h+=`<h4 style="font-size:13.5px;margin:16px 0 6px;">④ 30일 예측이 가장 크게 빗나간 제품 TOP 10</h4><div class="tw"><table><thead><tr><th>제품</th><th>기록일</th><th ${th}>예상</th><th ${th}>실제</th></tr></thead><tbody>`;
-    miss.forEach(x=>{ h+=`<tr><td>${_esc(String(x.p.name||''))} <small style="color:var(--tx2);">${_esc(String(x.p.code||''))}</small></td><td>${x.sd}</td><td ${th}>${n0(x.F)}</td><td ${th}>${n0(x.A)}</td></tr>`; });
-    h+=`</tbody></table></div>`;
-  }
-  return h;
 }
 function _soStatus(code){
   const it=_stockoutLog&&_stockoutLog.items&&_stockoutLog.items[code]; if(!it) return null;
