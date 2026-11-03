@@ -1129,6 +1129,11 @@ td{padding:6px 9px;color:var(--tx);vertical-align:middle;white-space:nowrap;}
 .simx-dl{display:grid;grid-template-columns:104px 1fr;gap:4px 12px;padding:9px 0;border-top:1px solid var(--bd);}
 .simx-dl .k{font-size:13px;font-weight:800;color:var(--tx);}
 .simx-note{font-size:12px;color:var(--tx2);line-height:1.6;padding:0 4px;}
+.simx-tbl{width:100%;border-collapse:collapse;margin:2px 0 8px;font-size:13px;}
+.simx-tbl th{background:var(--bg2);color:var(--tx2);font-weight:700;font-size:12px;padding:6px 8px;text-align:right;border-bottom:1px solid var(--bd);}
+.simx-tbl td{color:var(--tx);padding:5px 8px;text-align:right;border-bottom:1px solid var(--bd);}
+.simx-tbl th:first-child,.simx-tbl td:first-child{text-align:left;}
+.simx-tbl tr.tot td{font-weight:800;}
 @media(max-width:700px){.simx-kpi{grid-template-columns:repeat(2,1fr);}.simx-dl{grid-template-columns:1fr;}}
 html.mob-native .sim-fab{bottom:20px;right:74px;}
 html.mob-native .sim-pop{bottom:0;right:0;left:0;width:auto;max-width:none;max-height:88vh;border-radius:16px 16px 0 0;}
@@ -32133,6 +32138,42 @@ function simWhyOpen(){
   ov.innerHTML=_simWhyHtml; ov.classList.add('on');
 }
 function simWhyClose(){ document.getElementById('simxOv')?.classList.remove('on'); }
+// ── 채널별 판매(일반 채널 vs 로켓그로스) — 분석 근거 팝업용 "참고용 분해". 계산 결과·저장값에는 영향 없음(읽기 전용).
+//  · 일반 = daily_sales(is_rg=false, _dCache) / 로켓그로스 = 로켓그로스 매출 화면 업로드분(옵션→백데이터 매칭, 최근 INSIGHT_RG_LOOKBACK_MONTHS개월)
+//  · 로켓그로스 매칭·판매가 없는 제품은 빈 문자열(섹션 자체를 안 그림)
+//  · 계절·성수기 월별 패턴(getTotalM)은 일반 채널만, 최근 7·30일 속도는 일반+로켓그로스 합계 — 이 차이를 그대로 알려줌
+function simChannelSplitHtml(p, wc, fpat, n){
+  try{
+    const bdId=insightBdIdFor(p);
+    if(bdId==null) return '';
+    const rgSer=(_insightRgQtyByIdCache&&_insightRgQtyByIdCache[bdId])||{}, regSer=_dCache[p.code]||{};
+    if(!(Object.values(rgSer).reduce((a,b)=>a+b,0)>0)) return '';
+    const DAY=86400000, today=new Date(); today.setHours(0,0,0,0);
+    const win=(ser,days)=>{ let s=0; for(let i=0;i<days;i++) s+=ser[fmtDate(new Date(today.getTime()-i*DAY))]||0; return s; };
+    const reg7=win(regSer,7), rg7=win(rgSer,7), reg30=win(regSer,30), rg30=win(rgSer,30), t30=reg30+rg30;
+    const pct=Math.round(rg30/(t30||1)*100);
+    const d1=v=>(Math.round(v*10)/10).toFixed(1);
+    const tr=(nm,s7,s30)=>{ if(s30<10) return ''; const a7=s7/7, a30=s30/30; return a7<a30*0.5?`${nm}은 최근 일주일이 30일 평균보다 크게 낮아 식고 있어요. `:(a7>a30*1.6?`${nm}은 최근 일주일이 30일 평균보다 높아 늘고 있어요. `:''); };
+    const monthSum=(ser,ym)=>Object.entries(ser).reduce((s,[d,q])=>d.startsWith(ym+'-')?s+q:s,0);
+    const yms=insightRgYms().slice().reverse(), curYm=fmtDate(today).slice(0,7);
+    const trow=(lbl,a,b,strong)=>`<tr${strong?' class="tot"':''}><td>${lbl}</td><td>${n(a)}개</td><td>${n(b)}개</td><td>${n(a+b)}개</td><td>${(a+b)>0?Math.round(b/(a+b)*100)+'%':'-'}</td></tr>`;
+    const table=`<table class="simx-tbl"><thead><tr><th>기간</th><th>일반 채널</th><th>🚀 로켓그로스</th><th>합계</th><th>그로스 비중</th></tr></thead><tbody>`
+      +trow('최근 7일',reg7,rg7)+trow('최근 30일',reg30,rg30,true)
+      +yms.map(ym=>trow(`${+ym.slice(5)}월${ym===curYm?'(진행중)':''}`,monthSum(regSer,ym),monthSum(rgSer,ym))).join('')+`</tbody></table>`;
+    let t=`최근 30일 일평균: 일반 채널 <b>${d1(reg30/30)}개</b> + 로켓그로스 <b>${d1(rg30/30)}개</b> = 합계 <b>${d1(t30/30)}개</b>. 최근 7일 일평균은 일반 ${d1(reg7/7)}개 · 로켓그로스 ${d1(rg7/7)}개예요. `;
+    if(t30===0) t+=`→ 최근 30일은 일반 채널·로켓그로스 모두 판매가 없어요. `;
+    else if(reg30===0) t+=`→ 최근 30일 판매는 <b>전부 로켓그로스</b>예요(일반 채널 0개). 일반 채널 월별 실적으로 만든 '작년 같은 달·성수기' 패턴이 지금 판매를 설명하지 못할 수 있어요. `;
+    else if(rg30===0) t+=`→ 최근 30일은 일반 채널에서만 팔렸고 로켓그로스는 0개예요(이전 달에는 로켓그로스 판매가 있었어요). `;
+    else if(pct>=60) t+=`→ 최근 30일 판매의 <b>${pct}%가 로켓그로스</b>예요. 일반 채널 월별 실적만 보고 성수기·비수기를 판단하면 로켓그로스 쪽 움직임을 놓칠 수 있어요. `;
+    else if(pct<=15) t+=`→ 최근 30일은 대부분 일반 채널 판매예요(로켓그로스 비중 ${pct}%). `;
+    else t+=`→ 일반 채널과 로켓그로스가 함께 팔리고 있어요(로켓그로스 비중 ${pct}%). `;
+    t+=tr('일반 채널',reg7,reg30)+tr('로켓그로스',rg7,rg30);
+    t+=`성수기·비수기 판단과 '작년 같은 달' 비교는 일반 채널 월별 실적 기준이고, 로켓그로스는 최근 ${yms.length}개월분만 연동돼 월별 패턴에는 들어가 있지 않아요. 반대로 최근 7일·30일 판매속도는 일반+로켓그로스 합계예요. `;
+    if(wc && wc.status==='ok' && wc.growthOk && rg30>0 && wc.gPrev>0) t+=`올해 흐름 ×${wc.growth.toFixed(2)}는 '최근 30일 ${n(wc.gCur)}개(일반+로켓그로스) ÷ 작년 같은 30일 ${n(wc.gPrev)}개(일반 채널만)'로 계산돼서 로켓그로스만큼 높게 나올 수 있어요 — 일반 채널끼리만 비교하면 약 ×${(reg30/wc.gPrev).toFixed(2)}예요. `;
+    t+=`(이 표는 참고용이라 위 계산 결과는 바뀌지 않아요.)`;
+    return `<section class="simx-sec" style="--sc:#0EA5E9;"><h4><span>🛒</span>채널별 판매 (일반 채널 / 🚀 로켓그로스)</h4>${table}${simLines(t)}</section>`;
+  }catch(err){ console.warn('채널별 판매 분석 실패', err); return ''; }
+}
 function simRender(){
   const res=document.getElementById('simResult'); if(!res) return;
   const r=_simRow; if(!r){ res.innerHTML=''; return; }
@@ -32306,6 +32347,7 @@ function simRender(){
     <div class="simx-body">
       <div class="simx-vd" style="background:${st.bg};color:${st.fg};"><div class="v1">${st.icon} ${vText}</div>${head.replace('class="v2"','class="v2" style="color:'+st.fg+';"')}</div>
       <div class="simx-kpi">${kp('현재고',n(S)+'개')}${kp('진행중 발주',n(P)+'개')}${kp('이번 주문',n(Q)+'개')}${kp('주문 후 보유',n(T)+'개')}${kp('앱 권장 주문',bx(need)+'박스')}</div>
+      ${simChannelSplitHtml(p,wc,fpat,n)}
       ${sec('📈','① 판매 패턴 (작년+올해)',s1,'#3182F6')}
       ${sec('🔮','② 앞으로 예상 판매',s2,'#8B5CF6')}
       ${sec('📦','③ 필요한 재고',s3,'#F59E0B')}
