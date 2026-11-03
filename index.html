@@ -37026,7 +37026,16 @@ function cmbRenderList(){
   document.getElementById('cmbCount').textContent = COMBO_PRODUCTS.length.toLocaleString();
   cmbUpdateCheckedCount();
 }
+// 한국단가·공급가가 둘 다 없는(비었거나 0) 제품 = 사용하지 않는 코드
+function cmbIsUnusedCode(p){ return !p || !(Number(p.arrival)>0 || Number(p.supply)>0); }
 function cmbCheck(code, on){
+  if(on && cmbIsUnusedCode(COMBO_PRODUCTS.find(x=>x.code===code))){
+    const cb = document.querySelector(`#cmbTbody tr[data-code="${CSS.escape(code)}"] input[type=checkbox]`);
+    if(cb) cb.checked = false;
+    alert(`'${code}' 코드는 한국단가·공급가가 모두 없는, 사용하지 않는 코드입니다.
+선택할 수 없습니다.`);
+    return;
+  }
   _cmbState[code] = _cmbState[code] || {};
   _cmbState[code].checked = on;
   if(on && !_cmbState[code].qty){ _cmbState[code].qty = '1'; }
@@ -37042,14 +37051,17 @@ function cmbCheck(code, on){
 }
 function cmbQty(code, val){ _cmbState[code] = _cmbState[code] || {}; _cmbState[code].qty = val; }
 function cmbToggleAll(on){
+  let unused = 0;
   document.querySelectorAll('#cmbTbody tr[data-code]').forEach(tr=>{
     const code = tr.getAttribute('data-code');
+    if(on && cmbIsUnusedCode(COMBO_PRODUCTS.find(x=>x.code===code))){ unused++; return; }   // 사용 안 하는 코드는 전체선택에서 제외
     _cmbState[code] = _cmbState[code] || {};
     _cmbState[code].checked = on;
     const cb = tr.querySelector('input[type=checkbox]'); if(cb) cb.checked = on;
     tr.classList.toggle('cmb-on', on);
   });
   cmbUpdateCheckedCount();
+  if(unused) toast(`단가가 없는 '사용 안 하는 코드' ${unused}개는 선택에서 제외했습니다.`);
 }
 function cmbUpdateCheckedCount(){
   const n = Object.values(_cmbState).filter(s=>s.checked).length;
