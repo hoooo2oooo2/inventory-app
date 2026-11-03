@@ -37114,7 +37114,7 @@ async function cmbLoadProductEdits(){
 // 표에서 한국단가/공급가 셀 직접 수정 → override로 저장(다른 PC에도 즉시 공유)
 async function cmbEditPrice(code, field, val){
   if(!_cmbIsPriceAdmin()){ toast('단가수정은 관리자 계정만 가능합니다.'); cmbRenderList(); return; }
-  const n = val==='' ? null : Math.round(Number(val));
+  const n = val==='' ? 0 : Math.round(Number(val));   // 빈칸 = 단가 지움 → 0 (null은 보정값에서 무시되어 되돌아옴)
   if(val!=='' && (isNaN(n) || n<0)){ toast('올바른 숫자를 입력하세요.'); cmbRenderList(); return; }
   const p = COMBO_PRODUCTS.find(x=>x.code===code); if(!p) return;
   p[field] = n;
@@ -37129,7 +37129,7 @@ async function cmbSyncItemPrice(code, p){
   const recalc = it => {
     if(it.code !== code) return false;
     const base = it.basis==='arrival' ? p.arrival : p.supply;
-    if(base==null) return false;
+    if(!(Number(base)>0)) return false;   // 단가를 지운(0/빈칸) 경우 저장된 세트 금액을 0원으로 바꾸지 않음
     const unit = it.basis==='arrival' ? Math.round(base*1.1) : base;
     if(unit === it.unit) return false;
     it.unit = unit;
@@ -37190,7 +37190,7 @@ async function cmbHandleUpload(e){
   if(!rows.length){ alert('빈 파일입니다.'); return; }
   const seen = new Set();
   const changedCodes = [];
-  let added=0, updated=0, unchanged=0, bad=0;
+  let added=0, updated=0, unchanged=0, bad=0, cleared=0;
   for(let i=1;i<rows.length;i++){ // 1행은 헤더
     const r = rows[i]; if(!r || r.every(v=>v===''||v==null)) continue;
     const code = _s(r[0]), name = _s(r[1]);
@@ -37202,8 +37202,10 @@ async function cmbHandleUpload(e){
     if(existing){
       const ov = {..._cmbOverrides[code]};
       let changed = false;
-      if(arrival!=null && arrival!==existing.arrival){ ov.arrival = arrival; changed = true; }
-      if(supply!=null && supply!==existing.supply){ ov.supply = supply; changed = true; }
+      // 빈칸은 '단가 지움'으로 보고 0 저장 (null은 보정값에서 무시되어 지운 값이 되살아나므로). 기존 빈값/0은 같은 값으로 취급
+      const newArr = arrival==null ? 0 : arrival, newSup = supply==null ? 0 : supply;
+      if(newArr!==(existing.arrival||0)){ ov.arrival = newArr; changed = true; if(newArr===0) cleared++; }
+      if(newSup!==(existing.supply||0)){ ov.supply = newSup; changed = true; if(newSup===0) cleared++; }
       if(changed){ _cmbOverrides[code] = ov; updated++; changedCodes.push(code); }
       else unchanged++;
     } else {
@@ -37215,7 +37217,8 @@ async function cmbHandleUpload(e){
     alert(`반영할 변경사항이 없습니다.\n(동일 ${unchanged}건${bad?` · 코드/상품명 누락 ${bad}건 제외`:''})`);
     return;
   }
-  if(!confirm(`엑셀 반영 내용\n\n신규 추가: ${added}건\n단가 수정: ${updated}건\n변경 없음(유지): ${unchanged}건${bad?`\n코드/상품명 누락 제외: ${bad}건`:''}\n\n적용할까요?`)) return;
+  if(!confirm(`엑셀 반영 내용\n\n신규 추가: ${added}건\n단가 수정: ${updated}건\n${cleared?`단가 지움(0 처리): ${cleared}칸
+`:''}변경 없음(유지): ${unchanged}건${bad?`\n코드/상품명 누락 제외: ${bad}건`:''}\n\n적용할까요?`)) return;
   await cloudKvSave('combo_price_overrides', _cmbOverrides);
   await cloudKvSave('combo_extra_products', _cmbExtra);
   cmbRebuildProducts();
