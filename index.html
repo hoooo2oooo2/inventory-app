@@ -315,6 +315,24 @@ body{background:var(--bg2);color:var(--tx);min-height:100vh;line-height:1.3;}
 .ni:hover .ni-star{opacity:.7;}
 .ni .ni-star:hover{opacity:1;color:var(--amber-500);}
 .ni .ni-star.on{opacity:1;color:var(--amber-500);}
+/* 유현 계정 전용 — 부서 메뉴(로켓그로스) 옆 즐겨찾기 빠른이동 칩 (배경·글자색을 항상 함께 지정) */
+#navFavStrip{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;margin-left:8px;padding-left:12px;border-left:1px solid var(--bd);}
+#navFavStrip .nf-lbl{font-size:11px;font-weight:800;color:var(--amber-500);white-space:nowrap;flex:0 0 auto;}
+#navFavStrip .nf-chips{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;flex:0 1 auto;}
+#navFavStrip .nf-empty{font-size:11.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nf-chip{display:inline-flex;align-items:center;gap:5px;height:27px;padding:0 11px;border-radius:14px;background:#FFF4D6;color:#8A5A00;border:1px solid #F3D58A;font-size:12px;font-weight:600;white-space:nowrap;flex:0 0 auto;cursor:pointer;transition:transform .12s,box-shadow .12s;}
+.nf-chip:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.14);}
+.nf-chip .nf-path{opacity:.65;font-weight:500;}
+.nf-chip.on{background:var(--pr);border-color:var(--pr);color:#fff;}
+:root[data-theme="dark"] .nf-chip{background:#3B3320;color:#FBD38D;border-color:#6B5A2A;}
+:root[data-theme="dark"] .nf-chip.on{background:var(--pr);border-color:var(--pr);color:#fff;}
+.nf-btn{flex:0 0 auto;height:27px;padding:0 9px;border-radius:14px;border:1px solid var(--bd);background:var(--bg);color:var(--tx2);font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.nf-btn:hover{border-color:var(--pr);color:var(--pr);}
+#navFavPop{position:fixed;z-index:1000;min-width:210px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px;}
+#navFavPop button{display:flex;align-items:center;gap:7px;width:100%;text-align:left;padding:8px 10px;border-radius:7px;font-size:12.5px;background:transparent;color:var(--tx);border:none;cursor:pointer;}
+#navFavPop button:hover{background:var(--bg2);}
+#navFavPop button.on{color:var(--pr);font-weight:700;}
+html.mob-native #navFavStrip{display:none;}
 /* ═══ 홈 화면(관리자 전용): 시계·달력 + 즐겨찾기 위젯(작게/보통/크게) ═══ */
 #page-home{padding:18px 20px 40px;}
 /* ── 홈 레이아웃(2026-10-19 재배치): 인사·시각 헤더 → [오늘 할 일 | 지금 확인할 것 | 달력] → 즐겨찾기 위젯 ── */
@@ -9446,8 +9464,84 @@ function toggleHomeFav(id,ev){
   has ? homeRemove(id) : homeAdd(id);
   toast(has ? '즐겨찾기에서 뺐습니다.' : '⭐ 즐겨찾기에 추가했습니다. 홈 화면에서 위젯으로 볼 수 있어요.');
 }
+// ── 유현 계정 전용: 상단 부서 메뉴(로켓그로스) 바로 옆 즐겨찾기 빠른이동 ──
+// 즐겨찾기 목록 = 홈 화면 위젯(home_cfg_<아이디>)과 같은 데이터를 읽기만 함(저장 없음). 클릭 = 홈 위젯과 같은 이동(homeOpenWidget)
+function _navFavOn(){ return !!window.__CURRENT_USER && _hmMyPerson()==='유현'; }
+function _navFavActive(id){
+  try{
+    const {base,sub}=_hmParse(id);
+    if(currentPage!==base) return false;
+    if(!sub) return true;
+    if(base==='revenue') return _revPage===sub;
+    if(base==='phoneorder') return _pivTab===sub;
+    if(base==='retmgmt') return _rtTab===sub;
+  }catch(e){}
+  return false;
+}
+function _navFavInfo(id){
+  const {base,sub}=_hmParse(id);
+  const path=sub?(String(_menuLabel(base)).replace(/^[^\w가-힣]+/,'').trim()+' › '):'';
+  let nm=_hmLabel(id);
+  if(String(base).indexOf('rpt_')===0) nm+=' 업무보고서';   // 메뉴 이름이 사람 이름뿐이라 무엇인지 알 수 있게
+  return {ico:_hmIcon(id), path, nm};
+}
+function _renderNavFav(){
+  const dn=document.getElementById('deptNav'); if(!dn) return;
+  let st=document.getElementById('navFavStrip');
+  if(!_navFavOn()){ if(st) st.remove(); return; }
+  const cfg=_homeCfg||_homeNorm(_homeLocalGet());
+  const favs=(cfg.widgets||[]).map(w=>w.id).filter(id=>{ try{ return _hmPerm(id); }catch(e){ return false; } });
+  if(!st){ st=document.createElement('div'); st.id='navFavStrip'; dn.appendChild(st); }
+  const chips=favs.map(id=>{
+    const f=_navFavInfo(id);
+    return `<button class="nf-chip${_navFavActive(id)?' on':''}" data-id="${id}" onclick="navFavGo('${id}')" title="${_hmEsc(f.path+f.nm)}">${f.ico} ${f.path?`<span class="nf-path">${_hmEsc(f.path)}</span>`:''}${_hmEsc(f.nm)}</button>`;
+  }).join('');
+  st.innerHTML=`<span class="nf-lbl">★ 즐겨찾기</span>`
+    +(favs.length?`<div class="nf-chips">${chips}</div><button class="nf-btn nf-more" style="display:none" onclick="navFavMore(this,event)"></button>`
+                 :`<span class="nf-empty">메뉴 이름 옆 ☆를 누르면 여기에 표시됩니다</span>`)
+    +`<button class="nf-btn nf-edit" onclick="navFavManage()" title="홈 화면에서 즐겨찾기 순서 변경·삭제">✎ 편집</button>`;
+  _navFavFit();
+}
+function _navFavFit(){
+  const st=document.getElementById('navFavStrip'); if(!st) return;
+  const wrap=st.querySelector('.nf-chips'), more=st.querySelector('.nf-more'); if(!wrap||!more) return;
+  const chips=[...wrap.children]; chips.forEach(c=>{ c.style.display=''; }); more.style.display='none';
+  if(!st.offsetWidth) return;
+  const room=st.offsetWidth-(st.querySelector('.nf-lbl').offsetWidth+st.querySelector('.nf-edit').offsetWidth+120);
+  // 지금 보고 있는 화면의 칩은 항상 보이게 먼저 자리를 잡고, 나머지는 앞에서부터 들어가는 만큼만 표시
+  let used=0; const hid=[];
+  const act=chips.find(c=>c.classList.contains('on'));
+  if(act) used+=act.offsetWidth+6;
+  chips.forEach(c=>{
+    if(c===act) return;
+    const w=c.offsetWidth+6;
+    if(used+w<=room) used+=w; else { c.style.display='none'; hid.push(c.dataset.id); }
+  });
+  if(hid.length){ more.style.display=''; more.textContent='⋯ 더보기 ('+hid.length+')'; more.dataset.ids=hid.join(','); }
+}
+window.addEventListener('resize',()=>{ try{ _navFavFit(); }catch(e){} });
+function navFavGo(id){
+  navFavClosePop();
+  homeOpenWidget(id);
+  setTimeout(()=>{ try{ _renderNavFav(); }catch(e){} },150);   // 하위 탭 전환 뒤 현재 화면 표시 갱신
+}
+function navFavClosePop(){ document.getElementById('navFavPop')?.remove(); }
+function navFavMore(btn,ev){
+  ev.stopPropagation();
+  if(document.getElementById('navFavPop')){ navFavClosePop(); return; }
+  const ids=(btn.dataset.ids||'').split(',').filter(Boolean); if(!ids.length) return;
+  const pop=document.createElement('div'); pop.id='navFavPop';
+  pop.innerHTML=ids.map(id=>{ const f=_navFavInfo(id); return `<button class="${_navFavActive(id)?'on':''}" onclick="navFavGo('${id}')">${f.ico} ${_hmEsc(f.path+f.nm)}</button>`; }).join('');
+  document.body.appendChild(pop);
+  const r=btn.getBoundingClientRect();
+  pop.style.top=(r.bottom+6)+'px'; pop.style.left=Math.max(8,Math.min(r.right-pop.offsetWidth,innerWidth-pop.offsetWidth-8))+'px';
+  setTimeout(()=>document.addEventListener('click',navFavClosePop,{once:true}),0);
+}
+// 편집 = 홈 화면의 위젯 편집(드래그 순서 변경·삭제)으로 이동
+function navFavManage(){ goHome(); setTimeout(()=>{ if(!_homeEdit) homeToggleEdit(); },80); }
 // 메뉴 항목 옆 ☆/★ (관리자 전용)
 function _syncFavStars(){
+  try{ _renderNavFav(); }catch(e){ console.warn('navFav', e); }
   const admin=!!window.__CURRENT_USER;   // (변수명 유지) 모든 로그인 계정에 ☆ 표시
   const fav=new Set(((_homeCfg||_homeNorm(_homeLocalGet())).widgets).map(w=>w.id));
   MENUS.forEach(m=>{
