@@ -21617,7 +21617,7 @@ function insightFcRender(snaps, ev){
 }
 // ══════════════════════════════════════════════════════════════
 //  📦 입고 후 판매 속도 (2026-11-04 사용자 요청)
-//  · 발주관리에 입력한 1·2차 입고일(recv_in_dates)과 입고 수량 중 제품별 가장 최근 입고일을 기준으로
+//  · 발주관리에 입력한 1차 입고일 중 제품별 가장 최근 입고일을 기준으로
 //    ① 입고일(포함) 이후 7일 동안 몇 개 팔렸는지 ② 입고일 이후 오늘까지 몇 개 팔렸는지 ③ 사용자가 넣은 수량을 파는 데 며칠 걸렸는지(못 팔았으면 지금까지 판매량)를 보여준다.
 //  · 판매 = 일반 채널 + 로켓그로스(불러온 기간만). 읽기 전용 — 저장되는 값 없음.
 // ══════════════════════════════════════════════════════════════
@@ -21636,15 +21636,16 @@ function _rsBuild(){
   const end=(lastData && lastData<today)?lastData:today;      // 판매 데이터가 올라온 마지막 날까지만 셈
   const rgById=insightRgQtyById(), rgStart=insightRgYms().slice(-1)[0]+'-01';
   const byCode={}; products.forEach(p=>{ if(!p.hidden) (byCode[p.code]=byCode[p.code]||[]).push(p); });
-  const recs={};
+  const recs={}, undated={};
   [...receiveList, ...doneList].forEach(r=>{
     const cands=byCode[r.code]; if(!cands) return;
     const p=cands.length===1?cands[0]:(cands.find(x=>x.name===r.name)||null); if(!p) return;
-    [[r.in1,r.in1Date],[r.in2,r.in2Date]].forEach(([q,d])=>{
-      d=String(d||'').slice(0,10);
-      if(q>0 && /^\d{4}-\d{2}-\d{2}$/.test(d) && d<=today) (recs[p.id]=recs[p.id]||[]).push({date:d, qty:q});
-    });
+    // 기준은 1차 입고일만(2026-11-04 사용자 지정) — 2차 입고일은 보지 않는다
+    const d=String(r.in1Date||'').slice(0,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d) && d<=today) (recs[p.id]=recs[p.id]||[]).push({date:d, qty:+r.in1||0});
+    else if(+r.in1>0) undated[p.id]=p;          // 입고 수량은 있는데 1차 입고일이 비어 있는 제품 — 목록엔 못 넣고 안내만 한다
   });
+  Object.keys(undated).forEach(id=>{ if(recs[id]) delete undated[id]; });
   const rows=[];
   Object.keys(recs).forEach(id=>{
     const p=products.find(x=>String(x.id)===id); if(!p) return;
@@ -21657,8 +21658,14 @@ function _rsBuild(){
     rows.push({p, last, qty, days, elapsed:days.length, d7:sum(days.slice(0,7)), d7done:days.length>=7, since:sum(days), rgPartial});
   });
   rows.sort((a,b)=>b.last.localeCompare(a.last)||String(a.p.name).localeCompare(String(b.p.name)));
-  _rsMeta={today, end, lag:end<today, rgStart};
+  _rsMeta={today, end, lag:end<today, late:end<_fcAddDays(today,-1), rgStart, undated:Object.values(undated)};
   return rows;
+}
+// 판매 데이터 기준일 안내 — 판매는 매일 전날분까지 올라오므로 새 데이터가 올라오면 자동으로 날짜가 늘어난다
+function _rsLagNote(){
+  const m=_rsMeta; if(!m||!m.lag) return '';
+  return `※ 판매 데이터는 올라온 마지막 날(${_rsMD(m.end)})까지 기준이에요. 새 판매 데이터를 올리면 자동으로 오늘 날짜까지 늘어납니다.`
+    +(m.late?` 마지막 판매 업로드가 ${_rsMD(m.end)}이라 며칠 밀려 있어요.`:'');
 }
 function _rsReach(row, Q){
   let cum=0;
@@ -21671,7 +21678,7 @@ function _rsSentence(r, Q){
   const n=v=>Math.round(v).toLocaleString('ko-KR'), m=_rsMeta;
   const todayLbl=m.lag?`오늘(판매 데이터 기준 ${_rsMD(m.end)})`:`오늘(${_rsMD(m.end)})`;
   const nm=`<b>${_esc(String(r.p.name||''))}</b>`;
-  if(!Q) return `${nm} — 최근 입고일 ${_rsMD(r.last)}(${n(r.qty)}개 입고) 이후 7일 동안 <b>${n(r.d7)}개</b> 판매${r.d7done?'':`(아직 ${r.elapsed}일째라 7일이 안 됐어요)`}, ${todayLbl}까지 <b>${n(r.since)}개</b> 판매했어요.`;
+  if(!Q) return `${nm} — 최근 1차 입고일 ${_rsMD(r.last)}${r.qty>0?`(${n(r.qty)}개 입고)`:''} 이후 7일 동안 <b>${n(r.d7)}개</b> 판매${r.d7done?'':`(아직 ${r.elapsed}일째라 7일이 안 됐어요)`}, ${todayLbl}까지 <b>${n(r.since)}개</b> 판매했어요.`;
   const hit=_rsReach(r,Q);
   return hit
     ? `${nm} — 입고일(${_rsMD(r.last)} 포함) 이후 ${n(Q)}개를 판매하는 데 <b>${hit.days}일</b> 걸렸어요(${_rsMD(hit.date)} 달성, 입고일을 1일째로 셈).`
@@ -21684,7 +21691,8 @@ function simRecvInit(p){
   try{ _rsRows=_rsBuild(); }catch(e){ console.warn('시뮬레이터 입고 후 판매 계산 실패', e); box.innerHTML=''; return; }
   _simRecvRow=_rsRows.find(x=>x.p.id===p.id)||null;
   if(!_simRecvRow){
-    box.innerHTML=`<div class="sim-card" style="margin-top:8px;"><b>📦 입고 후 판매</b><div class="sim-note" style="margin-top:4px;">발주관리에 입고일이 입력된 입고 건이 없는 제품이에요.</div></div>`;
+    const und=(_rsMeta.undated||[]).some(x=>x.id===p.id);
+    box.innerHTML=`<div class="sim-card" style="margin-top:8px;"><b>📦 입고 후 판매</b><div class="sim-note" style="margin-top:4px;">${und?'입고 건은 있지만 <b>1차 입고일이 입력되지 않아</b> 계산할 수 없어요. 발주관리에서 1차 입고일을 입력하면 나와요.':'발주관리에 입고 건이 없는 제품이에요.'}</div></div>`;
     return;
   }
   box.innerHTML=`<div class="sim-card" style="margin-top:8px;"><b>📦 입고 후 판매</b> <small style="color:var(--tx2);">최근 입고일(그날 포함)부터</small>
@@ -21697,7 +21705,7 @@ function simRecvUpdate(){
   const qv=document.getElementById('simRecvQty').value, Q=(qv!==''&&parseFloat(qv)>0)?Math.round(parseFloat(qv)):0;
   out.innerHTML=_rsSentence(r,Q)
     +(r.rgPartial?`<div style="font-size:11px;color:var(--tx2);">※ 이 입고일은 로켓그로스 판매 기록(${_rsMD(_rsMeta.rgStart)}부터 불러옴) 이전이라 일반 채널 판매만 반영됐어요.</div>`:'')
-    +(_rsMeta.lag?`<div style="font-size:11px;color:var(--tx2);">※ 판매 데이터가 ${_rsMD(_rsMeta.end)}까지만 올라와 있어 그날까지 기준이에요.</div>`:'');
+    +(_rsMeta.lag?`<div style="font-size:11px;color:var(--tx2);">${_rsLagNote()}</div>`:'');
 }
 async function recvSalesOpen(){
   let ov=document.getElementById('rsModal');
@@ -21705,7 +21713,7 @@ async function recvSalesOpen(){
     ov=document.createElement('div'); ov.className='modal-overlay'; ov.id='rsModal';
     ov.innerHTML=`<div class="modal" style="max-width:980px;">
       <h3 style="font-size:16px;margin:0 0 4px;">📦 입고 후 판매 속도</h3>
-      <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">발주관리에 입력한 입고일 중 제품별 가장 최근 입고일(그날 포함)부터의 판매예요. 입고일을 1일째로 세고, 판매는 일반 채널+로켓그로스 합계입니다. 입고일이 입력되지 않은 제품은 나오지 않아요.</div>
+      <div style="font-size:12px;color:var(--tx2);margin-bottom:10px;line-height:1.6;">발주관리에 입력한 <b>1차 입고일</b> 중 제품별 가장 최근 입고일(그날 포함)부터의 판매예요. 입고일을 1일째로 세고, 판매는 일반 채널+로켓그로스 합계입니다. 1차 입고일이 입력되지 않은 제품은 나오지 않아요.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
         <div class="search-box"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 10l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input type="text" id="rsSrch" placeholder="상품명, 코드 검색..." oninput="recvSalesRender()" style="width:200px;"></div>
         <label style="font-size:13px;display:flex;align-items:center;gap:6px;">판매할 수량 <input class="inp" type="number" id="rsQty" min="1" placeholder="예: 20" oninput="recvSalesRender()" style="width:90px;"> 개</label>
@@ -21731,16 +21739,23 @@ function recvSalesRender(){
   const sentence=r=>_rsSentence(r,Q);
   let a='';
   if(list.length && list.length<=3 && (toks.length||Q)) a=list.map(r=>`<div style="padding:9px 12px;margin-bottom:6px;border-radius:8px;border:0.5px solid var(--bd);background:var(--bg2);font-size:13px;line-height:1.7;">${sentence(r)}${r.rgPartial?`<div style="font-size:11.5px;color:var(--tx2);">※ 이 입고일은 로켓그로스 판매 기록(${_rsMD(m.rgStart)}부터 불러옴) 이전이라 일반 채널 판매만 반영됐어요.</div>`:''}</div>`).join('');
-  if(m.lag) a+=`<div style="font-size:11.5px;color:var(--tx2);margin-bottom:6px;">※ 판매 데이터가 ${_rsMD(m.end)}까지만 올라와 있어 그날까지 기준이에요.</div>`;
+  if(m.lag) a+=`<div style="font-size:11.5px;color:var(--tx2);margin-bottom:6px;">${_rsLagNote()}</div>`;
+  if((m.undated||[]).length) a+=`<div style="font-size:11.5px;color:var(--tx2);margin-bottom:6px;">※ 입고 건은 있지만 1차 입고일이 입력되지 않은 제품 ${m.undated.length}개는 계산할 수 없어 목록에서 빠져 있어요(발주관리에서 1차 입고일을 입력하면 나타나요).</div>`;
   ans.innerHTML=a;
-  if(!_rsRows.length){ body.innerHTML='<div class="sim-note" style="padding:14px;font-size:13px;">입고일이 입력된 입고 건이 없어요. 발주관리의 입고 건에 1차·2차 입고일을 입력하면 여기에 나타나요.</div>'; return; }
-  if(!list.length){ body.innerHTML='<div class="sim-note" style="padding:14px;font-size:13px;">검색 결과가 없어요.</div>'; return; }
+  if(!_rsRows.length){ body.innerHTML='<div class="sim-note" style="padding:14px;font-size:13px;">1차 입고일이 입력된 입고 건이 없어요. 발주관리의 입고 건에 1차 입고일을 입력하면 여기에 나타나요.</div>'; return; }
+  if(!list.length){
+    const und=(m.undated||[]).filter(p=>toks.every(t=>(String(p.name||'')+' '+String(p.code||'')).toLowerCase().includes(t)));
+    body.innerHTML=und.length
+      ?`<div class="sim-note" style="padding:14px;font-size:13px;line-height:1.7;">${und.slice(0,5).map(p=>`<b>${_esc(String(p.name||''))}</b>`).join(', ')}${und.length>5?` 외 ${und.length-5}개`:''}은(는) 입고 건은 있지만 <b>1차 입고일이 입력되지 않아</b> 계산할 수 없어요. 발주관리에서 1차 입고일을 입력하면 여기에 나타나요.</div>`
+      :'<div class="sim-note" style="padding:14px;font-size:13px;">검색 결과가 없어요.</div>';
+    return;
+  }
   const th='style="text-align:right;"';
-  body.innerHTML=`<div class="tw"><table><thead><tr><th>제품</th><th>최근 입고일</th><th ${th}>입고 수량</th><th ${th}>입고 후 7일 판매</th><th ${th}>입고 후 오늘까지</th><th>${Q?`${n(Q)}개 판매 소요`:'목표 수량 소요'}</th><th ${th}>현재고</th></tr></thead><tbody>`
+  body.innerHTML=`<div class="tw"><table><thead><tr><th>제품</th><th>최근 1차 입고일</th><th ${th}>입고 수량</th><th ${th}>입고 후 7일 판매</th><th ${th}>입고 후 오늘까지</th><th>${Q?`${n(Q)}개 판매 소요`:'목표 수량 소요'}</th><th ${th}>현재고</th></tr></thead><tbody>`
     +list.map(r=>{
       let tgt='<span style="color:var(--tx2);">수량을 넣어주세요</span>';
       if(Q){ const hit=_rsReach(r,Q); tgt=hit?`<b>${hit.days}일</b> <span style="color:var(--tx2);">(${_rsMD(hit.date)})</span>`:`<span style="color:var(--amber-600,#B45309);">아직 못 팔았어요 · ${n(r.since)}개 판매</span>`; }
-      return `<tr><td>${_esc(String(r.p.name||''))} <small style="color:var(--tx2);">${_esc(String(r.p.code||''))}</small>${r.rgPartial?' <span title="입고일이 로켓그로스 기록 이전이라 일반 채널 판매만 반영" style="font-size:10px;color:var(--tx2);">(일반만)</span>':''}</td><td>${_rsMD(r.last)} <small style="color:var(--tx2);">${r.last.slice(0,4)}</small></td><td ${th}>${n(r.qty)}</td><td ${th}>${n(r.d7)}${r.d7done?'':` <small style="color:var(--tx2);">(${r.elapsed}일째)</small>`}</td><td ${th}>${n(r.since)} <small style="color:var(--tx2);">(${r.elapsed}일)</small></td><td>${tgt}</td><td ${th}>${n(r.p.stock||0)}</td></tr>`;
+      return `<tr><td>${_esc(String(r.p.name||''))} <small style="color:var(--tx2);">${_esc(String(r.p.code||''))}</small>${r.rgPartial?' <span title="입고일이 로켓그로스 기록 이전이라 일반 채널 판매만 반영" style="font-size:10px;color:var(--tx2);">(일반만)</span>':''}</td><td>${_rsMD(r.last)} <small style="color:var(--tx2);">${r.last.slice(0,4)}</small></td><td ${th}>${r.qty>0?n(r.qty):'-'}</td><td ${th}>${n(r.d7)}${r.d7done?'':` <small style="color:var(--tx2);">(${r.elapsed}일째)</small>`}</td><td ${th}>${n(r.since)} <small style="color:var(--tx2);">(${r.elapsed}일)</small></td><td>${tgt}</td><td ${th}>${n(r.p.stock||0)}</td></tr>`;
     }).join('')+`</tbody></table></div>`;
 }
 function _soStatus(code){
