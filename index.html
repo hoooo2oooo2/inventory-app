@@ -2520,7 +2520,11 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .lcr-btag{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:99px;background:#FEF3C7;color:#92400E;white-space:nowrap;vertical-align:middle;margin-left:4px;}
 .lcr-item .lcr-i-b{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;cursor:pointer;margin:0;}
 .lcr-item.is-b .lcr-i-b{display:inline-block;}
-.lcr-item.is-b .lcr-i-name{padding-right:84px;}
+.lcr-item.is-b .lcr-i-name{padding-right:150px;}
+.lcb-pick-opt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;padding:10px 14px;border:1.5px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);cursor:pointer;font-family:inherit;}
+.lcb-pick-opt:hover{border-color:var(--brand);background:var(--bg2);}
+.lcb-pick-reason{font-size:14px;font-weight:700;word-break:break-all;}
+.lcb-pick-meta{font-size:12px;color:var(--tx2);}
 .lcb-tabs{display:flex;gap:6px;margin:0 0 10px;flex-shrink:0;}
 .lcb-tabs button{border:1px solid var(--bd);background:var(--bg);color:var(--tx2);font-size:13px;font-weight:700;border-radius:99px;padding:6px 14px;cursor:pointer;font-family:inherit;}
 .lcb-tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff;}
@@ -3327,7 +3331,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
 <!-- ═══ B급제품 등록/수정 ═══ -->
 <div class="modal-overlay" id="lcbAddModal" style="z-index:340;" data-keep-open>
-  <div class="modal" style="max-width:480px;">
+  <div class="modal" style="max-width:520px;">
     <h3 id="lcbModalTitle">🅱️ B급제품 등록</h3>
     <input type="hidden" id="lcbEditId">
     <div style="margin-top:6px;">
@@ -3337,11 +3341,41 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <input class="lcr-i-qty" id="lcbQty" type="number" min="0" placeholder="0" style="width:86px;" onkeydown="if(event.key==='Enter'){event.preventDefault();lcbSave();}">
       </div>
       <div id="lcbHint" class="lcr-meta" style="margin-top:8px;font-size:12px;"></div>
+      <div style="margin-top:12px;">
+        <div class="cl-lbl">B급 사유 <span style="font-weight:600;color:var(--tx2);font-size:11.5px;">(예: 박스 파손, 외관 스크래치, 작동 불량)</span></div>
+        <textarea id="lcbReason" rows="2" maxlength="300" placeholder="B급이 된 사유를 입력하세요" style="width:100%;box-sizing:border-box;border:1.5px solid var(--bd);border-radius:8px;padding:9px 12px;font-size:14px;outline:none;resize:vertical;font-family:inherit;background:var(--bg);color:var(--tx);"></textarea>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="cl-lbl">이미지 <span style="font-weight:600;color:var(--tx2);font-size:11.5px;">(최대 5장 · 이 창에서 Ctrl+V로 붙여넣기도 가능)</span></div>
+        <div class="kb-img-grid" id="lcbImgGrid" style="margin-top:6px;"></div>
+        <input type="file" id="lcbImgInput" accept="image/*" multiple style="display:none;" onchange="lcbAddImages(event)">
+        <button type="button" class="kb-img-add" onclick="document.getElementById('lcbImgInput').click()">🖼️ 이미지 추가</button>
+      </div>
     </div>
     <div class="ma">
       <button class="btn" onclick="closeModal('lcbAddModal')">취소</button>
       <button class="btn btn-pr" onclick="lcbSave()">저장</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ B급 선택 (같은 제품, 사유가 다른 B급이 여러 개일 때) ═══ -->
+<div class="modal-overlay" id="lcbPickModal" style="z-index:390;" data-keep-open>
+  <div class="modal" style="max-width:440px;">
+    <h3>🅱️ 판매하는 B급 선택</h3>
+    <div id="lcbPickMsg" style="font-size:13.5px;color:var(--tx);line-height:1.6;margin-top:6px;"></div>
+    <div id="lcbPickList" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;max-height:46vh;overflow-y:auto;"></div>
+    <div class="ma"><button class="btn" onclick="lcbPickAnswer(-1)">새제품 판매 (B급 아님)</button></div>
+  </div>
+</div>
+
+<!-- ═══ B급제품 이미지 보기 ═══ -->
+<div class="modal-overlay" id="lcbImgModal" style="z-index:345;" data-keep-open>
+  <div class="modal" style="max-width:640px;">
+    <h3 id="lcbImgTitle">🅱️ B급 이미지</h3>
+    <div id="lcbImgReason" style="font-size:13px;color:var(--tx);line-height:1.6;margin-top:6px;white-space:pre-wrap;word-break:break-all;"></div>
+    <div id="lcbImgView" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;max-height:62vh;overflow-y:auto;"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('lcbImgModal')">닫기</button></div>
   </div>
 </div>
 
@@ -14249,7 +14283,7 @@ function _lcrInRange(o, fy, fm){
 // 주문 1건 = 제품 여러 개(items) 가능. items 가 없는 기존 주문은 productName/qty/price/unitCost 한 줄로 취급(저장값 변환 없음)
 function _lcrItems(o){
   if(Array.isArray(o.items) && o.items.length){
-    const its=o.items.map(it=>({productName:it.productName||'', qty:Number(it.qty)||0, price:(it.price!=null?Number(it.price):null), isB:!!it.isB,
+    const its=o.items.map(it=>({productName:it.productName||'', qty:Number(it.qty)||0, price:(it.price!=null?Number(it.price):null), isB:!!it.isB, bId:it.bId||'', bReason:it.bReason||'',
       unit: it.unitCost!=null ? Number(it.unitCost) : lcrUnitCost(it.productName)}));
     // 제품별 판매금액이 저장돼 있지 않으면(주문 전체 합계만 입력) 합계를 공급가×수량 비례로 배분 — 제품별 랭킹용 추정치이며 주문 합계·마진은 그대로 정확
     if(its.some(i=>i.price==null)){
@@ -14262,13 +14296,25 @@ function _lcrItems(o){
     }
     return its;
   }
-  return [{productName:o.productName||'', qty:Number(o.qty)||0, price:Number(o.price)||0, isB:!!o.bGrade, unit:_lcrUnit(o)}];
+  return [{productName:o.productName||'', qty:Number(o.qty)||0, price:Number(o.price)||0, isB:!!o.bGrade, bId:o.bId||'', bReason:o.bReason||'', unit:_lcrUnit(o)}];
 }
-// 주문건에서 B급으로 판매된 수량 {제품명: 수량} — B급 재고 차감·복원 계산용
+// 주문건에서 B급으로 판매된 수량 — B급 재고 차감·복원 계산용. 키 = B급 항목 id(사유별로 다른 항목), 항목 id가 없는 옛 주문은 'n:제품명'(제품명 기준·먼저 등록된 것부터 차감)
+//   → { 키: {qty, name, bId, reason} }
+function _lcrBKey(i){ return i.bId || ('n:'+i.productName); }
+// B급 표시 태그 — 사유가 있으면 "B급·사유(앞 8자)" (전체 사유는 마우스를 올리면)
+function _lcrBTag(i, label){
+  const r=(i&&i.bReason)||'';
+  return `<span class="lcr-btag" title="${_lcrEsc(r?('B급 사유: '+r):'B급 판매')}">${label||'B급'}${r?'·'+_lcrEsc(r.length>8?r.slice(0,8)+'…':r):''}</span>`;
+}
 function _lcrBMap(o){
   const m={};
   if(!o) return m;
-  _lcrItems(o).forEach(i=>{ if(i.isB && i.qty>0) m[i.productName]=(m[i.productName]||0)+i.qty; });
+  _lcrItems(o).forEach(i=>{
+    if(!(i.isB && i.qty>0)) return;
+    const k=_lcrBKey(i);
+    if(!m[k]) m[k]={qty:0, name:i.productName, bId:i.bId||'', reason:i.bReason||''};
+    m[k].qty+=i.qty;
+  });
   return m;
 }
 function _lcrAgg(rows){
@@ -14611,7 +14657,7 @@ function lcrOpenDetail(id, ev){
   document.getElementById('lcrDetPhone').textContent = _lcrFmtPhone(o.phone) || '-';
   document.getElementById('lcrDetAddr').textContent = o.visitSale ? '🚶 방문판매' : (o.address || '-');
   const _its=_lcrItems(o);
-  document.getElementById('lcrDetProd').innerHTML = _its.length>1 ? _its.map(i=>`<div>${_lcrEsc(i.productName)}${i.isB?'<span class="lcr-btag">B급</span>':''} <span style="color:var(--tx2);">× ${i.qty.toLocaleString('ko-KR')} · ${_lcrWon(i.price)}${i.est?'(추정)':''}</span></div>`).join('') : ((_lcrEsc(o.productName) || '-') + (_its[0]&&_its[0].isB?'<span class="lcr-btag">B급</span>':''));
+  document.getElementById('lcrDetProd').innerHTML = _its.length>1 ? _its.map(i=>`<div>${_lcrEsc(i.productName)}${i.isB?_lcrBTag(i):''} <span style="color:var(--tx2);">× ${i.qty.toLocaleString('ko-KR')} · ${_lcrWon(i.price)}${i.est?'(추정)':''}</span></div>`).join('') : ((_lcrEsc(o.productName) || '-') + (_its[0]&&_its[0].isB?_lcrBTag(_its[0]):''));
   document.getElementById('lcrDetQty').textContent = _lbxNum(_its.reduce((t,i)=>t+i.qty,0));
   document.getElementById('lcrDetPrice').textContent = _lcrWon(_its.reduce((t,i)=>t+i.price,0));
   document.getElementById('lcrDetMargin').innerHTML = lcrMarginCell(o);
@@ -14629,11 +14675,10 @@ function lcrCarrierSel(o){
 // 제품명 칸: 여러 개면 "첫 제품명 외 N건" (전체 목록은 마우스를 올리거나 행을 눌러 상세 팝업에서 확인)
 function lcrProdCell(o){
   const its=_lcrItems(o);
-  const bTag='<span class="lcr-btag">B급</span>';
-  if(its.length<=1) return _lcrEsc(o.productName) + (its[0]&&its[0].isB ? bTag : '');
-  const tip=its.map(i=>`${i.productName}${i.isB?' [B급]':''} × ${i.qty.toLocaleString('ko-KR')}`).join('\n');
+  if(its.length<=1) return _lcrEsc(o.productName) + (its[0]&&its[0].isB ? _lcrBTag(its[0]) : '');
+  const tip=its.map(i=>`${i.productName}${i.isB?` [B급${i.bReason?'·'+i.bReason:''}]`:''} × ${i.qty.toLocaleString('ko-KR')}`).join('\n');
   const otherB = its.slice(1).some(i=>i.isB);
-  return `<span title="${_lcrEsc(tip)}">${_lcrEsc(its[0].productName)}${its[0].isB?bTag:''} <span class="lcr-meta" style="display:inline;font-weight:700;">외 ${its.length-1}건</span>${otherB?bTag.replace('B급','B급 포함'):''}</span>`;
+  return `<span title="${_lcrEsc(tip)}">${_lcrEsc(its[0].productName)}${its[0].isB?_lcrBTag(its[0]):''} <span class="lcr-meta" style="display:inline;font-weight:700;">외 ${its.length-1}건</span>${otherB?_lcrBTag(null,'B급 포함'):''}</span>`;
 }
 function lcrRowHtml(o){
   const erpMeta = o.erpChecked ? `<div class="lcr-meta">${_lcrEsc(o.erpCheckedBy||'-')} · ${_lcrEsc(o.erpCheckedAt||'-')}</div>` : '';
@@ -14675,7 +14720,7 @@ function lcrAddItemRow(it){
     <input class="lcr-i-price" data-money placeholder="0" value="${it.price!=null?it.price:''}" oninput="lcrItemsSum()" title="이 제품의 판매금액 — 수량과 무관하게 직접 입력한 금액이 그대로 판매금액입니다">
     <button type="button" class="lcr-del-btn" title="이 제품 줄 삭제" onclick="lcrRemoveItemRow(this)">✕</button>`;
   box.appendChild(row);
-  if(it.isB) lcrSetRowB(row, true);
+  if(it.isB) lcrSetRowB(row, true, {bId:it.bId||'', reason:it.bReason||''});
   lcrItemsSum();
   return row;
 }
@@ -14686,12 +14731,17 @@ function lcrRemoveItemRow(btn){
   lcrItemsSum();
 }
 // ── B급 판매 표시(제품 줄 단위) — 제품을 고를 때 B급 재고가 있으면 "B급 판매인가요?"를 물어 예/아니오로 정함 ──
-function lcrSetRowB(row, on){
+// info = {bId, reason} — 어떤 B급 항목(사유)을 판매하는지. 같은 제품에 사유가 다른 B급이 여러 개일 수 있어 항목 id로 기억한다
+function lcrSetRowB(row, on, info){
   if(!row) return;
-  const nm=row.querySelector('.lcr-i-name');
+  const nm=row.querySelector('.lcr-i-name'), badge=row.querySelector('.lcr-i-b');
   row.classList.toggle('is-b', !!on);
-  if(on){ row.dataset.b='1'; row.dataset.bname=(nm.value||'').trim(); }
-  else { delete row.dataset.b; delete row.dataset.bname; }
+  if(on){
+    row.dataset.b='1'; row.dataset.bname=(nm.value||'').trim();
+    row.dataset.bid=(info&&info.bId)||''; row.dataset.breason=(info&&info.reason)||'';
+    if(badge){ const r=row.dataset.breason; badge.textContent='🅱 B급'+(r?'·'+(r.length>6?r.slice(0,6)+'…':r):''); badge.title=(r?`B급 사유: ${r}\n`:'')+'B급 판매로 등록됨 — 클릭하면 B급 해제(새제품 판매)'; }
+  }
+  else { delete row.dataset.b; delete row.dataset.bname; delete row.dataset.bid; delete row.dataset.breason; }
 }
 function lcrToggleRowB(badge){ lcrSetRowB(badge.closest('.lcr-item'), false); }
 // 제품명을 직접 고치면 앞서 정한 B급 표시는 풀고(다른 제품이 되므로), 이어서 검색 드롭다운을 띄운다
@@ -14744,7 +14794,7 @@ function lcrOpenEdit(id){
   // 제품별 판매금액이 저장돼 있지 않은 예전 다제품 주문은 표시용 배분값(_lcrItems)으로 채워 주문 합계가 그대로 유지되게 함
   const est = _lcrItems(o);
   const raw = (Array.isArray(o.items) && o.items.length) ? o.items.map((it,i)=>({...it, price: it.price!=null ? it.price : est[i].price}))
-    : [{productName:o.productName, qty:o.qty, price:o.price, unitCost:o.unitCost}];
+    : [{productName:o.productName, qty:o.qty, price:o.price, unitCost:o.unitCost, isB:!!o.bGrade, bId:o.bId||'', bReason:o.bReason||''}];   // 단일 제품 주문의 B급 표시도 그대로 불러와야 저장 때 B급 재고가 잘못 복원되지 않음
   lcrSetItemRows(raw);
   openModal('logiCarrotAddModal');
   setTimeout(()=>document.getElementById('lcrName')?.focus(), 50);
@@ -14769,8 +14819,9 @@ async function lcrSave(){
     const keep = !!editId && row.dataset.orig!=='' && productName===row.dataset.orig;
     const unitCost = keep ? (row.dataset.unit!=='' ? Number(row.dataset.unit) : null) : lcrUnitCost(productName);
     const isB = row.dataset.b==='1' && productName===row.dataset.bname;   // 제품 선택 때 "B급 판매"로 답한 줄만(이름을 고치면 해제됨)
-    const dup = items.find(x=>x.productName===productName && x.unitCost===unitCost && !!x.isB===isB);
-    if(dup){ dup.qty+=qty; dup.price+=price; } else items.push({productName, qty, price, ...(isB?{isB:true}:{}), unitCost});
+    const bId = isB ? (row.dataset.bid||'') : '', bReason = isB ? (row.dataset.breason||'') : '';
+    const dup = items.find(x=>x.productName===productName && x.unitCost===unitCost && !!x.isB===isB && (x.bId||'')===bId);
+    if(dup){ dup.qty+=qty; dup.price+=price; } else items.push({productName, qty, price, ...(isB?{isB:true, ...(bId?{bId}:{}), ...(bReason?{bReason}:{})}:{}), unitCost});
   }
   if(!items.length){ toast('제품명을 입력하세요.'); document.querySelector('#lcrItems .lcr-i-name')?.focus(); return; }
   // 판매금액 = 제품별로 직접 입력한 금액의 합계(수량에 비례하지 않음, 입력한 금액이 순수 판매금액)
@@ -14778,6 +14829,8 @@ async function lcrSave(){
   // 최상위 productName/qty/price/unitCost 는 기존 형식 호환용 — 여러 제품이면 첫 제품명·총수량·총판매금액·unitCost=null (items 에는 제품별 수량·판매금액·공급가)
   const flat = { productName:items[0].productName, qty:totQty, price:totPrice, unitCost: items.length===1 ? items[0].unitCost : null,
     bGrade: (items.length===1 && items[0].isB) ? true : undefined,   // 단일 제품 주문의 B급 표시(여러 제품이면 items[].isB)
+    bId: (items.length===1 && items[0].isB && items[0].bId) ? items[0].bId : undefined,           // 어떤 B급 항목(사유)에서 나갔는지
+    bReason: (items.length===1 && items[0].isB && items[0].bReason) ? items[0].bReason : undefined,
     items: items.length>1 ? items : undefined };
   let latest = await cloudKvLoad('logi_carrot_orders');
   latest = Array.isArray(latest) ? latest : [];
@@ -14785,12 +14838,15 @@ async function lcrSave(){
   const oldOrder = editId ? latest.find(o=>o.id===editId) : null;
   if(editId && !oldOrder){ toast('수정할 주문건을 찾을 수 없습니다.'); return; }
   const oldB = _lcrBMap(oldOrder), newB = _lcrBMap({items, productName:items[0].productName, qty:totQty, price:totPrice});
-  const bNames = [...new Set([...Object.keys(oldB), ...Object.keys(newB)])];
-  if(bNames.length){
+  const bKeys = [...new Set([...Object.keys(oldB), ...Object.keys(newB)])];
+  if(bKeys.length){
     const bl = await _lcbLoadLatest(); if(bl===null) return;   // B급 목록을 못 읽으면 저장 중단(재고가 어긋나지 않게)
-    for(const n of Object.keys(newB)){
-      const have = bl.filter(b=>b.productName===n && b.qty>0).reduce((t,b)=>t+b.qty,0) + (oldB[n]||0);
-      if(newB[n]>have){ toast(`B급 재고가 부족합니다 — ${n}: B급 ${have}개 보유, ${newB[n]}개 입력. 초과분은 새제품 줄로 나눠 입력하세요.`); return; }
+    for(const k of Object.keys(newB)){
+      const nb=newB[k];
+      // 보유 = 그 B급 항목(사유)의 남은 수량 (항목 id가 없는 옛 주문은 같은 제품명 B급 전체) + 수정 중인 이 주문이 이미 쓴 수량
+      const stockNow = nb.bId ? ((bl.find(b=>b.id===nb.bId)||{}).qty||0) : bl.filter(b=>b.productName===nb.name && b.qty>0).reduce((t,b)=>t+b.qty,0);
+      const have = Math.max(0,stockNow) + ((oldB[k]||{}).qty||0);
+      if(nb.qty>have){ toast(`B급 재고가 부족합니다 — ${nb.name}${nb.reason?` (사유: ${nb.reason})`:''}: B급 ${have}개 보유, ${nb.qty}개 입력. 초과분은 새제품 줄로 나눠 입력하세요.`); return; }
     }
   }
   if(editId){
@@ -14808,7 +14864,11 @@ async function lcrSave(){
   lcrRender();
   await cloudKvSave('logi_carrot_orders', latest);
   // B급 재고 차감/복원 — 이번 B급 수량 − 이전 B급 수량 (양수=차감, 음수=복원)
-  const deltas = {}; bNames.forEach(n=>{ const d=(newB[n]||0)-(oldB[n]||0); if(d) deltas[n]=d; });
+  const deltas = {};
+  bKeys.forEach(k=>{
+    const d=((newB[k]||{}).qty||0)-((oldB[k]||{}).qty||0); if(!d) return;
+    const ref=newB[k]||oldB[k]; deltas[k]={d, name:ref.name, bId:ref.bId, reason:ref.reason};
+  });
   if(Object.keys(deltas).length){
     const ok = await lcbApplyDeltas(deltas, {orderId:savedId, customer:name});
     if(!ok) toast('⚠ 주문은 저장됐지만 B급 재고 차감에 실패했습니다. B급제품 리스트에서 수량을 직접 확인·수정하세요.');
@@ -14866,9 +14926,9 @@ async function lcrDelete(id){
   // B급으로 판매된 주문이면 그 수량을 B급 재고로 되돌린다(주문이 없어졌으니 판매도 취소)
   const bm = _lcrBMap(gone);
   if(Object.keys(bm).length){
-    const back = {}; Object.keys(bm).forEach(n=>back[n]=-bm[n]);
+    const back = {}; Object.keys(bm).forEach(k=>back[k]={d:-bm[k].qty, name:bm[k].name, bId:bm[k].bId, reason:bm[k].reason});
     const ok = await lcbApplyDeltas(back, {orderId:id, customer:(gone&&gone.customerName)||'', restore:true});
-    toast(ok ? `🅱️ B급 재고 ${Object.values(bm).reduce((a,b)=>a+b,0)}개를 복원했습니다.` : '⚠ 주문은 삭제됐지만 B급 재고 복원에 실패했습니다. B급제품 리스트에서 수량을 직접 확인·수정하세요.');
+    toast(ok ? `🅱️ B급 재고 ${Object.values(bm).reduce((a,b)=>a+b.qty,0)}개를 복원했습니다.` : '⚠ 주문은 삭제됐지만 B급 재고 복원에 실패했습니다. B급제품 리스트에서 수량을 직접 확인·수정하세요.');
   }
 }
 
@@ -14959,33 +15019,59 @@ async function lcrBAsk(nameEl){
   lcrSetRowB(row, false);
   if(!name) return;
   try{ await lcrBRefresh(); }catch{}
-  const stock = lcbStock(name);
-  if(stock<=0) return;
-  lcrAskYn(`"${name}"\nB급 제품이 ${stock}개 있습니다.\n\nB급 판매 주문건이면 [예], 새제품 판매이면 [아니오]를 눌러주세요.`,
-    ()=>{ if((nameEl.value||'').trim()===name){ lcrSetRowB(row, true); row.querySelector('.lcr-i-qty')?.focus(); } },
-    ()=>{ lcrSetRowB(row, false); },
-    '🅱️ B급 제품 확인');
+  const entries = (_lcrB||[]).filter(b=>b.productName===name && b.qty>0).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+  if(!entries.length) return;
+  const stillSame = ()=> (nameEl.value||'').trim()===name;
+  const choose = b=>{ if(stillSame()){ lcrSetRowB(row, true, {bId:b.id, reason:b.reason||''}); row.querySelector('.lcr-i-qty')?.focus(); } };
+  const notB = ()=>{ lcrSetRowB(row, false); };
+  if(entries.length===1){
+    const b=entries[0];
+    lcrAskYn(`"${name}"\nB급 제품이 ${b.qty}개 있습니다.${b.reason?`\nB급 사유: ${b.reason.slice(0,120)}`:''}\n\nB급 판매 주문건이면 [예], 새제품 판매이면 [아니오]를 눌러주세요.`,
+      ()=>choose(b), notB, '🅱️ B급 제품 확인');
+  } else {
+    lcbOpenPick(name, entries, choose, notB);   // 같은 제품에 사유가 다른 B급이 여러 개 — 어떤 B급이 나가는지 고르게 한다
+  }
 }
-// deltas: {제품명: 수량} 양수=B급 판매로 차감(오래 등록된 것부터), 음수=복원(해당 제품의 가장 최근 등록분에 되돌림). 성공 true
+// 사유가 다른 B급 여러 항목 중 판매하는 B급 선택 팝업 (선택 = 그 항목에서 차감, "새제품 판매" = B급 아님)
+let _lcbPickCb = null;
+function lcbOpenPick(name, entries, onPick, onNew){
+  _lcbPickCb = {entries, onPick, onNew};
+  document.getElementById('lcbPickMsg').innerHTML = `<b>${_lcrEsc(name)}</b><br>사유가 다른 B급 제품이 ${entries.length}종 있습니다.<br>이번에 판매하는 B급을 선택하세요. 새제품 판매이면 아래 [새제품 판매]를 눌러주세요.`;
+  document.getElementById('lcbPickList').innerHTML = entries.map((b,i)=>`<button type="button" class="lcb-pick-opt" onclick="lcbPickAnswer(${i})">
+      <span class="lcb-pick-reason">${b.reason?_lcrEsc(b.reason):'<span style="color:var(--tx2);font-weight:500;">사유 없음</span>'}</span>
+      <span class="lcb-pick-meta">남은 <b>${b.qty.toLocaleString('ko-KR')}</b>개 · 등록 ${_lcrEsc(b.createdAt||'-')}${b.imgCount>0?` · 📷 ${b.imgCount}장`:''}</span></button>`).join('');
+  openModal('lcbPickModal');
+}
+function lcbPickAnswer(i){
+  const p=_lcbPickCb; _lcbPickCb=null;
+  closeModal('lcbPickModal');
+  if(!p) return;
+  if(i<0) p.onNew(); else p.onPick(p.entries[i]);
+}
+// deltas: { 키: {d, name, bId, reason} } — d 양수=B급 판매로 차감, 음수=복원. bId가 있으면 그 B급 항목에서만 차감·복원(사유별 재고가 섞이지 않음).
+// bId 없는 옛 주문은 같은 제품명 B급에서 먼저 등록된 것부터 차감 / 가장 최근 등록분에 복원. 성공 true
 async function lcbApplyDeltas(deltas, ctx){
   const latest = await _lcbLoadLatest(); if(latest===null) return false;
   const today = _lcrToday(), by = _lcrActor();
   const mk = (t,qty)=>({t, qty, date:today, by, ...(ctx&&ctx.orderId?{order:ctx.orderId}:{}), ...(ctx&&ctx.customer?{cust:ctx.customer}:{}), ...(ctx&&ctx.restore?{restore:true}:{})});
-  for(const [name,d] of Object.entries(deltas)){
-    if(!d) continue;
+  const out=(b,take)=>{ b.qty-=take; (b.log=b.log||[]).push(mk('out', take)); if(b.qty<=0) b.doneAt=today; };
+  for(const v of Object.values(deltas)){
+    const {d,name,bId,reason}=v; if(!d) continue;
     if(d>0){
-      let rest=d;
-      latest.filter(b=>b.productName===name && b.qty>0).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')).forEach(b=>{
-        if(rest<=0) return;
-        const take=Math.min(b.qty, rest); b.qty-=take; rest-=take;
-        (b.log=b.log||[]).push(mk('out', take));
-        if(b.qty<=0) b.doneAt=today;
-      });
+      if(bId){ const b=latest.find(x=>x.id===bId); if(b && b.qty>0) out(b, Math.min(b.qty,d)); }
+      else {
+        let rest=d;
+        latest.filter(b=>b.productName===name && b.qty>0).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')).forEach(b=>{
+          if(rest<=0) return;
+          const take=Math.min(b.qty, rest); rest-=take; out(b,take);
+        });
+      }
     } else {
       const back=-d;
-      const e = latest.filter(b=>b.productName===name).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];
+      const e = bId ? latest.find(x=>x.id===bId)
+        : latest.filter(b=>b.productName===name).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];
       if(e){ e.qty+=back; e.doneAt=''; (e.log=e.log||[]).push(mk('in', back)); }
-      else latest.push({ id:'lcb_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), productName:name, qty:back, total:back, createdAt:today, createdBy:by, doneAt:'', log:[mk('in', back)] });
+      else latest.push({ id:bId||('lcb_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)), productName:name, qty:back, total:back, reason:reason||'', imgCount:0, createdAt:today, createdBy:by, doneAt:'', log:[mk('in', back)] });
     }
   }
   await _lcbSave(latest);
@@ -14995,26 +15081,88 @@ function lcbHint(){
   const el=document.getElementById('lcbHint'); if(!el) return;
   const nm=(document.getElementById('lcbName').value||'').trim();
   const s=nm?lcbStock(nm):0;
-  el.textContent = (!document.getElementById('lcbEditId').value && s>0) ? `이미 등록된 B급 ${s.toLocaleString('ko-KR')}개가 있습니다 — 저장하면 수량이 합산됩니다.` : '';
+  el.textContent = (!document.getElementById('lcbEditId').value && s>0) ? `이미 등록된 B급 ${s.toLocaleString('ko-KR')}개가 있습니다 — 사유·이미지가 같으면(둘 다 없으면) 수량이 합산되고, 다르면 별도 행으로 등록됩니다.` : '';
+}
+// ── B급 이미지: 등록 시 압축(가로 1000px, JPEG)해 항목별 별도 키 'logi_carrot_bimg_<id>' 에 저장 — 목록 조회 땐 읽지 않고 이미지 보기/수정을 열 때만 로드(egress 절약)
+const LCB_IMG_MAX = 5;
+let _lcbImgs = [];            // 지금 등록/수정 창에 올라온 이미지(dataURL)
+let _lcbImgsReady = true;     // 수정 창에서 기존 이미지를 못 불러왔으면 false — 이 경우 이미지는 덮어쓰지 않음
+let _lcbPending = 0, _lcbTok = 0;   // 압축 진행 중인 장수 / 창을 열 때마다 바뀌는 토큰
+function lcbRenderImgs(){
+  const wrap=document.getElementById('lcbImgGrid'); if(!wrap) return;
+  wrap.innerHTML = _lcbImgs.map((src,i)=>`<div class="kb-img-thumb"><img src="${src}"><button type="button" class="kb-img-del" onclick="lcbRemoveImg(${i})">✕</button></div>`).join('')
+    || '<span class="lcr-meta" style="margin:0;">등록된 이미지가 없습니다.</span>';
+}
+function lcbRemoveImg(i){
+  if(!_lcbImgsReady){ toast('기존 이미지를 불러오지 못해 이미지는 수정할 수 없습니다.'); return; }
+  _lcbImgs.splice(i,1); lcbRenderImgs();
+}
+function _lcbAddFiles(files){
+  if(!_lcbImgsReady){ toast('기존 이미지를 불러오지 못해 이미지는 수정할 수 없습니다. 창을 닫고 다시 열어보세요.'); return; }
+  (files||[]).forEach(f=>{
+    if(!f.type || !f.type.startsWith('image/')) return;
+    if(_lcbImgs.length+_lcbPending>=LCB_IMG_MAX){ toast(`이미지는 최대 ${LCB_IMG_MAX}장까지 등록할 수 있습니다.`); return; }
+    _lcbPending++;
+    const tok=_lcbTok;   // 압축 중에 창을 닫고 다시 열었으면(다른 등록 건) 결과를 버린다
+    kbCompressImage(f).then(url=>{ if(tok===_lcbTok){ _lcbImgs.push(url); lcbRenderImgs(); } })
+      .catch(()=>toast('이미지 처리 중 오류가 발생했습니다.'))
+      .finally(()=>{ if(tok===_lcbTok) _lcbPending--; });
+  });
+}
+function lcbAddImages(ev){
+  const files=[...(ev.target.files||[])]; ev.target.value='';
+  _lcbAddFiles(files);
+}
+// 등록 창이 열려 있을 때 Ctrl+V 로 클립보드 이미지 붙여넣기
+document.addEventListener('paste', e=>{
+  if(!document.getElementById('lcbAddModal')?.classList.contains('open')) return;
+  const files=[...(e.clipboardData?.files||[])].filter(f=>f.type&&f.type.startsWith('image/'));
+  if(files.length){ e.preventDefault(); _lcbAddFiles(files); }
+});
+async function lcbViewImgs(id){
+  const b=(_lcrB||[]).find(x=>x.id===id); if(!b) return;
+  document.getElementById('lcbImgTitle').textContent = `🅱️ ${b.productName}`;
+  document.getElementById('lcbImgReason').textContent = b.reason ? `사유: ${b.reason}` : '';
+  const box=document.getElementById('lcbImgView');
+  box.innerHTML='<div class="lcr-meta" style="text-align:center;padding:20px;">이미지 불러오는 중…</div>';
+  openModal('lcbImgModal');
+  const imgs=(await cloudKvLoad('logi_carrot_bimg_'+id))||[];
+  box.innerHTML = imgs.length ? imgs.map(s=>`<img src="${s}" style="width:100%;border-radius:10px;border:1px solid var(--bd);display:block;">`).join('')
+    : '<div class="lcr-meta" style="text-align:center;padding:20px;font-size:13px;">이미지를 불러오지 못했거나 등록된 이미지가 없습니다.</div>';
 }
 function lcbOpenAdd(){
   document.getElementById('lcbModalTitle').textContent = '🅱️ B급제품 등록';
   document.getElementById('lcbEditId').value = '';
   const nm=document.getElementById('lcbName'); nm.value=''; nm.readOnly=false;
   document.getElementById('lcbQty').value='';
+  document.getElementById('lcbReason').value='';
   document.getElementById('lcbHint').textContent='';
+  _lcbTok++; _lcbPending=0; _lcbImgs=[]; _lcbImgsReady=true; lcbRenderImgs();
   openModal('lcbAddModal');
   setTimeout(()=>nm.focus(), 50);
 }
-function lcbOpenEdit(id){
+async function lcbOpenEdit(id){
   const b=(_lcrB||[]).find(x=>x.id===id); if(!b) return;
-  document.getElementById('lcbModalTitle').textContent = '✎ B급 수량 수정';
+  document.getElementById('lcbModalTitle').textContent = '✎ B급제품 수정';
   document.getElementById('lcbEditId').value = id;
   const nm=document.getElementById('lcbName'); nm.value=b.productName; nm.readOnly=true;
   document.getElementById('lcbQty').value=b.qty;
+  document.getElementById('lcbReason').value=b.reason||'';
   document.getElementById('lcbHint').textContent='남은 수량을 실제 보유 수량에 맞게 고칩니다(0으로 저장하면 B급 소진완료로 이동).';
+  _lcbTok++; _lcbPending=0; _lcbImgs=[]; _lcbImgsReady=true;
   openModal('lcbAddModal');
+  const tok=_lcbTok;
   setTimeout(()=>document.getElementById('lcbQty').focus(), 50);
+  if(!(b.imgCount>0)){ lcbRenderImgs(); return; }
+  _lcbImgsReady=false;   // 기존 이미지를 확실히 읽어오기 전에는 저장 때 이미지 키를 건드리지 않는다(못 읽은 채 덮어써 지우는 사고 방지)
+  document.getElementById('lcbImgGrid').innerHTML='<span class="lcr-meta" style="margin:0;">이미지 불러오는 중…</span>';
+  const imgs=await cloudKvLoad('logi_carrot_bimg_'+id);
+  if(tok!==_lcbTok) return;   // 그사이 창을 닫고 다른 건을 열었으면 무시
+  if(Array.isArray(imgs) && imgs.length){ _lcbImgs=imgs; _lcbImgsReady=true; lcbRenderImgs(); }
+  else{
+    document.getElementById('lcbHint').textContent='⚠ 기존 이미지를 불러오지 못했습니다. 이미지는 그대로 두고 수량·사유만 수정됩니다.';
+    document.getElementById('lcbImgGrid').innerHTML=`<span class="lcr-meta" style="margin:0;">기존 이미지 ${b.imgCount}장은 그대로 유지됩니다.</span>`;
+  }
 }
 async function lcbSave(){
   const editId=(document.getElementById('lcbEditId').value||'').trim();
@@ -15026,8 +15174,12 @@ async function lcbSave(){
     if(!(typeof _bdData!=='undefined' ? _bdData : []).some(r=>(r.name||'').trim()===name)){ toast('운영관리 백데이터에 있는 제품명을 검색해서 선택하세요.'); document.getElementById('lcbName').focus(); return; }
     if(!(qty>0)){ toast('수량을 입력하세요.'); document.getElementById('lcbQty').focus(); return; }
   } else if(qty==null || qty<0){ toast('수량을 입력하세요.'); document.getElementById('lcbQty').focus(); return; }
+  if(_lcbPending>0){ toast('이미지를 처리하는 중입니다. 잠시 후 다시 저장하세요.'); return; }
+  const reason=(document.getElementById('lcbReason').value||'').trim();
+  const imgs=_lcbImgs.filter(Boolean);
   const latest = await _lcbLoadLatest(); if(latest===null) return;
   const today=_lcrToday(), by=_lcrActor();
+  let imgId=null, imgWrite=false;   // 이미지 키에 쓸 대상 항목 id
   if(editId){
     const b=latest.find(x=>x.id===editId);
     if(!b){ toast('수정할 B급제품을 찾을 수 없습니다.'); return; }
@@ -15037,14 +15189,24 @@ async function lcbSave(){
       (b.log=b.log||[]).push({t:'adj', qty:diff, date:today, by});
       b.doneAt = qty<=0 ? today : '';
     }
+    b.reason=reason;
+    if(_lcbImgsReady){ b.imgCount=imgs.length; imgId=b.id; imgWrite=true; }   // 기존 이미지를 확실히 읽은 경우에만 이미지 갱신
   } else {
-    const ex=latest.filter(b=>b.productName===name && b.qty>0).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];
+    // 같은 제품이라도 사유·이미지가 다르면 별도 행 — 합산은 사유가 같고 양쪽 모두 이미지가 없을 때만
+    const ex=imgs.length ? null : latest.filter(b=>b.productName===name && b.qty>0 && (b.reason||'')===reason && !(b.imgCount>0))
+      .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];
     if(ex){ ex.qty+=qty; ex.total=(ex.total||0)+qty; (ex.log=ex.log||[]).push({t:'in', qty, date:today, by}); }
-    else latest.push({ id:'lcb_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), productName:name, qty, total:qty, createdAt:today, createdBy:by, doneAt:'', log:[{t:'in', qty, date:today, by}] });
+    else {
+      imgId='lcb_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      latest.push({ id:imgId, productName:name, qty, total:qty, reason, imgCount:imgs.length, createdAt:today, createdBy:by, doneAt:'', log:[{t:'in', qty, date:today, by}] });
+      imgWrite = imgs.length>0;
+    }
   }
   closeModal('lcbAddModal');
+  // 이미지를 먼저 저장하고 목록을 저장 — 목록이 이미지 장수를 가리키는데 이미지가 없는 상태가 생기지 않게
+  if(imgWrite) await cloudKvSave('logi_carrot_bimg_'+imgId, imgs, {force:true});
   await _lcbSave(latest);
-  toast(editId ? '✅ B급 수량이 수정되었습니다.' : `✅ B급제품이 등록되었습니다. (${name} ${qty.toLocaleString('ko-KR')}개)`);
+  toast(editId ? '✅ B급제품이 수정되었습니다.' : `✅ B급제품이 등록되었습니다. (${name} ${qty.toLocaleString('ko-KR')}개)`);
 }
 async function lcbDelete(id){
   const b=(_lcrB||[]).find(x=>x.id===id); if(!b) return;
@@ -15054,6 +15216,7 @@ async function lcbDelete(id){
   if(!confirm(`"${b.productName}" B급 기록을 삭제하시겠습니까?\n(이미 B급으로 판매된 주문건은 그대로 남습니다)`)) return;
   const latest = await _lcbLoadLatest(); if(latest===null) return;
   await _lcbSave(latest.filter(x=>x.id!==id));
+  if(b.imgCount>0) await cloudKvSave('logi_carrot_bimg_'+id, [], {force:true});   // 이 항목의 이미지도 함께 정리(다른 항목 이미지는 별도 키라 영향 없음)
 }
 function lcbSetTab(t){ _lcbTab=t; lcbRender(); }
 function lcbRender(){
@@ -15070,11 +15233,13 @@ function lcbRender(){
   const logTip=b=>(b.log||[]).map(l=>`${l.date} ${l.t==='out'?`판매 −${l.qty}${l.cust?` (${l.cust})`:''}`:l.t==='adj'?`수정 ${l.qty>0?'+':''}${l.qty}`:`${l.restore?'복원':'등록'} +${l.qty}`}`).join('\n');
   const totQty=rows.reduce((t,b)=>t+(isDone?(b.total||0):b.qty),0);
   const head = isDone
-    ? `<th>소진일</th><th class="lcs-nm">제품명</th><th>총 등록수량</th><th>등록일</th><th>등록자</th><th>관리</th>`
-    : `<th>등록일</th><th class="lcs-nm">제품명</th><th>남은 수량</th><th>총 등록수량</th><th>판매수량</th><th>등록자</th><th>관리</th>`;
+    ? `<th>소진일</th><th class="lcs-nm">제품명</th><th class="lcs-nm">B급 사유</th><th>이미지</th><th>총 등록수량</th><th>등록일</th><th>등록자</th><th>관리</th>`
+    : `<th>등록일</th><th class="lcs-nm">제품명</th><th class="lcs-nm">B급 사유</th><th>이미지</th><th>남은 수량</th><th>총 등록수량</th><th>판매수량</th><th>등록자</th><th>관리</th>`;
+  const reasonTd=b=>`<td class="lcs-nm" style="min-width:140px;max-width:260px;" title="${_lcrEsc(b.reason||'')}">${b.reason?_lcrEsc(b.reason):'<span style="color:var(--tx2);font-weight:500;">—</span>'}</td>`;
+  const imgTd=b=>`<td>${b.imgCount>0?`<button class="btn btn-sm" onclick="lcbViewImgs('${b.id}')" title="이미지 보기">📷 ${b.imgCount}장</button>`:'<span style="color:var(--tx2);font-weight:500;">—</span>'}</td>`;
   const tr=b=> isDone
-    ? `<tr title="${_lcrEsc(logTip(b))}"><td>${_lcrEsc(b.doneAt||'-')}</td><td class="lcs-nm">${_lcrEsc(b.productName)}</td><td>${(b.total||0).toLocaleString('ko-KR')}</td><td>${_lcrEsc(b.createdAt||'-')}</td><td>${_lcrEsc(b.createdBy||'-')}</td><td><button class="lcr-del-btn" title="삭제" onclick="lcbDelete('${b.id}')">✕</button></td></tr>`
-    : `<tr title="${_lcrEsc(logTip(b))}"><td>${_lcrEsc(b.createdAt||'-')}</td><td class="lcs-nm">${_lcrEsc(b.productName)}<span class="lcr-btag">B급</span></td><td style="font-weight:800;">${b.qty.toLocaleString('ko-KR')}</td><td>${(b.total||0).toLocaleString('ko-KR')}</td><td>${Math.max(0,(b.total||0)-b.qty).toLocaleString('ko-KR')}</td><td>${_lcrEsc(b.createdBy||'-')}</td><td><button class="lcr-del-btn" title="수량 수정" onclick="lcbOpenEdit('${b.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcbDelete('${b.id}')">✕</button></td></tr>`;
+    ? `<tr title="${_lcrEsc(logTip(b))}"><td>${_lcrEsc(b.doneAt||'-')}</td><td class="lcs-nm">${_lcrEsc(b.productName)}</td>${reasonTd(b)}${imgTd(b)}<td>${(b.total||0).toLocaleString('ko-KR')}</td><td>${_lcrEsc(b.createdAt||'-')}</td><td>${_lcrEsc(b.createdBy||'-')}</td><td><button class="lcr-del-btn" title="삭제" onclick="lcbDelete('${b.id}')">✕</button></td></tr>`
+    : `<tr title="${_lcrEsc(logTip(b))}"><td>${_lcrEsc(b.createdAt||'-')}</td><td class="lcs-nm">${_lcrEsc(b.productName)}<span class="lcr-btag">B급</span></td>${reasonTd(b)}${imgTd(b)}<td style="font-weight:800;">${b.qty.toLocaleString('ko-KR')}</td><td>${(b.total||0).toLocaleString('ko-KR')}</td><td>${Math.max(0,(b.total||0)-b.qty).toLocaleString('ko-KR')}</td><td>${_lcrEsc(b.createdBy||'-')}</td><td><button class="lcr-del-btn" title="수정(수량·사유·이미지)" onclick="lcbOpenEdit('${b.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcbDelete('${b.id}')">✕</button></td></tr>`;
   body.innerHTML = `<div class="lcs-sec"><div class="lcs-sec-h"><b>${isDone?'B급 소진완료':'B급 재고'} (${rows.length}개 제품 · ${isDone?'총 등록':'남은'} ${totQty.toLocaleString('ko-KR')}개)</b>`
     + `<span class="lcs-sub">${isDone?'남은 수량이 0이 된 제품입니다. 행에 마우스를 올리면 입출고 내역이 보입니다.':'B급 판매 주문건을 저장하면 남은 수량이 자동으로 줄어듭니다. 행에 마우스를 올리면 입출고 내역이 보입니다.'}</span></div>`
     + (rows.length ? `<div style="overflow-x:auto;"><table class="lcs-tbl"><thead><tr>${head}</tr></thead><tbody>${rows.map(tr).join('')}</tbody></table></div>`
