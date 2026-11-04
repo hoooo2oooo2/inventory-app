@@ -8428,6 +8428,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
     <input class="sim-in" id="simSearch" placeholder="🔍 상품명·코드로 제품 선택" oninput="simSearch()" onkeydown="if(event.key==='Escape')simToggle()" autocomplete="off">
     <div id="simList"></div>
     <div id="simPicked"></div>
+    <div id="simRecv"></div>
     <div class="sim-row" id="simInputRow" style="display:none;">
       <input class="sim-in" id="simQty" type="number" min="0" inputmode="numeric" placeholder="주문할 수량" oninput="simRender()">
       <select class="sim-in" id="simUnit" onchange="simRender()"><option value="box">박스</option><option value="ea">개</option></select>
@@ -21665,6 +21666,39 @@ function _rsReach(row, Q){
   return null;
 }
 const _rsMD=d=>d?`${+d.slice(5,7)}/${+d.slice(8,10)}`:'-';
+// 제품 한 건의 답변 문장 — 입고 후 판매 팝업과 발주 시뮬레이터가 같이 쓴다. Q=0이면 7일·오늘까지 판매, Q>0이면 그 수량을 파는 데 걸린 일수(못 팔았으면 지금까지 판매량)
+function _rsSentence(r, Q){
+  const n=v=>Math.round(v).toLocaleString('ko-KR'), m=_rsMeta;
+  const todayLbl=m.lag?`오늘(판매 데이터 기준 ${_rsMD(m.end)})`:`오늘(${_rsMD(m.end)})`;
+  const nm=`<b>${_esc(String(r.p.name||''))}</b>`;
+  if(!Q) return `${nm} — 최근 입고일 ${_rsMD(r.last)}(${n(r.qty)}개 입고) 이후 7일 동안 <b>${n(r.d7)}개</b> 판매${r.d7done?'':`(아직 ${r.elapsed}일째라 7일이 안 됐어요)`}, ${todayLbl}까지 <b>${n(r.since)}개</b> 판매했어요.`;
+  const hit=_rsReach(r,Q);
+  return hit
+    ? `${nm} — 입고일(${_rsMD(r.last)} 포함) 이후 ${n(Q)}개를 판매하는 데 <b>${hit.days}일</b> 걸렸어요(${_rsMD(hit.date)} 달성, 입고일을 1일째로 셈).`
+    : `${nm} — <b>아직 ${n(Q)}개(요청하신 수량)를 판매하지 못했어요.</b> 최근 입고일(${_rsMD(r.last)}, 날짜 포함)부터 ${todayLbl}까지 <b>${n(r.since)}개</b> 판매했어요(${r.elapsed}일 경과).`;
+}
+// ── 발주 시뮬레이터 안의 "입고 후 판매" 블록(제품을 고르면 그 제품의 최근 입고일 이후 판매를 보여줌) ──
+let _simRecvRow=null;
+function simRecvInit(p){
+  const box=document.getElementById('simRecv'); if(!box) return;
+  try{ _rsRows=_rsBuild(); }catch(e){ console.warn('시뮬레이터 입고 후 판매 계산 실패', e); box.innerHTML=''; return; }
+  _simRecvRow=_rsRows.find(x=>x.p.id===p.id)||null;
+  if(!_simRecvRow){
+    box.innerHTML=`<div class="sim-card" style="margin-top:8px;"><b>📦 입고 후 판매</b><div class="sim-note" style="margin-top:4px;">발주관리에 입고일이 입력된 입고 건이 없는 제품이에요.</div></div>`;
+    return;
+  }
+  box.innerHTML=`<div class="sim-card" style="margin-top:8px;"><b>📦 입고 후 판매</b> <small style="color:var(--tx2);">최근 입고일(그날 포함)부터</small>
+    <div style="display:flex;gap:6px;align-items:center;margin:6px 0;"><input class="sim-in" id="simRecvQty" type="number" min="1" inputmode="numeric" placeholder="판매할 수량 (예: 20)" oninput="simRecvUpdate()" style="flex:1;"><span style="font-size:12px;color:var(--tx2);">개 팔리는 데 며칠?</span></div>
+    <div id="simRecvOut" style="font-size:12.5px;line-height:1.7;"></div></div>`;
+  simRecvUpdate();
+}
+function simRecvUpdate(){
+  const out=document.getElementById('simRecvOut'), r=_simRecvRow; if(!out||!r) return;
+  const qv=document.getElementById('simRecvQty').value, Q=(qv!==''&&parseFloat(qv)>0)?Math.round(parseFloat(qv)):0;
+  out.innerHTML=_rsSentence(r,Q)
+    +(r.rgPartial?`<div style="font-size:11px;color:var(--tx2);">※ 이 입고일은 로켓그로스 판매 기록(${_rsMD(_rsMeta.rgStart)}부터 불러옴) 이전이라 일반 채널 판매만 반영됐어요.</div>`:'')
+    +(_rsMeta.lag?`<div style="font-size:11px;color:var(--tx2);">※ 판매 데이터가 ${_rsMD(_rsMeta.end)}까지만 올라와 있어 그날까지 기준이에요.</div>`:'');
+}
 async function recvSalesOpen(){
   let ov=document.getElementById('rsModal');
   if(!ov){
@@ -21693,15 +21727,8 @@ function recvSalesRender(){
   const qv=document.getElementById('rsQty').value, Q=(qv!==''&&parseFloat(qv)>0)?Math.round(parseFloat(qv)):0;
   const list=_rsRows.filter(r=>toks.every(t=>(String(r.p.name||'')+' '+String(r.p.code||'')).toLowerCase().includes(t)));
   const n=v=>Math.round(v).toLocaleString('ko-KR');
-  const m=_rsMeta, todayLbl=m.lag?`오늘(판매 데이터 기준 ${_rsMD(m.end)})`:`오늘(${_rsMD(m.end)})`;
-  const sentence=(r)=>{
-    const nm=`<b>${_esc(String(r.p.name||''))}</b>`;
-    if(!Q) return `${nm} — 최근 입고일 ${_rsMD(r.last)}(${n(r.qty)}개 입고) 이후 7일 동안 <b>${n(r.d7)}개</b> 판매${r.d7done?'':`(아직 ${r.elapsed}일째라 7일이 안 됐어요)`}, ${todayLbl}까지 <b>${n(r.since)}개</b> 판매했어요.`;
-    const hit=_rsReach(r,Q);
-    return hit
-      ? `${nm} — 입고일(${_rsMD(r.last)} 포함) 이후 ${n(Q)}개를 판매하는 데 <b>${hit.days}일</b> 걸렸어요(${_rsMD(hit.date)} 달성, 입고일을 1일째로 셈).`
-      : `${nm} — <b>아직 ${n(Q)}개(요청하신 수량)를 판매하지 못했어요.</b> 최근 입고일(${_rsMD(r.last)}, 날짜 포함)부터 ${todayLbl}까지 <b>${n(r.since)}개</b> 판매했어요(${r.elapsed}일 경과).`;
-  };
+  const m=_rsMeta;
+  const sentence=r=>_rsSentence(r,Q);
   let a='';
   if(list.length && list.length<=3 && (toks.length||Q)) a=list.map(r=>`<div style="padding:9px 12px;margin-bottom:6px;border-radius:8px;border:0.5px solid var(--bd);background:var(--bg2);font-size:13px;line-height:1.7;">${sentence(r)}${r.rgPartial?`<div style="font-size:11.5px;color:var(--tx2);">※ 이 입고일은 로켓그로스 판매 기록(${_rsMD(m.rgStart)}부터 불러옴) 이전이라 일반 채널 판매만 반영됐어요.</div>`:''}</div>`).join('');
   if(m.lag) a+=`<div style="font-size:11.5px;color:var(--tx2);margin-bottom:6px;">※ 판매 데이터가 ${_rsMD(m.end)}까지만 올라와 있어 그날까지 기준이에요.</div>`;
@@ -33045,6 +33072,7 @@ async function simPick(id){
   document.getElementById('simPicked').innerHTML='<div class="sim-note">분석 데이터를 불러오는 중… ⏳ (처음 한 번만 몇 초 걸려요)</div>';
   document.getElementById('simInputRow').style.display='none';
   document.getElementById('simResult').innerHTML='';
+  const _rcv=document.getElementById('simRecv'); if(_rcv) _rcv.innerHTML=''; _simRecvRow=null;
   _simRow=null;
   try{
     const rows=await simEnsureRows();
@@ -33057,12 +33085,13 @@ async function simPick(id){
     <div style="margin-top:6px;"><button class="btn btn-sm" onclick="simChange()">다른 제품 선택</button></div></div>`;
   document.getElementById('simInputRow').style.display='flex';
   const q=document.getElementById('simQty'); q.value='';
+  simRecvInit(p);
   simRender();
   q.focus();
 }
 function simChange(){
-  _simRow=null;
-  ['simPicked','simResult','simList'].forEach(i=>{ document.getElementById(i).innerHTML=''; });
+  _simRow=null; _simRecvRow=null;
+  ['simPicked','simResult','simList','simRecv'].forEach(i=>{ const el=document.getElementById(i); if(el) el.innerHTML=''; });
   document.getElementById('simInputRow').style.display='none';
   const s=document.getElementById('simSearch'); s.value=''; s.focus();
 }
