@@ -11531,6 +11531,7 @@ function renderMpList(){
       const cells = keys.map(r=>`<td>${_lvlTag((u.perms&&u.perms[r.key])||'none')}</td>`).join('');
       return `<tr><td><b>${u.username}</b>${u.is_master?' <span style="color:var(--amber-600);font-size:10px;">★마스터</span>':''}</td><td>${u.name||'-'}</td>${cells}`
         + `<td style="white-space:nowrap;"><button class="btn btn-sm" onclick="mpOpenForm('${u.username}')">수정</button> `
+        + (u.is_master?'':`<button class="btn btn-sm" onclick="mpResetPw('${u.username}')" title="비밀번호를 잊은 직원에게 임시 비밀번호를 만들어 줍니다">🔑 비번 초기화</button> `)
         + `<button class="btn btn-da btn-sm" onclick="mpDeleteAccount('${u.username}')">삭제</button></td></tr>`;
     }).join('');
   }
@@ -11609,6 +11610,58 @@ async function mpSaveAccount(){
   toast(editing ? '권한이 수정되었습니다.' : '직원이 등록되었습니다.');
   mpCancelForm(); await loadAppProfiles(); renderMpList();
 }
+// 마스터가 비밀번호를 잊은 직원에게 임시 비밀번호를 만들어 준다 — 서버 함수(admin-reset-password)가 마스터 여부를 다시 확인하고 비밀번호를 바꾼다.
+// 임시 비밀번호는 이 창에만 한 번 표시하고 어디에도 저장하지 않는다(변동이력에도 비밀번호는 남기지 않음).
+let _mpResetBusy=false;
+async function mpResetPw(username){
+  const me=window.__CURRENT_USER; if(!me||me.role!=='master'){ toast('마스터만 사용할 수 있습니다.'); return; }
+  const u=APP_PROFILES.find(x=>x.username===username); if(!u||u.is_master) return;
+  if(_mpResetBusy) return;
+  if(!confirm(`${u.name||u.username}(${u.username}) 님의 비밀번호를 초기화하고 임시 비밀번호를 만들까요?\n\n· 기존 비밀번호로는 더 이상 로그인할 수 없게 됩니다.\n· 임시 비밀번호는 이번 한 번만 화면에 보여요. 직원에게 전달해 주세요.`)) return;
+  _mpResetBusy=true;
+  try{
+    const { data, error } = await sb.functions.invoke('admin-reset-password', { body:{ user_id:u.user_id } });
+    if(error || !data || !data.ok){
+      let msg='';
+      try{ if(error && error.context && typeof error.context.json==='function'){ const j=await error.context.json(); msg=(j&&j.error)||''; } }catch{}
+      if(!msg && data && data.error) msg=data.error;
+      if(!msg && error && error.context && error.context.status===404) msg='서버 함수(admin-reset-password)가 아직 설치되지 않았어요. 관리자 설정이 필요합니다.';
+      toast('초기화 실패: '+(msg||'잠시 뒤 다시 시도해 주세요.'));
+      return;
+    }
+    mpShowTempPw(data.name||u.name||'', data.username||u.username, data.temp_password);
+    try{ addHistory({menu:'계정관리',type:'edit',code:'PW_RESET',name:`${data.name||u.name||u.username} (${data.username||u.username})`,desc:'마스터가 비밀번호 초기화(임시 비밀번호 발급)',before:'-',after:'-',user:'계정'}).catch(e=>console.warn('비밀번호 초기화 이력 기록 실패', e)); }catch(e){ console.warn('비밀번호 초기화 이력 기록 실패', e); }
+  }catch(e){
+    console.warn('비밀번호 초기화 실패', e);
+    toast('초기화 실패: 네트워크 또는 서버 오류입니다. 잠시 뒤 다시 시도해 주세요.');
+  }finally{ _mpResetBusy=false; }
+}
+function mpShowTempPw(name, username, pw){
+  const old=document.getElementById('mpTmpPwModal'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.className='modal-overlay'; ov.id='mpTmpPwModal';
+  ov.innerHTML=`<div class="modal" style="max-width:420px;">
+    <h3 style="font-size:16px;margin:0 0 6px;">🔑 임시 비밀번호가 만들어졌어요</h3>
+    <div style="font-size:13px;margin-bottom:10px;"><b>${_esc(name||username)}</b> <span style="color:var(--tx2);">(${_esc(username)})</span></div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;">
+      <input id="mpTmpPwVal" readonly value="${_esc(pw)}" style="flex:1;font:600 18px/1.4 ui-monospace,Consolas,monospace;letter-spacing:1px;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg2);color:var(--tx);" onfocus="this.select()">
+      <button class="btn btn-pr btn-sm" id="mpTmpPwCopy" onclick="mpCopyTempPw()">복사</button>
+    </div>
+    <div style="font-size:12px;color:var(--tx2);line-height:1.7;">
+      · 이 창을 닫으면 <b>다시 볼 수 없어요.</b> 직원에게 전달해 주세요.<br>
+      · 직원은 이 비밀번호로 로그인한 뒤, 마이페이지의 <b>“내 비밀번호 변경”</b>에서 본인 비밀번호로 바꾸도록 안내해 주세요.<br>
+      · 직원이 이미 로그인해 둔 기기는 한동안 그대로 유지될 수 있어요.
+    </div>
+    <div class="ma"><button class="btn btn-pr" onclick="mpCloseTempPw()">확인했어요</button></div></div>`;
+  document.body.appendChild(ov);
+  openModal('mpTmpPwModal');
+}
+function mpCopyTempPw(){
+  const el=document.getElementById('mpTmpPwVal'), b=document.getElementById('mpTmpPwCopy'); if(!el) return;
+  const done=()=>{ if(b){ b.textContent='복사됨 ✓'; setTimeout(()=>{ if(b) b.textContent='복사'; },1500); } };
+  try{ navigator.clipboard.writeText(el.value).then(done,()=>{ el.select(); document.execCommand('copy'); done(); }); }
+  catch(e){ el.select(); try{ document.execCommand('copy'); done(); }catch{} }
+}
+function mpCloseTempPw(){ const ov=document.getElementById('mpTmpPwModal'); if(ov) ov.remove(); }   // 닫으면서 화면(DOM)에서 비밀번호까지 지움
 async function mpDeleteAccount(username){
   if(!confirm(username+' 계정 권한을 삭제할까요? (Supabase Auth 로그인 계정 자체는 대시보드에서 별도로 삭제해야 합니다)')) return;
   const target = APP_PROFILES.find(u=>u.username===username);
