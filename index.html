@@ -26938,6 +26938,11 @@ async function submitRgUpload(){
     const merged=latestProd.filter(r=>r.date!==date).concat(vendorRows);
     await cloudKvSave('rg_products_'+ym, merged);
     _rgProdCache[ym]=merged;
+    // 변동이력에 업로드 기록(2026-11-04) — 'edit' 종류라 이력 화면의 업로드 롤백(삭제) 버튼은 붙지 않는다. 기록이 실패해도 업로드 자체에는 영향 없음.
+    try{
+      const prevCnt=latestProd.filter(r=>r.date===date).length;
+      await addHistory({menu:'로켓그로스',type:'edit',code:'RG_SALES',name:`${date} 매출`,desc:`로켓그로스 매출(셀러인사이트) 업로드 · 상품 ${vendorRows.length}건${prevCnt?' · 같은 날짜 덮어쓰기':''}`,before:prevCnt?`기존 ${prevCnt}건`:'-',after:`${vendorRows.length}건`,user:'업로드'});
+    }catch(e){ console.warn('로켓그로스 매출 업로드 변동이력 기록 실패', e); }
 
     _rgUpFiles={};
     setMsg(`✅ ${date} 데이터 저장 완료 (상품 ${vendorRows.length}건)`, '#059669');
@@ -31670,11 +31675,13 @@ async function _submitRevUploadImpl(){
         existCnt+=count||0;
       }
       let insRows = rows;
+      let upModeLbl = '';      // 변동이력 표시용: 기존 데이터가 있을 때 추가/덮어쓰기 중 무엇을 골랐는지
       let postCheckBase = 0;   // 저장 후 건수 점검용: 저장 직후 파일 날짜 범위에 "기존부터 있던 행"이 몇 건이어야 하는지(null이면 점검 생략)
       if(existCnt>0){
         const dateLabel = ymSet.length===1 ? ymSet[0].replace('|','-') : `${ymSet.length}개 날짜`;
         const mode = await askRevUpExistMode(ch, dateLabel, existCnt, rows.length);
         if(mode==='skip'){ skipped.push(`${ch}(${existCnt}건 유지)`); continue; }
+        upModeLbl = mode==='append' ? '추가' : '덮어쓰기';
         if(mode==='append'){
           // 기존 데이터는 그대로 두고, 이미 있는 건(주문번호·상품번호·코드·수량 동일)은 제외한 새 건만 추가
           const ap = await buildAppendRows(ch, ymSet, rows);
@@ -31714,6 +31721,11 @@ async function _submitRevUploadImpl(){
       insertedChannels.add(ch);
       insertedYm.set(ch, [...new Set(insRows.map(r=>`${r.year}|${r.sale_date}`))]);
       console.log(`${ch}: ${insRows.length}건 업로드 완료`);
+      // 변동이력에 업로드 기록(2026-11-04) — 'edit' 종류라 이력 화면의 업로드 롤백(삭제) 버튼은 붙지 않는다. 기록이 실패해도 업로드 자체에는 영향 없음.
+      try{
+        const ds=insRows.map(r=>r.sale_date).filter(Boolean).sort(), dLbl=ds.length?(ds[0]===ds[ds.length-1]?ds[0]:`${ds[0]}~${ds[ds.length-1]}`):'';
+        await addHistory({menu:'매출관리',type:'edit',code:'UPLOAD',name:`${ch} ${insRows.length}건`,desc:`매출 엑셀 업로드${dLbl?` (${dLbl})`:''}${upModeLbl?` · 기존 데이터 ${upModeLbl}`:''}`,before:existCnt>0?`기존 ${existCnt}건`:'-',after:`${insRows.length}건`,user:'업로드'});
+      }catch(e){ console.warn('매출 업로드 변동이력 기록 실패', e); }
       // 저장 직후 점검: 파일 날짜 범위의 실제 건수가 "남아 있던 기존 + 이번에 저장한 건수"와 같은지 확인.
       // 다르면 동시에 다른 곳에서 올렸거나 중복 등록됐을 수 있으므로 알린다(자동 삭제는 하지 않음).
       if(postCheckBase!=null){
@@ -32775,9 +32787,11 @@ function renderHist(){
   const srch=document.getElementById('histSrch').value.toLowerCase();
   const tf=document.getElementById('histTypeF').value;
   const mf=document.getElementById('histMenuF').value;
+  // 매출관리·로켓그로스 매출 엑셀 업로드는 'edit' 종류로 저장되지만(롤백 삭제 버튼이 붙지 않게) 화면에서는 '엑셀업로드'로 표시·필터한다
+  const isUpLog=h=>h.type==='edit' && (h.code==='UPLOAD'||h.code==='RG_SALES');
   let list=historyLog.filter(h=>{
     if(srch&&!h.name?.toLowerCase().includes(srch)&&!h.code?.toLowerCase().includes(srch))return false;
-    if(tf&&h.type!==tf)return false;
+    if(tf){ const eff=isUpLog(h)?'upload':h.type; if(eff!==tf) return false; }
     if(mf&&h.menu!==mf)return false;
     return true;
   });
@@ -32792,7 +32806,7 @@ function renderHist(){
     return `<tr>
       <td style="color:var(--tx2);font-size:11px;white-space:nowrap;">${h.time}</td>
       <td><span class="badge b-gy">${h.menu}</span></td>
-      <td><span class="badge ${HIST_BADGE[h.type]||''}">${HIST_LBL[h.type]||h.type}</span></td>
+      <td><span class="badge ${HIST_BADGE[isUpLog(h)?'upload':h.type]||''}">${HIST_LBL[isUpLog(h)?'upload':h.type]||h.type}</span></td>
       <td><span class="code-chip">${h.code||'-'}</span></td>
       <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;">${h.name||'-'}</td>
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;">${h.desc||'-'}</td>
