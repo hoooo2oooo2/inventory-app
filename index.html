@@ -29249,7 +29249,7 @@ function uniExportExcel(){
   const rows=_uniRowsCache||[];
   if(!rows.length){ toast('다운로드할 데이터가 없어요.'); return; }
   toast(`엑셀 만드는 중… (${rows.length.toLocaleString()}건)`);
-  setTimeout(()=>{
+  setTimeout(async()=>{
     try{
       const plain=s=>String(s==null?'':s).replace(/<[^>]*>/g,'');      // 마스킹 중이면 화면과 똑같이 마스킹된 값으로 저장(개인정보 보호)
       const head=['년도','날짜','판매처','주문번호','구매자','수취인','연락처','우편','주소','상품번호','구분','코드','모델명','수량','출고','배송비','판매가','정산','매입','마진','마진율','단가'];
@@ -29261,18 +29261,49 @@ function uniExportExcel(){
         num(r.orderQty), num(r.shipQty), num(r.shipping), num(r.salePrice), num(r.settlement), num(r.costPrice), num(r.margin??0),
         (r.marginRate!=null&&!isNaN(r.marginRate))?Number(r.marginRate):'', num(r.unitCost)
       ]));
-      const ws=XLSX.utils.aoa_to_sheet(aoa);
-      for(let i=1;i<aoa.length;i++){ const c=ws[XLSX.utils.encode_cell({r:i,c:20})]; if(c&&c.t==='n') c.z='0.0%'; }      // 마진율 열 = 비율 → % 표시
-      ws['!cols']=[6,6,8,18,8,8,14,7,22,14,8,10,34,5,5,7,9,9,9,9,7,9].map(w=>({wch:w}));
-      ws['!freeze']={xSplit:0,ySplit:1}; ws['!views']=[{state:'frozen',ySplit:1}];
-      const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'통합');
       const d=new Date(), pad=n=>String(n).padStart(2,'0');
       const parts=['매출통합', _uniFilter.year==='ALL'?'전체년도':_uniFilter.year];
       if(_uniFilter.months.size) parts.push([..._uniFilter.months].sort((a,b)=>a-b).join('·')+'월');
       if(_uniFilter.chs.size) parts.push([..._uniFilter.chs].slice(0,3).join('·')+(_uniFilter.chs.size>3?'외':''));
       if((document.getElementById('revUniSrch')?.value||'').trim()) parts.push('검색');
       parts.push(`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`);
-      XLSX.writeFile(wb, parts.join('_').replace(/[\\/:*?"<>|]/g,'')+'.xlsx');
+      const fileName=parts.join('_').replace(/[\\/:*?"<>|]/g,'')+'.xlsx';
+      const colW=[6,6,8,18,8,8,14,7,22,14,8,10,34,5,5,7,9,9,9,9,7,9].map(w=>({wch:w}));
+      const lastCol=head.length-1;
+      // 스타일(헤더 색상)·틀고정·자동필터 — 일일보고 엑셀과 같은 방식(xlsx-js-style + 틀고정 XML patch). 모듈이 없거나 실패하면 서식 없는 기본 저장으로 대체
+      let saved=false;
+      if(window.XLSXStyle&&window.JSZip){
+        try{
+          const XS=window.XLSXStyle, U=XS.utils;
+          const ws=U.aoa_to_sheet(_xmlSafeAoa(aoa));
+          const bd={style:'thin',color:{rgb:'9DB2CC'}};
+          for(let c=0;c<=lastCol;c++){
+            const cell=ws[U.encode_cell({r:0,c})];
+            if(cell) cell.s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'1F4E78'}},alignment:{horizontal:'center',vertical:'center'},border:{top:bd,bottom:bd,left:bd,right:bd}};
+          }
+          for(let i=1;i<aoa.length;i++){ const cell=ws[U.encode_cell({r:i,c:20})]; if(cell&&cell.t==='n') cell.z='0.0%'; }   // 마진율 열 = 비율 → % 표시
+          ws['!cols']=colW; ws['!rows']=[{hpt:22}];
+          ws['!autofilter']={ref:U.encode_range({s:{r:0,c:0},e:{r:Math.max(1,aoa.length-1),c:lastCol}})};
+          const wb=U.book_new(); U.book_append_sheet(wb,ws,'통합');
+          const zip=await JSZip.loadAsync(XS.write(wb,{bookType:'xlsx',type:'array'}));
+          const paneXml='<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/>';   // 1행(헤더) 틀고정
+          let sx=await zip.file('xl/worksheets/sheet1.xml').async('string');
+          if(/<pane /.test(sx)){ /* 이미 있으면 그대로 */ }
+          else if(/<sheetView([^>]*)\/>/.test(sx)) sx=sx.replace(/<sheetView([^>]*)\/>/,`<sheetView$1>${paneXml}</sheetView>`);
+          else if(/<sheetView[^>]*>/.test(sx)) sx=sx.replace(/(<sheetView[^>]*>)/,`$1${paneXml}`);
+          else throw new Error('sheetView 없음');
+          zip.file('xl/worksheets/sheet1.xml',sx);
+          _saveBlob(await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE',compressionOptions:{level:4}}),fileName);   // 압축 저장(미압축이면 전체 데이터가 수십 MB)
+          saved=true;
+        }catch(e){ console.warn('통합 엑셀 서식(헤더 색상·틀고정) 적용 실패, 기본 저장으로 대체', e); }
+      }
+      if(!saved){
+        const ws=XLSX.utils.aoa_to_sheet(_xmlSafeAoa(aoa));
+        for(let i=1;i<aoa.length;i++){ const cell=ws[XLSX.utils.encode_cell({r:i,c:20})]; if(cell&&cell.t==='n') cell.z='0.0%'; }
+        ws['!cols']=colW; ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(1,aoa.length-1),c:lastCol}})};
+        const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'통합');
+        XLSX.writeFile(wb,fileName);
+      }
       toast(`엑셀 다운로드 완료 (${rows.length.toLocaleString()}건)`);
     }catch(e){ console.warn('통합 엑셀 다운로드 실패', e); toast('엑셀을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
   },30);
