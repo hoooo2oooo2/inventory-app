@@ -7523,6 +7523,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
             <button class="rfbtn active" onclick="setUniFilter('ch',this,'ALL')">전체</button>
           </div>
         </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
         <div style="display:flex;flex-direction:column;gap:6px;background:var(--bg);border:0.5px solid var(--bd);border-radius:10px;padding:8px 14px;font-size:12px;white-space:nowrap;flex-shrink:0;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span id="revMaskStatus">🔒 개인정보 마스킹 중</span>
@@ -7532,6 +7533,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
             <span id="uniEditStatus">🔒 수정 잠금</span>
             <button class="btn btn-sm" id="uniEditBtn" onclick="toggleUniEdit()">✏️ 수정모드</button>
           </div>
+        </div>
+        <button class="btn btn-sm" id="uniXlsBtn" onclick="uniExportExcel()" title="지금 표에 보이는 데이터(년도·월·판매처·검색·모델명 필터 적용, 전체 페이지)를 엑셀로 받습니다. 마스킹 중이면 마스킹된 값으로 저장돼요." style="width:100%;">📥 엑셀 다운로드</button>
         </div>
       </div>
       <!-- 검색 + 건수 -->
@@ -7582,7 +7585,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
               <th>년도</th><th>날짜</th><th>판매처</th><th>주문번호</th>
               <th>구매자</th><th>수취인</th><th>연락처</th>
               <th>우편</th><th>주소</th><th>상품번호</th>
-              <th>구분</th><th>코드</th><th>모델명</th>
+              <th>구분</th><th>코드</th>
+              <th>모델명<input type="text" id="revUniModelF" class="rt-hfilter" list="revUniModelDL" placeholder="모델명 필터" autocomplete="off" title="모델명에 포함된 글자로 걸러요(띄어쓰기로 여러 단어 가능). 입력칸을 누르면 목록에서 고를 수도 있어요." style="width:100%;box-sizing:border-box;margin:4px 0 0;font-weight:500;cursor:text;" onfocus="_uniModelListBuild()" oninput="_uniPage=0;renderUnifiedTable();this.classList.toggle('on',!!this.value.trim())"><datalist id="revUniModelDL"></datalist></th>
               <th style="text-align:right;">수량</th><th style="text-align:right;">출고</th>
               <th style="text-align:right;">배송비</th>
               <th class="uni-sort-th" style="text-align:right;cursor:pointer;" onclick="setUniSort('salePrice')" title="클릭하여 정렬">판매가<span class="uni-sort-ar" data-k="salePrice"></span></th>
@@ -29236,6 +29240,54 @@ function buildUniFilterBtns(){
     +chs.map(c=>`<button class="rfbtn ${_uniFilter.chs.has(c)?'active':''}" data-val="${c}" onclick="setUniFilter('ch',this,'${c}')">${c}</button>`).join('');
 }
 
+// 모델명 헤더 필터의 선택 목록 — 년도·월·판매처로 걸러진 행의 모델명(중복 제거)만 담는다(입력칸을 누를 때 만든다)
+function _uniModelListBuild(){
+  const dl=document.getElementById('revUniModelDL'); if(!dl) return;
+  const set=new Set();
+  _revData.forEach(r=>{
+    if(_uniFilter.year!=='ALL'&&String(r.year)!==String(_uniFilter.year)) return;
+    if(_uniFilter.months.size>0&&!_uniFilter.months.has(r.month)) return;
+    if(_uniFilter.chs.size>0&&!_uniFilter.chs.has(r.ch)) return;
+    if(r.modelName) set.add(String(r.modelName));
+  });
+  dl.innerHTML=[...set].sort((a,b)=>a.localeCompare(b,'ko')).map(n=>`<option value="${escAttr(n)}"></option>`).join('');
+}
+// 📥 엑셀 다운로드 — 지금 통합 표에 보이는 조건(년도·월·판매처·검색·모델명 필터·정렬)의 전체 행(모든 페이지)을 받는다. 읽기 전용(저장되는 값 없음)
+function uniExportExcel(){
+  const need=_uniFilter.year==='ALL'?_revYearRange.some(y=>!_revYearsLoaded.has(y)):(_uniFilter.year!=null&&!_revYearsLoaded.has(Number(_uniFilter.year)));
+  if(need){ toast('데이터를 불러오는 중이에요. 잠시 뒤 다시 눌러주세요.'); return; }
+  const rows=_uniRowsCache||[];
+  if(!rows.length){ toast('다운로드할 데이터가 없어요.'); return; }
+  toast(`엑셀 만드는 중… (${rows.length.toLocaleString()}건)`);
+  setTimeout(()=>{
+    try{
+      const plain=s=>String(s==null?'':s).replace(/<[^>]*>/g,'');      // 마스킹 중이면 화면과 똑같이 마스킹된 값으로 저장(개인정보 보호)
+      const head=['년도','날짜','판매처','주문번호','구매자','수취인','연락처','우편','주소','상품번호','구분','코드','모델명','수량','출고','배송비','판매가','정산','매입','마진','마진율','단가'];
+      const num=v=>(v==null||v===''||isNaN(v))?'':Number(v);
+      const aoa=[head].concat(rows.map(r=>[
+        r.year||'', r.date||'', r.ch||'', String(r.orderNo||''),
+        plain(maskName(r.buyer)), plain(maskName(r.receiver)), plain(maskPhone(r.phone1)),
+        String(r.zip||''), plain(maskAddr(r.addr)), String(r.itemNo||''), r.itemType||'', r.itemCode||'', r.modelName||'',
+        num(r.orderQty), num(r.shipQty), num(r.shipping), num(r.salePrice), num(r.settlement), num(r.costPrice), num(r.margin??0),
+        (r.marginRate!=null&&!isNaN(r.marginRate))?Number(r.marginRate):'', num(r.unitCost)
+      ]));
+      const ws=XLSX.utils.aoa_to_sheet(aoa);
+      for(let i=1;i<aoa.length;i++){ const c=ws[XLSX.utils.encode_cell({r:i,c:20})]; if(c&&c.t==='n') c.z='0.0%'; }      // 마진율 열 = 비율 → % 표시
+      ws['!cols']=[6,6,8,18,8,8,14,7,22,14,8,10,34,5,5,7,9,9,9,9,7,9].map(w=>({wch:w}));
+      ws['!freeze']={xSplit:0,ySplit:1}; ws['!views']=[{state:'frozen',ySplit:1}];
+      const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'통합');
+      const d=new Date(), pad=n=>String(n).padStart(2,'0');
+      const parts=['매출통합', _uniFilter.year==='ALL'?'전체년도':_uniFilter.year];
+      if(_uniFilter.months.size) parts.push([..._uniFilter.months].sort((a,b)=>a-b).join('·')+'월');
+      if(_uniFilter.chs.size) parts.push([..._uniFilter.chs].slice(0,3).join('·')+(_uniFilter.chs.size>3?'외':''));
+      if((document.getElementById('revUniSrch')?.value||'').trim()||(document.getElementById('revUniModelF')?.value||'').trim()) parts.push('검색');
+      parts.push(`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`);
+      XLSX.writeFile(wb, parts.join('_').replace(/[\\/:*?"<>|]/g,'')+'.xlsx');
+      toast(`엑셀 다운로드 완료 (${rows.length.toLocaleString()}건)`);
+    }catch(e){ console.warn('통합 엑셀 다운로드 실패', e); toast('엑셀을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
+  },30);
+}
+
 const UNI_PAGE_SIZE = 300;
 let _uniPage = 0; // 현재 페이지 (0-based)
 let _uniRowsCache = []; // renderUnifiedTable()이 마지막으로 필터·정렬한 전체 목록(페이지네이션 전) — 특정 행으로 바로가기 시 재사용
@@ -29463,10 +29515,12 @@ function renderUnifiedTable(){
   const scroll=document.getElementById('revUniScroll');
 
   // 필터 적용
+  const modelToks=(document.getElementById('revUniModelF')?.value||'').toLowerCase().split(/\s+/).filter(Boolean);   // 모델명 헤더 필터
   let rows=_revData.filter(r=>{
     if(_uniFilter.year!=='ALL'&&String(r.year)!==String(_uniFilter.year)) return false;
     if(_uniFilter.months.size>0&&!_uniFilter.months.has(r.month)) return false;
     if(_uniFilter.chs.size>0&&!_uniFilter.chs.has(r.ch)) return false;
+    if(modelToks.length){ const mn=String(r.modelName||'').toLowerCase(); if(!modelToks.every(t=>mn.includes(t))) return false; }
     if(srch){
       // "주소검색" 체크 시 주소만 검색 대상 — 일반 검색과 섞으면 주소 문구가 다른 필드와 우연히 겹쳐 오탐될 수 있어 분리
       const hay=addrOnly
