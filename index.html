@@ -2525,6 +2525,16 @@ html.mob-native #pc-items-wrap{max-height:none!important;}
 .lcb-pick-opt:hover{border-color:var(--brand);background:var(--bg2);}
 .lcb-pick-reason{font-size:14px;font-weight:700;word-break:break-all;}
 .lcb-pick-meta{font-size:12px;color:var(--tx2);}
+/* B급 수량 3열 색상 구분 — 남은(파랑)·총 등록(회색)·판매(초록). 칩은 고정 배경+고정 글자색이라 라이트/다크 공통으로 읽힘 */
+.lcb-chip{display:inline-block;min-width:34px;padding:3px 11px;border-radius:99px;font-weight:800;font-size:15px;line-height:1.3;}
+.lcb-chip.rem{background:#DBEAFE;color:#1D4ED8;}
+.lcb-chip.sold{background:#DCFCE7;color:#15803D;}
+.lcb-chip.zero{background:transparent;color:var(--tx2);font-weight:600;}
+.lcb-tot{color:var(--tx2);font-weight:600;}
+.lcs-tbl th.lcb-th-rem{box-shadow:inset 0 -3px 0 #3B82F6;color:var(--tx);}
+.lcs-tbl th.lcb-th-tot{box-shadow:inset 0 -3px 0 #9CA3AF;}
+.lcs-tbl th.lcb-th-sold{box-shadow:inset 0 -3px 0 #22C55E;color:var(--tx);}
+.lcs-tbl td.lcb-col-rem{background:rgba(59,130,246,.07);}
 .lcb-tabs{display:flex;gap:6px;margin:0 0 10px;flex-shrink:0;}
 .lcb-tabs button{border:1px solid var(--bd);background:var(--bg);color:var(--tx2);font-size:13px;font-weight:700;border-radius:99px;padding:6px 14px;cursor:pointer;font-family:inherit;}
 .lcb-tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff;}
@@ -15234,12 +15244,12 @@ function lcbRender(){
   const totQty=rows.reduce((t,b)=>t+(isDone?(b.total||0):b.qty),0);
   const head = isDone
     ? `<th>소진일</th><th class="lcs-nm">제품명</th><th class="lcs-nm">B급 사유</th><th>이미지</th><th>총 등록수량</th><th>등록일</th><th>등록자</th><th>관리</th>`
-    : `<th>등록일</th><th class="lcs-nm">제품명</th><th class="lcs-nm">B급 사유</th><th>이미지</th><th>남은 수량</th><th>총 등록수량</th><th>판매수량</th><th>등록자</th><th>관리</th>`;
+    : `<th>등록일</th><th class="lcs-nm">제품명</th><th class="lcs-nm">B급 사유</th><th>이미지</th><th class="lcb-th-rem">남은 수량</th><th class="lcb-th-tot">총 등록수량</th><th class="lcb-th-sold">판매수량</th><th>등록자</th><th>관리</th>`;
   const reasonTd=b=>`<td class="lcs-nm" style="min-width:140px;max-width:260px;" title="${_lcrEsc(b.reason||'')}">${b.reason?_lcrEsc(b.reason):'<span style="color:var(--tx2);font-weight:500;">—</span>'}</td>`;
   const imgTd=b=>`<td>${b.imgCount>0?`<button class="btn btn-sm" onclick="lcbViewImgs('${b.id}')" title="이미지 보기">📷 ${b.imgCount}장</button>`:'<span style="color:var(--tx2);font-weight:500;">—</span>'}</td>`;
   const tr=b=> isDone
     ? `<tr title="${_lcrEsc(logTip(b))}"><td>${_lcrEsc(b.doneAt||'-')}</td><td class="lcs-nm">${_lcrEsc(b.productName)}</td>${reasonTd(b)}${imgTd(b)}<td>${(b.total||0).toLocaleString('ko-KR')}</td><td>${_lcrEsc(b.createdAt||'-')}</td><td>${_lcrEsc(b.createdBy||'-')}</td><td><button class="lcr-del-btn" title="삭제" onclick="lcbDelete('${b.id}')">✕</button></td></tr>`
-    : `<tr title="${_lcrEsc(logTip(b))}"><td>${_lcrEsc(b.createdAt||'-')}</td><td class="lcs-nm">${_lcrEsc(b.productName)}<span class="lcr-btag">B급</span></td>${reasonTd(b)}${imgTd(b)}<td style="font-weight:800;">${b.qty.toLocaleString('ko-KR')}</td><td>${(b.total||0).toLocaleString('ko-KR')}</td><td>${Math.max(0,(b.total||0)-b.qty).toLocaleString('ko-KR')}</td><td>${_lcrEsc(b.createdBy||'-')}</td><td><button class="lcr-del-btn" title="수정(수량·사유·이미지)" onclick="lcbOpenEdit('${b.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcbDelete('${b.id}')">✕</button></td></tr>`;
+    : `<tr title="${_lcrEsc(logTip(b))}"><td>${_lcrEsc(b.createdAt||'-')}</td><td class="lcs-nm">${_lcrEsc(b.productName)}<span class="lcr-btag">B급</span></td>${reasonTd(b)}${imgTd(b)}<td class="lcb-col-rem"><span class="lcb-chip rem" title="남은 수량">${b.qty.toLocaleString('ko-KR')}</span></td><td class="lcb-tot" title="총 등록수량">${(b.total||0).toLocaleString('ko-KR')}</td><td>${(()=>{ const s=Math.max(0,(b.total||0)-b.qty); return `<span class="lcb-chip ${s>0?'sold':'zero'}" title="판매수량">${s.toLocaleString('ko-KR')}</span>`; })()}</td><td>${_lcrEsc(b.createdBy||'-')}</td><td><button class="lcr-del-btn" title="수정(수량·사유·이미지)" onclick="lcbOpenEdit('${b.id}')">✎</button><button class="lcr-del-btn" title="삭제" onclick="lcbDelete('${b.id}')">✕</button></td></tr>`;
   body.innerHTML = `<div class="lcs-sec"><div class="lcs-sec-h"><b>${isDone?'B급 소진완료':'B급 재고'} (${rows.length}개 제품 · ${isDone?'총 등록':'남은'} ${totQty.toLocaleString('ko-KR')}개)</b>`
     + `<span class="lcs-sub">${isDone?'남은 수량이 0이 된 제품입니다. 행에 마우스를 올리면 입출고 내역이 보입니다.':'B급 판매 주문건을 저장하면 남은 수량이 자동으로 줄어듭니다. 행에 마우스를 올리면 입출고 내역이 보입니다.'}</span></div>`
     + (rows.length ? `<div style="overflow-x:auto;"><table class="lcs-tbl"><thead><tr>${head}</tr></thead><tbody>${rows.map(tr).join('')}</tbody></table></div>`
