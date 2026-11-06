@@ -29270,7 +29270,12 @@ async function downloadDailyExcel(){
     });
     const cnt=st=>chkRows.filter(x=>x.status===st).length;
     const s5=[];
-    s5.push([`■ 판매 점검 [${chLabel}] 기준일 ${selY}-${selMonStr}-${pad(endDay)} — 판매없음 ${cnt('판매없음')}개 · 저조 ${cnt('저조')}개 · 신규(반응약함) ${cnt('신규(반응약함)')}개 · 신규 ${cnt('신규')}개 | 평소=기준일 직전 28일(최근 7일 제외) | 정렬: 판매없음 → 저조 → 신규(반응약함) → 신규 → 그 외 | 정상=직전 28일 중 ${_DLY_CHK.STEADY_MIN_DAYS}일 이상 판매, 간헐=미만${chActive?'':' | ※ 기준일·전날 판매 데이터가 없어 판매없음·저조 판정을 생략했습니다'}`]);
+    // 1행은 3칸으로 나눠 각각 병합 — 긴 문장이 A1 한 칸에 있으면 모델명 열 '자동 맞춤' 시 열이 과도하게 넓어진다(병합 셀은 자동 맞춤에서 제외됨)
+    s5.push([
+      `■ 판매 점검 [${chLabel}] ${selY}-${selMonStr}-${pad(endDay)}`,'','',
+      `판매없음 ${cnt('판매없음')}개 · 저조 ${cnt('저조')}개 · 신규(반응약함) ${cnt('신규(반응약함)')}개 · 신규 ${cnt('신규')}개`,'','','','','',
+      `평소=기준일 직전 28일(최근 7일 제외) | 정렬: 판매없음 → 저조 → 신규(반응약함) → 신규 → 그 외 | 정상=직전 28일 중 ${_DLY_CHK.STEADY_MIN_DAYS}일 이상 판매, 간헐=미만${chActive?'':' | ※ 기준일·전날 판매 데이터가 없어 판매없음·저조 판정을 생략했습니다'}`
+    ]);
     s5.push(['모델명','구분','상태','평소 일평균','최근7일 일평균','평소 대비','마지막 판매일','무판매 일수','비고', ...dateHeaders]);
     const r1=x=>Math.round(x*10)/10;
     chkRows.forEach(x=>{
@@ -29279,7 +29284,8 @@ async function downloadDailyExcel(){
     });
     const ws5=U.aoa_to_sheet(_xmlSafeAoa(s5));
     ws5['!cols']=[{wch:40},{wch:11},{wch:13},{wch:11},{wch:13},{wch:10},{wch:13},{wch:11},{wch:30}, ...Array(DAILY_COLS_DAYS).fill({wch:9})];
-    sc(ws5,0,0,SECT);
+    ws5['!merges']=[{s:{r:0,c:0},e:{r:0,c:2}},{s:{r:0,c:3},e:{r:0,c:8}},{s:{r:0,c:9},e:{r:0,c:totalCols-1}}];   // 틀고정 경계(C|D)를 넘는 병합 없음
+    sc(ws5,0,0,SECT); sc(ws5,0,3,{font:{bold:true,sz:11}}); sc(ws5,0,9,{font:{color:{rgb:'6B7280'}}});
     for(let c=0;c<totalCols;c++) sc(ws5,1,c,HEAD);
     ws5['!autofilter']={ref:U.encode_range({s:{r:1,c:0},e:{r:Math.max(1,1+chkRows.length),c:totalCols-1}})};
     const STY={
