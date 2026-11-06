@@ -18815,9 +18815,14 @@ async function qtCaptureDoc(doc){
     let text;
     if(el.tagName==='SELECT') text=el.value===''?'':(el.options[el.selectedIndex]?.text||'');
     else text=el.value||'';
+    // 글자색: 견적서 표 안 입력칸은 항상 검정(다크모드 안전장치가 넣은 밝은 글자색이 PDF에 딸려오지 않게).
+    // 그 외 칸은 실제로 화면에 칠해지는 -webkit-text-fill-color를 우선 사용.
+    const fill=cs.webkitTextFillColor;
+    const inTbl=!!(el.closest && el.closest('.qt-tbl'));
+    const color=inTbl?'#000':((fill&&fill!=='rgba(0, 0, 0, 0)'&&fill!=='transparent')?fill:cs.color);
     return {text,hidden,
       fontSize:cs.fontSize,fontFamily:cs.fontFamily,fontWeight:cs.fontWeight,fontStyle:cs.fontStyle,
-      color:cs.color,textAlign:cs.textAlign,padding:cs.padding};
+      color,textAlign:cs.textAlign,padding:cs.padding};
   });
   doc.classList.add('qt-printing');
   try{
@@ -34207,6 +34212,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
   };
   const fix=el=>{
     if(!el || !el.tagName || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || SKIP.includes(el.type)) return;
+    if(el.closest && el.closest('.qt-doc')) return;   // 견적서 문서는 항상 흰 종이+검정 글씨 고정(다크모드 영향 X) — 여기서 색을 바꾸면 PDF 글씨가 연하게 나옴
     restore(el);                       // 이전에 우리가 바꾼 값은 되돌리고 다시 판단
     if(!isDark()) return;
     const fg=parse(getComputedStyle(el).color); if(!fg) return;
