@@ -6068,7 +6068,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
     </div>
 
     <div class="wbm-card">
-      <div class="wbm-card-h"><div class="wbm-card-t">③ 취합 결과 미리보기</div></div>
+      <div class="wbm-card-h">
+        <div class="wbm-card-t">③ 취합 결과 미리보기</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <span class="wbm-sub" id="wbmSearchCount" style="margin:0;"></span>
+          <input id="wbmSearch" class="wbm-input" type="search" style="width:260px;" placeholder="🔍 고객명 · 운송장번호 · 주소 검색" autocomplete="off" oninput="wbmPreviewSearch()">
+        </div>
+      </div>
       <div class="wbm-legend">
         <span><i class="wbm-chip" style="background:#C6EFCE;"></i>새 차수 첫 행 (연한 초록)</span>
         <span><i class="wbm-chip" style="background:#FFC7CE;"></i>수하인명 중복 (동명이인)</span>
@@ -16447,6 +16453,12 @@ async function wbmRefresh(){
   if(b) b.disabled=false; toast('서버 최신 상태로 새로고침했어요');
 }
 
+let _wbmQ = '';     // ③ 미리보기 검색어
+let _wbmQT = null;
+function wbmPreviewSearch(){   // 입력할 때마다 바로 다시 그리되 타이핑 중 과도한 재계산은 막는다
+  const el=document.getElementById('wbmSearch'); _wbmQ=el?el.value:'';
+  clearTimeout(_wbmQT); _wbmQT=setTimeout(()=>wbmRender(),120);
+}
 function wbmInit(){
   const sel=document.getElementById('wbmRoundSel');
   if(sel && !sel.options.length){
@@ -16629,13 +16641,18 @@ function wbmRender(){
   const stale=_wbmStale();
   wEl.innerHTML=(stale.length?`<div class="wbm-warn">📅 <b>${_wbmEsc(stale[0].date)}</b>에 올린 데이터(${stale.map(r=>r.round+'차').join(', ')})인데 자동 정리가 되지 않았어요. 다운로드는 가능하고, 새로 올리려면 먼저 비워 주세요. <button class="wbm-x" style="color:inherit;text-decoration:underline;" onclick="wbmClearAll()">지금 비우고 새로 시작</button></div>`:'')+
     (m.mismatch?'<div class="wbm-warn">⚠️ 일부 차수의 열 구성이 1차와 달라서 헤더 이름 기준으로 맞춰 합쳤어요. 없는 열은 빈칸으로 들어갑니다.</div>':'');
+  // 검색: 고객명·운송장번호·주소에 검색어가 들어 있는 행만 보여준다(공백·대소문자 무시). 300행 표시 제한과 무관하게 전체 행에서 찾는다
+  const nk=s=>String(s==null?'':s).replace(/\s+/g,'').toLowerCase(), q=nk(_wbmQ);
+  const hit=q?m.rows.filter(r=>[r.cells[m.col.name],r.cells[m.col.wb],r.cells[m.col.addr]].some(c=>nk(_wbmCellStr(c)).includes(q))):m.rows;
+  const cntEl=document.getElementById('wbmSearchCount'); if(cntEl) cntEl.textContent=q?`검색 결과 ${hit.length.toLocaleString()}행 / 전체 ${m.rows.length.toLocaleString()}행`:'';
   const LIM=300, cols=[['차수',null],['수하인명',m.col.name],['운송장번호',m.col.wb],['수하인기본주소',m.col.addr]];
-  pvEl.innerHTML=`<div class="wbm-pv"><table class="wbm-tbl"><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`+
-    m.rows.slice(0,LIM).map(r=>{
+  pvEl.innerHTML=!hit.length?`<div class="wbm-empty">“${_wbmEsc(_wbmQ.trim())}”에 해당하는 행이 없어요.</div>`:
+    `<div class="wbm-pv"><table class="wbm-tbl"><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`+
+    hit.slice(0,LIM).map(r=>{
       const n=_wbmCellStr(r.cells[m.col.name]);
       return `<tr class="${r.first?'wbm-first':''}"><td>${r.round}차</td><td class="${n&&nameCnt[n]>1?'wbm-dup':''}">${_wbmEsc(n)}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.wb]))}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.addr]))}</td></tr>`;
     }).join('')+`</tbody></table></div>`+
-    (m.rows.length>LIM?`<div class="wbm-sub" style="margin:8px 2px 0;">미리보기는 앞 ${LIM}행만 보여줘요. 다운로드 파일에는 전체 ${m.rows.length.toLocaleString()}행이 들어갑니다.</div>`:'');
+    (hit.length>LIM?`<div class="wbm-sub" style="margin:8px 2px 0;">${q?'검색 결과가 많아 ':'미리보기는 '}앞 ${LIM}행만 보여줘요. 다운로드 파일에는 전체 ${m.rows.length.toLocaleString()}행이 들어갑니다.</div>`:'');
 }
 
 // 합본 엑셀(Blob) 생성 — 다운로드와 분리해 둔 이유: 저장 없이 결과 검증 가능
