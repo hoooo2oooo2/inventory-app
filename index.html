@@ -21305,6 +21305,19 @@ function erpRenderPreview(){
   const el=document.getElementById('erpPreview'); if(el) el.innerHTML=html;
   const btn=document.getElementById('erpApplyBtn'); if(btn) btn.style.display=rows.length?'':'none';
 }
+// 작업 목록을 한 번에 limit개씩 동시에 처리(각 작업은 서로 다른 DB 행을 건드리는 경우에만 사용).
+// fn이 던지는 예외는 삼키지 않고 첫 예외를 전체 완료 후 다시 던진다.
+async function _erpPool(items, limit, fn){
+  let i=0, firstErr=null;
+  const worker=async()=>{
+    while(i<items.length){
+      const item=items[i++];
+      try{ await fn(item); }catch(e){ if(!firstErr) firstErr=e; }
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(limit, items.length)}, worker));
+  if(firstErr) throw firstErr;
+}
 async function erpApplyImport(){
   const rows=_erpPendingRows;
   if(!rows.length) return;
@@ -21323,6 +21336,7 @@ async function erpApplyImport(){
 
   const btn=document.getElementById('erpApplyBtn');
   if(btn){ btn.disabled=true; btn.textContent='적용 중...'; }
+  const _erpFails=[];   // 저장 단계에서 실패한 건(이전엔 콘솔에만 남고 '완료'로 표시됨) — 끝에 사용자에게 알림
   try{
     // 1) 신규 상품 등록
     const toInsert=newRows.map(r=>({code:r.code, name:r.name, type:_erpNewTypes[r.code].trim(), stock:r.stock, box_qty:r.boxQty, monthly:Array(12).fill(0), last_yr:Array(12).fill(0)}));
@@ -21331,11 +21345,18 @@ async function erpApplyImport(){
       if(error) console.error('ERP 신규등록 오류', error.message);
     }
     // 2) 기존 상품 재고·박스당수량·이름 갱신 (구분·발주시점·리드타임 등은 건드리지 않음)
+    //    상품마다 서로 다른 행을 건드리므로 동시에 여러 건씩 보낸다(순서대로 하나씩 보내면 447건에 수 분 소요).
+    //    같은 코드가 파일에 두 줄 있으면 기존(순차 처리)과 같이 마지막 줄 값이 최종값이 되도록 코드당 1건만 보낸다.
     const toUpdate=rows.filter(r=>r.exists);
-    for(const r of toUpdate){
+    const _lastByCode=new Map(); toUpdate.forEach(r=>_lastByCode.set(r.code, r));
+    const stockJobs=[..._lastByCode.values()];
+    let stockDone=0;
+    await _erpPool(stockJobs, 10, async r=>{
       const {error}=await sb.from('products').update({stock:r.stock, box_qty:r.boxQty, name:r.name}).eq('code', r.code);
-      if(error) console.error('ERP 갱신 오류', r.code, error.message);
-    }
+      if(error){ _erpFails.push('재고갱신 '+r.code+': '+error.message); console.error('ERP 갱신 오류', r.code, error.message); }
+      stockDone++;
+      if(btn && (stockDone%20===0 || stockDone===stockJobs.length)) btn.textContent=`적용 중... 재고 ${stockDone}/${stockJobs.length}`;
+    });
     await _bumpProducts();
     await loadProducts(true); // 신규 상품 id 포함해서 최신 목록 확보
 
@@ -21359,15 +21380,17 @@ async function erpApplyImport(){
       }
     }
 
+    if(btn) btn.textContent='적용 중... 판매데이터 저장';
     for(let b=0;b<dailyRows.length;b+=100){
       const {error}=await sb.from('daily_sales').upsert(dailyRows.slice(b,b+100), {onConflict:'code,sale_date,is_rg', ignoreDuplicates:false});
-      if(error) console.error('ERP daily_sales 오류', error.message);
+      if(error){ _erpFails.push('판매데이터 저장('+(b+1)+'~'+Math.min(b+100,dailyRows.length)+'번째): '+error.message); console.error('ERP daily_sales 오류', error.message); }
     }
     if(dailyRows.length) await _bumpDaily();
     // 재고소진 자동전환 예약 체크 — 방금 갱신된 daily_sales 기준으로 구단가 재고 소진 여부 확인(백그라운드)
     if(dailyRows.length){ (_bdLoaded?Promise.resolve():loadBackdata()).then(()=>bdCheckPriceReservations()).catch(()=>{}); }
 
     const monthlyUpd={};
+    const monthlyChanged={};   // 상품id → 증가분(delta)이 0이 아닌 값이 하나라도 있었는지
     dailyRows.forEach(dr=>{
       const p=products.find(x=>x.code===dr.code); if(!p) return;
       const yr=parseInt(dr.sale_date.slice(0,4)), mIdx=parseInt(dr.sale_date.slice(5,7))-1;
@@ -21376,15 +21399,23 @@ async function erpApplyImport(){
       if(!monthlyUpd[p.id][yr]) monthlyUpd[p.id][yr]=[...(p[col]||Array(12).fill(0))];
       const oldQty=oldQtyMap[dr.code+'|'+dr.sale_date]||0;
       const delta=dr.qty-oldQty;   // 재업로드분은 증가분만 반영 → 이중 누적 방지
+      if(delta!==0) monthlyChanged[p.id]=true;
       monthlyUpd[p.id][yr][mIdx]=Math.max(0, (monthlyUpd[p.id][yr][mIdx]||0)+delta);
       if(!YEARS.includes(yr)){ YEARS.push(yr); YEARS.sort((a,b)=>a-b); buildYearSelects(); }
     });
-    for(const [id, yrs] of Object.entries(monthlyUpd)){
+    // 증가분이 전혀 없는 상품(이미 반영된 지난 요일만 다시 올라온 경우)은 값이 그대로라 저장을 생략하고,
+    // 나머지는 상품마다 서로 다른 행이므로 동시에 여러 건씩 저장한다(순차 저장 시 수백 건에 수 분 소요).
+    const monthlyJobs=Object.entries(monthlyUpd).filter(([id])=>monthlyChanged[id]);
+    let monthlyDone=0;
+    await _erpPool(monthlyJobs, 10, async ([id, yrs])=>{
       const updateData={};
       for(const [yr, monthly] of Object.entries(yrs)) updateData['monthly_'+yr]=monthly;
-      await sb.from('products').update(updateData).eq('id', parseInt(id));
-    }
-    if(Object.keys(monthlyUpd).length) await _bumpProducts();
+      const {error}=await sb.from('products').update(updateData).eq('id', parseInt(id));
+      if(error){ _erpFails.push('월 누적 저장 id '+id+': '+error.message); console.error('ERP 월 누적 오류', id, error.message); }
+      monthlyDone++;
+      if(btn && (monthlyDone%20===0 || monthlyDone===monthlyJobs.length)) btn.textContent=`적용 중... 월 누적 ${monthlyDone}/${monthlyJobs.length}`;
+    });
+    if(monthlyJobs.length) await _bumpProducts();
 
     await addHistory({menu:'발주 인사이트', type:'upload', code:'MULTI', name:`${rows.length}개`, desc:'ERP 엑셀 자동연동 업로드',
       before:'-', after:`신규 ${newRows.length}·갱신 ${toUpdate.length}·출고데이터 ${dailyRows.length}건`, user:'업로드'});
@@ -21395,6 +21426,7 @@ async function erpApplyImport(){
     closeModal('erpUploadModal');
     stockoutTrackAfterUpload();   // 업로드 직후 품절 이력 기록(백그라운드)
     toast(`ERP 업로드 완료 — 신규 ${newRows.length}개, 갱신 ${toUpdate.length}개, 출고데이터 ${dailyRows.length}건 반영됐습니다.`);
+    if(_erpFails.length) alert(`⚠ 일부 저장에 실패했습니다 (${_erpFails.length}건). 아래 내용을 관리자에게 알려주세요(임의로 재업로드하지 마세요).\n\n`+_erpFails.slice(0,8).join('\n')+(_erpFails.length>8?`\n...외 ${_erpFails.length-8}건`:''));
     renderInsight();
     if(currentPage==='inv'){ renderInv(); updateFloat(); }
     if(currentPage==='sales'){ renderSalesPeriod(); renderSalesTbody(); }
