@@ -16634,12 +16634,16 @@ function _wbmBuild(){
 //  · 합본에서 '같은 수하인+운송장'은 한 줄로 합쳐지므로(여러 품목 주문의 2번째 이후 품목 줄이 사라짐), 판정은 합치기 전의 모든 품목 줄(all)로 하고
 //    결과는 합본의 해당 운송장 줄에 연결한다.
 //  · 이전 차수 행이 그대로 다시 들어온 경우(같은 운송장)는 의심이 아니다. 같은 차수 안의 여러 품목 줄끼리는 비교하지 않는다.
+//  · 수취인 이름 뒤에 숫자가 붙은 줄(박스 분할 표시)은 비교에서 뺀다(_wbmSplitName).
 const _wbmProdKey = s => String(s==null?'':s).replace(/\s*\*\s*\d+\s*$/,'').replace(/\s+/g,'').toLowerCase();
+// 한 주문을 여러 박스로 나눌 때 수취인 이름 뒤에 숫자를 붙여 구분한다(김길동, 김길동2, 김길동3 …) → 이런 줄은 이중 출고 판정에서 제외한다.
+// 이름이 '글자+숫자'로 끝나는 경우(김길동2 · 김길동 2 · 김길동-2 · 김길동(2)). 앞에 붙은 숫자(2김길동)나 글자 중간의 숫자(3M코리아)는 해당 없음.
+const _wbmSplitName = n => /\D\s*[-_.#(]?\s*\d+\)?\s*$/.test(String(n==null?'':n));
 function _wbmFindDouble(all,rows,col){
   const res={byRow:new Map(),list:[],count:0,hasProd:col.prod>=0};   // byRow: 합본 줄 index → 의심 품목 줄들 / list: 의심 품목 줄 전체 / count: 의심 운송장(박스) 수
   if(col.prod<0) return res;
   const seen=new Map();   // 수하인|상품 → [{round,wb}]  (이전 차수까지의 출력 기록)
-  const keyOf=r=>{ const n=_wbmNameKey(_wbmCellStr(r.cells[col.name])), a=_wbmNameKey(_wbmCellStr(r.cells[col.addr])), p=_wbmProdKey(_wbmCellStr(r.cells[col.prod])), w=_wbmCellStr(r.cells[col.wb]); return (n&&p&&w)?{k:n+'\u0001'+a+'\u0001'+p,w,mk:w+'\u0001'+_wbmCellStr(r.cells[col.name])+'\u0001'+_wbmCellStr(r.cells[col.addr])}:null; };   // mk: 합본 줄 식별(운송장+이름+주소)
+  const keyOf=r=>{ if(_wbmSplitName(_wbmCellStr(r.cells[col.name]))) return null; const n=_wbmNameKey(_wbmCellStr(r.cells[col.name])), a=_wbmNameKey(_wbmCellStr(r.cells[col.addr])), p=_wbmProdKey(_wbmCellStr(r.cells[col.prod])), w=_wbmCellStr(r.cells[col.wb]); return (n&&p&&w)?{k:n+'\u0001'+a+'\u0001'+p,w,mk:w+'\u0001'+_wbmCellStr(r.cells[col.name])+'\u0001'+_wbmCellStr(r.cells[col.addr])}:null; };   // mk: 합본 줄 식별(운송장+이름+주소)
   const lines=[]; let i=0;
   while(i<all.length){
     const R=all[i].round; let j=i; while(j<all.length&&all[j].round===R) j++;
