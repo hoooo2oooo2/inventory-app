@@ -6008,6 +6008,9 @@ html.mob-native .lcr-det-val{font-size:15px;}
   #page-waybill .wbm-pv .wbm-tbl th{position:sticky;top:0;z-index:1;}
   #page-waybill .wbm-pv .wbm-dup{background:#FFC7CE;color:#9C0006;font-weight:600;}
   #page-waybill .wbm-pv tr.wbm-first td{background:#C6EFCE;color:#006100;}
+  #page-waybill .wbm-pv tr.wbm-dbl td{background:#FFE1E1;color:#9C0006;font-weight:600;}
+  #page-waybill .wbm-dbl-banner{margin:0 0 16px;padding:14px 16px;border-radius:12px;background:#FFE1E1;color:#9C0006;border:2px solid #FF3B30;font-size:14px;line-height:1.7;}
+  #page-waybill .wbm-dbl-banner .wbm-x{color:#9C0006;text-decoration:underline;font-weight:700;margin-left:6px;}
   #page-waybill .wbm-pv tr.wbm-first td.wbm-dup{background:#FFC7CE;color:#9C0006;}
   #page-waybill .wbm-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--tx2);margin-bottom:10px;}
   #page-waybill .wbm-chip{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:5px;}
@@ -6037,6 +6040,8 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="wbm-rule"><div class="wbm-rule-n">2</div><div><div class="wbm-rule-t">중복 항목 제거</div><div class="wbm-rule-d">수하인명·운송장번호·수하인기본주소가 모두 같은 행만 제거</div></div></div>
       <div class="wbm-rule"><div class="wbm-rule-n">3</div><div><div class="wbm-rule-t">동명이인 표시</div><div class="wbm-rule-d">수하인명 중복값은 빨간 글씨 + 연한 빨강 채우기 (조건부서식)</div></div></div>
     </div>
+
+    <div id="wbmDblBanner"></div>
 
     <div class="wbm-card">
       <div class="wbm-card-h"><div class="wbm-card-t">① 차수별 원본 엑셀 업로드</div></div>
@@ -6072,12 +6077,13 @@ html.mob-native .lcr-det-val{font-size:15px;}
         <div class="wbm-card-t">③ 취합 결과 미리보기</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <span class="wbm-sub" id="wbmSearchCount" style="margin:0;"></span>
-          <input id="wbmSearch" class="wbm-input" type="search" style="width:260px;" placeholder="🔍 고객명 · 운송장번호 · 주소 검색" autocomplete="off" oninput="wbmPreviewSearch()">
+          <input id="wbmSearch" class="wbm-input" type="search" style="width:260px;" placeholder="🔍 고객명 · 운송장번호 · 주소 · 상품명 검색" autocomplete="off" oninput="wbmPreviewSearch()">
         </div>
       </div>
       <div class="wbm-legend">
         <span><i class="wbm-chip" style="background:#C6EFCE;"></i>새 차수 첫 행 (연한 초록)</span>
         <span><i class="wbm-chip" style="background:#FFC7CE;"></i>수하인명 중복 (동명이인)</span>
+        <span><i class="wbm-chip" style="background:#FF3B30;"></i>이중 출고 의심 (이전 차수에 같은 수하인·같은 상품 · 합본 엑셀에서는 주황색)</span>
       </div>
       <div id="wbmPreview"></div>
     </div>
@@ -16566,6 +16572,7 @@ async function wbmReadFile(file){
     _wbmSig=null;   // 다음 열람 때 서버 버전 다시 확인
     _wbmPickNextRound(); wbmRender();
     toast(skipped?`${round}차 등록 완료 — 이전 차수와 중복 ${skipped}행 제외, 새 데이터 ${fresh.length}행 저장`:`${round}차 등록 완료 (${fresh.length}행) · 서버에 저장됨`);
+    try{ const mm=_wbmBuild(); if(mm&&mm.dbl.list.some(x=>x.round===round)) wbmOpenDoubleModal(round); }catch(e){ console.warn('이중 출고 점검 실패',e); }   // 이번 차수에 의심 건이 있으면 바로 경고창
   };
   fr.onerror=()=>alert('파일을 읽지 못했어요.');
   fr.readAsArrayBuffer(file);
@@ -16589,7 +16596,8 @@ function _wbmBuild(){
   const prep=rounds.map(r=>{ const c=_wbmCols(r.header); const order=_wbmOrder(r.header,c); return {r,order,header:order.map(i=>r.header[i])}; });
   const header=prep[0].header;
   const col=_wbmCols(header);
-  const seen=new Set(), rows=[], stats=[]; let mismatch=false;
+  col.prod=header.findIndex(h=>_wbmNorm(h)==='상품명');   // 이중 출고 점검용(없으면 점검 생략)
+  const seen=new Set(), rows=[], stats=[], all=[]; let mismatch=false;   // all: 합쳐지기 전 모든 품목 줄(이중 출고 판정용)
   prep.forEach((p,pi)=>{
     const same=p.header.length===header.length && p.header.every((h,i)=>h===header[i]);
     let map=null;
@@ -16604,6 +16612,7 @@ function _wbmBuild(){
       const ordered=p.order.map(i=>orig[i]==null?null:orig[i]);
       const cells=same?ordered:map.map(i=>i<0?null:ordered[i]);
       const w=_wbmCellStr(cells[col.wb]);
+      all.push({round:p.r.round,cells});
       if(w){   // 운송장번호가 빈 행은 비교 대상에서 제외(지우지 않음)
         const key=_wbmCellStr(cells[col.name])+'\u0001'+w+'\u0001'+_wbmCellStr(cells[col.addr]);
         if(seen.has(key)){ removed++; return; }
@@ -16614,8 +16623,77 @@ function _wbmBuild(){
     });
     stats.push({round:p.r.round,fileName:p.r.fileName,uploadedAt:p.r.uploadedAt,total:p.r.sourceRows||p.r.rows.length,skipped:p.r.skipped||0,kept,removed});
   });
-  return {header,rows,stats,col,mismatch};
+  rows.forEach((r,i)=>{ r.idx=i; });
+  return {header,rows,stats,col,mismatch,all,dbl:_wbmFindDouble(all,rows,col)};
 }
+
+// ── 이중 출고 의심 ──────────────────────────────────────────────
+// 같은 수하인(이름+기본주소)에게 '같은 상품명'이 이전 차수에 다른 운송장번호로 이미 출력돼 있으면 의심으로 본다.
+//  · 주문번호는 쓰지 않는다 — 택배 프로그램이 파일을 접수할 때 붙이는 순번이라 같은 주문을 다시 접수하면 달라진다.
+//  · 상품명 끝의 '*수량'은 빼고 비교(수량이 달라도 같은 상품이면 의심).
+//  · 합본에서 '같은 수하인+운송장'은 한 줄로 합쳐지므로(여러 품목 주문의 2번째 이후 품목 줄이 사라짐), 판정은 합치기 전의 모든 품목 줄(all)로 하고
+//    결과는 합본의 해당 운송장 줄에 연결한다.
+//  · 이전 차수 행이 그대로 다시 들어온 경우(같은 운송장)는 의심이 아니다. 같은 차수 안의 여러 품목 줄끼리는 비교하지 않는다.
+const _wbmProdKey = s => String(s==null?'':s).replace(/\s*\*\s*\d+\s*$/,'').replace(/\s+/g,'').toLowerCase();
+function _wbmFindDouble(all,rows,col){
+  const res={byRow:new Map(),list:[],count:0,hasProd:col.prod>=0};   // byRow: 합본 줄 index → 의심 품목 줄들 / list: 의심 품목 줄 전체 / count: 의심 운송장(박스) 수
+  if(col.prod<0) return res;
+  const seen=new Map();   // 수하인|상품 → [{round,wb}]  (이전 차수까지의 출력 기록)
+  const keyOf=r=>{ const n=_wbmNameKey(_wbmCellStr(r.cells[col.name])), a=_wbmNameKey(_wbmCellStr(r.cells[col.addr])), p=_wbmProdKey(_wbmCellStr(r.cells[col.prod])), w=_wbmCellStr(r.cells[col.wb]); return (n&&p&&w)?{k:n+'\u0001'+a+'\u0001'+p,w,mk:w+'\u0001'+_wbmCellStr(r.cells[col.name])+'\u0001'+_wbmCellStr(r.cells[col.addr])}:null; };   // mk: 합본 줄 식별(운송장+이름+주소)
+  const lines=[]; let i=0;
+  while(i<all.length){
+    const R=all[i].round; let j=i; while(j<all.length&&all[j].round===R) j++;
+    for(let x=i;x<j;x++){   // 이번 차수의 모든 품목 줄을 '이전 차수' 기록과 비교
+      const k=keyOf(all[x]); if(!k) continue;
+      const prev=(seen.get(k.k)||[]).filter(p=>p.round<R&&p.wb!==k.w);
+      if(prev.length){ const c=all[x].cells; lines.push({round:R,wb:k.w,mk:k.mk,prev,name:_wbmCellStr(c[col.name]),addr:_wbmCellStr(c[col.addr]),prod:_wbmCellStr(c[col.prod])}); }
+    }
+    for(let x=i;x<j;x++){   // 이번 차수 줄을 기록에 추가(다음 차수가 비교할 수 있게)
+      const k=keyOf(all[x]); if(!k) continue;
+      let a=seen.get(k.k); if(!a){ a=[]; seen.set(k.k,a); }
+      if(!a.some(p=>p.round===R&&p.wb===k.w)) a.push({round:R,wb:k.w});
+    }
+    i=j;
+  }
+  // 합본 줄 찾기: 같은 차수의 (운송장+이름+주소) → 없으면 차수 무관하게 같은 키(이전 차수에서 이미 합쳐진 경우)
+  const idxByRound=new Map(), idxAny=new Map();
+  rows.forEach(r=>{ const w=_wbmCellStr(r.cells[col.wb]); if(!w) return; const mk=w+'\u0001'+_wbmCellStr(r.cells[col.name])+'\u0001'+_wbmCellStr(r.cells[col.addr]); const kr=r.round+'\u0002'+mk; if(!idxByRound.has(kr)) idxByRound.set(kr,r.idx); if(!idxAny.has(mk)) idxAny.set(mk,r.idx); });
+  lines.forEach(L=>{
+    const idx=idxByRound.has(L.round+'\u0002'+L.mk)?idxByRound.get(L.round+'\u0002'+L.mk):idxAny.get(L.mk);
+    if(idx==null) return;
+    L.row=idx; res.list.push(L);
+    let a=res.byRow.get(idx); if(!a){ a=[]; res.byRow.set(idx,a); } a.push(L);
+  });
+  res.count=res.byRow.size;
+  return res;
+}
+let _wbmDblOnly = false;    // ③ 미리보기에서 의심 건만 보기
+function wbmToggleDblOnly(){
+  _wbmDblOnly=!_wbmDblOnly; wbmRender();
+  if(_wbmDblOnly){ const p=document.getElementById('wbmPreview'); if(p&&p.scrollIntoView) p.scrollIntoView({behavior:'smooth',block:'center'}); }
+}
+const _wbmDblPrevText = d => d.prev.map(p=>`${p.round}차 ${p.wb}`).join(', ');
+function _wbmDblModalHtml(list,round){
+  const rows=list.map(d=>`<tr><td>${_wbmEsc(d.name)}</td><td>${_wbmEsc(d.addr)}</td><td>${_wbmEsc(d.prod)}</td><td>${_wbmEsc(_wbmDblPrevText(d))}</td><td><b>${d.round}차 ${_wbmEsc(d.wb)}</b></td></tr>`).join('');
+  return `<div style="background:var(--bg);color:var(--tx);border:3px solid #FF3B30;border-radius:14px;max-width:960px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.45);">
+    <div style="background:#D70015;color:#fff;padding:14px 18px;font-size:17px;font-weight:800;">🚨 이중 출고 의심 ${new Set(list.map(d=>d.round+'|'+d.wb)).size}건 — 발송 전에 확인하세요</div>
+    <div style="padding:12px 18px 6px;font-size:13.5px;line-height:1.6;">${round?`이번 <b>${round}차</b>에 출력된 주문 중, `:'출력된 주문 중, '}<b>이전 차수에 같은 수하인에게 같은 상품이 이미 출력된 건</b>이에요. 박스를 확인해서 중복이면 빼 주세요.</div>
+    <div style="overflow:auto;padding:0 18px 12px;"><table class="wbm-tbl" style="min-width:720px;"><thead><tr><th>수하인</th><th>주소</th><th>상품명</th><th>이전 출력(차수·운송장)</th><th>이번 출력</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--bd);">
+      <button class="wbm-btn sec" onclick="wbmCloseDoubleModal();if(!_wbmDblOnly)wbmToggleDblOnly();">의심 건만 표에서 보기</button>
+      <button class="wbm-btn" style="background:#D70015;" onclick="wbmCloseDoubleModal()">확인했어요</button>
+    </div></div>`;
+}
+function wbmOpenDoubleModal(round){
+  const m=_wbmBuild(); if(!m||!m.dbl.count) return;
+  const list=round?m.dbl.list.filter(x=>x.round===round):m.dbl.list; if(!list.length) return;
+  wbmCloseDoubleModal();
+  const el=document.createElement('div'); el.id='wbmDblModal';
+  el.style.cssText='position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+  el.innerHTML=_wbmDblModalHtml(list,round);
+  const host=document.getElementById('page-waybill'); (host&&host.appendChild?host:document.body).appendChild(el);   // 이 페이지 안에 붙여야 버튼·표 스타일(#page-waybill …)이 적용된다
+}
+function wbmCloseDoubleModal(){ const e=document.getElementById('wbmDblModal'); if(e) e.remove(); }
 
 function wbmRender(){
   const m=_wbmBuild();
@@ -16624,7 +16702,7 @@ function wbmRender(){
   const stEl=document.getElementById('wbmStats'), rdEl=document.getElementById('wbmRounds'), pvEl=document.getElementById('wbmPreview'), wEl=document.getElementById('wbmWarn');
   if(!stEl) return;
   if(!m){
-    stEl.innerHTML=''; wEl.innerHTML='';
+    stEl.innerHTML=''; wEl.innerHTML=''; const bn0=document.getElementById('wbmDblBanner'); if(bn0) bn0.innerHTML='';
     rdEl.innerHTML=_wbmLoaded?'<div class="wbm-empty">아직 등록된 차수가 없어요. 위에서 1차 원본 엑셀을 올려주세요.</div>':'<div class="wbm-empty">서버에서 불러오는 중…</div>';
     pvEl.innerHTML='<div class="wbm-empty">차수를 등록하면 취합 결과가 여기에 표시돼요.</div>';
     return;
@@ -16633,40 +16711,52 @@ function wbmRender(){
   const nameCnt={}; m.rows.forEach(r=>{ const n=_wbmCellStr(r.cells[m.col.name]); if(n) nameCnt[n]=(nameCnt[n]||0)+1; });
   const dupNames=Object.keys(nameCnt).filter(k=>nameCnt[k]>1).length;
   const stat=(l,v)=>`<div class="wbm-stat"><div class="wbm-stat-l">${l}</div><div class="wbm-stat-v">${v}</div></div>`;
-  stEl.innerHTML=stat('등록 차수',m.stats.length+'개')+stat('원본 합계',tot.total.toLocaleString()+'행')+stat('중복 제거',tot.removed.toLocaleString()+'행')+stat('최종 행 수',tot.kept.toLocaleString()+'행')+stat('동명이인(중복 이름)',dupNames.toLocaleString()+'명');
+  stEl.innerHTML=stat('등록 차수',m.stats.length+'개')+stat('원본 합계',tot.total.toLocaleString()+'행')+stat('중복 제거',tot.removed.toLocaleString()+'행')+stat('최종 행 수',tot.kept.toLocaleString()+'행')+stat('동명이인(중복 이름)',dupNames.toLocaleString()+'명')+(m.dbl.hasProd?`<div class="wbm-stat" style="${m.dbl.count?'background:#FFE1E1;':''}"><div class="wbm-stat-l" style="${m.dbl.count?'color:#9C0006;':''}">🚨 이중 출고 의심</div><div class="wbm-stat-v" style="${m.dbl.count?'color:#D70015;':''}">${m.dbl.count}건</div></div>`:'');
   const fmt=t=>{ const d=new Date(t); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
   rdEl.innerHTML=`<table class="wbm-tbl"><thead><tr><th>차수</th><th>파일명</th><th class="num">원본 행</th><th class="num" title="업로드할 때 이전 차수에 이미 있어서 제외된 행">이전 차수와 중복</th><th class="num" title="같은 송장(합포장) 중복행 — 다운로드 파일에서 제거">같은 송장 중복</th><th class="num">반영 행</th><th>업로드</th><th></th></tr></thead><tbody>`+
     m.stats.map(s=>`<tr><td><span class="wbm-rd">${s.round}차</span></td><td>${_wbmEsc(s.fileName)}</td><td class="num">${s.total.toLocaleString()}</td><td class="num">${s.skipped.toLocaleString()}</td><td class="num">${s.removed.toLocaleString()}</td><td class="num"><b>${s.kept.toLocaleString()}</b></td><td>${fmt(s.uploadedAt)}</td><td style="text-align:right;"><button class="wbm-x" onclick="wbmDelRound(${s.round})">✕ 빼기</button></td></tr>`).join('')+
     `</tbody></table>`;
   const stale=_wbmStale();
   wEl.innerHTML=(stale.length?`<div class="wbm-warn">📅 <b>${_wbmEsc(stale[0].date)}</b>에 올린 데이터(${stale.map(r=>r.round+'차').join(', ')})인데 자동 정리가 되지 않았어요. 다운로드는 가능하고, 새로 올리려면 먼저 비워 주세요. <button class="wbm-x" style="color:inherit;text-decoration:underline;" onclick="wbmClearAll()">지금 비우고 새로 시작</button></div>`:'')+
-    (m.mismatch?'<div class="wbm-warn">⚠️ 일부 차수의 열 구성이 1차와 달라서 헤더 이름 기준으로 맞춰 합쳤어요. 없는 열은 빈칸으로 들어갑니다.</div>':'');
-  // 검색: 고객명·운송장번호·주소에 검색어가 들어 있는 행만 보여준다(공백·대소문자 무시). 300행 표시 제한과 무관하게 전체 행에서 찾는다
-  const nk=s=>String(s==null?'':s).replace(/\s+/g,'').toLowerCase(), q=nk(_wbmQ);
-  const hit=q?m.rows.filter(r=>[r.cells[m.col.name],r.cells[m.col.wb],r.cells[m.col.addr]].some(c=>nk(_wbmCellStr(c)).includes(q))):m.rows;
-  const cntEl=document.getElementById('wbmSearchCount'); if(cntEl) cntEl.textContent=q?`검색 결과 ${hit.length.toLocaleString()}행 / 전체 ${m.rows.length.toLocaleString()}행`:'';
-  const LIM=300, cols=[['차수',null],['수하인명',m.col.name],['운송장번호',m.col.wb],['수하인기본주소',m.col.addr]];
-  pvEl.innerHTML=!hit.length?`<div class="wbm-empty">“${_wbmEsc(_wbmQ.trim())}”에 해당하는 행이 없어요.</div>`:
+    (m.mismatch?'<div class="wbm-warn">⚠️ 일부 차수의 열 구성이 1차와 달라서 헤더 이름 기준으로 맞춰 합쳤어요. 없는 열은 빈칸으로 들어갑니다.</div>':'')+
+    (m.dbl.hasProd?'':'<div class="wbm-warn">⚠️ 송장 파일에서 [상품명] 열을 찾지 못해 이중 출고 점검을 하지 못했어요.</div>');
+  // 이중 출고 의심 배너(페이지 위쪽) — 차수별 건수 + 목록 크게 보기 / 의심 건만 보기
+  const dbl=m.dbl, bn=document.getElementById('wbmDblBanner');
+  if(bn){
+    const byR={}; dbl.byRow.forEach((_,idx)=>{ const rr=m.rows[idx].round; byR[rr]=(byR[rr]||0)+1; });   // 운송장(박스) 단위로 차수별 집계
+    bn.innerHTML=dbl.count?`<div class="wbm-dbl-banner">🚨 <b>이중 출고 의심 ${dbl.count}건</b> (${Object.keys(byR).map(r=>r+'차 '+byR[r]+'건').join(' · ')}) — 이전 차수에 같은 수하인에게 같은 상품이 이미 출력돼 있어요. 박스를 확인해서 중복이면 빼 주세요.
+      <button class="wbm-x" onclick="wbmOpenDoubleModal()">목록 크게 보기</button><button class="wbm-x" onclick="wbmToggleDblOnly()">${_wbmDblOnly?'전체 보기':'의심 건만 보기'}</button></div>`:'';
+  }
+  // 검색·필터: 고객명·운송장번호·주소·상품명에 검색어가 들어 있는 행(공백·대소문자 무시)만. 300행 표시 제한과 무관하게 전체 행에서 찾는다
+  const nk=s=>String(s==null?'':s).replace(/\s+/g,'').toLowerCase(), q=nk(_wbmQ), dblOn=_wbmDblOnly&&dbl.count>0;
+  const hit=m.rows.filter(r=>(!dblOn||dbl.byRow.has(r.idx)) && (!q||[r.cells[m.col.name],r.cells[m.col.wb],r.cells[m.col.addr],m.col.prod>=0?r.cells[m.col.prod]:null].some(c=>nk(_wbmCellStr(c)).includes(q))));
+  const cntEl=document.getElementById('wbmSearchCount'); if(cntEl) cntEl.textContent=(q||dblOn)?`${dblOn?'🚨 의심 건만 · ':''}${q?'검색 ':''}결과 ${hit.length.toLocaleString()}행 / 전체 ${m.rows.length.toLocaleString()}행`:'';
+  const showProd=m.col.prod>=0, showWarn=dbl.count>0;
+  const LIM=300, cols=[['차수'],['수하인명'],['운송장번호'],['수하인기본주소']].concat(showProd?[['상품명']]:[]).concat(showWarn?[['경고']]:[]);
+  pvEl.innerHTML=!hit.length?`<div class="wbm-empty">${dblOn&&!q?'이중 출고 의심 건이 없어요.':`“${_wbmEsc(_wbmQ.trim())}”에 해당하는 행이 없어요.`}</div>`:
     `<div class="wbm-pv"><table class="wbm-tbl"><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`+
     hit.slice(0,LIM).map(r=>{
-      const n=_wbmCellStr(r.cells[m.col.name]);
-      return `<tr class="${r.first?'wbm-first':''}"><td>${r.round}차</td><td class="${n&&nameCnt[n]>1?'wbm-dup':''}">${_wbmEsc(n)}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.wb]))}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.addr]))}</td></tr>`;
+      const n=_wbmCellStr(r.cells[m.col.name]), d=dbl.byRow.get(r.idx);
+      return `<tr class="${d?'wbm-dbl':(r.first?'wbm-first':'')}"><td>${r.round}차</td><td class="${n&&nameCnt[n]>1?'wbm-dup':''}">${_wbmEsc(n)}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.wb]))}</td><td>${_wbmEsc(_wbmCellStr(r.cells[m.col.addr]))}</td>`+
+        (showProd?`<td>${_wbmEsc(_wbmCellStr(r.cells[m.col.prod]))}</td>`:'')+
+        (showWarn?`<td>${d?`<span class="wbm-st none">🚨 이중 출고 의심</span>`+d.map(L=>`<div style="font-weight:400;margin-top:2px;">${_wbmEsc(L.prod)} — 이전: ${_wbmEsc(_wbmDblPrevText(L))}</div>`).join(''):''}</td>`:'')+`</tr>`;
     }).join('')+`</tbody></table></div>`+
-    (hit.length>LIM?`<div class="wbm-sub" style="margin:8px 2px 0;">${q?'검색 결과가 많아 ':'미리보기는 '}앞 ${LIM}행만 보여줘요. 다운로드 파일에는 전체 ${m.rows.length.toLocaleString()}행이 들어갑니다.</div>`:'');
+    (hit.length>LIM?`<div class="wbm-sub" style="margin:8px 2px 0;">${(q||dblOn)?'결과가 많아 ':'미리보기는 '}앞 ${LIM}행만 보여줘요. 다운로드 파일에는 전체 ${m.rows.length.toLocaleString()}행이 들어갑니다.</div>`:'');
 }
 
 // 합본 엑셀(Blob) 생성 — 다운로드와 분리해 둔 이유: 저장 없이 결과 검증 가능
 async function _wbmMakeXlsx(m){
   const XS=window.XLSXStyle, U=XS.utils;
   const GREEN={fill:{patternType:'solid',fgColor:{rgb:'C6EFCE'}}};
+  const ORANGE={fill:{patternType:'solid',fgColor:{rgb:'FFC000'}}};   // 이중 출고 의심 행(초록보다 우선)
   const ws={}, nC=m.header.length;
   m.header.forEach((h,c)=>{ ws[U.encode_cell({r:0,c})]={t:'s',v:h}; });
   m.rows.forEach((row,i)=>{
-    const r=i+1;
+    const r=i+1, sty=(m.dbl&&m.dbl.byRow.has(i))?ORANGE:(row.first?GREEN:null);
     for(let c=0;c<nC;c++){
       const x=row.cells[c], addr=U.encode_cell({r,c});
-      if(x){ const o={t:x.t,v:x.v}; if(x.z) o.z=x.z; if(row.first) o.s=GREEN; ws[addr]=o; }
-      else if(row.first) ws[addr]={t:'s',v:'',s:GREEN};
+      if(x){ const o={t:x.t,v:x.v}; if(x.z) o.z=x.z; if(sty) o.s=sty; ws[addr]=o; }
+      else if(sty) ws[addr]={t:'s',v:'',s:sty};
     }
   });
   const lastRow=m.rows.length+1;
