@@ -10797,7 +10797,7 @@ function _wcId(){ return Date.now().toString(36)+Math.random().toString(36).slic
 function _wcEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _wcTKey(ym){ return 'wc_admin_t_'+ym; }
 function _wcAddMonth(ym,delta){ const [y,m]=ym.split('-').map(Number); const d=new Date(y,m-1+delta,1); return d.getFullYear()+'-'+_wcPad(d.getMonth()+1); }
-function _wcFixedFor(ds){ const dow=_wcLocal(ds).getDay(); if(dow===0||dow===6) return []; return _wc.fixed.filter(f=>f.startDate<=ds); }   // 고정 업무는 평일만, 등록일 이후 매일
+function _wcFixedFor(ds){ const dow=_wcLocal(ds).getDay(); if(dow===0||dow===6) return []; return _wc.fixed.filter(f=>f.startDate<=ds && !(f.endDate && ds>=f.endDate)); }   // 고정 업무는 평일만, 등록일 이후 매일 (endDate=삭제한 날: 그 날부터 안 보임, 이전 날짜 기록은 유지)
 function _wcTasks(ds){ return ((_wc.mon[ds.slice(0,7)]||{})[ds])||[]; }
 
 // ── 저장소 (읽기: 버전 확인 후 필요할 때만 / 쓰기: 항상 최신본 위에 적용) ──
@@ -10990,7 +10990,7 @@ function _wcCard(t,ds,fixed){
   const ti=(!isDone&&t.dueTime)?_wcTimer(t.dueTime,ds):null, over=ti&&ti.cls==='over';
   const pri=t.priority||'medium', pl={high:'높음',medium:'보통',low:'낮음'}[pri];
   const chk=fixed?`wcToggleFixed('${t.id}','${ds}')`:`wcToggle1('${t.id}','${ds}')`;
-  const ed=fixed?`wcEditFixed('${t.id}')`:`wcEdit('${t.id}','${ds}')`, del=fixed?`wcDelFixed('${t.id}')`:`wcDel('${t.id}','${ds}')`;
+  const ed=fixed?`wcEditFixed('${t.id}')`:`wcEdit('${t.id}','${ds}')`, del=fixed?`wcDelFixed('${t.id}','${ds}')`:`wcDel('${t.id}','${ds}')`;
   return `<div class="wc-card${fixed?' fx':''}${isDone?' done':''}${over?' over':''}"><div class="wc-chk${isDone?' on':''}" onclick="${chk}"></div><div class="wc-cb">
     <div class="wc-r1">${fixed?'<span>📌</span>':''}<div class="wc-tt">${_wcEsc(t.title)}</div>${isDone?'<span class="wc-bdg wc-b-done">완료</span>':`<span class="wc-bdg wc-b-${pri}">${pl}</span>`}${t.dueTime&&!isDone?`<span class="wc-tm">⏱ ${t.dueTime}</span>`:''}</div>
     <div class="wc-r2"><div class="wc-timer ${ti?ti.cls:''}">${ti?(over?'❗ ':ti.cls==='danger'?'🔴 ':ti.cls==='warn'?'⚠️ ':'⏳ ')+ti.text:''}</div><div class="wc-act"><button onclick="${ed}" title="수정">✎</button><button onclick="${del}" title="삭제">🗑</button></div></div>
@@ -11095,11 +11095,13 @@ async function wcToggleFixed(id,ds){
   const ok=await wcMutFixed(arr=>{ const f=arr.find(x=>x.id===id); if(!f) return; if(!f.doneDates) f.doneDates={}; if(f.doneDates[ds]) delete f.doneDates[ds]; else f.doneDates[ds]=true; nowDone=!!f.doneDates[ds]; });
   if(ok){ wcRender(); wcCheckAlerts(); if(nowDone) toast('✅ 완료!'); }
 }
-async function wcDelFixed(id){
+// 고정 업무 삭제 = 레코드를 지우지 않고 endDate(삭제한 날)만 기록 → 그 날부터 사라지고, 이전 날짜의 표시·완료 기록은 그대로 남음
+async function wcDelFixed(id,ds){
   const f=_wc.fixed.find(x=>x.id===id); if(!f) return;
-  if(!confirm(`"${f.title}" 고정 업무를 삭제할까요?\n등록일 이후 모든 날짜에서 사라집니다.`)) return;
-  const ok=await wcMutFixed(arr=>{ const i=arr.findIndex(x=>x.id===id); if(i>=0) arr.splice(i,1); });
-  if(ok){ wcRender(); wcCheckAlerts(); }
+  const from=ds||_wc.sel||_wcToday();
+  if(!confirm(`"${f.title}" 고정 업무를 삭제할까요?\n${_wcKor(from)}부터 사라지고, 그 이전 날짜의 기록은 그대로 남습니다.`)) return;
+  const ok=await wcMutFixed(arr=>{ const x=arr.find(y=>y.id===id); if(x) x.endDate=from; });
+  if(ok){ wcRender(); wcCheckAlerts(); toast('🗑 '+from+'부터 삭제됨 (이전 기록은 유지)'); }
 }
 // ── 메모장 / 업무보고서 ──
 function _wcNoteHtml(){
@@ -11169,7 +11171,7 @@ function _wcSearchHtml(){
   if(q){
     const res=[];
     Object.keys(_wc.mon).forEach(ym=>{ const m=_wc.mon[ym]||{}; Object.keys(m).forEach(ds=>(m[ds]||[]).forEach(t=>{ if(`${t.title} ${t.memo||''}`.toLowerCase().includes(q)) res.push({ds,type:'할일',icon:t.done?'✅':'🔲',text:t.title}); })); });
-    _wc.fixed.forEach(f=>{ if(`${f.title} ${f.memo||''}`.toLowerCase().includes(q)) res.push({ds:f.startDate,type:'고정업무',icon:'📌',text:f.title}); });
+    _wc.fixed.forEach(f=>{ if(f.endDate&&f.endDate<=f.startDate) return; if(`${f.title} ${f.memo||''}`.toLowerCase().includes(q)) res.push({ds:f.startDate,type:'고정업무',icon:'📌',text:f.title}); });
     Object.keys(_wc.notes).forEach(ds=>{ const c=_wc.notes[ds]||''; if(c.toLowerCase().includes(q)) res.push({ds,type:'메모',icon:'📝',text:_wcSnip(c,q)}); });
     Object.keys(_wc.reports).forEach(ds=>{ const r=_wc.reports[ds]||{}, hay=`${r.workDone||''} ${r.tomorrow||''} ${r.issues||''}`; if(hay.toLowerCase().includes(q)) res.push({ds,type:'보고서',icon:'📋',text:_wcSnip(hay,q)}); });
     res.sort((a,b)=>b.ds.localeCompare(a.ds));
