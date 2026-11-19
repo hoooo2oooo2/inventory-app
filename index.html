@@ -5454,7 +5454,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
 
 <!-- 저장 전 업체 확인 팝업 -->
 <div class="modal-overlay" id="pivConfirmModal" style="z-index:320;">
-  <div class="modal" style="max-width:380px;">
+  <div class="modal" style="max-width:440px;">
     <h3>🏢 이 업체가 맞는지 확인해주세요</h3>
     <div id="pivConfirmBody" style="font-size:13px;line-height:1.8;color:var(--tx);padding:10px 12px;background:var(--bg2);border-radius:9px;"></div>
     <div class="ma"><button class="btn" onclick="closeModal('pivConfirmModal')">취소</button>
@@ -40472,7 +40472,12 @@ function pivApplyCompany(silent){
   const c = _pivFindCompany(raw);
   _pivMatchedCo = c;
   if(!c){
-    hint.textContent = (_pivDigits(raw).length>=10 && !silent && /^[d-]+$/.test(raw)) ? '업체등록에 없는 번호입니다 — 직접 입력하거나 업체등록 탭에서 먼저 등록하세요.' : '';
+    const _d = _pivDigits(raw);
+    if(_d.length>=10 && !silent && /^[d-]+$/.test(raw)){
+      hint.textContent = (document.getElementById('pivFReceipt').value==='세금계산서' && _d.length===10 && _pivBizValid(_d))
+        ? '🆕 업체등록에 없는 새 업체입니다 — 그대로 입력하고 저장하면 업체등록에도 함께 저장됩니다.'
+        : '업체등록에 없는 번호입니다 — 직접 입력하거나 업체등록 탭에서 먼저 등록하세요.';
+    } else hint.textContent = '';
     return;
   }
   _pivSet('Company', c.company); _pivSet('Ceo', c.ceo); _pivSet('Addr', c.addr);
@@ -40681,6 +40686,47 @@ function pivCancelClick(){
   closeModal('pivModal');
 }
 function pivConfirmOk(){ closeModal('pivConfirmModal'); pivSave(true); }
+// 사업자번호(10자리) 체크섬 검증 — 오타로 틀린 번호가 업체등록에 자동 저장되는 것을 막는다
+function _pivBizValid(d){
+  if(!/^\d{10}$/.test(d)) return false;
+  const w = [1,3,7,1,3,7,1,3,5]; let s = 0;
+  for(let i=0;i<9;i++) s += (+d[i])*w[i];
+  s += Math.floor((+d[8])*5/10);
+  return (10 - s%10)%10 === (+d[9]);
+}
+function _pivCoNorm(v){ return String(v==null?'':v).replace(/\s+/g,' ').trim(); }
+const PIV_CO_FIELDS = [['company','상호'],['ceo','대표자'],['addr','사업장'],['bizType','업태'],['bizItem','종목'],['email','이메일']];
+// 계산서를 저장할 때 업체등록과 맞춰본다: ① 신규 업체(자동 저장 후보) ② 번호 검증 실패 ③ 기존 업체와 달라진 항목
+//  · 세금계산서만 대상(현금영수증 번호는 개인정보라 업체로 자동 저장하지 않음) · 발급완료 건(발급 당시 내용 유지)은 건드리지 않음
+function _pivCoCheck(rec){
+  const out = { newCo:null, badNo:false, regCo:null, diffs:[] };
+  if(_pivIsIssuedLocked() || rec.receiptType!=='세금계산서') return out;
+  const d = _pivDigits(rec.regNo), regCo = _pivFindCompany(rec.regNo);
+  if(regCo){
+    out.regCo = regCo;
+    PIV_CO_FIELDS.forEach(([k,l])=>{ if(_pivCoNorm(rec[k])!==_pivCoNorm(regCo[k])) out.diffs.push([k,l]); });
+    return out;
+  }
+  if(d.length===10 && rec.company){
+    if(_pivBizValid(d)) out.newCo = { kind:'사업자등록증', regNo:_pivFmtBiz(rec.regNo), company:rec.company, ceo:rec.ceo, addr:rec.addr, bizType:rec.bizType, bizItem:rec.bizItem, email:rec.email };
+    else out.badNo = true;
+  }
+  return out;
+}
+// 신규 업체 자동 저장 — 서버 최신본에서 같은 번호가 이미 있으면 아무것도 하지 않음(기존 업체는 절대 덮어쓰지 않음)
+async function _pivAutoRegCompany(co, staff){
+  let added = false; const now = new Date().toISOString();
+  try{
+    const ok = await _pivMutate(PIV_CO_KEY, list=>{
+      const d = _pivDigits(co.regNo);
+      if(list.some(x=>_pivDigits(x.regNo)===d)) return list;
+      added = true;
+      list.push({ ...co, id:_pivNewId('pco'), source:'auto', autoBy:staff||'', createdAt:now });
+      return list;
+    });
+    return !ok ? 'fail' : (added ? 'added' : 'exists');
+  }catch(e){ console.warn('업체 자동 저장 실패', e); return 'fail'; }
+}
 async function pivSave(confirmed){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
   if(_pivMode==='view'){ toast('수정하려면 먼저 [수정하기]를 눌러주세요.'); return; }
@@ -40701,12 +40747,20 @@ async function pivSave(confirmed){
   if(!rec.company){ toast('상호를 입력하세요.'); return; }
   if(rec.issued==='발급취소'){ rec.paid = ''; rec.dueDate = ''; }   // 발급취소는 입금여부·입금예정일 없이 저장
   if(rec.paid==='미입금' && !rec.dueDate){ toast('미입금 건은 입금예정일을 지정해주세요.'); return; }
-  // 업체등록에서 불러온 업체면 저장 전에 한 번 더 확인
-  if(_pivMatchedCo && confirmed!==true){
-    document.getElementById('pivConfirmBody').innerHTML = `<b>${_esc(rec.company)}</b><br>등록번호 ${_esc(rec.regNo)}<br>대표자 ${_esc(rec.ceo||'-')}`;
+  // 업체등록에서 불러온 업체 / 업체등록에 없는 신규 업체 / 기존 업체와 내용이 달라진 경우 → 저장 전에 한 번 더 확인
+  const chk = _pivCoCheck(rec);
+  if(confirmed!==true && (_pivMatchedCo || chk.newCo || chk.badNo || chk.diffs.length)){
+    let html = `<b>${_esc(rec.company)}</b><br>등록번호 ${_esc(rec.regNo)}<br>대표자 ${_esc(rec.ceo||'-')}`;
+    const box = (inner)=>`<div style="margin-top:10px;padding:9px 10px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);">${inner}</div>`;
+    if(chk.newCo) html += box(`<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-weight:700;"><input type="checkbox" id="pivAutoRegChk" checked style="margin-top:4px;"><span>🏢 업체등록에도 함께 저장<small style="display:block;font-weight:400;color:var(--tx2);">업체등록에 없는 신규 업체입니다. 다음부터는 등록번호만 입력해도 자동으로 채워집니다.</small></span></label>`);
+    else if(chk.badNo) html += box(`<span style="color:var(--amber-700);font-weight:700;">⚠ 사업자번호 형식이 맞지 않아 업체등록에는 자동 저장하지 않습니다.</span><small style="display:block;color:var(--tx2);">번호 오타인지 확인해 주세요. 고유번호증 업체는 업체등록 탭에서 직접 등록합니다.</small>`);
+    if(chk.diffs.length) html += box(`<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-weight:700;"><input type="checkbox" id="pivUpdCoChk" style="margin-top:4px;"><span>업체등록 정보도 이 내용으로 바꾸기<small style="display:block;font-weight:400;color:var(--tx2);">다른 항목: ${chk.diffs.map(x=>x[1]).join(', ')} (체크하지 않으면 이 계산서에만 적용)</small></span></label>`);
+    document.getElementById('pivConfirmBody').innerHTML = html;
     openModal('pivConfirmModal');
     return;
   }
+  const wantAuto = confirmed===true && !!chk.newCo && !!document.getElementById('pivAutoRegChk')?.checked;
+  const wantUpd = confirmed===true && !!chk.regCo && chk.diffs.length>0 && !!document.getElementById('pivUpdCoChk')?.checked;
   const btn = document.getElementById('pivSaveBtn');
   btn.disabled = true; btn.textContent = '저장 중…';
   const editId = _pivEditId;
@@ -40725,9 +40779,28 @@ async function pivSave(confirmed){
     if(_pivIsAlertAdmin()) _pivReqLastCount = _pivRows.filter(r=>r.issued==='발행요청').length;   // 관리자 본인이 올린 건은 스스로에게 알리지 않음
     else _pivReqBroadcast();
   }
+  let coMsg = '';
+  if(wantAuto){
+    const r = await _pivAutoRegCompany(chk.newCo, rec.staff);
+    coMsg += r==='added' ? ' · 업체등록에도 저장됨' : (r==='fail' ? ' · ⚠ 업체등록 저장 실패(업체등록 탭에서 등록해주세요)' : '');
+  }
+  if(wantUpd){
+    const patch = {}; chk.diffs.forEach(([k])=>{ patch[k] = rec[k]; });
+    let okU = false;
+    try{
+      okU = await _pivMutate(PIV_CO_KEY, list=>{
+        const i = list.findIndex(x=>x.id===chk.regCo.id);
+        if(i<0) throw new Error('업체등록에서 해당 업체를 찾지 못했습니다.');
+        list[i] = { ...list[i], ...patch, updatedAt:now };
+        return list;
+      });
+    }catch(e){ console.warn('업체 수정 실패', e); }
+    coMsg += okU ? ' · 업체등록 정보도 수정됨' : ' · ⚠ 업체등록 수정 실패';
+  }
+  if(wantAuto || wantUpd) pivCoRender();
   closeModal('pivModal');
   pivRender();
-  toast(editId ? '수정되었습니다.' : '등록되었습니다.');
+  toast((editId ? '수정되었습니다.' : '등록되었습니다.') + coMsg);
 }
 function pivDelete(id){
   if(!_pivCanEdit()){ toast('수정 권한이 없습니다.'); return; }
@@ -40768,7 +40841,7 @@ function pivCoRender(){
   } else {
     const ell = (v,w)=>`<td class="piv-l"><div class="piv-ell" style="max-width:${w}px" title="${_esc(v||'')}">${_esc(v||'')}</div></td>`;   // 한 줄 …처리
     tb.innerHTML = page.map(r=>`<tr class="${canEdit?'piv-click':''}" ${canEdit?`onclick="pivCoOpenModal('${r.id}')"`:''}>
-      <td><span class="piv-badge piv-type">${_esc(r.kind||'')}</span></td>
+      <td><span class="piv-badge piv-type">${_esc(r.kind||'')}</span>${r.source==='auto'?'<span class="piv-sub" title="계산서 등록 중 직원이 입력한 내용으로 자동 저장된 업체입니다 — 내용을 확인해 주세요(수정하면 표시가 사라집니다)">🆕 자동등록</span>':''}</td>
       <td>${_esc(r.regNo||'')}</td>
       <td class="piv-l piv-wrapc" style="font-weight:600;">${_esc(r.company||'')}</td>
       <td class="piv-wrapc">${_esc(r.ceo||'')}</td>
@@ -40861,7 +40934,7 @@ async function pivCoSave(){
     const d = _pivDigits(rec.regNo);
     if(list.some(x=>x.id!==editId && _pivDigits(x.regNo)===d)) throw new Error('이미 등록된 등록번호입니다.');
     const i = editId ? list.findIndex(x=>x.id===editId) : -1;
-    if(i>=0) list[i] = { ...list[i], ...rec, updatedAt:now };
+    if(i>=0) list[i] = { ...list[i], ...rec, updatedAt:now, ...(list[i].source==='auto' ? { source:'auto-reviewed' } : {}) };   // 업체등록에서 직접 저장하면 '자동등록' 확인 완료
     else list.push({ ...rec, id: editId || _pivNewId('pco'), createdAt:now });
     return list;
   });
