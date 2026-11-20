@@ -26304,8 +26304,10 @@ function renderDailyReport(){
     document.getElementById('revDlyK1s').innerHTML=diffHtml(totalMarginDisp,prevMarginDisp);
     document.getElementById('revDlyK2').textContent=totalRateDisp.toFixed(1)+'%';
     document.getElementById('revDlyK2s').innerHTML=prevSettleDisp?`<span style="color:${totalRateDisp>=prevRateDisp?'#DC2626':'#059669'};font-weight:600;">${totalRateDisp>=prevRateDisp?'▲':'▼'} ${Math.abs(totalRateDisp-prevRateDisp).toFixed(1)}%p</span>&nbsp;<span style="color:var(--tx2);">${compareLabel} ${prevRateDisp.toFixed(1)}%</span>`:`<span style="color:var(--tx2);">${compareLabel} 데이터 없음</span>`;
-    document.getElementById('revDlyK3').textContent=totalOrders.toLocaleString()+'건';
-    document.getElementById('revDlyK3s').innerHTML=diffHtml(totalOrders,prevOrders,'건');
+    // 택배건수: 일반 판매처 합포장 기준 건수 + (로켓그로스가 선택 범위에 포함되면) 로켓그로스 주문 건수
+    const ordersDisp=totalOrders+(rgActive?rgSumProdOrders(curFrom,curTo):0), prevOrdersDisp=prevOrders+(rgActive?rgSumProdOrders(prevFrom,prevTo):0);
+    document.getElementById('revDlyK3').textContent=ordersDisp.toLocaleString()+'건';
+    document.getElementById('revDlyK3s').innerHTML=diffHtml(ordersDisp,prevOrdersDisp,'건');
     // 광고비: 마이너스 없이 검은 글씨로 금액만 표시
     document.getElementById('revDlyK4').textContent=fmt(adDly);
     document.getElementById('revDlyK4s').innerHTML=adPrev?diffHtml(adDly,adPrev):'<span style="color:var(--tx2);">해당 기간·판매처</span>';
@@ -26901,6 +26903,15 @@ function rgCalcRowFinance(r){
 }
 // 날짜범위(from~to, 'YYYY-MM-DD' 포함) 내 모든 로드된 월 샤드에서 정산금액·마진 합계
 // (마진은 원가를 아는 옵션만 합산 — unmatchedRevenue로 제외된 매출 규모를 알려줌)
+// 기간 내 로켓그로스 택배건수 = 상품별 업로드 데이터의 '주문' 열 합계 — 제품별 표·엑셀 핵심지표와 같은 기준
+function rgSumProdOrders(dateFrom, dateTo){
+  let n=0; const fromYm=dateFrom.slice(0,7), toYm=dateTo.slice(0,7);
+  Object.keys(_rgProdCache).forEach(ym=>{
+    if(ym<fromYm||ym>toYm) return;
+    (_rgProdCache[ym]||[]).forEach(r=>{ if(r.date>=dateFrom && r.date<=dateTo) n+=(r.orders||0); });
+  });
+  return n;
+}
 function rgSumSettlementMargin(dateFrom, dateTo){
   let settlement=0, margin=0, unmatchedRevenue=0, revenue=0;
   const fromYm=dateFrom.slice(0,7), toYm=dateTo.slice(0,7);
@@ -29102,8 +29113,9 @@ async function downloadDailyExcel(){
     if(rgIncludedEx){
       (_rgProdCache[name]||[]).forEach(r=>{
         if(!r.date) return;
-        if(!rgByDate[r.date]) rgByDate[r.date]={sale:0,settle:0,margin:0};
+        if(!rgByDate[r.date]) rgByDate[r.date]={sale:0,settle:0,margin:0,orders:0};
         rgByDate[r.date].sale+=r.revenue||0;
+        rgByDate[r.date].orders+=r.orders||0;   // 로켓그로스 택배건수 = 셀러인사이트 업로드 파일(상품별)의 '주문' 열 합계(2026-11-20 요청)
         const fin=rgCalcRowFinance(r);
         rgByDate[r.date].settle+=fin.settlement;
         if(fin.margin!=null) rgByDate[r.date].margin+=fin.margin;
@@ -29121,7 +29133,7 @@ async function downloadDailyExcel(){
       const settle=rs.reduce((s,r)=>s+(r.settlement||0),0)+(rg?rg.settle:0);
       const margin=rs.reduce((s,r)=>s+(r.margin||0),0)+(rg?rg.margin:0);  // 마진 = 정산예정금액 - 매입금액 - 배송비 (DB 저장값)
       const ad=sumAdSpend({year:yy,month:mm,day:dd,ch:chFilter});
-      const pkgs=new Set(rs.map(pkgKey)).size;
+      const pkgs=new Set(rs.map(pkgKey)).size+(rg?rg.orders:0);   // 일반 판매처 합포장 기준 건수 + 로켓그로스 주문 건수
       const finalMargin=margin-ad;                        // 최종마진 = 마진 - 광고비
       const rate=settle>0?margin/settle:0;
       return {serial:_excelSerial(yy,mm,dd), sale, settle, margin, rate, pkgs, ad, finalMargin};
