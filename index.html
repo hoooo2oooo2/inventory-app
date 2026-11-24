@@ -20358,7 +20358,8 @@ function insightSeasonalPreorderInfo(p, c, pending, season, normalNetNeeded, sea
   return {status:'flag', kind:'winter', reason, windowMonths, startDate:closeStart, forecastTotal, stockAtStart, neededQty, boxes,
     deadline, daysToDeadline, overdue:daysToDeadline<0, monthsAway, typeUsed:p.type||'기타',
     pendingUsed:pending||0, normalNetNeededUsed:normalNetNeeded||0,
-    coverUsed:!!coverBase, rangeLow:coverBase?cover.scenarios.low.win:null, rangeHigh:coverBase?cover.scenarios.high.win:null};
+    coverUsed:!!coverBase, rangeLow:coverBase?cover.scenarios.low.win:null, rangeHigh:coverBase?cover.scenarios.high.win:null,
+    coverVerdict:(cover&&cover.status==='ok')?cover.verdict:null, coverShortQty:(cover&&cover.status==='ok')?(cover.shortQty||0):0, coverActive:!!(cover&&cover.status==='ok'&&cover.active)};
 }
 // ── 구정 마감 커버 점검 (전 제품) ───────────────────────────────────────
 // "지금 들어가 있는 발주량(현재고+진행중 발주)으로 생산이 멈추는 12월~4월을 버틸 수 있나?"에 답한다
@@ -20439,6 +20440,50 @@ function _insightFirstSaleDate(p){
   [CUR_YEAR-2, CUR_YEAR-1, CUR_YEAR].forEach(y=>getTotalM(p,y).forEach((v,i)=>{ if(v>0){ const d=new Date(y,i,1); if(!e||d<e) e=d; } }));
   return e;
 }
+// ── 신제품 겨울 예상용: 작년 겨울 같은 구분 제품들이 실제로 보인 변화율(참조 집단) ───────────────────────────
+// 판매 이력 1년 미만 신제품은 자기 작년 실적이 없어 '지금 속도 그대로 유지'만 썼는데, 겨울에 판매가 줄어드는 제품(태양광 등)을 크게 과대 예측했다.
+// 실측(2026-11-24): 작년 같은 시점(11/24)에 그 방식으로 예측했다면 제품 116개 중 83%가 예측보다 덜 팔렸고(실제÷예측 중앙값 0.53, 태양광 0.50, 줄조명 0.18),
+// 예측 합계가 실제 합계의 1.28배(줄조명은 6.3배)였다. 같은 구분 제품들의 실제 변화율(중앙값)을 지금 속도에 곱하면 오차가 63%→39%, 편향 1.28→0.92(줄조명 1.07)로 줄었다(제품별 leave-one-out).
+// → 겨울 예상 = 지금 속도 × (작년 같은 날 기준 '최근 30일 속도 유지' 예측 대비 입고 재개일까지 실제 판매의 중앙값). 구분 제품 4개 이상이면 구분 값, 아니면 태양광/그 외 그룹(8개 이상), 아니면 전체. 0.15~1.6배로 제한.
+// 한계: 판매 이력이 2025-01부터라 비교할 수 있는 겨울이 2025~26년 한 번뿐이다. 올해 겨울이 지나면 📈 예측 정확도로 다시 점검.
+let _insightWinterRef=null;
+function insightBuildWinterRef(rgQtyById){
+  try{
+    const DAY=86400000, today=new Date(); today.setHours(0,0,0,0);
+    const fac=insightFactoryDates();
+    const Y = today<=new Date(CUR_YEAR,fac.resumeM,fac.resumeD) ? CUR_YEAR-1 : CUR_YEAR;
+    const windowEnd=new Date(Y+1,fac.resumeM,fac.resumeD+1);
+    const T0=new Date(today.getFullYear()-1,today.getMonth(),today.getDate());                  // 작년 같은 날(기준 시점)
+    const W1=new Date(windowEnd.getFullYear()-1,windowEnd.getMonth(),windowEnd.getDate()-1);    // 작년 입고 재개일
+    const days=Math.round((W1-T0)/DAY);
+    if(days<30) return null;
+    const A0=new Date(T0.getTime()-29*DAY), firstOk=new Date(T0.getTime()-60*DAY);
+    const sumR=(ser,a,b)=>{ let s=0; for(let t=a.getTime(); t<=b.getTime(); t+=DAY) s+=ser[fmtDate(new Date(t))]||0; return s; };
+    const list=[];
+    products.forEach(p=>{
+      if(p.hidden) return;
+      let ser; try{ ser=insightMergedSeriesFor(p,rgQtyById,insightBdIdFor(p)); }catch(e){ return; }
+      const fs=_insightFirstSaleDate(p); if(!fs||fs>firstOk) return;     // 그때 이미 팔고 있던 제품만
+      const f30=sumR(ser,A0,T0); if(f30<30) return;                        // 30일 30개 이상(표본 확보)
+      const act=sumR(ser,new Date(T0.getTime()+DAY),W1);
+      list.push({type:p.type||'기타', solar:/태양광/.test(p.name||''), ratio:Math.min(3,act/(f30/30*days))});
+    });
+    const med=a=>{ const s=[...a].sort((x,y)=>x-y), n=s.length; return n?(n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2):null; };
+    const all=list.map(r=>r.ratio), solar=list.filter(r=>r.solar).map(r=>r.ratio), non=list.filter(r=>!r.solar).map(r=>r.ratio);
+    const byType={}; list.forEach(r=>{ (byType[r.type]=byType[r.type]||[]).push(r.ratio); });
+    const ref={ok:all.length>=8, T0, W1, days, n:all.length, overall:med(all), lessShare:all.length?all.filter(x=>x<1).length/all.length:0, solar:{n:solar.length,med:med(solar)}, non:{n:non.length,med:med(non)}, byType:{}};
+    Object.keys(byType).forEach(t=>{ ref.byType[t]={n:byType[t].length, med:med(byType[t])}; });
+    const cl=f=>Math.min(1.6,Math.max(0.15,f));
+    ref.factorFor=function(p){
+      const t=p.type||'기타', isS=/태양광/.test(p.name||''), T=ref.byType[t], G=isS?ref.solar:ref.non;
+      if(T && T.n>=4) return {f:cl(T.med), raw:T.med, n:T.n, scope:'구분', label:t, lessShare:ref.lessShare, days:ref.days, T0:ref.T0};
+      if(G.n>=8) return {f:cl(G.med), raw:G.med, n:G.n, scope:isS?'태양광 제품':'태양광이 아닌 제품', label:isS?'태양광':'기타', lessShare:ref.lessShare, days:ref.days, T0:ref.T0};
+      if(ref.n>=8) return {f:cl(ref.overall), raw:ref.overall, n:ref.n, scope:'전체 제품', label:'전체', lessShare:ref.lessShare, days:ref.days, T0:ref.T0};
+      return null;
+    };
+    return ref.ok?ref:null;
+  }catch(e){ console.warn('작년 겨울 변화율 계산 실패(지금 속도 유지로 대체)', e); return null; }
+}
 function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, grade){
   if(p.disc) return {status:'excluded'};
   if(c.noData || !(c.expM>0)) return {status:'nodata'};
@@ -20486,6 +20531,13 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
     methods.push({id:'category', label:`같은 구분(${p.type||'기타'}) 평균 계절패턴 × 지금 속도`, map:mp, primary:true}); }
   { const mp={}; hm.forEach(h=>{ mp[key(h.y,h.m)]=level; });
     methods.push({id:'flat', label:'지금 속도 그대로 유지(최근 30일)', map:mp, primary:true}); }
+  // 신제품(자체 작년 실적 없음): 지금 속도에 '작년 겨울 같은 구분 제품들의 실제 변화율'을 곱한 값을 기준으로 쓴다(위 insightBuildWinterRef 설명 참고)
+  let refInfo=null;
+  if(!useRef && _insightWinterRef){
+    refInfo=_insightWinterRef.factorFor(p);
+    if(refInfo){ const mp={}; hm.forEach(h=>{ mp[key(h.y,h.m)]=level*refInfo.f; });
+      methods.push({id:'refclass', label:`작년 겨울 ${refInfo.scope==='구분'?'같은 구분('+refInfo.label+')':refInfo.scope} 제품 ${refInfo.n}개의 실제 변화율 ×${refInfo.f.toFixed(2)} × 지금 속도`, map:mp, primary:true}); }
+  }
   // 참고용: 최근 30일 속도 — 3개월 평균과 15% 넘게 다를 때만(최근 급증·급감 신호). 기준 평균엔 넣지 않고 보수 하한으로만 사용
   const r30=(c.avg30>0?c.avg30*30:0);
   let recentMap=null;
@@ -20533,7 +20585,7 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
   // 본인 작년 실적을 쓸 수 있으면(1년 이상 판매 이력) 본인 작년 실적 80% + 같은 구분 패턴 20%(계절 무시 방법 제외), 아니면 동일 비중
   // 과거 판매 검증(2026-03 말→4~9월 예측, 제품 94개)으로 정한 규칙: 계절을 타는 제품(피크÷평균 1.8 이상)은 본인 월별 모양×올해 흐름만(오차 26% vs 지금 속도 39%),
   // 꾸준한 제품은 본인 작년 실적과 지금 속도 반반(오차 24% vs 작년만 35%), 판매 이력 1년 미만 신제품은 지금 속도 유지만(오차 43% vs 구분 패턴 55%·과대예측 +25%). 같은 구분 평균 패턴은 쓰지 않음.
-  const wOf=m=>useRef?(flow.peakR>=1.8?(m.id==='lastyear'?1:0):(m.id==='lastyear'?0.5:(m.id==='flat'?0.5:0))):(m.id==='flat'?1:0);
+  const wOf=m=>useRef?(flow.peakR>=1.8?(m.id==='lastyear'?1:0):(m.id==='lastyear'?0.5:(m.id==='flat'?0.5:0))):(refInfo?(m.id==='refclass'?1:0):(m.id==='flat'?1:0));
   const wSum=primary.reduce((s,m)=>s+wOf(m),0);
   const baseMap={}; Object.keys(primary[0].map).forEach(k=>{ baseMap[k]=primary.reduce((s,m)=>s+m.map[k]*wOf(m),0)/wSum; });
   const baseSim=simulate(baseMap);
@@ -20567,7 +20619,7 @@ function insightWinterCoverInfo(p, c, pending, seasonIndex, pendingOldestDate, g
     runout:base.runout, preOut:base.preOut, eta, etaLate:!!eta && eta>=windowEnd, leadDays, arriveIfOrderNow, onTimePct,
     closeStart, windowEnd, daysToClose, months:base.months,
     refWinTotal, refStartLbl:`${(Y-1)%100}.12`, refEndLbl:`${Y%100}.4`, refComplete,
-    growth, growthRaw, growthOk:gOk, gCur:lvSum, gPrev, gLbl:lvLbl, level, levelNote, expM:c.expM,
+    growth, growthRaw, growthOk:gOk, gCur:lvSum, gPrev, gLbl:lvLbl, level, levelNote, expM:c.expM, refInfo,
     rgLevel:levelRg, rgShare:flow.rgShare||0, rgOwnMonths, levelReg, levelRelIdx:idxArr.map(v=>(v||1)/levelIdx),
     flow:{r7:flow.r7, r30:flow.r30, rate:flow.rate, trend:flow.trend, recentSum:flow.recentSum, prevSum:flow.prevSum}};
 }
@@ -20690,7 +20742,21 @@ function insightForwardPattern(c, season, wc, p){
     }
   }
   const fm=(c.expert&&c.expert.monthly)||(wc&&wc.level)||0;
-  return {pattern:Array(12).fill(fm), seasonal:false, g:1};
+  const flatPat=Array(12).fill(fm);
+  // 신제품이라도 구정 커버 점검이 '작년 겨울 같은 구분 제품들의 실제 변화율(refInfo)'로 겨울 예상을 낮췄다면, 같은 기준으로 오늘~입고 재개일에 걸친 달의 월 판매를 낮춘다
+  // (안 그러면 같은 분석 근거 안에서 구정 커버는 겨울 130개인데 '재주문 없이 재개까지 필요량'·'1년 예상 판매'는 지금 속도 그대로라 숫자가 서로 어긋난다).
+  // 현재 달부터 재개일이 낀 달까지: 윈도우에 통째로 들어가는 달은 지금 속도×계수, 재개일이 낀 달은 재개일까지의 일수 비율만큼만 계수 적용.
+  if(wc && wc.status==='ok' && wc.refInfo && fm>0){
+    const f=wc.refInfo.f, today=new Date(); today.setHours(0,0,0,0);
+    let d=new Date(today.getFullYear(),today.getMonth(),1);
+    for(let i=0;i<14 && d<wc.windowEnd;i++){
+      const m=d.getMonth(), dim=new Date(d.getFullYear(),m+1,0).getDate(), nextM=new Date(d.getFullYear(),m+1,1);
+      const inDays=wc.windowEnd<nextM ? Math.max(0,wc.windowEnd.getDate()-1) : dim;
+      flatPat[m]=fm*((f*inDays+(dim-inDays))/dim);
+      d=nextM;
+    }
+  }
+  return {pattern:flatPat, seasonal:false, g:1};
 }
 function insightCoverMonths(pattern, factor, total){
   if(!(total>0)) return 0;
@@ -20745,6 +20811,7 @@ function insightBuildRows(){
   const rgQtyMap=insightRgQtyRecentById();
   const rgQtyById=insightRgQtyById();
   _insightRgQtyByIdCache=rgQtyById;   // 출고 추이 모달에서도 동일 데이터 재사용
+  _insightWinterRef=insightBuildWinterRef(rgQtyById);   // 신제품 겨울 예상용 — 작년 겨울 같은 구분 제품들의 실제 변화율
   try{ _insightRateGrades=insightBuildRateGrades(rgQtyById); }catch(e){ _insightRateGrades={}; console.warn('최근 판매 속도 등급 계산 실패', e); }
   try{ insightRgBuildHistIdx(); }catch(e){ _insightRgHistIdx=null; console.warn('로켓그로스 과거 기록 색인 실패', e); }
   const seasonIndex=insightBuildSeasonIndex(); // 신상품 겨울마감 예측용 구분별 계절지수(1회 계산)
@@ -20935,6 +21002,9 @@ function insightWinterCareCellHtml(sp, pid){
   if(sp.neededQty<=0){
     // 이 '여유'는 아직 주문하지 않은 "권장 발주" 칸의 예정량까지 넣는다는 전제로 계산된 값 — 그 경우엔 조건부임을 명시
     // (2026-10-03 사용자 리포트: 권장발주 74개가 뜨는데 구정재고 대비는 '재고여유'라고 떠서 서로 모순돼 보임)
+    // 이 칸은 '기준(평균) 예상 판매'만 채우면 여유로 보고, 진행중 발주 칸의 구정커버는 '안전 목표(판매 호조까지 대비)'까지 채워야 충분으로 본다.
+    // 기준은 채우는데 안전 목표엔 모자랄 때 여기에 '재고여유'만 쓰면 두 칸이 모순돼 보인다(2026-11-24 사용자 리포트: SSMAG01 — 커버 '빠듯 113%' vs 여기 '재고여유').
+    if(sp.coverActive && (sp.coverVerdict==='tight'||sp.coverVerdict==='short') && sp.coverShortQty>0) return `<span class="ins-tag" style="background:var(--amber-50);color:var(--amber-800);" title="${closeNote}\n\n${breakdown}">❄ ${label}·기준 예상은 충족</span><div class="ins-sub" title="${breakdown}">평균 예상 판매는 채우지만 안전 목표까지 ${sp.coverShortQty.toLocaleString()}개 부족(구정커버 ${sp.coverVerdict==='short'?'부족':'빠듯'}) — 진행중 발주 칸 참고</div>`;
     if(sp.normalNetNeededUsed>0) return `<span class="ins-tag" style="background:var(--amber-50);color:var(--amber-800);" title="${closeNote}\n\n${breakdown}">❄ ${label}·권장발주 전제</span><div class="ins-sub" title="${breakdown}">현재고·진행중발주만으론 부족 — 권장 발주 ${sp.normalNetNeededUsed.toLocaleString()}개를 넣는다는 전제로 충분</div>`;
     return `<span class="ins-tag" style="background:var(--teal-50);color:var(--teal-dark);">❄ ${label}·재고여유</span><div class="ins-sub" title="${closeNote}\n\n${breakdown}">현재고·진행중발주로 충분</div>`;
   }
@@ -33787,7 +33857,10 @@ function simRender(){
     s1+=(wc&&wc.status==='ok')?`→ 그래서 앞으로 월별 예상은 ${wc.growthOk?`작년 월별 모양 × ${wc.growth.toFixed(2)}`:(lw>=1?'작년 월별 모양(배율 없이)':'작년 월별 모양과 지금 속도 유지를 반반 섞은 값')}으로 잡았어요.`:'';
   } else {
     const fm=(e&&e.monthly)||(wc&&wc.level)||0;
-    s1=`판매 이력이 12개월 미만이라 계절 패턴을 알 수 없어요. ${flowTxt()||`현재 평균 월 ${n(fm)}개 수준으로 계속 팔린다고 가정했어요.`}${fl?'→ 그래서 지금 속도(최근 30일)가 앞으로도 이어진다고 예상했어요. 같은 구분의 평균 계절 모양은 과거 검증에서 신제품엔 오차가 가장 커서(중앙값 55%, 지금 속도 유지는 43%) 쓰지 않았어요 — 겨울에 더 팔릴 수도 있다는 점은 감안해 보세요.':''}`;
+    const ri=(wc&&wc.status==='ok')?wc.refInfo:null;
+    s1=`판매 이력이 12개월 미만이라 이 제품 자체의 계절 패턴은 알 수 없어요. ${flowTxt()||`현재 평균 월 ${n(fm)}개 수준으로 계속 팔린다고 가정했어요.`}`+(fl?(ri
+      ? `→ 그래서 지금 속도를 그대로 잇지 않고, <b>작년 겨울에 ${ri.scope==='구분'?'같은 구분('+_esc(ri.label)+')':ri.scope} 제품 ${ri.n}개가 실제로 보인 변화율 ×${ri.f.toFixed(2)}</b>를 곱해 겨울 예상을 잡았어요. 작년 ${ri.T0.getMonth()+1}/${ri.T0.getDate()}에 "최근 30일 속도 유지"로 예측했다면 ${ri.days}일 뒤까지 실제 판매는 예측의 중앙값 ${Math.round(ri.raw*100)}%였고${ri.raw!==ri.f?'(너무 극단적인 값이라 ×'+ri.f.toFixed(2)+'로 제한)':''}, 비교한 전체 제품의 ${Math.round(ri.lessShare*100)}%가 예측보다 덜 팔렸어요. 지금 속도를 그대로 이으면 겨울 판매를 과대 예측하기 쉬워요. 다만 비교할 수 있는 겨울이 작년 한 번뿐이라 올해는 다를 수 있어요.`
+      : `→ 그래서 지금 속도(최근 30일)가 앞으로도 이어진다고 예상했어요. 같은 구분의 평균 계절 모양은 과거 검증에서 신제품엔 오차가 가장 커서(중앙값 55%, 지금 속도 유지는 43%) 쓰지 않았어요 — 계절에 따라 더 팔릴 수도, 덜 팔릴 수도 있다는 점은 감안해 보세요.`):'');
   }
   // ── ② 앞으로 예상 판매 ──
   let s2='';
@@ -33799,7 +33872,9 @@ function simRender(){
     if(win.start>today) s2+=`지금~성수기 시작(${_insFmtMD(win.start)})까지 <b>${Math.round(offLen)}개월</b>의 비수기 동안 총 <b>${Drng(today,win.start)}개</b>(월 평균 ${mAvg(today,win.start)}개), `;
     s2+=`성수기(${win.nm}, <b>${Math.round(pkLen)}개월</b>) 동안 총 <b>${Drng(win.start,win.end)}개</b>(월 평균 ${mAvg(win.start,win.end)}개)가 팔릴 걸로 예상해요.`;
     if(win.start>today && offLen>pkLen){ const r=mMid(win.start,win.end)/Math.max(0.01,mMid(today,win.start)); if(isFinite(r)) s2+=` (비수기는 기간이 길어 총량이 더 커 보이지만, 한 달 평균으로 보면 성수기가 비수기의 약 <b>${r.toFixed(1)}배</b>예요.)`; }
-  } else s2+=`계절 편중이 크지 않은 제품이라 성수기를 따로 나누지 않았어요. 앞으로 1년 예상 판매는 약 <b>${rng(annB,annL)}개</b>(월 평균 ${rng(annB/12,annL/12)}개)예요.`;
+  } else s2+=(wc&&wc.status==='ok'&&wc.refInfo
+    ? `이 제품 자체의 계절 패턴은 모르지만, 작년 겨울 같은 구분 제품들처럼 입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))}) 전까지는 지금보다 줄어든다고 봤어요(×${wc.refInfo.f.toFixed(2)}). 그 뒤는 지금 속도 그대로 가정해 앞으로 1년 예상 판매는 약 <b>${rng(annB,annL)}개</b>(월 평균 ${rng(annB/12,annL/12)}개)예요.`
+    : `계절 편중이 크지 않은 제품이라 성수기를 따로 나누지 않았어요. 앞으로 1년 예상 판매는 약 <b>${rng(annB,annL)}개</b>(월 평균 ${rng(annB/12,annL/12)}개)예요.`);
   if(coverActive){
     const {low,base,high}=wc.scenarios;
     s2+=` 공장 주문 마감(${_insFmtMD(wc.closeStart)}) 이후~입고 재개(${_insFmtMD(new Date(wc.windowEnd.getTime()-86400000))})엔 <b>${n(base.win)}개</b>(낙관 ${n(low.win)} ~ 보수 ${n(high.win)})가 팔릴 걸로 봐요.`;
