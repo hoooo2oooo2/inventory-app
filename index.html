@@ -6153,14 +6153,29 @@ html.mob-native .lcr-det-val{font-size:15px;}
   #page-cost3day .c3-memo{margin-top:12px;color:var(--tx2);font-size:12.5px;line-height:1.5;}
   #page-cost3day .c3-standard{color:var(--tx2);font-size:13px;line-height:1.7;}
   #page-cost3day .c3-standard-title{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:4px;}
+  #page-cost3day .c3-hint{margin:-8px 0 16px;color:var(--tx2);font-size:12.5px;line-height:1.6;}
+  #page-cost3day .c3-kind{background:var(--bg2);border:0.5px solid var(--bd);border-radius:12px;padding:14px 14px 12px;margin-bottom:12px;}
+  #page-cost3day .c3-kind-head{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+  #page-cost3day .c3-kind input{margin-bottom:0;}
+  #page-cost3day .c3-kind-head input{flex:1;height:38px;font-size:14px;}
+  #page-cost3day .c3-kind-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  #page-cost3day .c3-kind label{font-size:12px;margin-bottom:4px;color:var(--tx2);}
+  #page-cost3day .c3-sub{margin-top:8px;font-size:12.5px;color:var(--tx2);text-align:right;}
+  #page-cost3day .c3-x{flex:none;width:34px;height:34px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx2);font-size:15px;cursor:pointer;}
+  #page-cost3day .c3-x:hover{color:#e5484d;border-color:#e5484d;}
+  #page-cost3day .c3-add{width:100%;height:42px;margin-bottom:12px;border:1.5px dashed var(--bd);border-radius:10px;background:var(--bg);color:var(--pr);font-size:14px;font-weight:700;cursor:pointer;}
+  #page-cost3day .c3-add:hover{border-color:var(--pr);}
+  #page-cost3day .c3-det{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px;color:var(--tx);}
+  #page-cost3day .c3-det th{color:var(--tx2);font-weight:600;text-align:left;padding:5px 6px;border-bottom:0.5px solid var(--bd);}
+  #page-cost3day .c3-det td{padding:5px 6px;border-bottom:0.5px solid var(--bd);}
+  #page-cost3day .c3-det .num{text-align:right;white-space:nowrap;}
   </style>
   <div class="c3-wrap">
     <div class="c3-card">
       <h2>📦 3일 비용 계산</h2>
-      <label for="c3Cbm">1BOX당 CBM</label>
-      <input id="c3Cbm" type="number" step="0.0001" placeholder="예: 0.05" autocomplete="off">
-      <label for="c3BoxCount">총 박스수</label>
-      <input id="c3BoxCount" type="number" placeholder="예: 100" autocomplete="off">
+      <div class="c3-hint">여러 종류를 한 번에 신청할 때는 <b>＋ 종류 추가</b>로 종류별 CBM·박스수를 넣으세요. 운송·수출 비용은 <b>전체 CBM 합계</b>로 계산하고, 통관비용은 신청 <b>1건당 한 번만</b> 붙어요.</div>
+      <div id="c3Kinds"></div>
+      <button class="c3-add" type="button" onclick="c3AddKind(true)">＋ 종류 추가</button>
       <button class="c3-btn" onclick="c3Calc()">계산하기</button>
     </div>
     <div class="c3-card">
@@ -6171,7 +6186,7 @@ html.mob-native .lcr-det-val{font-size:15px;}
       <div class="c3-standard-title">기준 비용</div>
       3일 운송 비용: CBM당 105,000원<br>
       중국 현지 수출비용: CBM당 5,000원<br>
-      통관비용: 건당 15,000원 (1번만 부과)
+      통관비용: 건당 15,000원 (신청 1건에 1번만 부과 — 종류가 여러 개여도 한 번)
     </div>
   </div>
 </div>
@@ -17184,33 +17199,69 @@ async function wbmMatchDownloadReview(){
 function c3Won(n){ return Math.round(n).toLocaleString()+'원'; }
 function c3FormatNumber(n, maxDigits){ return n.toLocaleString(undefined,{maximumFractionDigits:maxDigits}); }
 function c3DisplayCbm(n){ return Number.isInteger(n) ? n.toLocaleString() : c3FormatNumber(n,4); }
-function c3BillingCbm(rawCbm){ return Math.ceil(rawCbm*10)/10; }
+// 청구 CBM = 0.1CBM 단위 올림. 소수 곱셈 오차(0.07×100=7.000000000000001)로 7.0이 7.1로 올림되는 것을 막으려 6자리로 정리한 뒤 올린다
+function c3BillingCbm(rawCbm){ return Math.ceil(Number((rawCbm*10).toFixed(6)))/10; }
+const C3_RATE_TRANSPORT=105000, C3_RATE_EXPORT=5000, C3_FEE_CUSTOMS=15000;   // 3일 운송: CBM당 / 수출: CBM당 / 통관: 신청 1건당(종류 수와 무관하게 1회)
+// 여러 종류를 한 번에 신청 → CBM은 전부 합산한 뒤 한 번만 올림, 통관비는 1건이라 한 번만. 입력이 없으면 null
+function c3Compute(kinds){
+  const list=(kinds||[]).map(k=>{ const cbm=Math.max(0,Number(k.cbm)||0), box=Math.max(0,Number(k.box)||0); return {name:k.name||'',cbm,box,raw:cbm*box}; }).filter(k=>k.raw>0);
+  if(!list.length) return null;
+  const rawTotal=list.reduce((a,k)=>a+k.raw,0), boxTotal=list.reduce((a,k)=>a+k.box,0), charged=c3BillingCbm(rawTotal);
+  const transport=charged*C3_RATE_TRANSPORT, exportFee=charged*C3_RATE_EXPORT, customs=C3_FEE_CUSTOMS;
+  return {list,rawTotal,boxTotal,charged,transport,exportFee,customs,total:transport+exportFee+customs};
+}
+function c3AddKind(focus){
+  const wrap=document.getElementById('c3Kinds'); if(!wrap) return;
+  const el=document.createElement('div'); el.className='c3-kind';
+  el.innerHTML=`<div class="c3-kind-head"><input class="c3-name" type="text" placeholder="종류명 (선택)" autocomplete="off"><button type="button" class="c3-x" title="이 종류 삭제" onclick="c3RemoveKind(this)">✕</button></div>
+    <div class="c3-kind-grid"><div><label>1BOX당 CBM</label><input class="c3-cbm" type="number" step="0.0001" min="0" placeholder="예: 0.05" autocomplete="off"></div>
+    <div><label>총 박스수</label><input class="c3-box" type="number" min="0" placeholder="예: 100" autocomplete="off"></div></div>
+    <div class="c3-sub"></div>`;
+  wrap.appendChild(el); c3RefreshKinds();
+  if(focus){ const f=el.querySelector('.c3-cbm'); if(f) f.focus(); }
+}
+function c3RemoveKind(btn){
+  const el=btn&&btn.closest('.c3-kind'), wrap=document.getElementById('c3Kinds');
+  if(!el||!wrap||wrap.children.length<=1) return;   // 마지막 하나는 남겨 둔다
+  el.remove(); c3RefreshKinds(); c3Calc();
+}
+function c3RefreshKinds(){   // 종류 번호 안내문과 삭제 버튼 표시 갱신
+  const rows=[...document.querySelectorAll('#c3Kinds .c3-kind')];
+  rows.forEach((el,i)=>{ el.querySelector('.c3-name').placeholder='종류 '+(i+1)+' 이름 (선택)'; el.querySelector('.c3-x').style.visibility=rows.length>1?'visible':'hidden'; });
+}
 function c3Calc(){
-  const cbmPerBox = Number(document.getElementById('c3Cbm').value) || 0;
-  const boxCount = Number(document.getElementById('c3BoxCount').value) || 0;
-  const rawTotalCbm = cbmPerBox * boxCount;
-  const chargedCbm = c3BillingCbm(rawTotalCbm);
-  const transport3day = chargedCbm * 105000;
-  const chinaExport = chargedCbm * 5000;
-  const customsFee = 15000;
-  const totalCost = transport3day + chinaExport + customsFee;
-  document.getElementById('c3Output').innerHTML = `
-    <div class="c3-row"><span>3일 운송 비용</span><span class="c3-value">${c3Won(transport3day)}</span></div>
-    <div class="c3-row"><span>중국 현지 수출비용</span><span class="c3-value">${c3Won(chinaExport)}</span></div>
-    <div class="c3-row"><span>통관비용</span><span class="c3-value">${c3Won(customsFee)}</span></div>
-    <div class="c3-total"><span>총 3일 비용</span><span>${c3Won(totalCost)}</span></div>
+  const out=document.getElementById('c3Output'); if(!out) return;
+  const rows=[...document.querySelectorAll('#c3Kinds .c3-kind')];
+  const kinds=rows.map(el=>({name:el.querySelector('.c3-name').value.trim(),cbm:el.querySelector('.c3-cbm').value,box:el.querySelector('.c3-box').value}));
+  rows.forEach((el,i)=>{ const raw=(Number(kinds[i].cbm)||0)*(Number(kinds[i].box)||0); el.querySelector('.c3-sub').textContent=raw>0?'소계 '+c3DisplayCbm(raw)+' CBM':''; });
+  const r=c3Compute(kinds);
+  if(!r){ out.innerHTML='<div class="c3-memo" style="margin-top:0;">종류별 1BOX당 CBM과 박스수를 입력하면 예상 비용이 계산돼요.</div>'; return; }
+  const multi=r.list.length>1;
+  out.innerHTML = `
+    <div class="c3-row"><span>3일 운송 비용</span><span class="c3-value">${c3Won(r.transport)}</span></div>
+    <div class="c3-row"><span>중국 현지 수출비용</span><span class="c3-value">${c3Won(r.exportFee)}</span></div>
+    <div class="c3-row"><span>통관비용 <span style="color:var(--tx2);font-weight:400;font-size:12px;">(신청 1건당 1번${multi?' · 종류 '+r.list.length+'개 합쳐서 1번':''})</span></span><span class="c3-value">${c3Won(r.customs)}</span></div>
+    <div class="c3-total"><span>총 3일 비용</span><span>${c3Won(r.total)}</span></div>
     <div class="c3-memo">
-      총 박스수 : ${boxCount.toLocaleString()}BOX<br>
-      총 CBM : ${c3DisplayCbm(chargedCbm)} (${c3DisplayCbm(rawTotalCbm)})
-    </div>`;
+      총 박스수 : ${r.boxTotal.toLocaleString()}BOX${multi?' (종류 '+r.list.length+'개)':''}<br>
+      총 CBM : ${c3DisplayCbm(r.charged)} (${c3DisplayCbm(r.rawTotal)})${multi?'<br>※ 청구 CBM은 종류별로 올리지 않고 전체 합계를 0.1CBM 단위로 한 번만 올림':''}
+    </div>`+(multi?`<table class="c3-det"><thead><tr><th>종류</th><th class="num">1BOX당 CBM</th><th class="num">박스수</th><th class="num">CBM</th></tr></thead><tbody>`+
+      r.list.map((k,i)=>`<tr><td>${_esc(k.name||'종류 '+(i+1))}</td><td class="num">${c3DisplayCbm(k.cbm)}</td><td class="num">${k.box.toLocaleString()}</td><td class="num">${c3DisplayCbm(k.raw)}</td></tr>`).join('')+`</tbody></table>`:'');
 }
 function c3Init(){
-  const cbmEl=document.getElementById('c3Cbm'), boxEl=document.getElementById('c3BoxCount');
-  if(cbmEl && !cbmEl._c3Bound){
-    cbmEl._c3Bound=true;
-    cbmEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); boxEl.focus(); } });
-    boxEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); c3Calc(); } });
+  const wrap=document.getElementById('c3Kinds');
+  if(wrap && !wrap._c3Bound){
+    wrap._c3Bound=true;
+    wrap.addEventListener('input', ()=>c3Calc());   // 입력하는 대로 바로 계산
+    wrap.addEventListener('keydown', e=>{   // Enter: CBM → 박스수 → (다음 종류 CBM | 마지막이면 계산)
+      if(e.key!=='Enter') return; e.preventDefault();
+      const t=e.target, row=t.closest('.c3-kind'); if(!row) return;
+      if(t.classList.contains('c3-name')) row.querySelector('.c3-cbm').focus();
+      else if(t.classList.contains('c3-cbm')) row.querySelector('.c3-box').focus();
+      else if(t.classList.contains('c3-box')){ const nx=row.nextElementSibling; if(nx) nx.querySelector('.c3-cbm').focus(); else c3Calc(); }
+    });
   }
+  if(wrap && !wrap.children.length) c3AddKind(false);
   c3Calc();
 }
 
